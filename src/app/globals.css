@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0f14;
+  --surface: #141c26;
+  --surface-2: #1a2535;
+  --border: #1f2f42;
+  --accent: #00d4a0;
+  --accent-dim: rgba(0, 212, 160, 0.15);
+  --make: #00d4a0;
+  --miss: #ef4444;
+  --warn: #f59e0b;
+  --text: #f1f5f9;
+  --muted: #64748b;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Custom utilities */
+@layer components {
+  .card {
+    @apply bg-surface border border-border rounded-card p-6;
+  }
+  .card-2 {
+    @apply bg-surface-2 border border-border rounded-card p-4;
+  }
+  .btn-primary {
+    @apply bg-accent text-bg font-semibold px-5 py-2.5 rounded-input text-sm transition-all hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply border border-border text-slate-300 font-medium px-5 py-2.5 rounded-input text-sm transition-all hover:bg-surface-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply bg-miss/20 border border-miss/40 text-miss font-medium px-5 py-2.5 rounded-input text-sm transition-all hover:bg-miss/30 active:scale-95 disabled:opacity-50;
+  }
+  .input {
+    @apply bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all w-full placeholder:text-muted;
+  }
+  .select {
+    @apply bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all w-full;
+  }
+  .label {
+    @apply text-xs font-medium text-muted uppercase tracking-wider mb-1.5 block;
+  }
+  .badge-make {
+    @apply inline-flex items-center gap-1 bg-accent/15 text-accent text-xs font-semibold px-2 py-0.5 rounded-pill;
+  }
+  .badge-miss {
+    @apply inline-flex items-center gap-1 bg-miss/15 text-miss text-xs font-semibold px-2 py-0.5 rounded-pill;
+  }
+  .badge-warn {
+    @apply inline-flex items-center gap-1 bg-warn/15 text-warn text-xs font-semibold px-2 py-0.5 rounded-pill;
+  }
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium text-muted transition-all hover:text-slate-200 hover:bg-surface-2;
+  }
+  .nav-link-active {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-semibold text-accent bg-accent/10;
+  }
+  .table-header {
+    @apply text-xs font-semibold text-muted uppercase tracking-wider text-right py-2 px-3;
+  }
+  .table-cell {
+    @apply text-sm text-slate-200 text-right py-2 px-3 border-t border-border/50;
+  }
+  .table-name {
+    @apply text-sm font-medium text-slate-100 text-left py-2 px-3 border-t border-border/50;
+  }
+  .make-pct {
+    @apply text-accent font-semibold;
+  }
+}
