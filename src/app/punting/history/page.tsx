@@ -70,7 +70,7 @@ export default function PuntHistoryPage() {
                     <th className="table-header">Type</th>
                     <th className="table-header">Yds</th>
                     <th className="table-header">Hang</th>
-                    <th className="table-header">Dir</th>
+                    <th className="table-header">OT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -81,7 +81,7 @@ export default function PuntHistoryPage() {
                       <td className="table-cell text-muted">{p.type}</td>
                       <td className="table-cell">{p.yards} yd</td>
                       <td className="table-cell text-muted">{p.hangTime.toFixed(2)}s</td>
-                      <td className="table-cell text-muted">{p.direction}</td>
+                      <td className="table-cell text-muted">{(p.opTime || 0).toFixed(2)}s</td>
                     </tr>
                   ))}
                 </tbody>

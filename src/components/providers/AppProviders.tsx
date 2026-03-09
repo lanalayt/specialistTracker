@@ -1,52 +1,76 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
-import { AuthContext, DEMO_COACH } from "@/lib/auth";
+import { AuthContext } from "@/lib/auth";
+import { createClient } from "@/lib/supabase";
 import type { AuthUser, UserRole } from "@/types";
+
+function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
+  const meta = supaUser.user_metadata ?? {};
+  return {
+    id: supaUser.id,
+    email: supaUser.email ?? "",
+    name: (meta.name as string) ?? supaUser.email?.split("@")[0] ?? "",
+    role: (meta.role as UserRole) ?? "coach",
+    teamId: (meta.teamId as string) ?? undefined,
+  };
+}
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const supabase = createClient();
 
+  // Listen for auth state changes
   useEffect(() => {
-    // Load from localStorage (demo mode — replace with Amplify when configured)
-    const raw = localStorage.getItem("st_auth_v1");
-    if (raw) {
-      try {
-        setUser(JSON.parse(raw));
-      } catch {}
-    } else {
-      // Auto-login as demo coach for local development
-      setUser(DEMO_COACH);
-      localStorage.setItem("st_auth_v1", JSON.stringify(DEMO_COACH));
-    }
-    setIsLoading(false);
-  }, []);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(mapSupabaseUser(session.user));
+      }
+      setIsLoading(false);
+    });
 
-  const signIn = useCallback(async (email: string, _password: string) => {
-    // TODO: replace with Amplify Auth.signIn when backend configured
-    const u: AuthUser = {
-      id: "demo-coach-1",
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          setUser(mapSupabaseUser(session.user));
+        } else {
+          setUser(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const signUp = useCallback(async (email: string, password: string, name: string, role: UserRole = "coach") => {
+    const { error } = await supabase.auth.signUp({
       email,
-      name: email.split("@")[0],
-      role: "coach",
-      teamId: "demo-team-1",
-    };
-    setUser(u);
-    localStorage.setItem("st_auth_v1", JSON.stringify(u));
-  }, []);
+      password,
+      options: {
+        data: { name, role },
+      },
+    });
+    if (error) throw new Error(error.message);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem("st_auth_v1");
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setDemoRole = useCallback(
     (role: UserRole) => {
       if (!user) return;
       const updated = { ...user, role };
       setUser(updated);
-      localStorage.setItem("st_auth_v1", JSON.stringify(updated));
     },
     [user]
   );
@@ -59,6 +83,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         isCoach: user?.role === "coach",
         isAthlete: user?.role === "athlete",
         signIn,
+        signUp,
         signOut,
         setDemoRole,
       }}

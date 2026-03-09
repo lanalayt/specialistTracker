@@ -13,7 +13,6 @@ import {
   PuntAthleteStats,
   PuntStatBucket,
   PuntEntry,
-  PUNT_DIRECTIONS,
   PUNT_HASHES,
   PUNT_TYPES,
   PUNT_LANDING_ZONES,
@@ -171,25 +170,20 @@ export function avgScore(att: number, score: number): string {
 export function emptyPuntStats(): PuntAthleteStats {
   const byType = {} as PuntAthleteStats["byType"];
   PUNT_TYPES.forEach((t) => {
-    byType[t] = { att: 0, totalYards: 0, totalHang: 0, totalDirectionalAccuracy: 0, criticalDirections: 0 };
+    byType[t] = { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0 };
   });
   const byHash = {} as PuntAthleteStats["byHash"];
   PUNT_HASHES.forEach((h) => {
-    byHash[h] = { att: 0, totalYards: 0, totalHang: 0, totalDirectionalAccuracy: 0, criticalDirections: 0 };
-  });
-  const byDirection = {} as PuntAthleteStats["byDirection"];
-  PUNT_DIRECTIONS.forEach((d) => {
-    byDirection[d] = { att: 0, totalYards: 0, totalHang: 0, totalDirectionalAccuracy: 0, criticalDirections: 0 };
+    byHash[h] = { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0 };
   });
   const byLanding = {} as PuntAthleteStats["byLanding"];
   PUNT_LANDING_ZONES.forEach((z) => {
     byLanding[z] = 0;
   });
   return {
-    overall: { att: 0, totalYards: 0, totalHang: 0, totalDirectionalAccuracy: 0, criticalDirections: 0, long: 0, totalReturnYards: 0, poochYardLineTotal: 0, poochYardLineAtt: 0 },
+    overall: { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0, long: 0, totalReturnYards: 0, poochYardLineTotal: 0, poochYardLineAtt: 0 },
     byType,
     byHash,
-    byDirection,
     byLanding,
   };
 }
@@ -198,7 +192,8 @@ export function processPunt(
   punt: PuntEntry,
   statsMap: Record<string, PuntAthleteStats>
 ): Record<string, PuntAthleteStats> {
-  const { athlete, yards, hangTime, type, hash, direction } = punt;
+  const { athlete, yards, hangTime, type, hash } = punt;
+  const opTime = punt.opTime || 0;
 
   // Migration: old entries may have single landingZone instead of landingZones array
   const landingZones: PuntLandingZone[] = Array.isArray(punt.landingZones)
@@ -238,12 +233,13 @@ export function processPunt(
     s.overall = { ...s.overall, poochYardLineTotal: 0, poochYardLineAtt: 0 };
   }
 
-  const hasPoochYL = type === "POOCH" && poochLandingYardLine != null;
+  const hasPoochYL = (type === "POOCH_BLUE" || type === "POOCH_RED") && poochLandingYardLine != null;
 
   s.overall = {
     att: s.overall.att + 1,
     totalYards: s.overall.totalYards + yards,
     totalHang: s.overall.totalHang + hangTime,
+    totalOpTime: (s.overall.totalOpTime || 0) + opTime,
     totalDirectionalAccuracy: s.overall.totalDirectionalAccuracy + directionalAccuracy,
     criticalDirections: s.overall.criticalDirections + isCritical,
     long: Math.max(s.overall.long, yards),
@@ -256,13 +252,13 @@ export function processPunt(
     att: (b?.att || 0) + 1,
     totalYards: (b?.totalYards || 0) + yards,
     totalHang: (b?.totalHang || 0) + hangTime,
+    totalOpTime: (b?.totalOpTime || 0) + opTime,
     totalDirectionalAccuracy: (b?.totalDirectionalAccuracy || 0) + directionalAccuracy,
     criticalDirections: (b?.criticalDirections || 0) + isCritical,
   });
 
   s.byType = { ...s.byType, [type]: updateBucket(s.byType[type]) };
   s.byHash = { ...s.byHash, [hash]: updateBucket(s.byHash[hash]) };
-  s.byDirection = { ...s.byDirection, [direction]: updateBucket(s.byDirection[direction]) };
 
   // Landing zones (multi-select array)
   const newByLanding = { ...s.byLanding };

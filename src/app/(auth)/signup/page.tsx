@@ -4,10 +4,13 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import type { UserRole } from "@/types";
+import clsx from "clsx";
 
 export default function SignupPage() {
-  const { signIn } = useAuth();
+  const { signUp } = useAuth();
   const router = useRouter();
+  const [role, setRole] = useState<UserRole>("coach");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -27,11 +30,14 @@ export default function SignupPage() {
       setError("Passwords do not match");
       return;
     }
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      // TODO: Replace with Amplify Auth.signUp when backend configured
-      await signIn(form.email, form.password);
+      await signUp(form.email, form.password, form.name, role);
       router.push("/onboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Sign up failed");
@@ -61,6 +67,37 @@ export default function SignupPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Role selector */}
+            <div>
+              <label className="label">I am a</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRole("coach")}
+                  className={clsx(
+                    "py-3 rounded-input text-sm font-bold border transition-all",
+                    role === "coach"
+                      ? "bg-accent/20 text-accent border-accent/50"
+                      : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                  )}
+                >
+                  Coach
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole("athlete")}
+                  className={clsx(
+                    "py-3 rounded-input text-sm font-bold border transition-all",
+                    role === "athlete"
+                      ? "bg-accent/20 text-accent border-accent/50"
+                      : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                  )}
+                >
+                  Athlete
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Your name</label>

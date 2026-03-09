@@ -9,9 +9,8 @@ export type FGResult = "YL" | "YC" | "YR" | "XL" | "XR" | "XS";
 export type DistRange = "20-29" | "30-39" | "40-49" | "50-60" | "60+";
 
 // Punting
-export type PuntType = "REGULAR" | "POOCH" | "COFFIN_CORNER" | "RUGBY";
-export type PuntHash = "LEFT" | "MIDDLE" | "RIGHT";
-export type PuntDirection = "LEFT" | "MIDDLE" | "RIGHT" | "OOB";
+export type PuntType = "RED" | "BLUE" | "POOCH_BLUE" | "POOCH_RED" | "BROWN";
+export type PuntHash = "LH" | "LM" | "M" | "RM" | "RH";
 export type PuntLandingZone =
   | "TB"
   | "inside10"
@@ -90,7 +89,7 @@ export interface PuntEntry {
   hash: PuntHash;
   yards: number;
   hangTime: number;
-  direction: PuntDirection;
+  opTime: number; // punter operation time in seconds
   landingZones: PuntLandingZone[];
   returnYards?: number;
   directionalAccuracy: 0 | 0.5 | 1;
@@ -103,6 +102,7 @@ export interface PuntStatBucket {
   att: number;
   totalYards: number;
   totalHang: number;
+  totalOpTime: number;
   totalDirectionalAccuracy: number;
   criticalDirections: number;
 }
@@ -111,7 +111,6 @@ export interface PuntAthleteStats {
   overall: PuntStatBucket & { long: number; totalReturnYards: number; poochYardLineTotal: number; poochYardLineAtt: number };
   byType: Record<PuntType, PuntStatBucket>;
   byHash: Record<PuntHash, PuntStatBucket>;
-  byDirection: Record<PuntDirection, PuntStatBucket>;
   byLanding: Record<PuntLandingZone, number>;
 }
 
@@ -268,18 +267,13 @@ export const DIST_RANGES: DistRange[] = [
   "60+",
 ];
 export const PUNT_TYPES: PuntType[] = [
-  "REGULAR",
-  "POOCH",
-  "COFFIN_CORNER",
-  "RUGBY",
+  "RED",
+  "BLUE",
+  "POOCH_BLUE",
+  "POOCH_RED",
+  "BROWN",
 ];
-export const PUNT_HASHES: PuntHash[] = ["LEFT", "MIDDLE", "RIGHT"];
-export const PUNT_DIRECTIONS: PuntDirection[] = [
-  "LEFT",
-  "MIDDLE",
-  "RIGHT",
-  "OOB",
-];
+export const PUNT_HASHES: PuntHash[] = ["LH", "LM", "M", "RM", "RH"];
 export const PUNT_LANDING_ZONES: PuntLandingZone[] = [
   "TB",
   "inside10",

@@ -50,7 +50,7 @@ export function PuntFieldStrip({ punts }: PuntFieldStripProps) {
   const avgDA = att > 0 ? (totalDA / att).toFixed(2) : "—";
 
   // Pooch avg yard line
-  const poochPunts = punts.filter((p) => p.type === "POOCH" && p.poochLandingYardLine != null);
+  const poochPunts = punts.filter((p) => (p.type === "POOCH_BLUE" || p.type === "POOCH_RED") && p.poochLandingYardLine != null);
   const poochYLTotal = poochPunts.reduce((acc, p) => acc + (p.poochLandingYardLine ?? 0), 0);
   const avgPoochYL = poochPunts.length > 0 ? (poochYLTotal / poochPunts.length).toFixed(1) : null;
 

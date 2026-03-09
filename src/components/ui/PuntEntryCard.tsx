@@ -1,28 +1,24 @@
 "use client";
 
 import React, { useState } from "react";
-import type { PuntEntry, PuntType, PuntHash, PuntDirection, PuntLandingZone } from "@/types";
-import { PUNT_TYPES, PUNT_HASHES, PUNT_DIRECTIONS, PUNT_LANDING_ZONES } from "@/types";
+import type { PuntEntry, PuntType, PuntHash, PuntLandingZone } from "@/types";
+import { PUNT_TYPES, PUNT_HASHES, PUNT_LANDING_ZONES } from "@/types";
 import clsx from "clsx";
 
 const TYPE_LABELS: Record<PuntType, string> = {
-  REGULAR: "Reg",
-  POOCH: "Pooch",
-  COFFIN_CORNER: "CC",
-  RUGBY: "Rugby",
+  RED: "Red",
+  BLUE: "Blue",
+  POOCH_BLUE: "P-Blue",
+  POOCH_RED: "P-Red",
+  BROWN: "Brown",
 };
 
-const HASH_LABELS: Record<PuntHash, string> = {
-  LEFT: "L",
-  MIDDLE: "M",
-  RIGHT: "R",
-};
-
-const DIR_LABELS: Record<PuntDirection, string> = {
-  LEFT: "← Left",
-  MIDDLE: "↑ Mid",
-  RIGHT: "Right →",
-  OOB: "OOB",
+const POS_LABELS: Record<PuntHash, string> = {
+  LH: "LH",
+  LM: "LM",
+  M: "M",
+  RM: "RM",
+  RH: "RH",
 };
 
 const LANDING_LABELS: Record<PuntLandingZone, string> = {
@@ -49,11 +45,11 @@ interface PuntEntryCardProps {
 
 export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps) {
   const [athlete, setAthlete] = useState<string>(athletes[0] ?? "");
-  const [type, setType] = useState<PuntType>("REGULAR");
-  const [hash, setHash] = useState<PuntHash>("MIDDLE");
+  const [type, setType] = useState<PuntType>("RED");
+  const [hash, setHash] = useState<PuntHash>("M");
   const [yards, setYards] = useState<string>("42");
   const [hangTime, setHangTime] = useState<string>("4.5");
-  const [direction, setDirection] = useState<PuntDirection>("MIDDLE");
+  const [opTime, setOpTime] = useState<string>("");
   const [landingZones, setLandingZones] = useState<PuntLandingZone[]>([]);
   const [returnYards, setReturnYards] = useState<string>("0");
   const [directionalAccuracy, setDirectionalAccuracy] = useState<0 | 0.5 | 1>(1);
@@ -74,12 +70,12 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
       hash,
       yards: parseInt(yards) || 0,
       hangTime: parseFloat(hangTime) || 0,
-      direction,
+      opTime: parseFloat(opTime) || 0,
       landingZones,
       returnYards: landingZones.includes("returned") ? parseInt(returnYards) || 0 : undefined,
       directionalAccuracy,
       poochLandingYardLine:
-        type === "POOCH" && poochLandingYardLine !== ""
+        type === "POOCH_BLUE" || type === "POOCH_RED" && poochLandingYardLine !== ""
           ? parseInt(poochLandingYardLine) || undefined
           : undefined,
     };
@@ -125,7 +121,7 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
                   : "bg-surface-2 text-muted border border-border hover:text-slate-300"
               )}
             >
-              {HASH_LABELS[h]}
+              {POS_LABELS[h]}
             </button>
           ))}
         </div>
@@ -147,8 +143,8 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
         </div>
       </div>
 
-      {/* Yards + Hang Time */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Yards + Hang Time + Opp Time */}
+      <div className="grid grid-cols-3 gap-2">
         <div>
           <p className="label">Yards</p>
           <input
@@ -174,24 +170,19 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
             onChange={(e) => setHangTime(e.target.value)}
           />
         </div>
-      </div>
-
-      {/* Direction */}
-      <div className="grid grid-cols-4 gap-1">
-        {PUNT_DIRECTIONS.map((d) => (
-          <button
-            key={d}
-            onClick={() => setDirection(d)}
-            className={clsx(
-              "py-1.5 rounded-input text-xs font-semibold transition-all",
-              direction === d
-                ? "bg-accent/20 text-accent border border-accent/50"
-                : "bg-surface-2 text-muted border border-border hover:text-slate-300"
-            )}
-          >
-            {DIR_LABELS[d]}
-          </button>
-        ))}
+        <div>
+          <p className="label">Opp Time (s)</p>
+          <input
+            className="input text-center text-lg font-bold"
+            type="number"
+            step="0.01"
+            min={0}
+            max={9}
+            placeholder="sec"
+            value={opTime}
+            onChange={(e) => setOpTime(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Landing Zones (multi-select; none = implied beyond 20) */}
@@ -219,7 +210,7 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
       </div>
 
       {/* Pooch yard line — only when type=POOCH */}
-      {type === "POOCH" && (
+      {type === "POOCH_BLUE" || type === "POOCH_RED" && (
         <div>
           <p className="label">Landing Yard Line</p>
           <input

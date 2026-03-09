@@ -76,7 +76,6 @@ export default function KickoffSessionPage() {
       }));
     if (entries.length === 0) return;
     commitPractice(entries);
-    setRows(Array.from({ length: 6 }, newRow));
     setCommitted(true);
     setTimeout(() => setCommitted(false), 2000);
   };
@@ -107,7 +106,13 @@ export default function KickoffSessionPage() {
       <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
         <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-sm font-bold text-slate-100">Kickoff Log</h2>
+            <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+              </span>
+              Live Practice Log
+            </h2>
             <p className="text-xs text-muted">{filledRows.length} kicks entered</p>
           </div>
           {canUndo && (

@@ -95,22 +95,6 @@ export default function LoginPage() {
               Create one
             </Link>
           </p>
-
-          {/* Demo shortcut */}
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-center text-xs text-muted mb-2">
-              Demo — skip login
-            </p>
-            <button
-              className="btn-ghost w-full text-xs"
-              onClick={() => {
-                setEmail("coach@demo.com");
-                setPassword("demo1234");
-              }}
-            >
-              Fill demo credentials
-            </button>
-          </div>
         </div>
       </div>
     </div>

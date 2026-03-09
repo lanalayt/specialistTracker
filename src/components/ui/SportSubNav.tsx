@@ -11,12 +11,18 @@ const TABS = [
   { label: "Athletes", slug: "athletes" },
 ];
 
-export function SportSubNav({ basePath }: { basePath: string }) {
+interface SportSubNavProps {
+  basePath: string;
+  extraTabs?: { label: string; slug: string }[];
+}
+
+export function SportSubNav({ basePath, extraTabs }: SportSubNavProps) {
+  const allTabs = extraTabs ? [...TABS, ...extraTabs] : TABS;
   const pathname = usePathname();
   return (
     <div className="sticky top-14 z-20 bg-surface border-b border-border overflow-x-auto shrink-0">
       <div className="flex">
-        {TABS.map((tab) => {
+        {allTabs.map((tab) => {
           const href = `${basePath}/${tab.slug}`;
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (

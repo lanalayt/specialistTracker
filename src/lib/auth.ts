@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, createContext, useState, useCallback } from "react";
+import { useContext, createContext } from "react";
 import type { AuthUser, UserRole } from "@/types";
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -11,6 +11,7 @@ interface AuthContextValue {
   isCoach: boolean;
   isAthlete: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, role?: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
   setDemoRole: (role: UserRole) => void;
 }
@@ -21,27 +22,10 @@ export const AuthContext = createContext<AuthContextValue>({
   isCoach: false,
   isAthlete: false,
   signIn: async () => {},
+  signUp: async () => {},
   signOut: async () => {},
   setDemoRole: () => {},
 });
-
-// ─── Demo auth (replace with Amplify when configured) ────────────────────────
-
-export const DEMO_COACH: AuthUser = {
-  id: "demo-coach-1",
-  email: "coach@demo.com",
-  name: "Coach Demo",
-  role: "coach",
-  teamId: "demo-team-1",
-};
-
-export const DEMO_ATHLETE: AuthUser = {
-  id: "demo-athlete-1",
-  email: "athlete@demo.com",
-  name: "Demo Athlete",
-  role: "athlete",
-  teamId: "demo-team-1",
-};
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
