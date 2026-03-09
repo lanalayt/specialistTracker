@@ -30,6 +30,7 @@ interface FGContextValue extends FGStateData {
   commitPractice: (kicks: FGKick[], label?: string) => Session;
   undoLastCommit: () => boolean;
   resetAll: () => void;
+  updateSessionDate: (sessionId: string, date: string, label: string) => void;
   canUndo: boolean;
 }
 
@@ -154,6 +155,20 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
     return success;
   }, []);
 
+  const updateSessionDate = useCallback(
+    (sessionId: string, date: string, label: string) => {
+      setState((prev) => {
+        const newHistory = prev.history.map((s) =>
+          s.id === sessionId ? { ...s, date, label } : s
+        );
+        const next = { ...prev, history: newHistory };
+        localSet("FG", next);
+        return next;
+      });
+    },
+    []
+  );
+
   const resetAll = useCallback(() => {
     const next = defaultState();
     save(next);
@@ -168,6 +183,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         commitPractice,
         undoLastCommit,
         resetAll,
+        updateSessionDate,
         canUndo: state.snapshot !== null,
       }}
     >

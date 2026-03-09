@@ -23,10 +23,21 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
   // Listen for auth state changes
   useEffect(() => {
+    const isLocal =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(mapSupabaseUser(session.user));
+      } else if (isLocal) {
+        // Localhost fallback — auto-login as coach for local dev
+        setUser({
+          id: "local-dev",
+          email: "dev@localhost",
+          name: "Coach (Local)",
+          role: "coach",
+        });
       }
       setIsLoading(false);
     });

@@ -17,6 +17,7 @@ interface KickoffStateData {
 interface KickoffContextValue extends KickoffStateData {
   commitPractice: (entries: KickoffEntry[], label?: string) => Session;
   undoLastCommit: () => boolean;
+  updateSessionDate: (sessionId: string, date: string, label: string) => void;
   canUndo: boolean;
 }
 
@@ -79,9 +80,23 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     return success;
   }, []);
 
+  const updateSessionDate = useCallback(
+    (sessionId: string, date: string, label: string) => {
+      setState((prev) => {
+        const newHistory = prev.history.map((s) =>
+          s.id === sessionId ? { ...s, date, label } : s
+        );
+        const next = { ...prev, history: newHistory };
+        localSet("KICKOFF", next);
+        return next;
+      });
+    },
+    []
+  );
+
   return (
     <KickoffContext.Provider value={{
-      ...state, commitPractice, undoLastCommit, canUndo: state.snapshot !== null,
+      ...state, commitPractice, undoLastCommit, updateSessionDate, canUndo: state.snapshot !== null,
     }}>
       {children}
     </KickoffContext.Provider>

@@ -18,10 +18,17 @@ const AUTH_ROUTES = ["/login", "/signup", "/onboard"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get("host") ?? "";
+  const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1");
 
   // Redirect root to dashboard
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Skip auth checks on localhost
+  if (isLocal) {
+    return NextResponse.next();
   }
 
   let response = NextResponse.next({

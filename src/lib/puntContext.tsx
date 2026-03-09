@@ -30,6 +30,7 @@ interface PuntContextValue extends PuntStateData {
   commitPractice: (entries: PuntEntry[], label?: string) => Session;
   undoLastCommit: () => boolean;
   resetAll: () => void;
+  updateSessionDate: (sessionId: string, date: string, label: string) => void;
   canUndo: boolean;
 }
 
@@ -128,6 +129,20 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     return success;
   }, []);
 
+  const updateSessionDate = useCallback(
+    (sessionId: string, date: string, label: string) => {
+      setState((prev) => {
+        const newHistory = prev.history.map((s) =>
+          s.id === sessionId ? { ...s, date, label } : s
+        );
+        const next = { ...prev, history: newHistory };
+        localSet("PUNT", next);
+        return next;
+      });
+    },
+    []
+  );
+
   const resetAll = useCallback(() => {
     const next = defaultState();
     localSet("PUNT", next);
@@ -137,7 +152,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
   return (
     <PuntContext.Provider value={{
       ...state, addAthletes, removeAthlete, commitPractice,
-      undoLastCommit, resetAll, canUndo: state.snapshot !== null,
+      undoLastCommit, resetAll, updateSessionDate, canUndo: state.snapshot !== null,
     }}>
       {children}
     </PuntContext.Provider>

@@ -62,6 +62,30 @@ function loadSnapDistance(): number {
   return 7;
 }
 
+function loadMakeMode(): "simple" | "detailed" {
+  if (typeof window === "undefined") return "detailed";
+  try {
+    const raw = localStorage.getItem("fgSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed.makeMode === "simple" ? "simple" : "detailed";
+    }
+  } catch {}
+  return "detailed";
+}
+
+function loadMissMode(): "simple" | "detailed" {
+  if (typeof window === "undefined") return "detailed";
+  try {
+    const raw = localStorage.getItem("fgSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed.missMode === "simple" ? "simple" : "detailed";
+    }
+  } catch {}
+  return "detailed";
+}
+
 const RESULT_LABELS: Record<string, string> = {
   YL: "Make ←",
   YC: "Make ✓",
@@ -118,6 +142,8 @@ export default function KickingSessionPage() {
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [showReset, setShowReset] = useState(false);
   const [snapDistance] = useState(() => loadSnapDistance());
+  const [makeMode] = useState(() => loadMakeMode());
+  const [missMode] = useState(() => loadMissMode());
 
   // Persist draft on every relevant state change
   useEffect(() => {
@@ -578,38 +604,70 @@ export default function KickingSessionPage() {
                     <div>
                       <p className="label">Result</p>
                       <div className="space-y-1.5">
-                        <div className="grid grid-cols-3 gap-2">
-                          {MAKE_BTNS.map(({ r, label }) => (
+                        {makeMode === "simple" ? (
+                          <div>
                             <button
-                              key={r}
-                              onClick={() => setResult(r)}
+                              onClick={() => setResult("YC")}
                               className={clsx(
-                                "py-3 rounded-input text-xs font-bold transition-all",
-                                result === r
+                                "w-full py-3 rounded-input text-xs font-bold transition-all",
+                                result === "YC"
                                   ? "bg-make text-slate-900 shadow-lg"
                                   : "bg-make/10 text-make border border-make/30 hover:bg-make/20"
                               )}
                             >
-                              {label}
+                              ✓ GOOD
                             </button>
-                          ))}
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          {MISS_BTNS.map(({ r, label }) => (
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2">
+                            {MAKE_BTNS.map(({ r, label }) => (
+                              <button
+                                key={r}
+                                onClick={() => setResult(r)}
+                                className={clsx(
+                                  "py-3 rounded-input text-xs font-bold transition-all",
+                                  result === r
+                                    ? "bg-make text-slate-900 shadow-lg"
+                                    : "bg-make/10 text-make border border-make/30 hover:bg-make/20"
+                                )}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {missMode === "simple" ? (
+                          <div>
                             <button
-                              key={r}
-                              onClick={() => setResult(r)}
+                              onClick={() => setResult("XS")}
                               className={clsx(
-                                "py-3 rounded-input text-xs font-bold transition-all",
-                                result === r
+                                "w-full py-3 rounded-input text-xs font-bold transition-all",
+                                result === "XL" || result === "XS" || result === "XR"
                                   ? "bg-miss text-white shadow-lg"
                                   : "bg-miss/10 text-miss border border-miss/30 hover:bg-miss/20"
                               )}
                             >
-                              {label}
+                              ✗ MISS
                             </button>
-                          ))}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2">
+                            {MISS_BTNS.map(({ r, label }) => (
+                              <button
+                                key={r}
+                                onClick={() => setResult(r)}
+                                className={clsx(
+                                  "py-3 rounded-input text-xs font-bold transition-all",
+                                  result === r
+                                    ? "bg-miss text-white shadow-lg"
+                                    : "bg-miss/10 text-miss border border-miss/30 hover:bg-miss/20"
+                                )}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -885,9 +943,13 @@ export default function KickingSessionPage() {
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
                             >
                               <option value="">—</option>
-                              {RESULTS.map((r) => (
-                                <option key={r} value={r}>{RESULT_LABELS[r]}</option>
-                              ))}
+                              {(() => {
+                                const makes = makeMode === "simple" ? ["YC"] : ["YL", "YC", "YR"];
+                                const misses = missMode === "simple" ? ["XS"] : ["XL", "XS", "XR"];
+                                return [...makes, ...misses].map((r) => (
+                                  <option key={r} value={r}>{RESULT_LABELS[r]}</option>
+                                ));
+                              })()}
                             </select>
                           </td>
                           <td className="py-1 px-1">

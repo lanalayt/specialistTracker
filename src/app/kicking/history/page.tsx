@@ -6,11 +6,25 @@ import { makePct } from "@/lib/stats";
 import type { FGKick, Session } from "@/types";
 import clsx from "clsx";
 
+function formatDateForInput(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatLabel(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
+}
+
 export default function KickingHistoryPage() {
-  const { history } = useFG();
+  const { history, updateSessionDate } = useFG();
   const [selectedId, setSelectedId] = useState<string | null>(
     history[history.length - 1]?.id ?? null
   );
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const selected = history.find((s) => s.id === selectedId);
   const kicks = (selected?.entries ?? []) as FGKick[];
@@ -63,7 +77,41 @@ export default function KickingHistoryPage() {
           <>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
+                {editingId === selected.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      defaultValue={formatDateForInput(selected.date)}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          updateSessionDate(
+                            selected.id,
+                            new Date(e.target.value + "T12:00:00").toISOString(),
+                            formatLabel(e.target.value)
+                          );
+                        }
+                      }}
+                      className="input text-sm px-2 py-1"
+                    />
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
+                    <button
+                      onClick={() => setEditingId(selected.id)}
+                      className="text-xs text-muted hover:text-accent transition-colors"
+                      title="Change date"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                )}
                 <p className="text-xs text-muted mt-0.5">
                   {kicks.length} kicks · {makes} makes ·{" "}
                   <span className="text-accent font-semibold">{makePct(kicks.length, makes)}</span>
