@@ -18,11 +18,15 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
+      console.log("[login] attempting sign in for", email);
       await signIn(email, password);
-      router.push("/dashboard");
+      console.log("[login] sign in succeeded, redirecting…");
+      // Use window.location for a full page reload to ensure cookies are set
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Sign in failed");
-    } finally {
+      console.error("[login] Sign in error:", err);
+      const msg = err instanceof Error ? err.message : "Sign in failed";
+      setError(msg);
       setLoading(false);
     }
   };
