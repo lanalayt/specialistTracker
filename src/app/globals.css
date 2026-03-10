@@ -103,3 +103,21 @@ body {
     @apply text-accent font-semibold;
   }
 }
+
+/* Athlete view-only: allow navigation links but block interactive elements */
+.athlete-view-only {
+  user-select: none;
+}
+.athlete-view-only button,
+.athlete-view-only input,
+.athlete-view-only select,
+.athlete-view-only textarea,
+.athlete-view-only [role="button"] {
+  pointer-events: none !important;
+  opacity: 0.5;
+}
+/* Allow navigation links */
+.athlete-view-only a {
+  pointer-events: auto !important;
+  opacity: 1;
+}

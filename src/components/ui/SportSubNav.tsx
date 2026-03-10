@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import clsx from "clsx";
 
 const TABS = [
-  { label: "Session", slug: "session" },
-  { label: "Statistics", slug: "statistics" },
-  { label: "History", slug: "history" },
-  { label: "Athletes", slug: "athletes" },
+  { label: "Session", slug: "session", coachOnly: true },
+  { label: "Statistics", slug: "statistics", coachOnly: false },
+  { label: "History", slug: "history", coachOnly: false },
+  { label: "Athletes", slug: "athletes", coachOnly: true },
 ];
 
 interface SportSubNavProps {
@@ -17,12 +18,17 @@ interface SportSubNavProps {
 }
 
 export function SportSubNav({ basePath, extraTabs }: SportSubNavProps) {
-  const allTabs = extraTabs ? [...TABS, ...extraTabs] : TABS;
+  const { isAthlete } = useAuth();
+  // Extra tabs (like Settings) are coach-only
+  const extraWithRole = (extraTabs ?? []).map((t) => ({ ...t, coachOnly: true }));
+  const allTabs = [...TABS, ...extraWithRole];
+  const visibleTabs = isAthlete ? allTabs.filter((t) => !t.coachOnly) : allTabs;
   const pathname = usePathname();
+
   return (
     <div className="sticky top-14 z-20 bg-surface border-b border-border overflow-x-auto shrink-0">
       <div className="flex">
-        {allTabs.map((tab) => {
+        {visibleTabs.map((tab) => {
           const href = `${basePath}/${tab.slug}`;
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (
