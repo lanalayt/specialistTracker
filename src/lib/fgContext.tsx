@@ -17,6 +17,7 @@ import {
 } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
 import { useAuth } from "@/lib/auth";
 
 interface FGStateData {
@@ -61,9 +62,15 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       let saved: FGStateData | null = null;
+      const tid = getTeamId();
 
-      // Try Supabase first
-      if (userId && userId !== "local-dev") {
+      // Try team_data first (shared across team members)
+      if (tid && tid !== "local-dev") {
+        saved = await teamGet<FGStateData>(tid, "fg_data");
+      }
+
+      // Fall back to user's own Supabase data
+      if (!saved && userId && userId !== "local-dev") {
         saved = await cloudGet<FGStateData>(userId, getCloudKey("FG"));
       }
 
@@ -94,6 +101,11 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
   const save = useCallback((next: FGStateData) => {
     setState(next);
     localSet("FG", next);
+    // Also write to team_data for cross-account sharing
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamSet(tid, "fg_data", next);
+    }
   }, []);
 
   const addAthletes = useCallback(

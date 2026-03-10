@@ -11,9 +11,8 @@ import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
-import { cloudGet, cloudSet } from "@/lib/supabaseData";
-import { getCloudUserId } from "@/lib/amplify";
-import { useCloudDraftSync } from "@/lib/useCloudDraftSync";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { useTeamDraftSync } from "@/lib/useTeamDraftSync";
 
 const INIT_ROWS = 12;
 const MAX_SCORE = 4;
@@ -67,9 +66,9 @@ function loadDraft(): SessionDraft | null {
 function saveDraft(draft: SessionDraft) {
   if (typeof window === "undefined") return;
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(draft));
-  const userId = getCloudUserId();
-  if (userId && userId !== "local-dev") {
-    cloudSet(userId, "kickoff_session_draft", draft);
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") {
+    teamSet(tid, "kickoff_session_draft", draft);
   }
 }
 
@@ -127,7 +126,7 @@ export default function KickoffSessionPage() {
   const [score, setScore] = useState<number>(0);
 
   // Poll for draft changes from other devices
-  useCloudDraftSync<SessionDraft>("kickoff_session_draft", (cloudDraft) => {
+  useTeamDraftSync<SessionDraft>("kickoff_session_draft", (cloudDraft) => {
     if (cloudDraft && cloudDraft.rows) {
       setRows(cloudDraft.rows);
       setManualEntry(cloudDraft.manualEntry);
@@ -154,9 +153,9 @@ export default function KickoffSessionPage() {
 
   // Load draft from cloud if local is empty
   useEffect(() => {
-    const userId = getCloudUserId();
-    if (userId && userId !== "local-dev") {
-      cloudGet<SessionDraft>(userId, "kickoff_session_draft").then((cloudDraft) => {
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamGet<SessionDraft>(tid, "kickoff_session_draft").then((cloudDraft) => {
         if (cloudDraft && cloudDraft.rows) {
           const localDraft = loadDraft();
           const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.type || r.distance);

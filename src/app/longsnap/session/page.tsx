@@ -9,9 +9,8 @@ import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import type { LongSnapEntry, SnapBenchmark } from "@/types";
 import clsx from "clsx";
-import { cloudGet, cloudSet } from "@/lib/supabaseData";
-import { getCloudUserId } from "@/lib/amplify";
-import { useCloudDraftSync } from "@/lib/useCloudDraftSync";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { useTeamDraftSync } from "@/lib/useTeamDraftSync";
 
 const BM_COLORS: Record<SnapBenchmark, string> = {
   excellent: "text-make",
@@ -58,7 +57,7 @@ export default function LongSnapSessionPage() {
   const onTargetPct = makePct(totals.att, totals.onTarget);
 
   // Poll for draft changes from other devices
-  useCloudDraftSync<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(
+  useTeamDraftSync<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(
     "longsnap_session_draft",
     (cloud) => {
       if (cloud && cloud.sessionSnaps) {
@@ -69,19 +68,19 @@ export default function LongSnapSessionPage() {
     }
   );
 
-  // Sync session snaps to cloud
+  // Sync session snaps to team data
   const saveSnapsToCloud = useCallback((snaps: LongSnapEntry[]) => {
-    const userId = getCloudUserId();
-    if (userId && userId !== "local-dev") {
-      cloudSet(userId, "longsnap_session_draft", { sessionSnaps: snaps, sessionStarted: true, weather });
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamSet(tid, "longsnap_session_draft", { sessionSnaps: snaps, sessionStarted: true, weather });
     }
   }, [weather]);
 
-  // Load session from cloud on mount
+  // Load session from team data on mount
   useEffect(() => {
-    const userId = getCloudUserId();
-    if (userId && userId !== "local-dev") {
-      cloudGet<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(userId, "longsnap_session_draft").then((cloud) => {
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamGet<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(tid, "longsnap_session_draft").then((cloud) => {
         if (cloud && cloud.sessionSnaps && cloud.sessionSnaps.length > 0) {
           setSessionSnaps(cloud.sessionSnaps);
           setSessionStarted(cloud.sessionStarted ?? false);

@@ -196,6 +196,32 @@ function SettingsContent() {
             </p>
           </div>
 
+          {/* Team Code */}
+          {isCoach && user?.id && user.id !== "local-dev" && (
+            <div className="card space-y-3">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider">
+                Team Code
+              </p>
+              <p className="text-xs text-muted">
+                Share this code with your athletes so they can link to your team during sign up.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-surface-2 border border-border rounded-input px-3 py-2 text-sm font-mono text-accent select-all">
+                  {user.id}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.id);
+                    alert("Team code copied!");
+                  }}
+                  className="btn-ghost text-xs py-2 px-4"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Cloud Sync */}
           <div className="card space-y-3">
             <p className="text-xs font-semibold text-muted uppercase tracking-wider">

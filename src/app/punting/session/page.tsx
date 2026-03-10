@@ -12,9 +12,8 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
-import { cloudGet, cloudSet } from "@/lib/supabaseData";
-import { getCloudUserId } from "@/lib/amplify";
-import { useCloudDraftSync } from "@/lib/useCloudDraftSync";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { useTeamDraftSync } from "@/lib/useTeamDraftSync";
 
 const INIT_ROWS = 12;
 const SESSION_STORAGE_KEY = "puntSessionDraft";
@@ -71,9 +70,9 @@ function loadDraft(): SessionDraft | null {
 function saveDraft(draft: SessionDraft) {
   if (typeof window === "undefined") return;
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(draft));
-  const userId = getCloudUserId();
-  if (userId && userId !== "local-dev") {
-    cloudSet(userId, "punt_session_draft", draft);
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") {
+    teamSet(tid, "punt_session_draft", draft);
   }
 }
 
@@ -151,7 +150,7 @@ export default function PuntingSessionPage() {
   const [weather, setWeather] = useState("");
 
   // Poll for draft changes from other devices
-  useCloudDraftSync<SessionDraft>("punt_session_draft", (cloudDraft) => {
+  useTeamDraftSync<SessionDraft>("punt_session_draft", (cloudDraft) => {
     if (cloudDraft && cloudDraft.rows) {
       setRows(cloudDraft.rows);
       setManualEntry(cloudDraft.manualEntry);
@@ -172,9 +171,9 @@ export default function PuntingSessionPage() {
     });
 
     // Load draft from cloud if local is empty
-    const userId = getCloudUserId();
-    if (userId && userId !== "local-dev") {
-      cloudGet<SessionDraft>(userId, "punt_session_draft").then((cloudDraft) => {
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamGet<SessionDraft>(tid, "punt_session_draft").then((cloudDraft) => {
         if (cloudDraft && cloudDraft.rows) {
           const localDraft = loadDraft();
           const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.type || r.hash);

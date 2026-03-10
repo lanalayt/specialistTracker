@@ -7,6 +7,7 @@ import type { LongSnapEntry, LongSnapAthleteStats, Session } from "@/types";
 import { emptyLongSnapStats, processLongSnap, genId, sessionLabel } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
 import { useAuth } from "@/lib/auth";
 
 interface LongSnapStateData {
@@ -44,8 +45,15 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       let saved: LongSnapStateData | null = null;
+      const tid = getTeamId();
 
-      if (userId && userId !== "local-dev") {
+      // Try team_data first (shared across team members)
+      if (tid && tid !== "local-dev") {
+        saved = await teamGet<LongSnapStateData>(tid, "longsnap_data");
+      }
+
+      // Fall back to user's own Supabase data
+      if (!saved && userId && userId !== "local-dev") {
         saved = await cloudGet<LongSnapStateData>(userId, getCloudKey("LONGSNAP"));
       }
 
@@ -83,6 +91,7 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
       entries.forEach((e) => { newStats = processLongSnap(e, newStats); });
       const next = { ...prev, stats: newStats, history: [...prev.history, session], snapshot };
       localSet("LONGSNAP", next);
+      const _tid = getTeamId(); if (_tid && _tid !== "local-dev") teamSet(_tid, "longsnap_data", next);
       return next;
     });
     return session;
@@ -96,6 +105,7 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
         );
         const next = { ...prev, history: newHistory };
         localSet("LONGSNAP", next);
+      const _tid = getTeamId(); if (_tid && _tid !== "local-dev") teamSet(_tid, "longsnap_data", next);
         return next;
       });
     },
@@ -116,6 +126,7 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
       });
       const next = { ...prev, history: newHistory, snapshot: null, stats: newStats };
       localSet("LONGSNAP", next);
+      const _tid = getTeamId(); if (_tid && _tid !== "local-dev") teamSet(_tid, "longsnap_data", next);
       success = true;
       return next;
     });

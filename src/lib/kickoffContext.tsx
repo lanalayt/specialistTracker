@@ -7,6 +7,7 @@ import type { KickoffEntry, KickoffAthleteStats, Session } from "@/types";
 import { emptyKickoffStats, processKickoff, genId, sessionLabel } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
 import { useAuth } from "@/lib/auth";
 
 interface KickoffStateData {
@@ -46,7 +47,15 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     async function loadData() {
       let saved: KickoffStateData | null = null;
 
-      if (userId && userId !== "local-dev") {
+      const tid = getTeamId();
+
+      // Try team_data first (shared across team members)
+      if (tid && tid !== "local-dev") {
+        saved = await teamGet<KickoffStateData>(tid, "kickoff_data");
+      }
+
+      // Fall back to user's own Supabase data
+      if (!saved && userId && userId !== "local-dev") {
         saved = await cloudGet<KickoffStateData>(userId, getCloudKey("KICKOFF"));
       }
 
@@ -60,6 +69,9 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
         const migrated = { ...saved, stats };
         setState(migrated);
         localSet("KICKOFF", migrated);
+        if (tid && tid !== "local-dev") {
+          teamSet(tid, "kickoff_data", migrated);
+        }
       }
     }
 
@@ -78,6 +90,10 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       entries.forEach((e) => { newStats = processKickoff(e, newStats); });
       const next = { ...prev, stats: newStats, history: [...prev.history, session], snapshot };
       localSet("KICKOFF", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        teamSet(tid, "kickoff_data", next);
+      }
       return next;
     });
     return session;
@@ -97,6 +113,10 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       });
       const next = { ...prev, history: newHistory, snapshot: null, stats: newStats };
       localSet("KICKOFF", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        teamSet(tid, "kickoff_data", next);
+      }
       success = true;
       return next;
     });
@@ -111,6 +131,10 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
         );
         const next = { ...prev, history: newHistory };
         localSet("KICKOFF", next);
+        const tid = getTeamId();
+        if (tid && tid !== "local-dev") {
+          teamSet(tid, "kickoff_data", next);
+        }
         return next;
       });
     },
@@ -125,6 +149,10 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
         );
         const next = { ...prev, history: newHistory };
         localSet("KICKOFF", next);
+        const tid = getTeamId();
+        if (tid && tid !== "local-dev") {
+          teamSet(tid, "kickoff_data", next);
+        }
         return next;
       });
     },

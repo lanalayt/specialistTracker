@@ -13,9 +13,8 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
-import { cloudGet, cloudSet } from "@/lib/supabaseData";
-import { getCloudUserId } from "@/lib/amplify";
-import { useCloudDraftSync } from "@/lib/useCloudDraftSync";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { useTeamDraftSync } from "@/lib/useTeamDraftSync";
 
 const INIT_ROWS = 12;
 
@@ -61,9 +60,9 @@ function loadDraft(): SessionDraft | null {
 function saveDraft(draft: SessionDraft) {
   if (typeof window === "undefined") return;
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(draft));
-  const userId = getCloudUserId();
-  if (userId && userId !== "local-dev") {
-    cloudSet(userId, "fg_session_draft", draft);
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") {
+    teamSet(tid, "fg_session_draft", draft);
   }
 }
 
@@ -166,7 +165,7 @@ export default function KickingSessionPage() {
   const [weather, setWeather] = useState("");
 
   // Poll for draft changes from other devices
-  useCloudDraftSync<SessionDraft>("fg_session_draft", (cloudDraft) => {
+  useTeamDraftSync<SessionDraft>("fg_session_draft", (cloudDraft) => {
     if (cloudDraft && cloudDraft.rows) {
       setRows(cloudDraft.rows);
       setManualEntry(cloudDraft.manualEntry);
@@ -187,10 +186,10 @@ export default function KickingSessionPage() {
         if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
       }
     });
-    // Load draft from cloud if local is empty
-    const userId = getCloudUserId();
-    if (userId && userId !== "local-dev") {
-      cloudGet<SessionDraft>(userId, "fg_session_draft").then((cloudDraft) => {
+    // Load draft from team data if local is empty
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamGet<SessionDraft>(tid, "fg_session_draft").then((cloudDraft) => {
         if (cloudDraft && cloudDraft.rows) {
           const localDraft = loadDraft();
           const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.dist || r.pos);

@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { AuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
+import { setTeamId } from "@/lib/teamData";
 import type { AuthUser, UserRole } from "@/types";
 
 function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
@@ -29,7 +30,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        setUser(mapSupabaseUser(session.user));
+        const u = mapSupabaseUser(session.user);
+        setUser(u);
+        // Coach's team ID is their own user ID; athletes use their linked teamId
+        setTeamId(u.role === "athlete" && u.teamId ? u.teamId : u.id);
       } else if (isLocal) {
         // Localhost fallback — auto-login as coach for local dev
         setUser({
@@ -46,9 +50,12 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (session?.user) {
-          setUser(mapSupabaseUser(session.user));
+          const u = mapSupabaseUser(session.user);
+          setUser(u);
+          setTeamId(u.role === "athlete" && u.teamId ? u.teamId : u.id);
         } else {
           setUser(null);
+          setTeamId(null);
         }
       }
     );
@@ -61,12 +68,12 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     if (error) throw new Error(error.message);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const signUp = useCallback(async (email: string, password: string, name: string, role: UserRole = "coach") => {
+  const signUp = useCallback(async (email: string, password: string, name: string, role: UserRole = "coach", teamId?: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name, role },
+        data: { name, role, teamId },
       },
     });
     if (error) throw new Error(error.message);

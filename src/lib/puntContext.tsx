@@ -17,6 +17,7 @@ import {
 } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
 import { useAuth } from "@/lib/auth";
 
 interface PuntStateData {
@@ -58,8 +59,15 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       let saved: PuntStateData | null = null;
+      const tid = getTeamId();
 
-      if (userId && userId !== "local-dev") {
+      // Try team_data first (shared across team members)
+      if (tid && tid !== "local-dev") {
+        saved = await teamGet<PuntStateData>(tid, "punt_data");
+      }
+
+      // Fall back to user's own Supabase data
+      if (!saved && userId && userId !== "local-dev") {
         saved = await cloudGet<PuntStateData>(userId, getCloudKey("PUNT"));
       }
 
@@ -84,6 +92,9 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
         const migrated = { ...saved, stats };
         setState(migrated);
         localSet("PUNT", migrated);
+        if (tid && tid !== "local-dev") {
+          teamSet(tid, "punt_data", migrated);
+        }
       }
     }
 
@@ -100,6 +111,10 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       toAdd.forEach((a) => { if (!newStats[a.trim()]) newStats[a.trim()] = emptyPuntStats(); });
       const next = { ...prev, athletes: newAthletes, stats: newStats };
       localSet("PUNT", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        teamSet(tid, "punt_data", next);
+      }
       return next;
     });
   }, []);
@@ -108,6 +123,10 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => {
       const next = { ...prev, athletes: prev.athletes.filter((a) => a !== name) };
       localSet("PUNT", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        teamSet(tid, "punt_data", next);
+      }
       return next;
     });
   }, []);
@@ -129,6 +148,10 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       entries.forEach((e) => { newStats = processPunt(e, newStats); });
       const next = { ...prev, stats: newStats, history: newHistory, snapshot };
       localSet("PUNT", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        teamSet(tid, "punt_data", next);
+      }
       return next;
     });
     return session;
@@ -145,6 +168,10 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       );
       const next = { ...prev, history: newHistory, snapshot: null, stats: newStats };
       localSet("PUNT", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        teamSet(tid, "punt_data", next);
+      }
       success = true;
       return next;
     });
@@ -159,6 +186,10 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
         );
         const next = { ...prev, history: newHistory };
         localSet("PUNT", next);
+        const tid = getTeamId();
+        if (tid && tid !== "local-dev") {
+          teamSet(tid, "punt_data", next);
+        }
         return next;
       });
     },
@@ -173,6 +204,10 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
         );
         const next = { ...prev, history: newHistory };
         localSet("PUNT", next);
+        const tid = getTeamId();
+        if (tid && tid !== "local-dev") {
+          teamSet(tid, "punt_data", next);
+        }
         return next;
       });
     },
@@ -182,6 +217,10 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
   const resetAll = useCallback(() => {
     const next = defaultState();
     localSet("PUNT", next);
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamSet(tid, "punt_data", next);
+    }
     setState(next);
   }, []);
 

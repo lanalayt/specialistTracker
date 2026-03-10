@@ -11,7 +11,7 @@ interface AuthContextValue {
   isCoach: boolean;
   isAthlete: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, role?: UserRole) => Promise<void>;
+  signUp: (email: string, password: string, name: string, role?: UserRole, teamId?: string) => Promise<void>;
   signOut: () => Promise<void>;
   setDemoRole: (role: UserRole) => void;
 }

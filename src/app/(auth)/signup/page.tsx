@@ -24,6 +24,8 @@ export default function SignupPage() {
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const [teamCode, setTeamCode] = useState("");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.password !== form.confirm) {
@@ -34,11 +36,15 @@ export default function SignupPage() {
       setError("Password must be at least 6 characters");
       return;
     }
+    if (role === "athlete" && !teamCode.trim()) {
+      setError("Athletes must enter a Team Code from their coach");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      await signUp(form.email, form.password, form.name, role);
-      router.push("/onboard");
+      await signUp(form.email, form.password, form.name, role, role === "athlete" ? teamCode.trim() : undefined);
+      router.push(role === "athlete" ? "/dashboard" : "/onboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Sign up failed");
     } finally {
@@ -97,6 +103,20 @@ export default function SignupPage() {
                 </button>
               </div>
             </div>
+
+            {role === "athlete" && (
+              <div>
+                <label className="label">Team Code</label>
+                <input
+                  className="input"
+                  placeholder="Enter code from your coach"
+                  value={teamCode}
+                  onChange={(e) => setTeamCode(e.target.value)}
+                  required
+                />
+                <p className="text-[10px] text-muted mt-1">Ask your coach for the Team Code (found in Settings)</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
