@@ -10,6 +10,7 @@ import type { KickoffEntry, KickoffType, KickoffDirection } from "@/types";
 import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
+import { useAuth } from "@/lib/auth";
 
 const INIT_ROWS = 12;
 const MAX_SCORE = 4;
@@ -81,6 +82,7 @@ const DIR_LABELS: Record<KickoffDirection, string> = {
 export default function KickoffSessionPage() {
   const { athletes, stats, canUndo, undoLastCommit, commitPractice } =
     useKickoff();
+  const { isAthlete } = useAuth();
 
   // ── Initialize all state from localStorage ──────────────────
   const [draft] = useState<SessionDraft>(() => {

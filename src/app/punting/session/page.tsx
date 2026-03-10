@@ -11,6 +11,7 @@ import { PUNT_HASHES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
+import { useAuth } from "@/lib/auth";
 
 const INIT_ROWS = 12;
 const SESSION_STORAGE_KEY = "puntSessionDraft";
@@ -108,6 +109,7 @@ const DA_OPTIONS = [
 export default function PuntingSessionPage() {
   const { athletes, stats, canUndo, undoLastCommit, commitPractice, resetAll } =
     usePunt();
+  const { isAthlete } = useAuth();
 
   // ── Initialize all state from localStorage ──────────────────
   const [draft] = useState<SessionDraft>(() => {

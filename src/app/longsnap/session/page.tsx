@@ -5,6 +5,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { SnapEntryCard } from "@/components/ui/SnapEntryCard";
 import { SnapTimeBars } from "@/components/ui/SnapTimeBars";
 import { useLongSnap } from "@/lib/longSnapContext";
+import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import type { LongSnapEntry, SnapBenchmark } from "@/types";
 import clsx from "clsx";
@@ -31,6 +32,7 @@ const ACC_LABEL: Record<string, string> = {
 
 export default function LongSnapSessionPage() {
   const { athletes, stats, canUndo, undoLastCommit, commitPractice } = useLongSnap();
+  const { isAthlete } = useAuth();
   const [sessionSnaps, setSessionSnaps] = useState<LongSnapEntry[]>([]);
   const [committed, setCommitted] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
@@ -75,12 +77,16 @@ export default function LongSnapSessionPage() {
               ? `${sessionSnaps.length} snap${sessionSnaps.length !== 1 ? "s" : ""} in progress.`
               : "Ready to start? Hit the button to begin logging snaps."}
           </p>
-          <button
-            onClick={() => setSessionStarted(true)}
-            className="btn-primary py-3 px-8 text-sm w-full"
-          >
-            {sessionSnaps.length > 0 ? "▶ Continue Session" : "▶ Start Session"}
-          </button>
+          {!isAthlete ? (
+            <button
+              onClick={() => setSessionStarted(true)}
+              className="btn-primary py-3 px-8 text-sm w-full"
+            >
+              {sessionSnaps.length > 0 ? "▶ Continue Session" : "▶ Start Session"}
+            </button>
+          ) : (
+            <p className="text-xs text-warn font-semibold">View Only — Athlete accounts cannot start sessions</p>
+          )}
         </div>
       </div>
     );
@@ -97,16 +103,19 @@ export default function LongSnapSessionPage() {
             type="text"
             value={weather}
             onChange={(e) => setWeather(e.target.value)}
+            readOnly={isAthlete}
             placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
             className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
           />
         </div>
         <div className="overflow-y-auto border-b border-border">
-          <SnapEntryCard
-            athletes={athletes}
-            snapCount={sessionSnaps.length}
-            onAdd={handleAddSnap}
-          />
+          <div className={isAthlete ? "pointer-events-none opacity-60" : ""}>
+            <SnapEntryCard
+              athletes={athletes}
+              snapCount={sessionSnaps.length}
+              onAdd={handleAddSnap}
+            />
+          </div>
         </div>
 
         <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
@@ -153,12 +162,14 @@ export default function LongSnapSessionPage() {
                       {BM_LABELS[bm]}
                     </span>
                   )}
-                  <button
-                    onClick={() => handleDeleteSnap(idx)}
-                    className="w-6 h-6 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm ml-2"
-                  >
-                    ×
-                  </button>
+                  {!isAthlete && (
+                    <button
+                      onClick={() => handleDeleteSnap(idx)}
+                      className="w-6 h-6 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm ml-2"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               );
             })
@@ -166,21 +177,27 @@ export default function LongSnapSessionPage() {
         </div>
 
         <div className="border-t border-border p-3 flex items-center gap-2 shrink-0">
-          {canUndo && (
-            <button onClick={undoLastCommit} className="btn-ghost text-xs py-1.5 px-3">
-              ↩ Undo
-            </button>
+          {!isAthlete && (
+            <>
+              {canUndo && (
+                <button onClick={undoLastCommit} className="btn-ghost text-xs py-1.5 px-3">
+                  ↩ Undo
+                </button>
+              )}
+            </>
           )}
           <div className="flex-1" />
-          <button
-            onClick={handleCommit}
-            disabled={sessionSnaps.length === 0}
-            className={clsx("btn-primary text-xs py-2 px-5", committed && "bg-make/90")}
-          >
-            {committed
-              ? "✓ Committed!"
-              : `Commit Session${sessionSnaps.length > 0 ? ` (${sessionSnaps.length})` : ""}`}
-          </button>
+          {!isAthlete && (
+            <button
+              onClick={handleCommit}
+              disabled={sessionSnaps.length === 0}
+              className={clsx("btn-primary text-xs py-2 px-5", committed && "bg-make/90")}
+            >
+              {committed
+                ? "✓ Committed!"
+                : `Commit Session${sessionSnaps.length > 0 ? ` (${sessionSnaps.length})` : ""}`}
+            </button>
+          )}
         </div>
       </div>
 

@@ -12,6 +12,7 @@ import { POSITIONS, RESULTS } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
+import { useAuth } from "@/lib/auth";
 
 const INIT_ROWS = 12;
 
@@ -121,6 +122,7 @@ const MISS_BTNS: { r: FGResult; label: string }[] = [
 export default function KickingSessionPage() {
   const { athletes, stats, canUndo, undoLastCommit, commitPractice, resetAll } =
     useFG();
+  const { isAthlete } = useAuth();
 
   // ── Initialize all state from localStorage ──────────────────
   const [draft] = useState<SessionDraft>(() => {
@@ -876,6 +878,7 @@ export default function KickingSessionPage() {
               onChange={(e) => setWeather(e.target.value)}
               placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
               className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+              readOnly={isAthlete}
             />
           </div>
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
@@ -893,12 +896,14 @@ export default function KickingSessionPage() {
                 </span>
               )}
             </h2>
-            <button
-              onClick={addRow}
-              className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-slate-300 hover:bg-surface-2 font-semibold transition-all"
-            >
-              + Row
-            </button>
+            {!isAthlete && (
+              <button
+                onClick={addRow}
+                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-slate-300 hover:bg-surface-2 font-semibold transition-all"
+              >
+                + Row
+              </button>
+            )}
           </div>
 
           {/* Scrollable table */}
@@ -966,7 +971,8 @@ export default function KickingSessionPage() {
                           <select
                             value={row.athlete}
                             onChange={(e) => updateRow(idx, "athlete", e.target.value)}
-                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
+                            disabled={isAthlete}
+                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
                             {athletes.map((a) => (
@@ -986,6 +992,7 @@ export default function KickingSessionPage() {
                             placeholder="yds"
                             value={row.dist}
                             onChange={(e) => updateRow(idx, "dist", e.target.value)}
+                            readOnly={isAthlete}
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                           />
                         )}
@@ -997,7 +1004,8 @@ export default function KickingSessionPage() {
                           <select
                             value={row.pos}
                             onChange={(e) => updateRow(idx, "pos", e.target.value)}
-                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
+                            disabled={isAthlete}
+                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
                             {POSITIONS.map((p) => (
@@ -1017,7 +1025,8 @@ export default function KickingSessionPage() {
                                   updateRow(idx, "score", "0");
                                 }
                               }}
-                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
+                              disabled={isAthlete}
+                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                             >
                               <option value="">—</option>
                               {(() => {
@@ -1033,7 +1042,8 @@ export default function KickingSessionPage() {
                             <select
                               value={row.score}
                               onChange={(e) => updateRow(idx, "score", e.target.value)}
-                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
+                              disabled={isAthlete}
+                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                             >
                               <option value="">—</option>
                               {SCORE_OPTIONS.map((s) => (
@@ -1044,56 +1054,56 @@ export default function KickingSessionPage() {
                         </>
                       )}
                       <td className="py-1 px-1 text-center">
-                        {isLocked ? (
-                          <div className="flex items-center gap-0.5 justify-center">
+                        {!isAthlete && (
+                          isLocked ? (
+                            <div className="flex items-center gap-0.5 justify-center">
+                              <button
+                                onClick={() => {
+                                  const filled = rows
+                                    .map((r, ri) => ({ r, i: ri }))
+                                    .filter(({ r }) => r.athlete || r.dist || r.pos);
+                                  const planned = filled.map(({ r }) => ({
+                                    athlete: r.athlete,
+                                    dist: parseInt(r.dist) || 0,
+                                    pos: r.pos as FGPosition,
+                                  }));
+                                  setPlannedKicks(planned);
+                                  setPlannedRowIndices(filled.map(({ i: ri }) => ri));
+                                  setCurrentKickIdx(filledIdx);
+                                  setDistInput(planned[filledIdx]?.dist.toString() ?? "");
+                                  setEditingKickIdx(filledIdx);
+                                  const logged = sessionKicks[filledIdx];
+                                  if (logged) {
+                                    setResult(logged.result);
+                                    setScore(logged.score);
+                                  } else {
+                                    setResult(null);
+                                    setScore(0);
+                                  }
+                                  setSessionActive(true);
+                                }}
+                                className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
+                                title="Edit this kick's result"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleUnlockRow(filledIdx)}
+                                className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
+                                title="Unlock (removes this result and all after it)"
+                              >
+                                🔒
+                              </button>
+                            </div>
+                          ) : (
                             <button
-                              onClick={() => {
-                                // Jump into session and edit just this one kick
-                                const filled = rows
-                                  .map((r, ri) => ({ r, i: ri }))
-                                  .filter(({ r }) => r.athlete || r.dist || r.pos);
-                                const planned = filled.map(({ r }) => ({
-                                  athlete: r.athlete,
-                                  dist: parseInt(r.dist) || 0,
-                                  pos: r.pos as FGPosition,
-                                }));
-                                setPlannedKicks(planned);
-                                setPlannedRowIndices(filled.map(({ i: ri }) => ri));
-                                setCurrentKickIdx(filledIdx);
-                                setDistInput(planned[filledIdx]?.dist.toString() ?? "");
-                                setEditingKickIdx(filledIdx);
-                                // Pre-fill with logged data
-                                const logged = sessionKicks[filledIdx];
-                                if (logged) {
-                                  setResult(logged.result);
-                                  setScore(logged.score);
-                                } else {
-                                  setResult(null);
-                                  setScore(0);
-                                }
-                                setSessionActive(true);
-                              }}
-                              className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
-                              title="Edit this kick's result"
+                              onClick={() => deleteRow(idx)}
+                              className="text-border hover:text-miss transition-colors text-sm leading-none px-1"
+                              title="Delete row"
                             >
-                              ✏️
+                              ×
                             </button>
-                            <button
-                              onClick={() => handleUnlockRow(filledIdx)}
-                              className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
-                              title="Unlock (removes this result and all after it)"
-                            >
-                              🔒
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => deleteRow(idx)}
-                            className="text-border hover:text-miss transition-colors text-sm leading-none px-1"
-                            title="Delete row"
-                          >
-                            ×
-                          </button>
+                          )
                         )}
                       </td>
                       {/* Show logged result indicator on locked rows */}
@@ -1121,59 +1131,63 @@ export default function KickingSessionPage() {
                 ? "0 kicks entered"
                 : `${filledCount} kick${filledCount !== 1 ? "s" : ""} entered`}
             </span>
-            <div className="flex gap-2">
-              {(canUndo || deletedRowStack.length > 0) && (
-                <button
-                  onClick={() => {
-                    if (deletedRowStack.length > 0) {
-                      undoDeleteRow();
-                    } else {
-                      handleUndo();
-                    }
-                  }}
-                  className="btn-ghost text-xs py-1.5 px-3"
-                >
-                  ↩ Undo
-                </button>
-              )}
-              <button
-                onClick={() => clearLog()}
-                className="text-xs py-1.5 px-3 rounded-input border border-border text-muted hover:text-miss hover:border-miss/40 transition-all"
-              >
-                Clear Log
-              </button>
-            </div>
-            {!isContinuing && (
-              <button
-                onClick={() => setManualEntry((v) => !v)}
-                className={clsx(
-                  "text-xs py-2 px-5 rounded-input border font-semibold transition-all",
-                  manualEntry
-                    ? "bg-accent/20 text-accent border-accent/50"
-                    : "border-border text-muted hover:text-slate-300 hover:bg-surface-2"
+            {!isAthlete && (
+              <>
+                <div className="flex gap-2">
+                  {(canUndo || deletedRowStack.length > 0) && (
+                    <button
+                      onClick={() => {
+                        if (deletedRowStack.length > 0) {
+                          undoDeleteRow();
+                        } else {
+                          handleUndo();
+                        }
+                      }}
+                      className="btn-ghost text-xs py-1.5 px-3"
+                    >
+                      ↩ Undo
+                    </button>
+                  )}
+                  <button
+                    onClick={() => clearLog()}
+                    className="text-xs py-1.5 px-3 rounded-input border border-border text-muted hover:text-miss hover:border-miss/40 transition-all"
+                  >
+                    Clear Log
+                  </button>
+                </div>
+                {!isContinuing && (
+                  <button
+                    onClick={() => setManualEntry((v) => !v)}
+                    className={clsx(
+                      "text-xs py-2 px-5 rounded-input border font-semibold transition-all",
+                      manualEntry
+                        ? "bg-accent/20 text-accent border-accent/50"
+                        : "border-border text-muted hover:text-slate-300 hover:bg-surface-2"
+                    )}
+                  >
+                    {manualEntry ? "Manual Entry ●" : "Manual Entry"}
+                  </button>
                 )}
-              >
-                {manualEntry ? "Manual Entry ●" : "Manual Entry"}
-              </button>
-            )}
-            {manualEntry && !isContinuing ? (
-              <button
-                onClick={handleManualCommit}
-                disabled={filledCount === 0}
-                className="btn-primary text-xs py-2 px-5"
-              >
-                Commit Practice{filledCount > 0 ? ` (${filledCount})` : ""}
-              </button>
-            ) : (
-              <button
-                onClick={handleStartOrContinueSession}
-                disabled={filledCount === 0}
-                className="btn-primary text-xs py-2 px-5"
-              >
-                {isContinuing
-                  ? `Continue Session (${filledCount - sessionKicks.length} remaining)`
-                  : `Start Session${filledCount > 0 ? ` (${filledCount})` : ""}`}
-              </button>
+                {manualEntry && !isContinuing ? (
+                  <button
+                    onClick={handleManualCommit}
+                    disabled={filledCount === 0}
+                    className="btn-primary text-xs py-2 px-5"
+                  >
+                    Commit Practice{filledCount > 0 ? ` (${filledCount})` : ""}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleStartOrContinueSession}
+                    disabled={filledCount === 0}
+                    className="btn-primary text-xs py-2 px-5"
+                  >
+                    {isContinuing
+                      ? `Continue Session (${filledCount - sessionKicks.length} remaining)`
+                      : `Start Session${filledCount > 0 ? ` (${filledCount})` : ""}`}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
