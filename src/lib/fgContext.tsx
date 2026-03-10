@@ -92,6 +92,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         setState(migrated);
         // Ensure localStorage is in sync
         localSet("FG", migrated);
+        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", migrated); }
       }
     }
 
@@ -121,6 +122,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         });
         const next = { ...prev, athletes: newAthletes, stats: newStats };
         localSet("FG", next);
+        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
         return next;
       });
     },
@@ -135,6 +137,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
           athletes: prev.athletes.filter((a) => a !== name),
         };
         localSet("FG", next);
+        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
         return next;
       });
     },
@@ -162,6 +165,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         });
         const next = { ...prev, stats: newStats, history: newHistory, snapshot };
         localSet("FG", next);
+        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
         return next;
       });
 
@@ -186,6 +190,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         stats: newStats,
       };
       localSet("FG", next);
+      { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
       success = true;
       return next;
     });
@@ -200,6 +205,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         );
         const next = { ...prev, history: newHistory };
         localSet("FG", next);
+        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
         return next;
       });
     },
@@ -214,6 +220,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         );
         const next = { ...prev, history: newHistory };
         localSet("FG", next);
+        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
         return next;
       });
     },
