@@ -11,6 +11,7 @@ import type { LongSnapEntry, SnapBenchmark } from "@/types";
 import clsx from "clsx";
 import { cloudGet, cloudSet } from "@/lib/supabaseData";
 import { getCloudUserId } from "@/lib/amplify";
+import { useCloudDraftSync } from "@/lib/useCloudDraftSync";
 
 const BM_COLORS: Record<SnapBenchmark, string> = {
   excellent: "text-make",
@@ -55,6 +56,18 @@ export default function LongSnapSessionPage() {
 
   const avgTime = totals.att > 0 ? (totals.totalTime / totals.att).toFixed(2) : "—";
   const onTargetPct = makePct(totals.att, totals.onTarget);
+
+  // Poll for draft changes from other devices
+  useCloudDraftSync<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(
+    "longsnap_session_draft",
+    (cloud) => {
+      if (cloud && cloud.sessionSnaps) {
+        setSessionSnaps(cloud.sessionSnaps);
+        setSessionStarted(cloud.sessionStarted ?? false);
+        if (cloud.weather !== undefined) setWeather(cloud.weather);
+      }
+    }
+  );
 
   // Sync session snaps to cloud
   const saveSnapsToCloud = useCallback((snaps: LongSnapEntry[]) => {

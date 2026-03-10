@@ -14,6 +14,7 @@ import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { cloudGet, cloudSet } from "@/lib/supabaseData";
 import { getCloudUserId } from "@/lib/amplify";
+import { useCloudDraftSync } from "@/lib/useCloudDraftSync";
 
 const INIT_ROWS = 12;
 const SESSION_STORAGE_KEY = "puntSessionDraft";
@@ -148,6 +149,19 @@ export default function PuntingSessionPage() {
   puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState("");
+
+  // Poll for draft changes from other devices
+  useCloudDraftSync<SessionDraft>("punt_session_draft", (cloudDraft) => {
+    if (cloudDraft && cloudDraft.rows) {
+      setRows(cloudDraft.rows);
+      setManualEntry(cloudDraft.manualEntry);
+      setSessionActive(cloudDraft.sessionActive);
+      setPlannedPunts(cloudDraft.plannedPunts ?? []);
+      setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+      setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
+      setSessionPunts(cloudDraft.sessionPunts ?? []);
+    }
+  });
 
   // Load punt types from cloud on fresh device
   useEffect(() => {

@@ -63,6 +63,31 @@ export function cloudSet<T>(userId: string, dataKey: string, value: T): void {
 }
 
 /**
+ * Load data + updated_at timestamp from Supabase.
+ * Used for polling to detect remote changes.
+ */
+export async function cloudGetWithTimestamp<T>(
+  userId: string,
+  dataKey: string
+): Promise<{ data: T; updatedAt: string } | null> {
+  if (userId === "local-dev") return null;
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("user_data")
+      .select("data, updated_at")
+      .eq("user_id", userId)
+      .eq("data_key", dataKey)
+      .single();
+
+    if (error || !data) return null;
+    return { data: data.data as T, updatedAt: data.updated_at as string };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Immediately save data to Supabase (no debounce).
  * Use this for critical saves like committing a session.
  */

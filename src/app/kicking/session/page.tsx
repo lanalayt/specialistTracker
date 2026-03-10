@@ -15,6 +15,7 @@ import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { cloudGet, cloudSet } from "@/lib/supabaseData";
 import { getCloudUserId } from "@/lib/amplify";
+import { useCloudDraftSync } from "@/lib/useCloudDraftSync";
 
 const INIT_ROWS = 12;
 
@@ -163,6 +164,19 @@ export default function KickingSessionPage() {
   const [makeMode, setMakeMode] = useState(() => loadMakeMode());
   const [missMode, setMissMode] = useState(() => loadMissMode());
   const [weather, setWeather] = useState("");
+
+  // Poll for draft changes from other devices
+  useCloudDraftSync<SessionDraft>("fg_session_draft", (cloudDraft) => {
+    if (cloudDraft && cloudDraft.rows) {
+      setRows(cloudDraft.rows);
+      setManualEntry(cloudDraft.manualEntry);
+      setSessionActive(cloudDraft.sessionActive);
+      setPlannedKicks(cloudDraft.plannedKicks ?? []);
+      setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+      setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
+      setSessionKicks(cloudDraft.sessionKicks ?? []);
+    }
+  });
 
   // Load settings and draft from cloud on fresh device
   useEffect(() => {

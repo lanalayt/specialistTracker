@@ -13,6 +13,7 @@ import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
 import { cloudGet, cloudSet } from "@/lib/supabaseData";
 import { getCloudUserId } from "@/lib/amplify";
+import { useCloudDraftSync } from "@/lib/useCloudDraftSync";
 
 const INIT_ROWS = 12;
 const MAX_SCORE = 4;
@@ -124,6 +125,19 @@ export default function KickoffSessionPage() {
   const [hangTime, setHangTime] = useState("");
   const [direction, setDirection] = useState<KickoffDirection>("middle");
   const [score, setScore] = useState<number>(0);
+
+  // Poll for draft changes from other devices
+  useCloudDraftSync<SessionDraft>("kickoff_session_draft", (cloudDraft) => {
+    if (cloudDraft && cloudDraft.rows) {
+      setRows(cloudDraft.rows);
+      setManualEntry(cloudDraft.manualEntry);
+      setSessionActive(cloudDraft.sessionActive);
+      setPlannedKicks(cloudDraft.plannedKicks ?? []);
+      setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+      setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
+      setSessionKicks(cloudDraft.sessionKicks ?? []);
+    }
+  });
 
   // Persist draft on every relevant state change
   useEffect(() => {
