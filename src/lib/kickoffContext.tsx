@@ -15,9 +15,10 @@ interface KickoffStateData {
 }
 
 interface KickoffContextValue extends KickoffStateData {
-  commitPractice: (entries: KickoffEntry[], label?: string) => Session;
+  commitPractice: (entries: KickoffEntry[], label?: string, weather?: string) => Session;
   undoLastCommit: () => boolean;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
+  updateSessionWeather: (sessionId: string, weather: string) => void;
   canUndo: boolean;
 }
 
@@ -44,10 +45,11 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const commitPractice = useCallback((entries: KickoffEntry[], label?: string): Session => {
+  const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string): Session => {
     const session: Session = {
       id: genId(), teamId: "local", sport: "KICKOFF",
-      label: label ?? sessionLabel(), date: new Date().toISOString(), entries,
+      label: label ?? sessionLabel(), date: new Date().toISOString(),
+      weather: weather || undefined, entries,
     };
     setState((prev) => {
       const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
@@ -80,6 +82,20 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     return success;
   }, []);
 
+  const updateSessionWeather = useCallback(
+    (sessionId: string, weather: string) => {
+      setState((prev) => {
+        const newHistory = prev.history.map((s) =>
+          s.id === sessionId ? { ...s, weather: weather || undefined } : s
+        );
+        const next = { ...prev, history: newHistory };
+        localSet("KICKOFF", next);
+        return next;
+      });
+    },
+    []
+  );
+
   const updateSessionDate = useCallback(
     (sessionId: string, date: string, label: string) => {
       setState((prev) => {
@@ -96,7 +112,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <KickoffContext.Provider value={{
-      ...state, commitPractice, undoLastCommit, updateSessionDate, canUndo: state.snapshot !== null,
+      ...state, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, canUndo: state.snapshot !== null,
     }}>
       {children}
     </KickoffContext.Provider>

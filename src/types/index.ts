@@ -9,7 +9,7 @@ export type FGResult = "YL" | "YC" | "YR" | "XL" | "XR" | "XS";
 export type DistRange = "20-29" | "30-39" | "40-49" | "50-60" | "60+";
 
 // Punting
-export type PuntType = "RED" | "BLUE" | "POOCH_BLUE" | "POOCH_RED" | "BROWN";
+export type PuntType = string;
 export type PuntHash = "LH" | "LM" | "M" | "RM" | "RH";
 export type PuntLandingZone =
   | "TB"
@@ -19,6 +19,7 @@ export type PuntLandingZone =
   | "fairCatch";
 
 // Kickoff
+export type KickoffType = "REG" | "ONSIDE" | "SQUIB" | "FREE";
 export type KickoffLandingZone =
   | "TB"
   | "1"
@@ -121,12 +122,14 @@ export interface KickoffEntry {
   sessionId?: string;
   athleteId: string;
   athlete: string;
+  type: KickoffType;
   distance: number;
   hangTime: number;
-  landingZone: KickoffLandingZone;
-  result: "TB" | "RETURN" | "OOB";
-  returnYards: number;
-  direction?: KickoffDirection;
+  direction: KickoffDirection;
+  score: number;
+  landingZone?: KickoffLandingZone;
+  result?: "TB" | "RETURN" | "OOB";
+  returnYards?: number;
 }
 
 // ─── Kickoff stats ──────────────────────────────────────────────────────────
@@ -183,6 +186,7 @@ export interface Session {
   sport: SportType;
   label: string;
   date: string;
+  weather?: string;
   entries?: FGKick[] | PuntEntry[] | KickoffEntry[] | LongSnapEntry[];
 }
 
@@ -281,6 +285,8 @@ export const PUNT_LANDING_ZONES: PuntLandingZone[] = [
   "returned",
   "fairCatch",
 ];
+export const KICKOFF_TYPES: KickoffType[] = ["REG", "ONSIDE", "SQUIB", "FREE"];
+export const KICKOFF_DIRECTIONS: KickoffDirection[] = ["left", "middle", "right"];
 export const KICKOFF_ZONES: KickoffLandingZone[] = [
   "TB",
   "1",

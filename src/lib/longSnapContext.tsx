@@ -15,8 +15,9 @@ interface LongSnapStateData {
 }
 
 interface LongSnapContextValue extends LongSnapStateData {
-  commitPractice: (entries: LongSnapEntry[], label?: string) => Session;
+  commitPractice: (entries: LongSnapEntry[], label?: string, weather?: string) => Session;
   undoLastCommit: () => boolean;
+  updateSessionWeather: (sessionId: string, weather: string) => void;
   canUndo: boolean;
 }
 
@@ -50,10 +51,11 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const commitPractice = useCallback((entries: LongSnapEntry[], label?: string): Session => {
+  const commitPractice = useCallback((entries: LongSnapEntry[], label?: string, weather?: string): Session => {
     const session: Session = {
       id: genId(), teamId: "local", sport: "LONGSNAP",
-      label: label ?? sessionLabel(), date: new Date().toISOString(), entries,
+      label: label ?? sessionLabel(), date: new Date().toISOString(),
+      weather: weather || undefined, entries,
     };
     setState((prev) => {
       const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
@@ -65,6 +67,20 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
     });
     return session;
   }, []);
+
+  const updateSessionWeather = useCallback(
+    (sessionId: string, weather: string) => {
+      setState((prev) => {
+        const newHistory = prev.history.map((s) =>
+          s.id === sessionId ? { ...s, weather: weather || undefined } : s
+        );
+        const next = { ...prev, history: newHistory };
+        localSet("LONGSNAP", next);
+        return next;
+      });
+    },
+    []
+  );
 
   const undoLastCommit = useCallback((): boolean => {
     let success = false;
@@ -88,7 +104,7 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LongSnapContext.Provider value={{
-      ...state, commitPractice, undoLastCommit, canUndo: state.snapshot !== null,
+      ...state, commitPractice, undoLastCommit, updateSessionWeather, canUndo: state.snapshot !== null,
     }}>
       {children}
     </LongSnapContext.Provider>

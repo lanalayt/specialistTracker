@@ -27,10 +27,11 @@ interface PuntStateData {
 interface PuntContextValue extends PuntStateData {
   addAthletes: (names: string[]) => void;
   removeAthlete: (name: string) => void;
-  commitPractice: (entries: PuntEntry[], label?: string) => Session;
+  commitPractice: (entries: PuntEntry[], label?: string, weather?: string) => Session;
   undoLastCommit: () => boolean;
   resetAll: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
+  updateSessionWeather: (sessionId: string, weather: string) => void;
   canUndo: boolean;
 }
 
@@ -91,13 +92,14 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const commitPractice = useCallback((entries: PuntEntry[], label?: string): Session => {
+  const commitPractice = useCallback((entries: PuntEntry[], label?: string, weather?: string): Session => {
     const session: Session = {
       id: genId(),
       teamId: "local",
       sport: "PUNTING",
       label: label ?? sessionLabel(),
       date: new Date().toISOString(),
+      weather: weather || undefined,
       entries,
     };
     setState((prev) => {
@@ -143,6 +145,20 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateSessionWeather = useCallback(
+    (sessionId: string, weather: string) => {
+      setState((prev) => {
+        const newHistory = prev.history.map((s) =>
+          s.id === sessionId ? { ...s, weather: weather || undefined } : s
+        );
+        const next = { ...prev, history: newHistory };
+        localSet("PUNT", next);
+        return next;
+      });
+    },
+    []
+  );
+
   const resetAll = useCallback(() => {
     const next = defaultState();
     localSet("PUNT", next);
@@ -152,7 +168,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
   return (
     <PuntContext.Provider value={{
       ...state, addAthletes, removeAthlete, commitPractice,
-      undoLastCommit, resetAll, updateSessionDate, canUndo: state.snapshot !== null,
+      undoLastCommit, resetAll, updateSessionDate, updateSessionWeather, canUndo: state.snapshot !== null,
     }}>
       {children}
     </PuntContext.Provider>

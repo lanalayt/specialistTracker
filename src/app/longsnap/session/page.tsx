@@ -34,6 +34,7 @@ export default function LongSnapSessionPage() {
   const [sessionSnaps, setSessionSnaps] = useState<LongSnapEntry[]>([]);
   const [committed, setCommitted] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [weather, setWeather] = useState("");
 
   const totals = athletes.reduce(
     (acc, a) => {
@@ -56,9 +57,10 @@ export default function LongSnapSessionPage() {
 
   const handleCommit = () => {
     if (sessionSnaps.length === 0) return;
-    commitPractice(sessionSnaps);
+    commitPractice(sessionSnaps, undefined, weather);
     setSessionSnaps([]);
     setCommitted(true);
+    setWeather("");
     setTimeout(() => setCommitted(false), 2000);
   };
 
@@ -88,6 +90,17 @@ export default function LongSnapSessionPage() {
     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
       {/* Left: Entry card + session log */}
       <div className="lg:w-[55%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
+        {/* Weather input */}
+        <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
+          <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+          <input
+            type="text"
+            value={weather}
+            onChange={(e) => setWeather(e.target.value)}
+            placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+            className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+          />
+        </div>
         <div className="overflow-y-auto border-b border-border">
           <SnapEntryCard
             athletes={athletes}

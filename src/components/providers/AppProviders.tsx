@@ -75,6 +75,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
+    window.location.href = "/login";
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setDemoRole = useCallback(

@@ -10,8 +10,16 @@ import { makePct } from "@/lib/stats";
 import type { FGKick, FGPosition, FGResult } from "@/types";
 import { POSITIONS, RESULTS } from "@/types";
 import clsx from "clsx";
+import { useDragReorder } from "@/lib/useDragReorder";
 
 const INIT_ROWS = 12;
+
+// Outlier detection for FG distance
+function checkFGOutliers(dist: number): string[] {
+  const warnings: string[] = [];
+  if (dist < 7 || dist > 80) warnings.push(`Distance ${dist} yd seems unusual (expected 7–80)`);
+  return warnings;
+}
 const MAX_SCORE = 4;
 const SESSION_STORAGE_KEY = "fgSessionDraft";
 
@@ -142,8 +150,10 @@ export default function KickingSessionPage() {
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [showReset, setShowReset] = useState(false);
   const [snapDistance] = useState(() => loadSnapDistance());
+  const drag = useDragReorder(rows, setRows);
   const [makeMode] = useState(() => loadMakeMode());
   const [missMode] = useState(() => loadMissMode());
+  const [weather, setWeather] = useState("");
 
   // Persist draft on every relevant state change
   useEffect(() => {
@@ -189,16 +199,33 @@ export default function KickingSessionPage() {
     []
   );
 
-  const clearRow = useCallback((idx: number) => {
+  const [deletedRowStack, setDeletedRowStack] = useState<{ idx: number; row: LogRow }[]>([]);
+
+  const deleteRow = useCallback((idx: number) => {
     setRows((prev) => {
-      const next = [...prev];
-      next[idx] = emptyRow();
-      return next;
+      setDeletedRowStack((stack) => [...stack, { idx, row: prev[idx] }]);
+      return prev.filter((_, i) => i !== idx);
     });
     setErrorRows((prev) => {
-      const next = new Set(prev);
-      next.delete(idx);
+      const next = new Set<number>();
+      prev.forEach((i) => {
+        if (i < idx) next.add(i);
+        else if (i > idx) next.add(i - 1);
+      });
       return next;
+    });
+  }, []);
+
+  const undoDeleteRow = useCallback(() => {
+    setDeletedRowStack((stack) => {
+      if (stack.length === 0) return stack;
+      const last = stack[stack.length - 1];
+      setRows((prev) => {
+        const next = [...prev];
+        next.splice(last.idx, 0, last.row);
+        return next;
+      });
+      return stack.slice(0, -1);
     });
   }, []);
 
@@ -307,6 +334,14 @@ export default function KickingSessionPage() {
       score: parseInt(r.score) || 0,
     }));
 
+    // Outlier check across all kicks
+    const allWarnings: string[] = [];
+    kicks.forEach((k, i) => {
+      const w = checkFGOutliers(k.dist);
+      if (w.length > 0) allWarnings.push(`Row ${i + 1}: ${w.join(", ")}`);
+    });
+    if (allWarnings.length > 0 && !window.confirm(`Are you sure?\n\n${allWarnings.join("\n")}`)) return;
+
     setPendingKicks(kicks);
   };
 
@@ -325,6 +360,10 @@ export default function KickingSessionPage() {
       result,
       score,
     };
+
+    // Outlier check
+    const warnings = checkFGOutliers(plan.dist);
+    if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
 
     if (editingKickIdx !== null) {
       // Replace the existing kick at the edited index
@@ -377,10 +416,10 @@ export default function KickingSessionPage() {
   const [showAthleteDropdown, setShowAthleteDropdown] = useState(false);
   const [distInput, setDistInput] = useState(currentPlan?.dist?.toString() ?? "");
 
-  // Sync distInput when moving to a different kick
+  // Sync distInput when moving to a different kick or entering session
   useEffect(() => {
     setDistInput(currentPlan?.dist?.toString() ?? "");
-  }, [currentKickIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentKickIdx, sessionActive, plannedKicks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteKick = (idx: number) => {
     setSessionKicks((prev) => prev.filter((_, i) => i !== idx));
@@ -396,7 +435,7 @@ export default function KickingSessionPage() {
 
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;
-    commitPractice(pendingKicks);
+    commitPractice(pendingKicks, undefined, weather);
     setSessionKicks([]);
     setPendingKicks(null);
     setSessionActive(false);
@@ -404,6 +443,7 @@ export default function KickingSessionPage() {
     setPlannedKicks([]);
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
+    setWeather("");
   };
 
   const handleBackToLog = () => {
@@ -639,7 +679,7 @@ export default function KickingSessionPage() {
                         {missMode === "simple" ? (
                           <div>
                             <button
-                              onClick={() => setResult("XS")}
+                              onClick={() => { setResult("XS"); setScore(0); }}
                               className={clsx(
                                 "w-full py-3 rounded-input text-xs font-bold transition-all",
                                 result === "XL" || result === "XS" || result === "XR"
@@ -655,7 +695,7 @@ export default function KickingSessionPage() {
                             {MISS_BTNS.map(({ r, label }) => (
                               <button
                                 key={r}
-                                onClick={() => setResult(r)}
+                                onClick={() => { setResult(r); setScore(0); }}
                                 className={clsx(
                                   "py-3 rounded-input text-xs font-bold transition-all",
                                   result === r
@@ -815,6 +855,17 @@ export default function KickingSessionPage() {
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         {/* Left: Practice Log Table */}
         <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
+          {/* Weather input */}
+          <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+            <input
+              type="text"
+              value={weather}
+              onChange={(e) => setWeather(e.target.value)}
+              placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+              className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+            />
+          </div>
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               {!manualEntry && (
@@ -868,7 +919,11 @@ export default function KickingSessionPage() {
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-8 border-b border-border" />
                 </tr>
               </thead>
-              <tbody>
+              <tbody
+                ref={drag.containerRef}
+                onPointerMove={drag.handlePointerMove}
+                onPointerUp={drag.handlePointerUp}
+              >
                 {rows.map((row, idx) => {
                   const isLocked = lockedRowSet.has(idx);
                   // Find the filled index for this row to map to sessionKicks
@@ -881,10 +936,15 @@ export default function KickingSessionPage() {
                       className={clsx(
                         "border-b border-border/30 transition-colors",
                         errorRows.has(idx) && "bg-miss/10",
-                        isLocked && "bg-make/5"
+                        isLocked && "bg-make/5",
+                        drag.dragIdx === idx && "opacity-40",
+                        drag.overIdx === idx && drag.dragIdx !== null && drag.dragIdx !== idx && "border-t-2 border-t-accent"
                       )}
                     >
-                      <td className="text-center text-muted py-1 px-1">
+                      <td
+                        className="text-center text-muted py-1 px-1 cursor-grab active:cursor-grabbing select-none touch-none"
+                        onPointerDown={(e) => drag.handlePointerDown(idx, e)}
+                      >
                         {idx + 1}
                       </td>
                       <td className="py-1 px-1">
@@ -939,7 +999,12 @@ export default function KickingSessionPage() {
                           <td className="py-1 px-1">
                             <select
                               value={row.result}
-                              onChange={(e) => updateRow(idx, "result", e.target.value)}
+                              onChange={(e) => {
+                                updateRow(idx, "result", e.target.value);
+                                if (e.target.value.startsWith("X")) {
+                                  updateRow(idx, "score", "0");
+                                }
+                              }}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
                             >
                               <option value="">—</option>
@@ -1011,9 +1076,9 @@ export default function KickingSessionPage() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => clearRow(idx)}
+                            onClick={() => deleteRow(idx)}
                             className="text-border hover:text-miss transition-colors text-sm leading-none px-1"
-                            title="Clear row"
+                            title="Delete row"
                           >
                             ×
                           </button>
@@ -1045,9 +1110,15 @@ export default function KickingSessionPage() {
                 : `${filledCount} kick${filledCount !== 1 ? "s" : ""} entered`}
             </span>
             <div className="flex gap-2">
-              {canUndo && (
+              {(canUndo || deletedRowStack.length > 0) && (
                 <button
-                  onClick={handleUndo}
+                  onClick={() => {
+                    if (deletedRowStack.length > 0) {
+                      undoDeleteRow();
+                    } else {
+                      handleUndo();
+                    }
+                  }}
                   className="btn-ghost text-xs py-1.5 px-3"
                 >
                   ↩ Undo

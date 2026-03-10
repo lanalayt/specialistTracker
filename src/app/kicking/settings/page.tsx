@@ -27,40 +27,48 @@ function loadSettings(): FGSettings {
   return { snapDistance: "7", makeMode: "detailed", missMode: "detailed" };
 }
 
-function saveSettings(settings: FGSettings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
-
 export default function FGSettingsPage() {
   const [snapDistance, setSnapDistance] = useState("7");
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">("detailed");
   const [missMode, setMissMode] = useState<"simple" | "detailed">("detailed");
+  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  // Track what was last saved so we can detect changes
+  const [savedSettings, setSavedSettings] = useState<FGSettings>({
+    snapDistance: "7",
+    makeMode: "detailed",
+    missMode: "detailed",
+  });
 
   useEffect(() => {
     const s = loadSettings();
     setSnapDistance(s.snapDistance);
     setMakeMode(s.makeMode);
     setMissMode(s.missMode);
+    setSavedSettings(s);
+    setLoaded(true);
   }, []);
 
-  const save = (overrides: Partial<FGSettings>) => {
-    const updated = { snapDistance, makeMode, missMode, ...overrides };
-    saveSettings(updated);
-  };
+  // Detect unsaved changes
+  useEffect(() => {
+    if (!loaded) return;
+    const changed =
+      snapDistance !== savedSettings.snapDistance ||
+      makeMode !== savedSettings.makeMode ||
+      missMode !== savedSettings.missMode;
+    setDirty(changed);
+    if (changed) setSaved(false);
+  }, [snapDistance, makeMode, missMode, savedSettings, loaded]);
 
-  const handleSnapSelect = (val: string) => {
-    setSnapDistance(val);
-    save({ snapDistance: val });
-  };
-
-  const handleMakeModeSelect = (val: "simple" | "detailed") => {
-    setMakeMode(val);
-    save({ makeMode: val });
-  };
-
-  const handleMissModeSelect = (val: "simple" | "detailed") => {
-    setMissMode(val);
-    save({ missMode: val });
+  const handleSave = () => {
+    const settings: FGSettings = { snapDistance, makeMode, missMode };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    setSavedSettings(settings);
+    setDirty(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   return (
@@ -73,7 +81,7 @@ export default function FGSettingsPage() {
           {SNAP_DISTANCES.map((d) => (
             <button
               key={d}
-              onClick={() => handleSnapSelect(d)}
+              onClick={() => setSnapDistance(d)}
               className={clsx(
                 "flex-1 py-3 rounded-input text-sm font-bold transition-all",
                 snapDistance === d
@@ -91,7 +99,7 @@ export default function FGSettingsPage() {
         <p className="label">Make Tracking</p>
         <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={() => handleMakeModeSelect("simple")}
+            onClick={() => setMakeMode("simple")}
             className={clsx(
               "py-4 rounded-input text-sm font-bold border transition-all",
               makeMode === "simple"
@@ -105,7 +113,7 @@ export default function FGSettingsPage() {
             </span>
           </button>
           <button
-            onClick={() => handleMakeModeSelect("detailed")}
+            onClick={() => setMakeMode("detailed")}
             className={clsx(
               "py-4 rounded-input text-sm font-bold border transition-all",
               makeMode === "detailed"
@@ -125,7 +133,7 @@ export default function FGSettingsPage() {
         <p className="label">Miss Tracking</p>
         <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={() => handleMissModeSelect("simple")}
+            onClick={() => setMissMode("simple")}
             className={clsx(
               "py-4 rounded-input text-sm font-bold border transition-all",
               missMode === "simple"
@@ -139,7 +147,7 @@ export default function FGSettingsPage() {
             </span>
           </button>
           <button
-            onClick={() => handleMissModeSelect("detailed")}
+            onClick={() => setMissMode("detailed")}
             className={clsx(
               "py-4 rounded-input text-sm font-bold border transition-all",
               missMode === "detailed"
@@ -154,6 +162,21 @@ export default function FGSettingsPage() {
           </button>
         </div>
       </div>
+
+      <button
+        onClick={handleSave}
+        disabled={!dirty}
+        className={clsx(
+          "w-full py-3 rounded-input text-sm font-bold transition-all",
+          saved
+            ? "bg-make text-slate-900"
+            : dirty
+              ? "btn-primary"
+              : "bg-surface-2 text-muted border border-border cursor-not-allowed"
+        )}
+      >
+        {saved ? "✓ Saved!" : "Save Settings"}
+      </button>
     </div>
   );
 }

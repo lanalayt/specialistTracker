@@ -27,10 +27,11 @@ interface FGStateData {
 interface FGContextValue extends FGStateData {
   addAthletes: (names: string[]) => void;
   removeAthlete: (name: string) => void;
-  commitPractice: (kicks: FGKick[], label?: string) => Session;
+  commitPractice: (kicks: FGKick[], label?: string, weather?: string) => Session;
   undoLastCommit: () => boolean;
   resetAll: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
+  updateSessionWeather: (sessionId: string, weather: string) => void;
   canUndo: boolean;
 }
 
@@ -106,13 +107,14 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
   );
 
   const commitPractice = useCallback(
-    (kicks: FGKick[], label?: string): Session => {
+    (kicks: FGKick[], label?: string, weather?: string): Session => {
       const session: Session = {
         id: genId(),
         teamId: "local",
         sport: "KICKING",
         label: label ?? sessionLabel(),
         date: new Date().toISOString(),
+        weather: weather || undefined,
         entries: kicks,
       };
 
@@ -169,6 +171,20 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateSessionWeather = useCallback(
+    (sessionId: string, weather: string) => {
+      setState((prev) => {
+        const newHistory = prev.history.map((s) =>
+          s.id === sessionId ? { ...s, weather: weather || undefined } : s
+        );
+        const next = { ...prev, history: newHistory };
+        localSet("FG", next);
+        return next;
+      });
+    },
+    []
+  );
+
   const resetAll = useCallback(() => {
     const next = defaultState();
     save(next);
@@ -184,6 +200,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         undoLastCommit,
         resetAll,
         updateSessionDate,
+        updateSessionWeather,
         canUndo: state.snapshot !== null,
       }}
     >

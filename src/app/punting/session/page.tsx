@@ -7,11 +7,21 @@ import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
 import { PuntSessionSummary } from "@/components/ui/PuntSessionSummary";
 import { PuntFieldStrip } from "@/components/ui/PuntFieldStrip";
 import type { PuntEntry, PuntType, PuntHash } from "@/types";
-import { PUNT_TYPES, PUNT_HASHES } from "@/types";
+import { PUNT_HASHES } from "@/types";
 import clsx from "clsx";
+import { useDragReorder } from "@/lib/useDragReorder";
 
 const INIT_ROWS = 12;
 const SESSION_STORAGE_KEY = "puntSessionDraft";
+
+// Outlier detection for punt values
+function checkPuntOutliers(yards: number, hangTime: number, opTime: number): string[] {
+  const warnings: string[] = [];
+  if (yards < 1 || yards > 80) warnings.push(`Yards ${yards} seems unusual (expected 1–80)`);
+  if (hangTime < 1.0 || hangTime > 6.0) warnings.push(`Hang Time ${hangTime}s seems unusual (expected 1.0–6.0)`);
+  if (opTime < 0.8 || opTime > 3.0) warnings.push(`Punter Opp ${opTime}s seems unusual (expected 0.8–3.0)`);
+  return warnings;
+}
 
 // ── Table row (planning phase) ────────────────────────────────
 interface LogRow {
@@ -58,13 +68,27 @@ function saveDraft(draft: SessionDraft) {
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(draft));
 }
 
-const TYPE_LABELS: Record<PuntType, string> = {
-  RED: "Red",
-  BLUE: "Blue",
-  POOCH_BLUE: "P-Blue",
-  POOCH_RED: "P-Red",
-  BROWN: "Brown",
-};
+const DEFAULT_PUNT_TYPES = [
+  { id: "BLUE", label: "Blue" },
+  { id: "RED", label: "Red" },
+  { id: "POOCH_BLUE", label: "P-Blue" },
+  { id: "POOCH_RED", label: "P-Red" },
+  { id: "BROWN", label: "Brown" },
+];
+
+function loadPuntTypes(): { id: string; label: string }[] {
+  if (typeof window === "undefined") return DEFAULT_PUNT_TYPES;
+  try {
+    const raw = localStorage.getItem("puntSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.puntTypes && parsed.puntTypes.length > 0) {
+        return parsed.puntTypes;
+      }
+    }
+  } catch {}
+  return DEFAULT_PUNT_TYPES;
+}
 
 const POS_LABELS: Record<PuntHash, string> = {
   LH: "LH",
@@ -110,6 +134,11 @@ export default function PuntingSessionPage() {
   const [sessionPunts, setSessionPunts] = useState<PuntEntry[]>(draft.sessionPunts);
   const [pendingPunts, setPendingPunts] = useState<PuntEntry[] | null>(null);
   const [showReset, setShowReset] = useState(false);
+  const [puntTypes] = useState(() => loadPuntTypes());
+  const typeLabels: Record<string, string> = {};
+  puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
+  const drag = useDragReorder(rows, setRows);
+  const [weather, setWeather] = useState("");
 
   // Session card state
   const [yards, setYards] = useState("");
@@ -166,16 +195,33 @@ export default function PuntingSessionPage() {
     []
   );
 
-  const clearRow = useCallback((idx: number) => {
+  const [deletedRowStack, setDeletedRowStack] = useState<{ idx: number; row: LogRow }[]>([]);
+
+  const deleteRow = useCallback((idx: number) => {
     setRows((prev) => {
-      const next = [...prev];
-      next[idx] = emptyRow();
-      return next;
+      setDeletedRowStack((stack) => [...stack, { idx, row: prev[idx] }]);
+      return prev.filter((_, i) => i !== idx);
     });
     setErrorRows((prev) => {
-      const next = new Set(prev);
-      next.delete(idx);
+      const next = new Set<number>();
+      prev.forEach((i) => {
+        if (i < idx) next.add(i);
+        else if (i > idx) next.add(i - 1);
+      });
       return next;
+    });
+  }, []);
+
+  const undoDeleteRow = useCallback(() => {
+    setDeletedRowStack((stack) => {
+      if (stack.length === 0) return stack;
+      const last = stack[stack.length - 1];
+      setRows((prev) => {
+        const next = [...prev];
+        next.splice(last.idx, 0, last.row);
+        return next;
+      });
+      return stack.slice(0, -1);
     });
   }, []);
 
@@ -286,6 +332,14 @@ export default function PuntingSessionPage() {
       directionalAccuracy: parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1,
     }));
 
+    // Outlier check across all punts
+    const allWarnings: string[] = [];
+    punts.forEach((p, i) => {
+      const w = checkPuntOutliers(p.yards, p.hangTime, p.opTime);
+      if (w.length > 0) allWarnings.push(`Row ${i + 1}: ${w.join(", ")}`);
+    });
+    if (allWarnings.length > 0 && !window.confirm(`Are you sure?\n\n${allWarnings.join("\n")}`)) return;
+
     setPendingPunts(punts);
   };
 
@@ -316,17 +370,24 @@ export default function PuntingSessionPage() {
   const handleLogPunt = () => {
     if (!yards || !hangTime || !opTime) return;
     const plan = plannedPunts[currentPuntIdx];
+    const ydsVal = parseInt(yards) || 0;
+    const htVal = parseFloat(hangTime) || 0;
+    const otVal = parseFloat(opTime) || 0;
     const punt: PuntEntry = {
       athleteId: plan.athlete,
       athlete: plan.athlete,
       type: plan.type,
       hash: plan.hash,
-      yards: parseInt(yards) || 0,
-      hangTime: parseFloat(hangTime) || 0,
-      opTime: parseFloat(opTime) || 0,
+      yards: ydsVal,
+      hangTime: htVal,
+      opTime: otVal,
       landingZones: [],
       directionalAccuracy,
     };
+
+    // Outlier check
+    const warnings = checkPuntOutliers(ydsVal, htVal, otVal);
+    if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
 
     if (editingPuntIdx !== null) {
       // Replace the existing punt at the edited index
@@ -372,13 +433,14 @@ export default function PuntingSessionPage() {
 
   const handleConfirmCommit = () => {
     if (!pendingPunts) return;
-    commitPractice(pendingPunts);
+    commitPractice(pendingPunts, undefined, weather);
     setSessionPunts([]);
     setPendingPunts(null);
     setSessionActive(false);
     setManualEntry(false);
     setPlannedPunts([]);
     setPlannedRowIndices([]);
+    setWeather("");
     setCurrentPuntIdx(0);
   };
 
@@ -537,18 +599,18 @@ export default function PuntingSessionPage() {
                       <div className="shrink-0">
                         <p className="label">Type</p>
                         <div className="flex gap-1.5">
-                          {PUNT_TYPES.map((t) => (
+                          {puntTypes.map((pt) => (
                             <button
-                              key={t}
-                              onClick={() => updateCurrentPlan("type", t)}
+                              key={pt.id}
+                              onClick={() => updateCurrentPlan("type", pt.id)}
                               className={clsx(
                                 "px-3 py-2 rounded-input text-xs font-semibold text-center transition-all",
-                                currentPlan.type === t
+                                currentPlan.type === pt.id
                                   ? "bg-accent/20 text-accent border border-accent/50"
                                   : "bg-surface-2 text-muted border border-border hover:text-slate-300"
                               )}
                             >
-                              {TYPE_LABELS[t]}
+                              {pt.label}
                             </button>
                           ))}
                         </div>
@@ -763,6 +825,17 @@ export default function PuntingSessionPage() {
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         {/* Left: Practice Log Table */}
         <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
+          {/* Weather input */}
+          <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+            <input
+              type="text"
+              value={weather}
+              onChange={(e) => setWeather(e.target.value)}
+              placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+              className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+            />
+          </div>
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               {!manualEntry && (
@@ -808,21 +881,25 @@ export default function PuntingSessionPage() {
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                         Yards
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
-                        HT
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
+                        Hang Time
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
-                        OT
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
+                        Punter Opp
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
-                        DA
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
+                        Dir. Score
                       </th>
                     </>
                   )}
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
                 </tr>
               </thead>
-              <tbody>
+              <tbody
+                ref={drag.containerRef}
+                onPointerMove={drag.handlePointerMove}
+                onPointerUp={drag.handlePointerUp}
+              >
                 {rows.map((row, idx) => {
                   const isLocked = lockedRowSet.has(idx);
                   const filledIdx = filledIndices.indexOf(idx);
@@ -834,10 +911,15 @@ export default function PuntingSessionPage() {
                       className={clsx(
                         "border-b border-border/30 transition-colors",
                         errorRows.has(idx) && "bg-miss/10",
-                        isLocked && "bg-make/5"
+                        isLocked && "bg-make/5",
+                        drag.dragIdx === idx && "opacity-40",
+                        drag.overIdx === idx && drag.dragIdx !== null && drag.dragIdx !== idx && "border-t-2 border-t-accent"
                       )}
                     >
-                      <td className="text-center text-muted py-1 px-1">
+                      <td
+                        className="text-center text-muted py-1 px-1 cursor-grab active:cursor-grabbing select-none touch-none"
+                        onPointerDown={(e) => drag.handlePointerDown(idx, e)}
+                      >
                         {idx + 1}
                       </td>
                       <td className="py-1 px-1">
@@ -858,7 +940,7 @@ export default function PuntingSessionPage() {
                       </td>
                       <td className="py-1 px-1">
                         {isLocked ? (
-                          <span className="text-xs text-slate-400 text-center block">{TYPE_LABELS[row.type as PuntType] ?? row.type}</span>
+                          <span className="text-xs text-slate-400 text-center block">{typeLabels[row.type] ?? row.type}</span>
                         ) : (
                           <select
                             value={row.type}
@@ -866,8 +948,8 @@ export default function PuntingSessionPage() {
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
                           >
                             <option value="">—</option>
-                            {PUNT_TYPES.map((t) => (
-                              <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                            {puntTypes.map((pt) => (
+                              <option key={pt.id} value={pt.id}>{pt.label}</option>
                             ))}
                           </select>
                         )}
@@ -976,9 +1058,9 @@ export default function PuntingSessionPage() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => clearRow(idx)}
+                            onClick={() => deleteRow(idx)}
                             className="text-border hover:text-miss transition-colors text-sm leading-none px-1"
-                            title="Clear row"
+                            title="Delete row"
                           >
                             ×
                           </button>
@@ -1007,9 +1089,15 @@ export default function PuntingSessionPage() {
                 : `${filledCount} punt${filledCount !== 1 ? "s" : ""} entered`}
             </span>
             <div className="flex gap-2">
-              {canUndo && (
+              {(canUndo || deletedRowStack.length > 0) && (
                 <button
-                  onClick={handleUndo}
+                  onClick={() => {
+                    if (deletedRowStack.length > 0) {
+                      undoDeleteRow();
+                    } else {
+                      handleUndo();
+                    }
+                  }}
                   className="btn-ghost text-xs py-1.5 px-3"
                 >
                   ↩ Undo
@@ -1057,19 +1145,52 @@ export default function PuntingSessionPage() {
           </div>
         </div>
 
-        {/* Right: Season stats */}
+        {/* Right: Today's session stats by athlete */}
         <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <StatCard label="Avg Yards" value={avgYards} accent glow />
-            <StatCard
-              label="Avg Hang"
-              value={totals.att > 0 ? `${avgHang}s` : "—"}
-            />
-            <StatCard
-              label="Long Punt"
-              value={totals.long > 0 ? `${totals.long} yd` : "—"}
-            />
-          </div>
+          {(() => {
+            const todayPunts = sessionPunts;
+            const athleteNames = [...new Set(todayPunts.map((p) => p.athlete))];
+
+            if (athleteNames.length === 0) {
+              return (
+                <div className="flex items-center justify-center h-24 text-xs text-muted">
+                  Session stats will appear here
+                </div>
+              );
+            }
+
+            return athleteNames.map((name) => {
+              const ap = todayPunts.filter((p) => p.athlete === name);
+              const count = ap.length;
+              const totalYds = ap.reduce((s, p) => s + p.yards, 0);
+              const totalHT = ap.reduce((s, p) => s + p.hangTime, 0);
+              const totalOT = ap.reduce((s, p) => s + p.opTime, 0);
+              const totalDA = ap.reduce((s, p) => s + p.directionalAccuracy, 0);
+              const longPunt = Math.max(...ap.map((p) => p.yards));
+              const aYds = count > 0 ? (totalYds / count).toFixed(1) : "—";
+              const aHT = count > 0 ? (totalHT / count).toFixed(2) : "—";
+              const aOT = count > 0 ? (totalOT / count).toFixed(2) : "—";
+              const aDA = count > 0 ? `${Math.round((totalDA / count) * 100)}%` : "—";
+
+              return (
+                <div key={name} className="card space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-slate-100">{name}</p>
+                    <span className="text-xs text-muted">{count} punt{count !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatCard label="Avg Yards" value={aYds} accent />
+                    <StatCard label="Avg Hang" value={count > 0 ? `${aHT}s` : "—"} />
+                    <StatCard label="Punter Opp" value={count > 0 ? `${aOT}s` : "—"} />
+                    <StatCard label="Dir. Score" value={aDA} />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted px-1">
+                    <span>Long: {longPunt > 0 ? `${longPunt} yd` : "—"}</span>
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       </main>
 

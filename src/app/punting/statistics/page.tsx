@@ -1,16 +1,29 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { usePunt } from "@/lib/puntContext";
-import { PUNT_TYPES, PUNT_HASHES } from "@/types";
+import { PUNT_HASHES } from "@/types";
 import type { PuntType, PuntHash, PuntStatBucket, PuntAthleteStats } from "@/types";
 
-const TYPE_LABELS: Record<PuntType, string> = {
-  RED: "Red",
-  BLUE: "Blue",
-  POOCH_BLUE: "Pooch - Blue",
-  POOCH_RED: "Pooch - Red",
-  BROWN: "Brown",
-};
+const DEFAULT_PUNT_TYPES = [
+  { id: "BLUE", label: "Blue" },
+  { id: "RED", label: "Red" },
+  { id: "POOCH_BLUE", label: "Pooch - Blue" },
+  { id: "POOCH_RED", label: "Pooch - Red" },
+  { id: "BROWN", label: "Brown" },
+];
+
+function loadPuntTypes(): { id: string; label: string }[] {
+  if (typeof window === "undefined") return DEFAULT_PUNT_TYPES;
+  try {
+    const raw = localStorage.getItem("puntSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.puntTypes && parsed.puntTypes.length > 0) return parsed.puntTypes;
+    }
+  } catch {}
+  return DEFAULT_PUNT_TYPES;
+}
 
 const POS_LABELS: Record<PuntHash, string> = {
   LH: "Left Hash",
@@ -37,7 +50,7 @@ function avgOT(b: PuntStatBucket): string {
 
 function avgDA(b: PuntStatBucket): string {
   if (b.att === 0) return "—";
-  return (b.totalDirectionalAccuracy / b.att).toFixed(2);
+  return `${Math.round((b.totalDirectionalAccuracy / b.att) * 100)}%`;
 }
 
 function PuntTable({
@@ -58,7 +71,7 @@ function PuntTable({
           <th className="table-header">Dist Avg</th>
           <th className="table-header">HT Avg</th>
           <th className="table-header">OT Avg</th>
-          <th className="table-header">DA</th>
+          <th className="table-header">Dir. Score</th>
           <th className="table-header">Crit Dir</th>
         </tr>
       </thead>
@@ -88,6 +101,16 @@ function PuntTable({
 
 export default function PuntingStatisticsPage() {
   const { athletes, stats } = usePunt();
+  const [puntTypes, setPuntTypes] = useState(DEFAULT_PUNT_TYPES);
+  const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const types = loadPuntTypes();
+    setPuntTypes(types);
+    const map: Record<string, string> = {};
+    types.forEach((t) => { map[t.id] = t.label; });
+    setTypeLabels(map);
+  }, []);
 
   const hasData = athletes.some((a) => stats[a]?.overall.att > 0);
 
@@ -115,9 +138,9 @@ export default function PuntingStatisticsPage() {
       <section>
         <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Total by Type</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {PUNT_TYPES.map((type) => (
+          {puntTypes.map(({ id: type }) => (
             <div key={type} className="card-2">
-              <p className="text-xs font-semibold text-slate-300 mb-2">{TYPE_LABELS[type]}</p>
+              <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
               <PuntTable
                 athletes={athletes}
                 statsMap={stats}
@@ -129,10 +152,10 @@ export default function PuntingStatisticsPage() {
       </section>
 
       {/* By Position per Type */}
-      {PUNT_TYPES.map((type) => (
+      {puntTypes.map(({ id: type }) => (
         <section key={type}>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-            {TYPE_LABELS[type]} — By Position
+            {typeLabels[type] ?? type} — By Position
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {PUNT_HASHES.map((hash) => (

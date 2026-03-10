@@ -1,15 +1,27 @@
 "use client";
 
-import React from "react";
-import type { PuntEntry, PuntType } from "@/types";
+import React, { useState, useEffect } from "react";
+import type { PuntEntry } from "@/types";
 
-const TYPE_LABELS: Record<PuntType, string> = {
-  RED: "Red",
-  BLUE: "Blue",
-  POOCH_BLUE: "P-Blue",
-  POOCH_RED: "P-Red",
-  BROWN: "Brown",
-};
+const DEFAULT_PUNT_TYPES = [
+  { id: "BLUE", label: "Blue" },
+  { id: "RED", label: "Red" },
+  { id: "POOCH_BLUE", label: "P-Blue" },
+  { id: "POOCH_RED", label: "P-Red" },
+  { id: "BROWN", label: "Brown" },
+];
+
+function loadPuntTypes(): { id: string; label: string }[] {
+  if (typeof window === "undefined") return DEFAULT_PUNT_TYPES;
+  try {
+    const raw = localStorage.getItem("puntSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.puntTypes && parsed.puntTypes.length > 0) return parsed.puntTypes;
+    }
+  } catch {}
+  return DEFAULT_PUNT_TYPES;
+}
 
 interface PuntSessionLogProps {
   punts: PuntEntry[];
@@ -17,6 +29,15 @@ interface PuntSessionLogProps {
 }
 
 export function PuntSessionLog({ punts, onDelete }: PuntSessionLogProps) {
+  const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const types = loadPuntTypes();
+    const map: Record<string, string> = {};
+    types.forEach((t) => { map[t.id] = t.label; });
+    setTypeLabels(map);
+  }, []);
+
   if (punts.length === 0) {
     return (
       <div className="flex items-center justify-center h-16 text-xs text-muted">
@@ -39,7 +60,7 @@ export function PuntSessionLog({ punts, onDelete }: PuntSessionLogProps) {
               {p.athlete}
             </span>
             <span className="text-xs text-muted w-14 shrink-0">
-              {TYPE_LABELS[p.type] ?? p.type}
+              {typeLabels[p.type] ?? p.type}
             </span>
             <span className="text-xs text-muted w-8 shrink-0">{p.hash}</span>
             <span className="text-xs text-slate-200 w-12 shrink-0">{p.yards} yd</span>

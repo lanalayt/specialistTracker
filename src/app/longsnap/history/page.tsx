@@ -20,7 +20,7 @@ const BM_COLORS: Record<SnapBenchmark, string> = {
 };
 
 export default function LongSnapHistoryPage() {
-  const { history } = useLongSnap();
+  const { history, updateSessionWeather } = useLongSnap();
   const [selectedId, setSelectedId] = useState<string | null>(
     history[history.length - 1]?.id ?? null
   );
@@ -74,6 +74,20 @@ export default function LongSnapHistoryPage() {
             <div className="mb-4">
               <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
               <p className="text-xs text-muted mt-0.5">{snaps.length} snap{snaps.length !== 1 ? "s" : ""}</p>
+              {selected.weather && (
+                <p className="text-xs text-muted mt-1">Weather: {selected.weather}</p>
+              )}
+            </div>
+            {/* Editable weather */}
+            <div className="mb-4 flex items-center gap-2">
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+              <input
+                type="text"
+                value={selected.weather ?? ""}
+                onChange={(e) => updateSessionWeather(selected.id, e.target.value)}
+                placeholder="Add weather notes..."
+                className="flex-1 max-w-xs bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+              />
             </div>
             <div className="card-2 overflow-x-auto">
               <table className="w-full text-sm">

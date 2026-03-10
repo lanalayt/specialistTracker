@@ -80,33 +80,8 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* User + demo role toggle */}
+      {/* User info */}
       <div className="p-3 border-t border-border space-y-2">
-        {/* Demo role toggle */}
-        <div className="flex items-center gap-1.5 bg-surface-2 rounded-input p-1">
-          <button
-            onClick={() => setDemoRole("coach")}
-            className={clsx(
-              "flex-1 text-xs py-1 rounded transition-all",
-              user?.role === "coach"
-                ? "bg-accent text-bg font-semibold"
-                : "text-muted hover:text-slate-300"
-            )}
-          >
-            Coach
-          </button>
-          <button
-            onClick={() => setDemoRole("athlete")}
-            className={clsx(
-              "flex-1 text-xs py-1 rounded transition-all",
-              user?.role === "athlete"
-                ? "bg-accent text-bg font-semibold"
-                : "text-muted hover:text-slate-300"
-            )}
-          >
-            Athlete
-          </button>
-        </div>
         {/* User info */}
         <div className="flex items-center gap-2 px-1">
           <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent text-xs font-bold flex-shrink-0">

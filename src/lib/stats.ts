@@ -357,13 +357,15 @@ export function processKickoff(
     oob: s.overall.oob + (result === "OOB" ? 1 : 0),
     totalDist: s.overall.totalDist + distance,
     totalHang: s.overall.totalHang + hangTime,
-    totalReturn: s.overall.totalReturn + (returnYards || 0),
+    totalReturn: s.overall.totalReturn + (returnYards ?? 0),
   };
 
-  s.byZone = {
-    ...s.byZone,
-    [landingZone]: (s.byZone[landingZone] || 0) + 1,
-  };
+  if (landingZone) {
+    s.byZone = {
+      ...s.byZone,
+      [landingZone]: (s.byZone[landingZone] || 0) + 1,
+    };
+  }
 
   return { ...statsMap, [athlete]: s };
 }
