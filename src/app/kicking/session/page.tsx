@@ -13,6 +13,8 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
+import { cloudGet, cloudSet } from "@/lib/supabaseData";
+import { getCloudUserId } from "@/lib/amplify";
 
 const INIT_ROWS = 12;
 
@@ -58,6 +60,10 @@ function loadDraft(): SessionDraft | null {
 function saveDraft(draft: SessionDraft) {
   if (typeof window === "undefined") return;
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(draft));
+  const userId = getCloudUserId();
+  if (userId && userId !== "local-dev") {
+    cloudSet(userId, "fg_session_draft", draft);
+  }
 }
 
 function loadSnapDistance(): number {
@@ -158,7 +164,7 @@ export default function KickingSessionPage() {
   const [missMode, setMissMode] = useState(() => loadMissMode());
   const [weather, setWeather] = useState("");
 
-  // Load settings from cloud on fresh device
+  // Load settings and draft from cloud on fresh device
   useEffect(() => {
     loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string }>("fgSettings").then((cloud) => {
       if (cloud) {
@@ -167,6 +173,26 @@ export default function KickingSessionPage() {
         if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
       }
     });
+    // Load draft from cloud if local is empty
+    const userId = getCloudUserId();
+    if (userId && userId !== "local-dev") {
+      cloudGet<SessionDraft>(userId, "fg_session_draft").then((cloudDraft) => {
+        if (cloudDraft && cloudDraft.rows) {
+          const localDraft = loadDraft();
+          const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.dist || r.pos);
+          // Use cloud draft if local is empty or cloud has active session
+          if (!localHasData || cloudDraft.sessionActive) {
+            setRows(cloudDraft.rows);
+            setManualEntry(cloudDraft.manualEntry);
+            setSessionActive(cloudDraft.sessionActive);
+            setPlannedKicks(cloudDraft.plannedKicks ?? []);
+            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+            setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
+            setSessionKicks(cloudDraft.sessionKicks ?? []);
+          }
+        }
+      });
+    }
   }, []);
 
   // Persist draft on every relevant state change

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { StatCard } from "@/components/ui/StatCard";
 import { SnapEntryCard } from "@/components/ui/SnapEntryCard";
 import { SnapTimeBars } from "@/components/ui/SnapTimeBars";
@@ -9,6 +9,8 @@ import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import type { LongSnapEntry, SnapBenchmark } from "@/types";
 import clsx from "clsx";
+import { cloudGet, cloudSet } from "@/lib/supabaseData";
+import { getCloudUserId } from "@/lib/amplify";
 
 const BM_COLORS: Record<SnapBenchmark, string> = {
   excellent: "text-make",
@@ -54,8 +56,42 @@ export default function LongSnapSessionPage() {
   const avgTime = totals.att > 0 ? (totals.totalTime / totals.att).toFixed(2) : "—";
   const onTargetPct = makePct(totals.att, totals.onTarget);
 
-  const handleAddSnap = (snap: LongSnapEntry) => setSessionSnaps((prev) => [...prev, snap]);
-  const handleDeleteSnap = (idx: number) => setSessionSnaps((prev) => prev.filter((_, i) => i !== idx));
+  // Sync session snaps to cloud
+  const saveSnapsToCloud = useCallback((snaps: LongSnapEntry[]) => {
+    const userId = getCloudUserId();
+    if (userId && userId !== "local-dev") {
+      cloudSet(userId, "longsnap_session_draft", { sessionSnaps: snaps, sessionStarted: true, weather });
+    }
+  }, [weather]);
+
+  // Load session from cloud on mount
+  useEffect(() => {
+    const userId = getCloudUserId();
+    if (userId && userId !== "local-dev") {
+      cloudGet<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(userId, "longsnap_session_draft").then((cloud) => {
+        if (cloud && cloud.sessionSnaps && cloud.sessionSnaps.length > 0) {
+          setSessionSnaps(cloud.sessionSnaps);
+          setSessionStarted(cloud.sessionStarted ?? false);
+          if (cloud.weather) setWeather(cloud.weather);
+        }
+      });
+    }
+  }, []);
+
+  const handleAddSnap = (snap: LongSnapEntry) => {
+    setSessionSnaps((prev) => {
+      const next = [...prev, snap];
+      saveSnapsToCloud(next);
+      return next;
+    });
+  };
+  const handleDeleteSnap = (idx: number) => {
+    setSessionSnaps((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      saveSnapsToCloud(next);
+      return next;
+    });
+  };
 
   const handleCommit = () => {
     if (sessionSnaps.length === 0) return;

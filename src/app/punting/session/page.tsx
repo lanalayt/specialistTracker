@@ -12,6 +12,8 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
+import { cloudGet, cloudSet } from "@/lib/supabaseData";
+import { getCloudUserId } from "@/lib/amplify";
 
 const INIT_ROWS = 12;
 const SESSION_STORAGE_KEY = "puntSessionDraft";
@@ -68,6 +70,10 @@ function loadDraft(): SessionDraft | null {
 function saveDraft(draft: SessionDraft) {
   if (typeof window === "undefined") return;
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(draft));
+  const userId = getCloudUserId();
+  if (userId && userId !== "local-dev") {
+    cloudSet(userId, "punt_session_draft", draft);
+  }
 }
 
 const DEFAULT_PUNT_TYPES = [
@@ -150,6 +156,26 @@ export default function PuntingSessionPage() {
         setPuntTypes(cloud.puntTypes);
       }
     });
+
+    // Load draft from cloud if local is empty
+    const userId = getCloudUserId();
+    if (userId && userId !== "local-dev") {
+      cloudGet<SessionDraft>(userId, "punt_session_draft").then((cloudDraft) => {
+        if (cloudDraft && cloudDraft.rows) {
+          const localDraft = loadDraft();
+          const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.type || r.hash);
+          if (!localHasData || cloudDraft.sessionActive) {
+            setRows(cloudDraft.rows);
+            setManualEntry(cloudDraft.manualEntry);
+            setSessionActive(cloudDraft.sessionActive);
+            setPlannedPunts(cloudDraft.plannedPunts ?? []);
+            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+            setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
+            setSessionPunts(cloudDraft.sessionPunts ?? []);
+          }
+        }
+      });
+    }
   }, []);
 
   // Session card state

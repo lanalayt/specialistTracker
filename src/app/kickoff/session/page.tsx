@@ -11,6 +11,8 @@ import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
+import { cloudGet, cloudSet } from "@/lib/supabaseData";
+import { getCloudUserId } from "@/lib/amplify";
 
 const INIT_ROWS = 12;
 const MAX_SCORE = 4;
@@ -64,6 +66,10 @@ function loadDraft(): SessionDraft | null {
 function saveDraft(draft: SessionDraft) {
   if (typeof window === "undefined") return;
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(draft));
+  const userId = getCloudUserId();
+  if (userId && userId !== "local-dev") {
+    cloudSet(userId, "kickoff_session_draft", draft);
+  }
 }
 
 const TYPE_LABELS: Record<KickoffType, string> = {
@@ -131,6 +137,29 @@ export default function KickoffSessionPage() {
       sessionKicks,
     });
   }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks]);
+
+  // Load draft from cloud if local is empty
+  useEffect(() => {
+    const userId = getCloudUserId();
+    if (userId && userId !== "local-dev") {
+      cloudGet<SessionDraft>(userId, "kickoff_session_draft").then((cloudDraft) => {
+        if (cloudDraft && cloudDraft.rows) {
+          const localDraft = loadDraft();
+          const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.type || r.distance);
+          if (!localHasData || cloudDraft.sessionActive) {
+            setRows(cloudDraft.rows);
+            setManualEntry(cloudDraft.manualEntry);
+            setSessionActive(cloudDraft.sessionActive);
+            setPlannedKicks(cloudDraft.plannedKicks ?? []);
+            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+            setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
+            setSessionKicks(cloudDraft.sessionKicks ?? []);
+          }
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totals = athletes.reduce(
     (acc, a) => {
