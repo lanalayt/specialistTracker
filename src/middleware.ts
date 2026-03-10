@@ -25,7 +25,7 @@ export async function middleware(request: NextRequest) {
 
   // Check for Supabase auth cookie (sb-*-auth-token)
   const hasAuthCookie = request.cookies.getAll().some(
-    (c) => c.name.startsWith("sb-") && c.name.endsWith("-auth-token")
+    (c) => c.name.startsWith("sb-") && c.name.includes("-auth-token")
   );
 
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));

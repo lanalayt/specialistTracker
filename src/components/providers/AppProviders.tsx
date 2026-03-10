@@ -64,10 +64,8 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    console.log("[auth] signIn result:", { user: data?.user?.id, session: !!data?.session, error: error?.message });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
-    if (!data.session) throw new Error("No session returned from sign in");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signUp = useCallback(async (email: string, password: string, name: string, role: UserRole = "coach", teamId?: string) => {
