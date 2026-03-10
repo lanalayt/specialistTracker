@@ -31,13 +31,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // If env vars are missing, skip auth checks to avoid crashing
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {
@@ -58,22 +66,27 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
 
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
-  const isAuthRoute = AUTH_ROUTES.some((p) => pathname.startsWith(p));
+    const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+    const isAuthRoute = AUTH_ROUTES.some((p) => pathname.startsWith(p));
 
-  // Not logged in → redirect to login
-  if (!user && isProtected) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // Not logged in → redirect to login
+    if (!user && isProtected) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    // Logged in → redirect away from auth pages
+    if (user && isAuthRoute) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    return response;
+  } catch {
+    // If auth check fails, allow the request through
+    return NextResponse.next();
   }
-
-  // Logged in → redirect away from auth pages
-  if (user && isAuthRoute) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  return response;
 }
 
 export const config = {
