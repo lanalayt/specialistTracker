@@ -9,7 +9,7 @@ export function AthleteViewOnly({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative">
-      <div className="athlete-view-only">{children}</div>
+      {children}
       <div className="sticky bottom-0 left-0 right-0 bg-warn/10 border-t border-warn/30 px-4 py-2 text-center z-30">
         <p className="text-xs font-semibold text-warn">
           View Only — Athlete accounts cannot make changes

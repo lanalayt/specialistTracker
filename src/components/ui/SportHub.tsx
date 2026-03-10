@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 
 const CARDS = [
-  { icon: "📋", label: "Session", desc: "Log kicks and commit practice", slug: "session", coachOnly: true },
-  { icon: "📊", label: "Statistics", desc: "Season charts and breakdowns", slug: "statistics", coachOnly: false },
-  { icon: "📁", label: "History", desc: "Browse past sessions", slug: "history", coachOnly: false },
+  { icon: "📋", label: "Session", desc: "Log kicks and commit practice", slug: "session" },
+  { icon: "📊", label: "Statistics", desc: "Season charts and breakdowns", slug: "statistics" },
+  { icon: "📁", label: "History", desc: "Browse past sessions", slug: "history" },
   { icon: "👤", label: "Athletes", desc: "Manage athlete roster", slug: "athletes", coachOnly: true },
 ];
 

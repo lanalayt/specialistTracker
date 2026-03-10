@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import clsx from "clsx";
 
 const TABS = [
-  { label: "Session", slug: "session", coachOnly: true },
+  { label: "Session", slug: "session", coachOnly: false },
   { label: "Statistics", slug: "statistics", coachOnly: false },
   { label: "History", slug: "history", coachOnly: false },
   { label: "Athletes", slug: "athletes", coachOnly: true },
