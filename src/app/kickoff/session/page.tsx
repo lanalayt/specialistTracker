@@ -754,6 +754,7 @@ export default function KickoffSessionPage() {
               type="text"
               value={weather}
               onChange={(e) => setWeather(e.target.value)}
+              readOnly={isAthlete}
               placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
               className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
             />
@@ -773,12 +774,14 @@ export default function KickoffSessionPage() {
                 </span>
               )}
             </h2>
-            <button
-              onClick={addRow}
-              className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-slate-300 hover:bg-surface-2 font-semibold transition-all"
-            >
-              + Row
-            </button>
+            {!isAthlete && (
+              <button
+                onClick={addRow}
+                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-slate-300 hover:bg-surface-2 font-semibold transition-all"
+              >
+                + Row
+              </button>
+            )}
           </div>
 
           {/* Scrollable table */}
@@ -848,7 +851,8 @@ export default function KickoffSessionPage() {
                           <select
                             value={row.athlete}
                             onChange={(e) => updateRow(idx, "athlete", e.target.value)}
-                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
+                            disabled={isAthlete}
+                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
                             {athletes.map((a) => (
@@ -864,7 +868,8 @@ export default function KickoffSessionPage() {
                           <select
                             value={row.type}
                             onChange={(e) => updateRow(idx, "type", e.target.value)}
-                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
+                            disabled={isAthlete}
+                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
                             {KICKOFF_TYPES.map((t) => (
@@ -880,6 +885,7 @@ export default function KickoffSessionPage() {
                               type="number" min={0} max={99} placeholder="yds"
                               value={row.distance}
                               onChange={(e) => updateRow(idx, "distance", e.target.value)}
+                              readOnly={isAthlete}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
@@ -888,6 +894,7 @@ export default function KickoffSessionPage() {
                               type="number" min={0} max={9} step="0.01" placeholder="sec"
                               value={row.hangTime}
                               onChange={(e) => updateRow(idx, "hangTime", e.target.value)}
+                              readOnly={isAthlete}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
@@ -895,7 +902,8 @@ export default function KickoffSessionPage() {
                             <select
                               value={row.direction}
                               onChange={(e) => updateRow(idx, "direction", e.target.value)}
-                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
+                              disabled={isAthlete}
+                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                             >
                               <option value="">—</option>
                               {KICKOFF_DIRECTIONS.map((d) => (
@@ -907,7 +915,8 @@ export default function KickoffSessionPage() {
                             <select
                               value={row.score}
                               onChange={(e) => updateRow(idx, "score", e.target.value)}
-                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
+                              disabled={isAthlete}
+                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                             >
                               <option value="">—</option>
                               {Array.from({ length: MAX_SCORE + 1 }, (_, i) => (
@@ -919,55 +928,59 @@ export default function KickoffSessionPage() {
                       )}
                       <td className="py-1 px-1 text-center">
                         {isLocked ? (
-                          <div className="flex items-center gap-0.5 justify-center">
-                            <button
-                              onClick={() => {
-                                const filled = rows
-                                  .map((r, ri) => ({ r, i: ri }))
-                                  .filter(({ r }) => r.athlete || r.type);
-                                const planned = filled.map(({ r }) => ({
-                                  athlete: r.athlete,
-                                  type: r.type as KickoffType,
-                                }));
-                                setPlannedKicks(planned);
-                                setPlannedRowIndices(filled.map(({ i: ri }) => ri));
-                                setCurrentKickIdx(filledIdx);
-                                setEditingKickIdx(filledIdx);
-                                const logged = sessionKicks[filledIdx];
-                                if (logged) {
-                                  setDistance(String(logged.distance));
-                                  setHangTime(String(logged.hangTime));
-                                  setDirection(logged.direction);
-                                  setScore(logged.score);
-                                } else {
-                                  setDistance("");
-                                  setHangTime("");
-                                  setDirection("middle");
-                                  setScore(0);
-                                }
-                                setSessionActive(true);
-                              }}
-                              className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
-                              title="Edit this kickoff's result"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => handleUnlockRow(filledIdx)}
-                              className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
-                              title="Unlock (removes this result and all after it)"
-                            >
-                              🔒
-                            </button>
-                          </div>
+                          !isAthlete && (
+                            <div className="flex items-center gap-0.5 justify-center">
+                              <button
+                                onClick={() => {
+                                  const filled = rows
+                                    .map((r, ri) => ({ r, i: ri }))
+                                    .filter(({ r }) => r.athlete || r.type);
+                                  const planned = filled.map(({ r }) => ({
+                                    athlete: r.athlete,
+                                    type: r.type as KickoffType,
+                                  }));
+                                  setPlannedKicks(planned);
+                                  setPlannedRowIndices(filled.map(({ i: ri }) => ri));
+                                  setCurrentKickIdx(filledIdx);
+                                  setEditingKickIdx(filledIdx);
+                                  const logged = sessionKicks[filledIdx];
+                                  if (logged) {
+                                    setDistance(String(logged.distance));
+                                    setHangTime(String(logged.hangTime));
+                                    setDirection(logged.direction);
+                                    setScore(logged.score);
+                                  } else {
+                                    setDistance("");
+                                    setHangTime("");
+                                    setDirection("middle");
+                                    setScore(0);
+                                  }
+                                  setSessionActive(true);
+                                }}
+                                className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
+                                title="Edit this kickoff's result"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleUnlockRow(filledIdx)}
+                                className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
+                                title="Unlock (removes this result and all after it)"
+                              >
+                                🔒
+                              </button>
+                            </div>
+                          )
                         ) : (
-                          <button
-                            onClick={() => deleteRow(idx)}
-                            className="text-border hover:text-miss transition-colors text-sm leading-none px-1"
-                            title="Delete row"
-                          >
-                            ×
-                          </button>
+                          !isAthlete && (
+                            <button
+                              onClick={() => deleteRow(idx)}
+                              className="text-border hover:text-miss transition-colors text-sm leading-none px-1"
+                              title="Delete row"
+                            >
+                              ×
+                            </button>
+                          )
                         )}
                       </td>
                       {/* Show logged result indicator on locked rows */}
@@ -992,60 +1005,62 @@ export default function KickoffSessionPage() {
                 ? "0 kickoffs entered"
                 : `${filledCount} kickoff${filledCount !== 1 ? "s" : ""} entered`}
             </span>
-            <div className="flex gap-2">
-              {(canUndo || deletedRowStack.length > 0) && (
+            {!isAthlete && (<>
+              <div className="flex gap-2">
+                {(canUndo || deletedRowStack.length > 0) && (
+                  <button
+                    onClick={() => {
+                      if (deletedRowStack.length > 0) {
+                        undoDeleteRow();
+                      } else {
+                        handleUndo();
+                      }
+                    }}
+                    className="btn-ghost text-xs py-1.5 px-3"
+                  >
+                    ↩ Undo
+                  </button>
+                )}
                 <button
-                  onClick={() => {
-                    if (deletedRowStack.length > 0) {
-                      undoDeleteRow();
-                    } else {
-                      handleUndo();
-                    }
-                  }}
-                  className="btn-ghost text-xs py-1.5 px-3"
+                  onClick={() => clearLog()}
+                  className="text-xs py-1.5 px-3 rounded-input border border-border text-muted hover:text-miss hover:border-miss/40 transition-all"
                 >
-                  ↩ Undo
+                  Clear Log
+                </button>
+              </div>
+              {!isContinuing && (
+                <button
+                  onClick={() => setManualEntry((v) => !v)}
+                  className={clsx(
+                    "text-xs py-2 px-5 rounded-input border font-semibold transition-all",
+                    manualEntry
+                      ? "bg-accent/20 text-accent border-accent/50"
+                      : "border-border text-muted hover:text-slate-300 hover:bg-surface-2"
+                  )}
+                >
+                  {manualEntry ? "Manual Entry ●" : "Manual Entry"}
                 </button>
               )}
-              <button
-                onClick={() => clearLog()}
-                className="text-xs py-1.5 px-3 rounded-input border border-border text-muted hover:text-miss hover:border-miss/40 transition-all"
-              >
-                Clear Log
-              </button>
-            </div>
-            {!isContinuing && (
-              <button
-                onClick={() => setManualEntry((v) => !v)}
-                className={clsx(
-                  "text-xs py-2 px-5 rounded-input border font-semibold transition-all",
-                  manualEntry
-                    ? "bg-accent/20 text-accent border-accent/50"
-                    : "border-border text-muted hover:text-slate-300 hover:bg-surface-2"
-                )}
-              >
-                {manualEntry ? "Manual Entry ●" : "Manual Entry"}
-              </button>
-            )}
-            {manualEntry && !isContinuing ? (
-              <button
-                onClick={handleManualCommit}
-                disabled={filledCount === 0}
-                className="btn-primary text-xs py-2 px-5"
-              >
-                Commit Practice{filledCount > 0 ? ` (${filledCount})` : ""}
-              </button>
-            ) : (
-              <button
-                onClick={handleStartOrContinueSession}
-                disabled={filledCount === 0}
-                className="btn-primary text-xs py-2 px-5"
-              >
-                {isContinuing
-                  ? `Continue Session (${filledCount - sessionKicks.length} remaining)`
-                  : `Start Session${filledCount > 0 ? ` (${filledCount})` : ""}`}
-              </button>
-            )}
+              {manualEntry && !isContinuing ? (
+                <button
+                  onClick={handleManualCommit}
+                  disabled={filledCount === 0}
+                  className="btn-primary text-xs py-2 px-5"
+                >
+                  Commit Practice{filledCount > 0 ? ` (${filledCount})` : ""}
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartOrContinueSession}
+                  disabled={filledCount === 0}
+                  className="btn-primary text-xs py-2 px-5"
+                >
+                  {isContinuing
+                    ? `Continue Session (${filledCount - sessionKicks.length} remaining)`
+                    : `Start Session${filledCount > 0 ? ` (${filledCount})` : ""}`}
+                </button>
+              )}
+            </>)}
           </div>
         </div>
 
