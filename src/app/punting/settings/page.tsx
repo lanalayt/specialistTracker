@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import clsx from "clsx";
+import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 
 const STORAGE_KEY = "puntSettings";
 
@@ -43,6 +44,14 @@ export default function PuntSettingsPage() {
     setTypes(s.puntTypes);
     setSavedTypes(s.puntTypes);
     setLoaded(true);
+
+    // Try loading from Supabase (overrides if found)
+    loadSettingsFromCloud<PuntSettings>(STORAGE_KEY).then((cloud) => {
+      if (cloud?.puntTypes && cloud.puntTypes.length > 0) {
+        setTypes(cloud.puntTypes);
+        setSavedTypes(cloud.puntTypes);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -72,7 +81,7 @@ export default function PuntSettingsPage() {
 
   const handleSave = () => {
     const settings: PuntSettings = { puntTypes: types };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedTypes(types);
     setDirty(false);
     setSaved(true);

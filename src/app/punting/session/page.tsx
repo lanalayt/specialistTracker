@@ -10,6 +10,7 @@ import type { PuntEntry, PuntType, PuntHash } from "@/types";
 import { PUNT_HASHES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
+import { loadSettingsFromCloud } from "@/lib/settingsSync";
 
 const INIT_ROWS = 12;
 const SESSION_STORAGE_KEY = "puntSessionDraft";
@@ -134,11 +135,20 @@ export default function PuntingSessionPage() {
   const [sessionPunts, setSessionPunts] = useState<PuntEntry[]>(draft.sessionPunts);
   const [pendingPunts, setPendingPunts] = useState<PuntEntry[] | null>(null);
   const [showReset, setShowReset] = useState(false);
-  const [puntTypes] = useState(() => loadPuntTypes());
+  const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
   const typeLabels: Record<string, string> = {};
   puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState("");
+
+  // Load punt types from cloud on fresh device
+  useEffect(() => {
+    loadSettingsFromCloud<{ puntTypes?: { id: string; label: string }[] }>("puntSettings").then((cloud) => {
+      if (cloud?.puntTypes && cloud.puntTypes.length > 0) {
+        setPuntTypes(cloud.puntTypes);
+      }
+    });
+  }, []);
 
   // Session card state
   const [yards, setYards] = useState("");

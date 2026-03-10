@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import clsx from "clsx";
+import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 
 const SNAP_DISTANCES = ["6", "7", "8"];
 const STORAGE_KEY = "fgSettings";
@@ -12,7 +13,9 @@ interface FGSettings {
   missMode: "simple" | "detailed";
 }
 
-function loadSettings(): FGSettings {
+const DEFAULT_SETTINGS: FGSettings = { snapDistance: "7", makeMode: "detailed", missMode: "detailed" };
+
+function loadSettingsLocal(): FGSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -24,7 +27,7 @@ function loadSettings(): FGSettings {
       };
     }
   } catch {}
-  return { snapDistance: "7", makeMode: "detailed", missMode: "detailed" };
+  return DEFAULT_SETTINGS;
 }
 
 export default function FGSettingsPage() {
@@ -43,12 +46,23 @@ export default function FGSettingsPage() {
   });
 
   useEffect(() => {
-    const s = loadSettings();
-    setSnapDistance(s.snapDistance);
-    setMakeMode(s.makeMode);
-    setMissMode(s.missMode);
-    setSavedSettings(s);
+    // Load from localStorage immediately, then try cloud
+    const local = loadSettingsLocal();
+    setSnapDistance(local.snapDistance);
+    setMakeMode(local.makeMode);
+    setMissMode(local.missMode);
+    setSavedSettings(local);
     setLoaded(true);
+
+    // Try loading from Supabase (overrides if found)
+    loadSettingsFromCloud<FGSettings>(STORAGE_KEY).then((cloud) => {
+      if (cloud) {
+        setSnapDistance(cloud.snapDistance ?? "7");
+        setMakeMode(cloud.makeMode ?? "detailed");
+        setMissMode(cloud.missMode ?? "detailed");
+        setSavedSettings(cloud);
+      }
+    });
   }, []);
 
   // Detect unsaved changes
@@ -64,7 +78,7 @@ export default function FGSettingsPage() {
 
   const handleSave = () => {
     const settings: FGSettings = { snapDistance, makeMode, missMode };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
     setSaved(true);

@@ -15,7 +15,9 @@ import {
   genId,
   sessionLabel,
 } from "@/lib/stats";
-import { localGet, localSet } from "@/lib/amplify";
+import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
+import { cloudGet } from "@/lib/supabaseData";
+import { useAuth } from "@/lib/auth";
 
 interface PuntStateData {
   athletes: string[];
@@ -48,27 +50,45 @@ const PuntContext = createContext<PuntContextValue | null>(null);
 
 export function PuntProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PuntStateData>(defaultState);
+  const { user } = useAuth();
 
   useEffect(() => {
-    const saved = localGet<PuntStateData>("PUNT");
-    if (saved) {
-      const stats = { ...saved.stats };
-      (saved.athletes || []).forEach((a) => {
-        if (!stats[a]) {
-          stats[a] = emptyPuntStats();
-        } else if (
-          !stats[a].byLanding ||
-          stats[a].overall.totalDirectionalAccuracy === undefined ||
-          stats[a].overall.criticalDirections === undefined ||
-          stats[a].overall.poochYardLineTotal === undefined
-        ) {
-          // Migration: reset stats for old schema (missing DA/pooch fields)
-          stats[a] = emptyPuntStats();
-        }
-      });
-      setState({ ...saved, stats });
+    const userId = user?.id;
+    if (userId) setCloudUserId(userId);
+
+    async function loadData() {
+      let saved: PuntStateData | null = null;
+
+      if (userId && userId !== "local-dev") {
+        saved = await cloudGet<PuntStateData>(userId, getCloudKey("PUNT"));
+      }
+
+      if (!saved) {
+        saved = localGet<PuntStateData>("PUNT");
+      }
+
+      if (saved) {
+        const stats = { ...saved.stats };
+        (saved.athletes || []).forEach((a) => {
+          if (!stats[a]) {
+            stats[a] = emptyPuntStats();
+          } else if (
+            !stats[a].byLanding ||
+            stats[a].overall.totalDirectionalAccuracy === undefined ||
+            stats[a].overall.criticalDirections === undefined ||
+            stats[a].overall.poochYardLineTotal === undefined
+          ) {
+            stats[a] = emptyPuntStats();
+          }
+        });
+        const migrated = { ...saved, stats };
+        setState(migrated);
+        localSet("PUNT", migrated);
+      }
     }
-  }, []);
+
+    loadData();
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addAthletes = useCallback((names: string[]) => {
     setState((prev) => {

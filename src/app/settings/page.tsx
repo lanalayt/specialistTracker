@@ -5,6 +5,10 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { useAuth } from "@/lib/auth";
+import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
+import { localGet, localSet, STORAGE_KEYS, setCloudUserId } from "@/lib/amplify";
+import { cloudSetImmediate, cloudGet } from "@/lib/supabaseData";
+import { getCloudKey } from "@/lib/amplify";
 import clsx from "clsx";
 
 const SPORT_OPTIONS = [
@@ -20,6 +24,45 @@ function SettingsContent() {
   const [school, setSchool] = useState("My School");
   const [enabledSports, setEnabledSports] = useState<string[]>(["KICKING", "PUNTING", "KICKOFF", "LONGSNAP"]);
   const [saved, setSaved] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncDone, setSyncDone] = useState(false);
+
+  const handleSyncToCloud = async () => {
+    if (!user?.id || user.id === "local-dev") return;
+    setSyncing(true);
+    setCloudUserId(user.id);
+
+    try {
+      // Sync all sport data from localStorage to Supabase
+      const sportKeys: (keyof typeof STORAGE_KEYS)[] = ["FG", "PUNT", "KICKOFF", "LONGSNAP", "TEAM"];
+      for (const key of sportKeys) {
+        const local = localGet(key);
+        if (local) {
+          await cloudSetImmediate(user.id, getCloudKey(key), local);
+        }
+      }
+
+      // Sync settings
+      const settingsKeys = ["fgSettings", "puntSettings", "st_team_v1"];
+      for (const key of settingsKeys) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            await cloudSetImmediate(user.id, `settings_${key}`, parsed);
+          }
+        } catch {}
+      }
+
+      setSyncDone(true);
+      setTimeout(() => setSyncDone(false), 3000);
+    } catch (err) {
+      alert("Sync failed. Check console for details.");
+      console.error(err);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -31,6 +74,15 @@ function SettingsContent() {
         if (t.config?.enabledSports) setEnabledSports(t.config.enabledSports);
       }
     } catch {}
+
+    // Try loading from Supabase
+    loadSettingsFromCloud<{ name: string; school: string; config: { enabledSports: string[] } }>("st_team_v1").then((cloud) => {
+      if (cloud) {
+        if (cloud.name) setTeamName(cloud.name);
+        if (cloud.school) setSchool(cloud.school);
+        if (cloud.config?.enabledSports) setEnabledSports(cloud.config.enabledSports);
+      }
+    });
   }, []);
 
   const toggleSport = (id: string) =>
@@ -45,7 +97,7 @@ function SettingsContent() {
       school,
       config: { enabledSports },
     };
-    localStorage.setItem("st_team_v1", JSON.stringify(team));
+    saveSettingsToCloud("st_team_v1", team);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -136,12 +188,36 @@ function SettingsContent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">Backend</span>
-                <span className="text-warn text-xs">Local / Demo Mode</span>
+                <span className="text-make text-xs">Supabase Cloud Sync</span>
               </div>
             </div>
             <p className="text-xs text-muted">
-              To enable cloud sync and multi-user access, configure AWS Amplify and connect your account.
+              Data is synced to the cloud and persists across devices and deployments.
             </p>
+          </div>
+
+          {/* Cloud Sync */}
+          <div className="card space-y-3">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">
+              Cloud Sync
+            </p>
+            <p className="text-xs text-muted">
+              Push all local data (sessions, stats, settings) to the cloud. Use this if you have existing data in your browser that needs to be backed up.
+            </p>
+            <button
+              onClick={handleSyncToCloud}
+              disabled={syncing || !user?.id || user.id === "local-dev"}
+              className={clsx(
+                "w-full py-3 rounded-input text-sm font-bold transition-all",
+                syncDone
+                  ? "bg-make text-slate-900"
+                  : syncing
+                    ? "bg-surface-2 text-muted border border-border cursor-wait"
+                    : "bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30"
+              )}
+            >
+              {syncDone ? "✓ All Data Synced!" : syncing ? "Syncing..." : "Sync Local Data to Cloud"}
+            </button>
           </div>
 
           {/* Save */}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { saveSettingsToCloud } from "@/lib/settingsSync";
 
 const SPORT_OPTIONS = [
   { id: "KICKING", label: "FG Kicking", icon: "🏈", desc: "Field goals & PATs" },
@@ -22,14 +23,13 @@ export default function OnboardPage() {
     );
 
   const handleFinish = () => {
-    // TODO: Save to DynamoDB via Amplify when configured
     const team = {
       id: "demo-team-1",
       name: teamName || "My Team",
       school: school || "My School",
       config: { enabledSports: sports },
     };
-    localStorage.setItem("st_team_v1", JSON.stringify(team));
+    saveSettingsToCloud("st_team_v1", team);
     router.push("/dashboard");
   };
 

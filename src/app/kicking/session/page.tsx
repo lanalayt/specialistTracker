@@ -11,6 +11,7 @@ import type { FGKick, FGPosition, FGResult } from "@/types";
 import { POSITIONS, RESULTS } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
+import { loadSettingsFromCloud } from "@/lib/settingsSync";
 
 const INIT_ROWS = 12;
 
@@ -149,11 +150,22 @@ export default function KickingSessionPage() {
   const [score, setScore] = useState<number>(0);
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [showReset, setShowReset] = useState(false);
-  const [snapDistance] = useState(() => loadSnapDistance());
+  const [snapDistance, setSnapDistance] = useState(() => loadSnapDistance());
   const drag = useDragReorder(rows, setRows);
-  const [makeMode] = useState(() => loadMakeMode());
-  const [missMode] = useState(() => loadMissMode());
+  const [makeMode, setMakeMode] = useState(() => loadMakeMode());
+  const [missMode, setMissMode] = useState(() => loadMissMode());
   const [weather, setWeather] = useState("");
+
+  // Load settings from cloud on fresh device
+  useEffect(() => {
+    loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string }>("fgSettings").then((cloud) => {
+      if (cloud) {
+        if (cloud.snapDistance) setSnapDistance(parseInt(cloud.snapDistance) || 7);
+        if (cloud.makeMode === "simple" || cloud.makeMode === "detailed") setMakeMode(cloud.makeMode);
+        if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
+      }
+    });
+  }, []);
 
   // Persist draft on every relevant state change
   useEffect(() => {

@@ -5,7 +5,9 @@ import React, {
 } from "react";
 import type { KickoffEntry, KickoffAthleteStats, Session } from "@/types";
 import { emptyKickoffStats, processKickoff, genId, sessionLabel } from "@/lib/stats";
-import { localGet, localSet } from "@/lib/amplify";
+import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
+import { cloudGet } from "@/lib/supabaseData";
+import { useAuth } from "@/lib/auth";
 
 interface KickoffStateData {
   athletes: string[];
@@ -35,15 +37,34 @@ const KickoffContext = createContext<KickoffContextValue | null>(null);
 
 export function KickoffProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<KickoffStateData>(defaultState);
+  const { user } = useAuth();
 
   useEffect(() => {
-    const saved = localGet<KickoffStateData>("KICKOFF");
-    if (saved) {
-      const stats = { ...saved.stats };
-      (saved.athletes || []).forEach((a) => { if (!stats[a]) stats[a] = emptyKickoffStats(); });
-      setState({ ...saved, stats });
+    const userId = user?.id;
+    if (userId) setCloudUserId(userId);
+
+    async function loadData() {
+      let saved: KickoffStateData | null = null;
+
+      if (userId && userId !== "local-dev") {
+        saved = await cloudGet<KickoffStateData>(userId, getCloudKey("KICKOFF"));
+      }
+
+      if (!saved) {
+        saved = localGet<KickoffStateData>("KICKOFF");
+      }
+
+      if (saved) {
+        const stats = { ...saved.stats };
+        (saved.athletes || []).forEach((a) => { if (!stats[a]) stats[a] = emptyKickoffStats(); });
+        const migrated = { ...saved, stats };
+        setState(migrated);
+        localSet("KICKOFF", migrated);
+      }
     }
-  }, []);
+
+    loadData();
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string): Session => {
     const session: Session = {

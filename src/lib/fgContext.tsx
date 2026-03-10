@@ -15,7 +15,9 @@ import {
   genId,
   sessionLabel,
 } from "@/lib/stats";
-import { localGet, localSet } from "@/lib/amplify";
+import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
+import { cloudGet } from "@/lib/supabaseData";
+import { useAuth } from "@/lib/auth";
 
 interface FGStateData {
   athletes: string[];
@@ -50,23 +52,44 @@ const FGContext = createContext<FGContextValue | null>(null);
 
 export function FGProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<FGStateData>(defaultState);
+  const { user } = useAuth();
 
-  // Load from localStorage on mount
+  // Load from Supabase first, fall back to localStorage
   useEffect(() => {
-    const saved = localGet<FGStateData>("FG");
-    if (saved) {
-      const stats = { ...saved.stats };
-      (saved.athletes || []).forEach((a) => {
-        if (!stats[a]) {
-          stats[a] = emptyAthleteStats();
-        } else if (!stats[a].pat) {
-          // Migration: add pat bucket for old data
-          stats[a] = { ...stats[a], pat: { att: 0, made: 0, score: 0 } };
-        }
-      });
-      setState({ ...saved, stats });
+    const userId = user?.id;
+    if (userId) setCloudUserId(userId);
+
+    async function loadData() {
+      let saved: FGStateData | null = null;
+
+      // Try Supabase first
+      if (userId && userId !== "local-dev") {
+        saved = await cloudGet<FGStateData>(userId, getCloudKey("FG"));
+      }
+
+      // Fall back to localStorage
+      if (!saved) {
+        saved = localGet<FGStateData>("FG");
+      }
+
+      if (saved) {
+        const stats = { ...saved.stats };
+        (saved.athletes || []).forEach((a) => {
+          if (!stats[a]) {
+            stats[a] = emptyAthleteStats();
+          } else if (!stats[a].pat) {
+            stats[a] = { ...stats[a], pat: { att: 0, made: 0, score: 0 } };
+          }
+        });
+        const migrated = { ...saved, stats };
+        setState(migrated);
+        // Ensure localStorage is in sync
+        localSet("FG", migrated);
+      }
     }
-  }, []);
+
+    loadData();
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = useCallback((next: FGStateData) => {
     setState(next);

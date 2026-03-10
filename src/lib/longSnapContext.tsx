@@ -5,7 +5,9 @@ import React, {
 } from "react";
 import type { LongSnapEntry, LongSnapAthleteStats, Session } from "@/types";
 import { emptyLongSnapStats, processLongSnap, genId, sessionLabel } from "@/lib/stats";
-import { localGet, localSet } from "@/lib/amplify";
+import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
+import { cloudGet } from "@/lib/supabaseData";
+import { useAuth } from "@/lib/auth";
 
 interface LongSnapStateData {
   athletes: string[];
@@ -34,22 +36,40 @@ const LongSnapContext = createContext<LongSnapContextValue | null>(null);
 
 export function LongSnapProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<LongSnapStateData>(defaultState);
+  const { user } = useAuth();
 
   useEffect(() => {
-    const saved = localGet<LongSnapStateData>("LONGSNAP");
-    if (saved) {
-      const stats = { ...saved.stats };
-      (saved.athletes || []).forEach((a) => {
-        if (!stats[a]) {
-          stats[a] = emptyLongSnapStats();
-        } else if (stats[a].overall.excellent === undefined) {
-          // Migration: add benchmark tracking fields
-          stats[a] = emptyLongSnapStats();
-        }
-      });
-      setState({ ...saved, stats });
+    const userId = user?.id;
+    if (userId) setCloudUserId(userId);
+
+    async function loadData() {
+      let saved: LongSnapStateData | null = null;
+
+      if (userId && userId !== "local-dev") {
+        saved = await cloudGet<LongSnapStateData>(userId, getCloudKey("LONGSNAP"));
+      }
+
+      if (!saved) {
+        saved = localGet<LongSnapStateData>("LONGSNAP");
+      }
+
+      if (saved) {
+        const stats = { ...saved.stats };
+        (saved.athletes || []).forEach((a) => {
+          if (!stats[a]) {
+            stats[a] = emptyLongSnapStats();
+          } else if (stats[a].overall.excellent === undefined) {
+            stats[a] = emptyLongSnapStats();
+          }
+        });
+        const migrated = { ...saved, stats };
+        setState(migrated);
+        localSet("LONGSNAP", migrated);
+      }
     }
-  }, []);
+
+    loadData();
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commitPractice = useCallback((entries: LongSnapEntry[], label?: string, weather?: string): Session => {
     const session: Session = {
