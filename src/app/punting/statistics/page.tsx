@@ -7,6 +7,7 @@ import { PUNT_HASHES } from "@/types";
 import type { PuntHash, PuntStatBucket, PuntAthleteStats, PuntEntry } from "@/types";
 import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
+import { exportPuntStats } from "@/lib/exportStats";
 
 const DEFAULT_PUNT_TYPES = [
   { id: "BLUE", label: "Blue" },
@@ -282,8 +283,16 @@ export default function PuntingStatisticsPage() {
 
   return (
     <main className="p-4 lg:p-6 space-y-4 max-w-5xl overflow-y-auto">
-      {/* Date range filter */}
-      <DateRangeFilter {...dateFilter} />
+      {/* Header with date filter + export */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <DateRangeFilter {...dateFilter} />
+        <button
+          onClick={() => exportPuntStats(athletes, history as { date?: string; entries?: PuntEntry[] }[], hasStarred)}
+          className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
+        >
+          Export
+        </button>
+      </div>
 
       {/* Tabs + toggle */}
       {hasStarred && (

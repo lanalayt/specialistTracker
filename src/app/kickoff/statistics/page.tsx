@@ -8,6 +8,7 @@ import { KICKOFF_ZONES } from "@/types";
 import type { KickoffEntry, KickoffAthleteStats } from "@/types";
 import { emptyKickoffStats, processKickoff } from "@/lib/stats";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
+import { exportKickoffStats } from "@/lib/exportStats";
 
 function computeFilteredKOStats(
   athletes: string[],
@@ -65,7 +66,15 @@ export default function KickoffStatisticsPage() {
 
   return (
     <main className="p-4 lg:p-6 space-y-6 max-w-4xl overflow-y-auto">
-      <DateRangeFilter {...dateFilter} />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <DateRangeFilter {...dateFilter} />
+        <button
+          onClick={() => exportKickoffStats(athletes, history as { date?: string; entries?: KickoffEntry[] }[])}
+          className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
+        >
+          Export
+        </button>
+      </div>
 
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="TB Rate" value={tbRate} accent glow />

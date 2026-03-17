@@ -7,6 +7,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { SNAP_TYPES } from "@/types";
 import type { LongSnapEntry, LongSnapAthleteStats } from "@/types";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
+import { exportLongSnapStats } from "@/lib/exportStats";
 
 function computeFilteredSnapStats(
   athletes: string[],
@@ -54,7 +55,15 @@ export default function LongSnapStatisticsPage() {
 
   return (
     <main className="p-4 lg:p-6 space-y-6 max-w-4xl overflow-y-auto">
-      <DateRangeFilter {...dateFilter} />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <DateRangeFilter {...dateFilter} />
+        <button
+          onClick={() => exportLongSnapStats(athletes, history as { date?: string; entries?: LongSnapEntry[] }[])}
+          className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
+        >
+          Export
+        </button>
+      </div>
 
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="On-Target%" value={onTargetPct} accent glow />
