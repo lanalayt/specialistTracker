@@ -4,7 +4,7 @@ import React, {
   createContext, useContext, useState, useCallback, useEffect,
 } from "react";
 import type { LongSnapEntry, LongSnapAthleteStats, Session } from "@/types";
-import { emptyLongSnapStats, processLongSnap, genId, sessionLabel } from "@/lib/stats";
+import { emptyLongSnapStats, processLongSnap, recomputeLongSnapStats, genId, sessionLabel } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
 import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
@@ -21,6 +21,7 @@ interface LongSnapContextValue extends LongSnapStateData {
   commitPractice: (entries: LongSnapEntry[], label?: string, weather?: string) => Session;
   undoLastCommit: () => boolean;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  deleteSession: (sessionId: string) => void;
   canUndo: boolean;
 }
 
@@ -133,9 +134,23 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
     return success;
   }, []);
 
+  const deleteSession = useCallback((sessionId: string) => {
+    setState((prev) => {
+      const newHistory = prev.history.filter((s) => s.id !== sessionId);
+      const newStats = recomputeLongSnapStats(
+        prev.athletes,
+        newHistory.map((s) => ({ entries: (s.entries as LongSnapEntry[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("LONGSNAP", next);
+      const _tid = getTeamId(); if (_tid && _tid !== "local-dev") teamSet(_tid, "longsnap_data", next);
+      return next;
+    });
+  }, []);
+
   return (
     <LongSnapContext.Provider value={{
-      ...state, commitPractice, undoLastCommit, updateSessionWeather, canUndo: state.snapshot !== null,
+      ...state, commitPractice, undoLastCommit, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
     }}>
       {children}
     </LongSnapContext.Provider>

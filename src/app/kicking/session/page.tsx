@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useFG } from "@/lib/fgContext";
 import { LiveFGStats } from "@/components/ui/LiveSessionStats";
 import { SessionLog } from "@/components/ui/SessionLog";
@@ -34,19 +34,20 @@ interface LogRow {
   pos: string;
   result: string;
   score: string;
+  starred?: boolean;
 }
 
 interface SessionDraft {
   rows: LogRow[];
   manualEntry: boolean;
   sessionActive: boolean;
-  plannedKicks: { athlete: string; dist: number; pos: FGPosition }[];
+  plannedKicks: { athlete: string; dist: number; pos: FGPosition; starred?: boolean }[];
   plannedRowIndices: number[];
   currentKickIdx: number;
   sessionKicks: FGKick[];
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", result: "", score: "" });
+const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", result: "", score: "", starred: false });
 
 function loadDraft(): SessionDraft | null {
   if (typeof window === "undefined") return null;
@@ -149,13 +150,14 @@ export default function KickingSessionPage() {
   const [manualEntry, setManualEntry] = useState(draft.manualEntry);
   const [sessionActive, setSessionActive] = useState(draft.sessionActive);
   const [plannedKicks, setPlannedKicks] = useState<
-    { athlete: string; dist: number; pos: FGPosition }[]
+    { athlete: string; dist: number; pos: FGPosition; starred?: boolean }[]
   >(draft.plannedKicks);
   const [plannedRowIndices, setPlannedRowIndices] = useState<number[]>(draft.plannedRowIndices ?? []);
   const [currentKickIdx, setCurrentKickIdx] = useState(draft.currentKickIdx);
   const [sessionKicks, setSessionKicks] = useState<FGKick[]>(draft.sessionKicks);
   const [result, setResult] = useState<FGResult | null>(null);
   const [score, setScore] = useState<number>(0);
+  const [starred, setStarred] = useState(false);
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [showReset, setShowReset] = useState(false);
   const [snapDistance, setSnapDistance] = useState(() => loadSnapDistance());
@@ -163,9 +165,14 @@ export default function KickingSessionPage() {
   const [makeMode, setMakeMode] = useState(() => loadMakeMode());
   const [missMode, setMissMode] = useState(() => loadMissMode());
   const [weather, setWeather] = useState("");
+  const [weatherLocked, setWeatherLocked] = useState(false);
+
+  // Guard: skip sync callbacks that arrive shortly after a local save
+  const lastLocalSave = useRef(0);
 
   // Poll for draft changes from other devices
   useTeamDraftSync<SessionDraft>("fg_session_draft", (cloudDraft) => {
+    if (Date.now() - lastLocalSave.current < 8000) return;
     if (cloudDraft && cloudDraft.rows) {
       setRows(cloudDraft.rows);
       setManualEntry(cloudDraft.manualEntry);
@@ -210,6 +217,7 @@ export default function KickingSessionPage() {
 
   // Persist draft on every relevant state change
   useEffect(() => {
+    lastLocalSave.current = Date.now();
     saveDraft({
       rows,
       manualEntry,
@@ -237,7 +245,7 @@ export default function KickingSessionPage() {
 
   // ── Table helpers ────────────────────────────────────────────
   const updateRow = useCallback(
-    (idx: number, field: keyof LogRow, value: string) => {
+    (idx: number, field: keyof LogRow, value: string | boolean) => {
       setRows((prev) => {
         const next = [...prev];
         next[idx] = { ...next[idx], [field]: value };
@@ -332,22 +340,22 @@ export default function KickingSessionPage() {
       athlete: r.athlete,
       dist: parseInt(r.dist) || 0,
       pos: r.pos as FGPosition,
+      starred: r.starred || undefined,
     }));
 
     setPlannedKicks(planned);
     setPlannedRowIndices(filled.map(({ i }) => i));
 
     if (isContinuing) {
-      // Continuing: keep existing sessionKicks, resume from where we left off
       setCurrentKickIdx(sessionKicks.length);
     } else {
-      // Fresh start
       setCurrentKickIdx(0);
       setSessionKicks([]);
     }
 
     setResult(null);
     setScore(0);
+    setStarred(!!planned[isContinuing ? sessionKicks.length : 0]?.starred);
     setSessionActive(true);
   };
 
@@ -385,6 +393,7 @@ export default function KickingSessionPage() {
       pos: r.pos as FGPosition,
       result: r.result as FGResult,
       score: parseInt(r.score) || 0,
+      starred: r.starred || undefined,
     }));
 
     // Outlier check across all kicks
@@ -412,6 +421,7 @@ export default function KickingSessionPage() {
       pos: plan.pos,
       result,
       score,
+      starred: starred || undefined,
     };
 
     // Outlier check
@@ -439,6 +449,7 @@ export default function KickingSessionPage() {
 
     setResult(null);
     setScore(0);
+    setStarred(false);
     setShowAthleteDropdown(false);
   };
 
@@ -492,11 +503,11 @@ export default function KickingSessionPage() {
     setSessionKicks([]);
     setPendingKicks(null);
     setSessionActive(false);
-    setManualEntry(false);
     setPlannedKicks([]);
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
     setWeather("");
+    // Rows (practice log) are kept — user can clear manually
   };
 
   const handleBackToLog = () => {
@@ -572,10 +583,8 @@ export default function KickingSessionPage() {
                       uniqueAthletes.forEach((a, i) => {
                         colorMap[a] = ATHLETE_HEX[i % ATHLETE_HEX.length];
                       });
-                      const activeIdx = Math.min(sessionKicks.length, plannedKicks.length - 1);
                       return plannedKicks.map((k, i) => {
                         const isCurrent = i === currentKickIdx && !allKicksLogged;
-                        const isDone = i < sessionKicks.length;
                         const hex = colorMap[k.athlete];
                         return (
                           <button
@@ -584,28 +593,36 @@ export default function KickingSessionPage() {
                               setCurrentKickIdx(i);
                               setDistInput(plannedKicks[i].dist.toString());
                               setShowAthleteDropdown(false);
-                              // If clicking a logged kick, enter edit mode with pre-filled data
                               if (i < sessionKicks.length) {
                                 const logged = sessionKicks[i];
                                 setResult(logged.result);
                                 setScore(logged.score);
+                                setStarred(!!logged.starred);
                                 setEditingKickIdx(i);
                               } else {
                                 setResult(null);
                                 setScore(0);
+                                setStarred(!!plannedKicks[i]?.starred);
                                 setEditingKickIdx(null);
                               }
                             }}
-                            className={clsx(
-                              "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer",
-                              isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]"
-                            )}
-                            style={{
-                              backgroundColor: isDone || isCurrent ? hex : `${hex}33`,
-                              color: isDone || isCurrent ? "#0f172a" : "#94a3b8",
-                            }}
+                            className="flex flex-col items-center gap-0.5 cursor-pointer transition-all"
                           >
-                            {i + 1}
+                            <div
+                              className={clsx(
+                                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]"
+                              )}
+                              style={{
+                                backgroundColor: hex,
+                                color: "#0f172a",
+                              }}
+                            >
+                              {i + 1}
+                            </div>
+                            <span className="text-[8px] font-semibold leading-none" style={{ color: hex }}>
+                              {k.athlete}
+                            </span>
                           </button>
                         );
                       });
@@ -661,9 +678,9 @@ export default function KickingSessionPage() {
                         <p className="label">Distance (yd)</p>
                         <input
                           className="input w-20 text-center text-lg font-bold"
-                          type="number"
-                          min={15}
-                          max={65}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={distInput}
                           onChange={(e) => {
                             setDistInput(e.target.value);
@@ -692,6 +709,20 @@ export default function KickingSessionPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Next kick preview */}
+                    {(() => {
+                      const nextIdx = editingKickIdx !== null
+                        ? (sessionKicks.length < plannedKicks.length ? sessionKicks.length : null)
+                        : currentKickIdx + 1 < plannedKicks.length ? currentKickIdx + 1 : null;
+                      if (nextIdx === null || !plannedKicks[nextIdx]) return null;
+                      const next = plannedKicks[nextIdx];
+                      return (
+                        <p className="text-[10px] text-muted text-left">
+                          Next: <span className="text-slate-400 font-semibold">{next.athlete}</span> — {next.dist}yd (LOS {calcLOS(next.dist)}) · {next.pos}
+                        </p>
+                      );
+                    })()}
 
                     {/* Result buttons */}
                     <div>
@@ -785,28 +816,28 @@ export default function KickingSessionPage() {
                       </div>
                     </div>
 
-                    {/* Next kick preview */}
-                    {(() => {
-                      const nextIdx = editingKickIdx !== null
-                        ? (sessionKicks.length < plannedKicks.length ? sessionKicks.length : null)
-                        : currentKickIdx + 1 < plannedKicks.length ? currentKickIdx + 1 : null;
-                      if (nextIdx === null || !plannedKicks[nextIdx]) return null;
-                      const next = plannedKicks[nextIdx];
-                      return (
-                        <p className="text-[10px] text-muted text-right">
-                          Next: <span className="text-slate-400 font-semibold">{next.athlete}</span> — {next.dist}yd (LOS {calcLOS(next.dist)}) · {next.pos}
-                        </p>
-                      );
-                    })()}
-
-                    {/* Log button */}
-                    <button
-                      onClick={handleLogKick}
-                      disabled={!result}
-                      className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      LOG KICK
-                    </button>
+                    {/* Star + Log button */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setStarred((v) => !v)}
+                        className={clsx(
+                          "px-3 py-3 rounded-input text-lg transition-all border",
+                          starred
+                            ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
+                            : "bg-surface-2 text-muted border-border hover:text-amber-400"
+                        )}
+                        title={starred ? "Live rep (starred)" : "Mark as live rep"}
+                      >
+                        {starred ? "★" : "☆"}
+                      </button>
+                      <button
+                        onClick={handleLogKick}
+                        disabled={!result}
+                        className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        LOG KICK
+                      </button>
+                    </div>
                   </>
                 )}
 
@@ -867,19 +898,28 @@ export default function KickingSessionPage() {
 
           {/* Right: Live stats */}
           <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <StatCard
-                label="Season %"
-                value={makePct(totals.att, totals.made)}
-                accent
-                glow
-              />
-              <StatCard label="Attempts" value={totals.att || "—"} />
-              <StatCard
-                label="Long FG"
-                value={totals.longFG > 0 ? `${totals.longFG} yd` : "—"}
-              />
-            </div>
+            {(() => {
+              const fgKicks = sessionKicks.filter((k) => !k.isPAT);
+              const sessionMakes = fgKicks.filter((k) => k.result.startsWith("Y")).length;
+              const sessionAtt = fgKicks.length;
+              const sessionLong = fgKicks.reduce((max, k) => k.result.startsWith("Y") ? Math.max(max, k.dist) : max, 0);
+              const sessionAvgScore = sessionAtt > 0 ? (fgKicks.reduce((s, k) => s + k.score, 0) / sessionAtt).toFixed(1) : "—";
+              return (
+                <div className="grid grid-cols-3 gap-2">
+                  <StatCard
+                    label="Session %"
+                    value={makePct(sessionAtt, sessionMakes)}
+                    accent
+                    glow
+                  />
+                  <StatCard label="Avg Score" value={sessionAvgScore} />
+                  <StatCard
+                    label="Long FG"
+                    value={sessionLong > 0 ? `${sessionLong} yd` : "—"}
+                  />
+                </div>
+              );
+            })()}
             <LiveFGStats kicks={sessionKicks} />
           </div>
         </main>
@@ -908,17 +948,41 @@ export default function KickingSessionPage() {
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         {/* Left: Practice Log Table */}
         <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
-          {/* Weather input */}
-          <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
-            <input
-              type="text"
-              value={weather}
-              onChange={(e) => setWeather(e.target.value)}
-              placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
-              className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-              readOnly={isAthlete}
-            />
+          {/* Weather input / display */}
+          <div className="px-4 py-2 border-b border-border shrink-0">
+            {weatherLocked || isAthlete ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
+                  {weather && <p className="text-xs text-slate-300">{weather}</p>}
+                  {!weather && isAthlete && <p className="text-xs text-muted italic">No weather set</p>}
+                </div>
+                {!isAthlete && (
+                  <button
+                    onClick={() => setWeatherLocked(false)}
+                    className="text-muted hover:text-slate-300 transition-colors p-1"
+                    title="Edit weather"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+                <input
+                  type="text"
+                  value={weather}
+                  onChange={(e) => setWeather(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setWeatherLocked(true); } }}
+                  placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+                  className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+                  autoFocus={weather === ""}
+                />
+              </div>
+            )}
           </div>
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
@@ -972,6 +1036,7 @@ export default function KickingSessionPage() {
                       </th>
                     </>
                   )}
+                  <th className="bg-surface-2 text-amber-400 font-bold py-2 px-1 text-center w-8 border-b border-border">★</th>
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-8 border-b border-border" />
                 </tr>
               </thead>
@@ -1025,9 +1090,9 @@ export default function KickingSessionPage() {
                           <span className="text-xs text-slate-400 text-center block">{row.dist}</span>
                         ) : (
                           <input
-                            type="number"
-                            min={1}
-                            max={99}
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             placeholder="yds"
                             value={row.dist}
                             onChange={(e) => updateRow(idx, "dist", e.target.value)}
@@ -1093,6 +1158,21 @@ export default function KickingSessionPage() {
                         </>
                       )}
                       <td className="py-1 px-1 text-center">
+                        {!isAthlete ? (
+                          <button
+                            onClick={() => updateRow(idx, "starred", !row.starred)}
+                            className={clsx(
+                              "text-sm transition-colors",
+                              row.starred ? "text-amber-400" : "text-muted/40 hover:text-amber-400"
+                            )}
+                          >
+                            {row.starred ? "★" : "☆"}
+                          </button>
+                        ) : row.starred ? (
+                          <span className="text-sm text-amber-400">★</span>
+                        ) : null}
+                      </td>
+                      <td className="py-1 px-1 text-center">
                         {!isAthlete && (
                           isLocked ? (
                             <div className="flex items-center gap-0.5 justify-center">
@@ -1105,6 +1185,7 @@ export default function KickingSessionPage() {
                                     athlete: r.athlete,
                                     dist: parseInt(r.dist) || 0,
                                     pos: r.pos as FGPosition,
+                                    starred: r.starred || undefined,
                                   }));
                                   setPlannedKicks(planned);
                                   setPlannedRowIndices(filled.map(({ i: ri }) => ri));
@@ -1115,9 +1196,11 @@ export default function KickingSessionPage() {
                                   if (logged) {
                                     setResult(logged.result);
                                     setScore(logged.score);
+                                    setStarred(!!logged.starred);
                                   } else {
                                     setResult(null);
                                     setScore(0);
+                                    setStarred(!!planned[filledIdx]?.starred);
                                   }
                                   setSessionActive(true);
                                 }}

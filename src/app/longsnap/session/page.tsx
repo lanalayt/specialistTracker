@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { StatCard } from "@/components/ui/StatCard";
 import { SnapEntryCard } from "@/components/ui/SnapEntryCard";
 import { SnapTimeBars } from "@/components/ui/SnapTimeBars";
@@ -39,6 +39,7 @@ export default function LongSnapSessionPage() {
   const [committed, setCommitted] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [weather, setWeather] = useState("");
+  const [weatherLocked, setWeatherLocked] = useState(false);
 
   const totals = athletes.reduce(
     (acc, a) => {
@@ -56,10 +57,14 @@ export default function LongSnapSessionPage() {
   const avgTime = totals.att > 0 ? (totals.totalTime / totals.att).toFixed(2) : "—";
   const onTargetPct = makePct(totals.att, totals.onTarget);
 
+  // Guard: skip sync callbacks that arrive shortly after a local save
+  const lastLocalSave = useRef(0);
+
   // Poll for draft changes from other devices
   useTeamDraftSync<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(
     "longsnap_session_draft",
     (cloud) => {
+      if (Date.now() - lastLocalSave.current < 8000) return;
       if (cloud && cloud.sessionSnaps) {
         setSessionSnaps(cloud.sessionSnaps);
         setSessionStarted(cloud.sessionStarted ?? false);
@@ -70,6 +75,7 @@ export default function LongSnapSessionPage() {
 
   // Sync session snaps to team data
   const saveSnapsToCloud = useCallback((snaps: LongSnapEntry[]) => {
+    lastLocalSave.current = Date.now();
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       teamSet(tid, "longsnap_session_draft", { sessionSnaps: snaps, sessionStarted: true, weather });
@@ -144,17 +150,41 @@ export default function LongSnapSessionPage() {
     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
       {/* Left: Entry card + session log */}
       <div className="lg:w-[55%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
-        {/* Weather input */}
-        <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
-          <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
-          <input
-            type="text"
-            value={weather}
-            onChange={(e) => setWeather(e.target.value)}
-            readOnly={isAthlete}
-            placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
-            className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-          />
+        {/* Weather input / display */}
+        <div className="px-4 py-2 border-b border-border shrink-0">
+          {weatherLocked || isAthlete ? (
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <p className="text-[10px] text-muted">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
+                {weather && <p className="text-xs text-slate-300">{weather}</p>}
+                {!weather && isAthlete && <p className="text-xs text-muted italic">No weather set</p>}
+              </div>
+              {!isAthlete && (
+                <button
+                  onClick={() => setWeatherLocked(false)}
+                  className="text-muted hover:text-slate-300 transition-colors p-1"
+                  title="Edit weather"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                    <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+              <input
+                type="text"
+                value={weather}
+                onChange={(e) => setWeather(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setWeatherLocked(true); } }}
+                placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+                className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+                autoFocus={weather === ""}
+              />
+            </div>
+          )}
         </div>
         <div className="overflow-y-auto border-b border-border">
           <div className={isAthlete ? "pointer-events-none opacity-60" : ""}>

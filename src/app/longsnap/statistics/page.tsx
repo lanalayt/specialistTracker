@@ -1,16 +1,44 @@
 "use client";
 
+import { useMemo } from "react";
 import { useLongSnap } from "@/lib/longSnapContext";
-import { makePct } from "@/lib/stats";
+import { makePct, emptyLongSnapStats, processLongSnap } from "@/lib/stats";
 import { StatCard } from "@/components/ui/StatCard";
 import { SNAP_TYPES } from "@/types";
+import type { LongSnapEntry, LongSnapAthleteStats } from "@/types";
+import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
+
+function computeFilteredSnapStats(
+  athletes: string[],
+  history: { entries?: LongSnapEntry[] }[]
+): Record<string, LongSnapAthleteStats> {
+  let statsMap: Record<string, LongSnapAthleteStats> = {};
+  athletes.forEach((a) => { statsMap[a] = emptyLongSnapStats(); });
+  history.forEach((session) => {
+    const snaps = (session.entries ?? []) as LongSnapEntry[];
+    snaps.forEach((s) => {
+      statsMap = processLongSnap(s, statsMap);
+    });
+  });
+  return statsMap;
+}
 
 export default function LongSnapStatisticsPage() {
-  const { athletes, stats } = useLongSnap();
+  const { athletes, stats, history } = useLongSnap();
+  const dateFilter = useDateRangeFilter();
+
+  const filteredHistory = useMemo(() => {
+    return dateFilter.filterByDate(history as { date?: string; entries?: LongSnapEntry[] }[]);
+  }, [history, dateFilter.mode, dateFilter.range]) as { entries?: LongSnapEntry[] }[];
+
+  const displayStats = useMemo(() => {
+    if (dateFilter.mode === "all") return stats;
+    return computeFilteredSnapStats(athletes, filteredHistory);
+  }, [dateFilter.mode, filteredHistory, stats, athletes]);
 
   const totals = athletes.reduce(
     (acc, a) => {
-      const s = stats[a];
+      const s = displayStats[a];
       if (!s) return acc;
       return {
         att: acc.att + s.overall.att,
@@ -26,6 +54,8 @@ export default function LongSnapStatisticsPage() {
 
   return (
     <main className="p-4 lg:p-6 space-y-6 max-w-4xl overflow-y-auto">
+      <DateRangeFilter {...dateFilter} />
+
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="On-Target%" value={onTargetPct} accent glow />
         <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
@@ -47,7 +77,7 @@ export default function LongSnapStatisticsPage() {
             {SNAP_TYPES.map((t) => {
               let att = 0, onTarget = 0, totalTime = 0;
               athletes.forEach((a) => {
-                const s = stats[a]?.byType[t];
+                const s = displayStats[a]?.byType[t];
                 if (s) { att += s.att; onTarget += s.onTarget; totalTime += s.totalTime; }
               });
               return (
@@ -81,7 +111,7 @@ export default function LongSnapStatisticsPage() {
             </thead>
             <tbody>
               {athletes.map((a) => {
-                const s = stats[a];
+                const s = displayStats[a];
                 if (!s) return null;
                 return (
                   <tr key={a} className="hover:bg-surface/30">

@@ -35,6 +35,7 @@ interface PuntContextValue extends PuntStateData {
   resetAll: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  deleteSession: (sessionId: string) => void;
   canUndo: boolean;
 }
 
@@ -214,6 +215,21 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const deleteSession = useCallback((sessionId: string) => {
+    setState((prev) => {
+      const newHistory = prev.history.filter((s) => s.id !== sessionId);
+      const newStats = recomputePuntStats(
+        prev.athletes,
+        newHistory.map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("PUNT", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") { teamSet(tid, "punt_data", next); }
+      return next;
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     const next = defaultState();
     localSet("PUNT", next);
@@ -227,7 +243,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
   return (
     <PuntContext.Provider value={{
       ...state, addAthletes, removeAthlete, commitPractice,
-      undoLastCommit, resetAll, updateSessionDate, updateSessionWeather, canUndo: state.snapshot !== null,
+      undoLastCommit, resetAll, updateSessionDate, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
     }}>
       {children}
     </PuntContext.Provider>

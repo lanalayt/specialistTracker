@@ -77,6 +77,7 @@ export interface FGKick {
   result: FGResult;
   score: number;
   isPAT?: boolean;
+  starred?: boolean;
 }
 
 // ─── Punt entry ─────────────────────────────────────────────────────────────
@@ -95,6 +96,7 @@ export interface PuntEntry {
   returnYards?: number;
   directionalAccuracy: 0 | 0.5 | 1;
   poochLandingYardLine?: number;
+  starred?: boolean;
 }
 
 // ─── Punt stats ─────────────────────────────────────────────────────────────

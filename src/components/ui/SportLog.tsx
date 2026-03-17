@@ -183,9 +183,9 @@ export function SportLog({
                   <RoleGuard disableForAthletes>
                     <input
                       className="input py-1.5 text-xs w-16 text-right"
-                      type="number"
-                      min={1}
-                      max={99}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="yds"
                       value={row.dist}
                       onChange={(e) => updateRow(row.id, "dist", e.target.value)}
@@ -232,9 +232,9 @@ export function SportLog({
                   <RoleGuard disableForAthletes>
                     <input
                       className="input py-1.5 text-xs w-14 text-right"
-                      type="number"
-                      min={0}
-                      max={9}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="—"
                       value={row.score}
                       onChange={(e) => updateRow(row.id, "score", e.target.value)}

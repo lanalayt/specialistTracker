@@ -35,6 +35,7 @@ interface FGContextValue extends FGStateData {
   resetAll: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  deleteSession: (sessionId: string) => void;
   canUndo: boolean;
 }
 
@@ -227,6 +228,20 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const deleteSession = useCallback((sessionId: string) => {
+    setState((prev) => {
+      const newHistory = prev.history.filter((s) => s.id !== sessionId);
+      const newStats = recomputeFGStats(
+        prev.athletes,
+        newHistory.map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("FG", next);
+      { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
+      return next;
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     const next = defaultState();
     save(next);
@@ -243,6 +258,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         resetAll,
         updateSessionDate,
         updateSessionWeather,
+        deleteSession,
         canUndo: state.snapshot !== null,
       }}
     >

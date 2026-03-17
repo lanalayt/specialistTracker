@@ -103,9 +103,9 @@ export function KickEntryCard({ athletes, kickCount, onAdd }: KickEntryCardProps
             <p className="label">Distance (yd)</p>
             <input
               className="input w-20 text-center text-lg font-bold"
-              type="number"
-              min={1}
-              max={99}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               placeholder="35"
               value={dist}
               onChange={(e) => setDist(e.target.value)}

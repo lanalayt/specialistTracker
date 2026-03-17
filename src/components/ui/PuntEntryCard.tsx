@@ -149,9 +149,9 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
           <p className="label">Yards</p>
           <input
             className="input text-center text-lg font-bold"
-            type="number"
-            min={1}
-            max={80}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             placeholder="42"
             value={yards}
             onChange={(e) => setYards(e.target.value)}
@@ -161,10 +161,8 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
           <p className="label">Hang (s)</p>
           <input
             className="input text-center text-lg font-bold"
-            type="number"
-            step="0.1"
-            min={0}
-            max={10}
+            type="text"
+            inputMode="decimal"
             placeholder="4.5"
             value={hangTime}
             onChange={(e) => setHangTime(e.target.value)}
@@ -174,10 +172,8 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
           <p className="label">Opp Time (s)</p>
           <input
             className="input text-center text-lg font-bold"
-            type="number"
-            step="0.01"
-            min={0}
-            max={9}
+            type="text"
+            inputMode="decimal"
             placeholder="sec"
             value={opTime}
             onChange={(e) => setOpTime(e.target.value)}
@@ -215,9 +211,9 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
           <p className="label">Landing Yard Line</p>
           <input
             className="input w-24 text-center"
-            type="number"
-            min={1}
-            max={50}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             placeholder="15"
             value={poochLandingYardLine}
             onChange={(e) => setPoochLandingYardLine(e.target.value)}
@@ -231,9 +227,9 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
           <p className="label">Return Yards</p>
           <input
             className="input w-24 text-center"
-            type="number"
-            min={0}
-            max={99}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             placeholder="0"
             value={returnYards}
             onChange={(e) => setReturnYards(e.target.value)}

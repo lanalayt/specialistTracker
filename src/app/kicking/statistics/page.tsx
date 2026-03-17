@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFG } from "@/lib/fgContext";
-import { makePct, avgScore } from "@/lib/stats";
+import { makePct, avgScore, processKick, emptyAthleteStats } from "@/lib/stats";
 import { POSITIONS, DIST_RANGES } from "@/types";
-import type { FGPosition, DistRange, AthleteStats } from "@/types";
+import type { FGPosition, DistRange, AthleteStats, FGKick } from "@/types";
 import clsx from "clsx";
+import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 
 const POS_LABELS: Record<FGPosition, string> = {
   LH: "Left Hash",
@@ -100,24 +101,36 @@ function CollapsibleSection({
   );
 }
 
-export default function KickingStatisticsPage() {
-  const { athletes, stats } = useFG();
+function computeFilteredStats(
+  athletes: string[],
+  history: { entries?: FGKick[] }[],
+  filter: (k: FGKick) => boolean
+): Record<string, AthleteStats> {
+  let statsMap: Record<string, AthleteStats> = {};
+  athletes.forEach((a) => { statsMap[a] = emptyAthleteStats(); });
+  history.forEach((session) => {
+    const kicks = (session.entries ?? []) as FGKick[];
+    kicks.filter(filter).forEach((k) => {
+      statsMap = processKick(k, statsMap);
+    });
+  });
+  return statsMap;
+}
 
-  const hasData = athletes.some((a) => stats[a]?.overall.att > 0);
-
-  if (!hasData) {
-    return (
-      <main className="p-4 lg:p-6 max-w-5xl">
-        <p className="text-sm text-muted">No kicking data yet. Commit a practice to see statistics.</p>
-      </main>
-    );
-  }
-
+function FGStatsView({
+  athletes,
+  statsMap,
+  label,
+}: {
+  athletes: string[];
+  statsMap: Record<string, AthleteStats>;
+  label: string;
+}) {
   return (
-    <main className="p-4 lg:p-6 space-y-4 max-w-5xl overflow-y-auto">
-      {/* Overall FG — always visible */}
+    <div className="space-y-4">
+      {/* Overall FG */}
       <section className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall FG</p>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall {label}</p>
         <table className="w-full text-sm">
           <thead>
             <tr>
@@ -131,7 +144,7 @@ export default function KickingStatisticsPage() {
           </thead>
           <tbody>
             {athletes.map((a) => {
-              const s = stats[a];
+              const s = statsMap[a];
               if (!s) return null;
               const o = s.overall;
               return (
@@ -149,7 +162,7 @@ export default function KickingStatisticsPage() {
         </table>
       </section>
 
-      {/* Miss Chart — collapsible */}
+      {/* Miss Chart */}
       <CollapsibleSection title="Miss Chart">
         <div className="card-2">
           <table className="w-full text-sm">
@@ -164,7 +177,7 @@ export default function KickingStatisticsPage() {
             </thead>
             <tbody>
               {athletes.map((a) => {
-                const s = stats[a];
+                const s = statsMap[a];
                 if (!s) return null;
                 const total = s.miss.XL + s.miss.XR + s.miss.XS;
                 return (
@@ -182,18 +195,14 @@ export default function KickingStatisticsPage() {
         </div>
       </CollapsibleSection>
 
-      {/* By Hash / Position — collapsible */}
+      {/* By Hash / Position */}
       <CollapsibleSection title="By Hash / Position">
         <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {(["LH", "RH"] as FGPosition[]).map((pos) => (
               <div key={pos} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[pos]}</p>
-                <StatTable
-                  athletes={athletes}
-                  statsMap={stats}
-                  getValue={(s) => s.position[pos]}
-                />
+                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} />
               </div>
             ))}
           </div>
@@ -201,18 +210,14 @@ export default function KickingStatisticsPage() {
             {(["LM", "M", "RM"] as FGPosition[]).map((pos) => (
               <div key={pos} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[pos]}</p>
-                <StatTable
-                  athletes={athletes}
-                  statsMap={stats}
-                  getValue={(s) => s.position[pos]}
-                />
+                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} />
               </div>
             ))}
           </div>
         </div>
       </CollapsibleSection>
 
-      {/* By Distance — collapsible */}
+      {/* By Distance */}
       <CollapsibleSection title="By Distance">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {DIST_RANGES.map((range) => {
@@ -220,29 +225,137 @@ export default function KickingStatisticsPage() {
             return (
               <div key={range} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{DIST_LABELS[range]}</p>
-                <StatTable
-                  athletes={athletes}
-                  statsMap={stats}
-                  getValue={(s) => s.distance[range]}
-                  maxScore={maxScore}
-                />
+                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.distance[range]} maxScore={maxScore} />
               </div>
             );
           })}
         </div>
       </CollapsibleSection>
 
-      {/* PAT — collapsible */}
+      {/* PAT */}
       <CollapsibleSection title="PAT">
         <div className="card-2">
-          <StatTable
-            athletes={athletes}
-            statsMap={stats}
-            getValue={(s) => s.pat ?? { att: 0, made: 0, score: 0 }}
-            showScore={false}
-          />
+          <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.pat ?? { att: 0, made: 0, score: 0 }} showScore={false} />
         </div>
       </CollapsibleSection>
+    </div>
+  );
+}
+
+export default function KickingStatisticsPage() {
+  const { athletes, stats, history } = useFG();
+  const [tab, setTab] = useState<"all" | "starred">("all");
+  const dateFilter = useDateRangeFilter();
+
+  const [includeLiveReps, setIncludeLiveReps] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const v = localStorage.getItem("fg_include_live_reps");
+      return v === null ? true : v === "true";
+    } catch { return true; }
+  });
+
+  const toggleIncludeLiveReps = (val: boolean) => {
+    setIncludeLiveReps(val);
+    try { localStorage.setItem("fg_include_live_reps", String(val)); } catch {}
+  };
+
+  const filteredHistory = useMemo(() => {
+    return dateFilter.filterByDate(history as { date?: string; entries?: FGKick[] }[]);
+  }, [history, dateFilter.mode, dateFilter.range]) as { entries?: FGKick[] }[];
+
+  const hasStarred = useMemo(() => {
+    return filteredHistory.some((s) =>
+      ((s.entries ?? []) as unknown as FGKick[]).some((k) => k.starred)
+    );
+  }, [filteredHistory]);
+
+  const baseStats = useMemo(() => {
+    if (dateFilter.mode === "all") return stats;
+    return computeFilteredStats(athletes, filteredHistory, () => true);
+  }, [dateFilter.mode, filteredHistory, stats, athletes]);
+
+  const displayStats = useMemo(() => {
+    if (!hasStarred || includeLiveReps) return baseStats;
+    return computeFilteredStats(athletes, filteredHistory, (k) => !k.starred);
+  }, [baseStats, hasStarred, includeLiveReps, athletes, filteredHistory]);
+
+  const starredStats = useMemo(() => {
+    if (!hasStarred) return null;
+    return computeFilteredStats(athletes, filteredHistory, (k) => !!k.starred);
+  }, [hasStarred, athletes, filteredHistory]);
+
+  const hasData = athletes.some((a) => stats[a]?.overall.att > 0);
+
+  if (!hasData) {
+    return (
+      <main className="p-4 lg:p-6 max-w-5xl">
+        <p className="text-sm text-muted">No kicking data yet. Commit a practice to see statistics.</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="p-4 lg:p-6 space-y-4 max-w-5xl overflow-y-auto">
+      {/* Date range filter */}
+      <DateRangeFilter {...dateFilter} />
+
+      {/* Tabs + toggle */}
+      {hasStarred && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex rounded-input border border-border overflow-hidden">
+            <button
+              onClick={() => setTab("all")}
+              className={clsx(
+                "px-4 py-1.5 text-xs font-semibold transition-colors",
+                tab === "all"
+                  ? "bg-accent text-slate-900"
+                  : "text-muted hover:text-slate-300"
+              )}
+            >
+              All Stats
+            </button>
+            <button
+              onClick={() => setTab("starred")}
+              className={clsx(
+                "px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+                tab === "starred"
+                  ? "bg-amber-500 text-slate-900"
+                  : "text-amber-400/60 hover:text-amber-400"
+              )}
+            >
+              Live Reps ★
+            </button>
+          </div>
+          {tab === "all" && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => toggleIncludeLiveReps(!includeLiveReps)}
+                className={clsx(
+                  "relative w-9 h-5 rounded-full transition-colors",
+                  includeLiveReps ? "bg-accent" : "bg-border"
+                )}
+              >
+                <span
+                  className={clsx(
+                    "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform",
+                    includeLiveReps ? "left-[18px]" : "left-0.5"
+                  )}
+                />
+              </button>
+              <span className="text-xs text-slate-300">Include live reps</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "all" && (
+        <FGStatsView athletes={athletes} statsMap={displayStats} label="FG" />
+      )}
+
+      {tab === "starred" && starredStats && (
+        <FGStatsView athletes={athletes} statsMap={starredStats} label="Live Reps" />
+      )}
     </main>
   );
 }

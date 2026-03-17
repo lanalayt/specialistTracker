@@ -4,7 +4,7 @@ import React, {
   createContext, useContext, useState, useCallback, useEffect,
 } from "react";
 import type { KickoffEntry, KickoffAthleteStats, Session } from "@/types";
-import { emptyKickoffStats, processKickoff, genId, sessionLabel } from "@/lib/stats";
+import { emptyKickoffStats, processKickoff, recomputeKickoffStats, genId, sessionLabel } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
 import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
@@ -22,6 +22,7 @@ interface KickoffContextValue extends KickoffStateData {
   undoLastCommit: () => boolean;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  deleteSession: (sessionId: string) => void;
   canUndo: boolean;
 }
 
@@ -159,9 +160,24 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const deleteSession = useCallback((sessionId: string) => {
+    setState((prev) => {
+      const newHistory = prev.history.filter((s) => s.id !== sessionId);
+      const newStats = recomputeKickoffStats(
+        prev.athletes,
+        newHistory.map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("KICKOFF", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") { teamSet(tid, "kickoff_data", next); }
+      return next;
+    });
+  }, []);
+
   return (
     <KickoffContext.Provider value={{
-      ...state, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, canUndo: state.snapshot !== null,
+      ...state, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
     }}>
       {children}
     </KickoffContext.Provider>

@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
-import { TrendChart, DistBarChart } from "@/components/ui/Chart";
+import { TrendChart, DistBarChart, LineTrendChart, MultiLineTrendChart, ZoneBarChart } from "@/components/ui/Chart";
 import { FGProvider, useFG } from "@/lib/fgContext";
+import { PuntProvider, usePunt } from "@/lib/puntContext";
+import { KickoffProvider } from "@/lib/kickoffContext";
+import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
-import type { FGKick } from "@/types";
-import { DIST_RANGES } from "@/types";
+import type { FGKick, PuntEntry } from "@/types";
+import { DIST_RANGES, PUNT_LANDING_ZONES } from "@/types";
 import clsx from "clsx";
 
 type Tab = "kicking" | "punting" | "kickoff" | "longsnap";
@@ -18,6 +21,14 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "kickoff", label: "Kickoff", icon: "🎯" },
   { id: "longsnap", label: "Long Snap", icon: "📏" },
 ];
+
+const LANDING_LABELS: Record<string, string> = {
+  TB: "Touchback",
+  inside10: "Inside 10",
+  inside20: "Inside 20",
+  returned: "Returned",
+  fairCatch: "Fair Catch",
+};
 
 function KickingAnalytics() {
   const { history, stats, athletes } = useFG();
@@ -104,6 +115,174 @@ function KickingAnalytics() {
   );
 }
 
+function PuntingAnalytics() {
+  const { history, stats, athletes } = usePunt();
+
+  if (history.length === 0) {
+    return (
+      <div className="card flex items-center justify-center h-48 text-muted text-sm">
+        Punting analytics — commit some sessions to see charts
+      </div>
+    );
+  }
+
+  // Avg distance per session trend
+  const distTrend = history.map((s) => {
+    const punts = (s.entries ?? []) as PuntEntry[];
+    const totalYds = punts.reduce((sum, p) => sum + p.yards, 0);
+    return {
+      label: s.label,
+      "Avg Dist": punts.length > 0 ? Math.round((totalYds / punts.length) * 10) / 10 : 0,
+    };
+  });
+
+  // Avg hang time per session trend
+  const htTrend = history.map((s) => {
+    const punts = (s.entries ?? []) as PuntEntry[];
+    const totalHT = punts.reduce((sum, p) => sum + p.hangTime, 0);
+    return {
+      label: s.label,
+      "Avg HT": punts.length > 0 ? Math.round((totalHT / punts.length) * 100) / 100 : 0,
+    };
+  });
+
+  // Directional accuracy % per session
+  const daTrend = history.map((s) => {
+    const punts = (s.entries ?? []) as PuntEntry[];
+    const totalDA = punts.reduce((sum, p) => sum + p.directionalAccuracy, 0);
+    return {
+      label: s.label,
+      "DA%": punts.length > 0 ? Math.round((totalDA / punts.length) * 100) : 0,
+    };
+  });
+
+  // Op time trend
+  const otTrend = history.map((s) => {
+    const punts = (s.entries ?? []) as PuntEntry[];
+    const totalOT = punts.reduce((sum, p) => sum + p.opTime, 0);
+    return {
+      label: s.label,
+      "Avg OT": punts.length > 0 ? Math.round((totalOT / punts.length) * 100) / 100 : 0,
+    };
+  });
+
+  // Landing zone distribution
+  const landingData = PUNT_LANDING_ZONES.map((zone) => {
+    let count = 0;
+    athletes.forEach((a) => {
+      const s = stats[a];
+      if (!s) return;
+      count += s.byLanding[zone] ?? 0;
+    });
+    return { zone: LANDING_LABELS[zone] ?? zone, count };
+  });
+
+  // Per-athlete comparison
+  const athleteRows = athletes.map((a) => {
+    const s = stats[a];
+    if (!s) return { athlete: a, att: 0, avgDist: "—", avgHT: "—", avgOT: "—", da: "—", long: 0, critDir: 0 };
+    const o = s.overall;
+    return {
+      athlete: a,
+      att: o.att,
+      avgDist: o.att > 0 ? (o.totalYards / o.att).toFixed(1) : "—",
+      avgHT: o.att > 0 ? (o.totalHang / o.att).toFixed(2) : "—",
+      avgOT: o.att > 0 ? (o.totalOpTime / o.att).toFixed(2) : "—",
+      da: o.att > 0 ? `${Math.round((o.totalDirectionalAccuracy / o.att) * 100)}%` : "—",
+      long: o.long,
+      critDir: o.criticalDirections,
+    };
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <LineTrendChart
+          data={distTrend}
+          dataKey="Avg Dist"
+          title="Avg Distance Over Sessions"
+          unit=" yd"
+        />
+        <LineTrendChart
+          data={htTrend}
+          dataKey="Avg HT"
+          title="Avg Hang Time Over Sessions"
+          unit="s"
+          domain={[
+            Math.min(4, ...htTrend.map((d) => d["Avg HT"] as number).filter(Boolean)) - 0.1,
+            Math.max(5, ...htTrend.map((d) => d["Avg HT"] as number).filter(Boolean)) + 0.1,
+          ]}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <LineTrendChart
+          data={daTrend}
+          dataKey="DA%"
+          title="Directional Accuracy Over Sessions"
+          unit="%"
+          domain={[0, 100]}
+        />
+        <ZoneBarChart data={landingData} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <LineTrendChart
+          data={otTrend}
+          dataKey="Avg OT"
+          title="Avg Operation Time Over Sessions"
+          unit="s"
+          domain={[
+            Math.min(1.2, ...otTrend.map((d) => d["Avg OT"] as number).filter(Boolean)) - 0.05,
+            Math.max(1.5, ...otTrend.map((d) => d["Avg OT"] as number).filter(Boolean)) + 0.05,
+          ]}
+        />
+      </div>
+
+      {/* Comparison table */}
+      <div className="card">
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">
+          Athlete Comparison
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr>
+                <th className="table-header text-left">Athlete</th>
+                <th className="table-header">Att</th>
+                <th className="table-header">Avg Dist</th>
+                <th className="table-header">Avg HT</th>
+                <th className="table-header">Avg OT</th>
+                <th className="table-header">DA%</th>
+                <th className="table-header">Long</th>
+                <th className="table-header">Crit Dir</th>
+              </tr>
+            </thead>
+            <tbody>
+              {athleteRows.map((r) => (
+                <tr key={r.athlete} className="hover:bg-surface-2 transition-colors">
+                  <td className="table-name font-semibold">{r.athlete}</td>
+                  <td className="table-cell">{r.att || "—"}</td>
+                  <td className="table-cell">{r.avgDist}</td>
+                  <td className="table-cell">{r.avgHT}</td>
+                  <td className="table-cell">{r.avgOT}</td>
+                  <td className="table-cell">{r.da}</td>
+                  <td className="table-cell text-muted">
+                    {r.long > 0 ? `${r.long} yd` : "—"}
+                  </td>
+                  <td className={clsx("table-cell", r.critDir > 0 ? "text-miss" : "text-muted")}>
+                    {r.critDir || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PlaceholderAnalytics({ sport }: { sport: string }) {
   return (
     <div className="card flex items-center justify-center h-48 text-muted text-sm">
@@ -148,7 +327,7 @@ function AnalyticsContent() {
 
         {/* Content */}
         {activeTab === "kicking" && <KickingAnalytics />}
-        {activeTab === "punting" && <PlaceholderAnalytics sport="Punting" />}
+        {activeTab === "punting" && <PuntingAnalytics />}
         {activeTab === "kickoff" && <PlaceholderAnalytics sport="Kickoff" />}
         {activeTab === "longsnap" && <PlaceholderAnalytics sport="Long Snap" />}
       </main>
@@ -159,11 +338,17 @@ function AnalyticsContent() {
 export default function AnalyticsPage() {
   return (
     <FGProvider>
-      <div className="flex">
-        <Sidebar />
-        <AnalyticsContent />
-        <MobileNav />
-      </div>
+      <PuntProvider>
+        <KickoffProvider>
+          <LongSnapProvider>
+            <div className="flex">
+              <Sidebar />
+              <AnalyticsContent />
+              <MobileNav />
+            </div>
+          </LongSnapProvider>
+        </KickoffProvider>
+      </PuntProvider>
     </FGProvider>
   );
 }

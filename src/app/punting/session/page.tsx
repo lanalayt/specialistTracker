@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { usePunt } from "@/lib/puntContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
@@ -36,13 +36,14 @@ interface LogRow {
   hangTime: string;
   opTime: string;
   directionalAccuracy: string;
+  starred?: boolean;
 }
 
 interface SessionDraft {
   rows: LogRow[];
   manualEntry: boolean;
   sessionActive: boolean;
-  plannedPunts: { athlete: string; type: PuntType; hash: PuntHash }[];
+  plannedPunts: { athlete: string; type: PuntType; hash: PuntHash; starred?: boolean }[];
   plannedRowIndices: number[];
   currentPuntIdx: number;
   sessionPunts: PuntEntry[];
@@ -56,6 +57,7 @@ const emptyRow = (): LogRow => ({
   hangTime: "",
   opTime: "",
   directionalAccuracy: "",
+  starred: false,
 });
 
 function loadDraft(): SessionDraft | null {
@@ -136,7 +138,7 @@ export default function PuntingSessionPage() {
   const [manualEntry, setManualEntry] = useState(draft.manualEntry);
   const [sessionActive, setSessionActive] = useState(draft.sessionActive);
   const [plannedPunts, setPlannedPunts] = useState<
-    { athlete: string; type: PuntType; hash: PuntHash }[]
+    { athlete: string; type: PuntType; hash: PuntHash; starred?: boolean }[]
   >(draft.plannedPunts);
   const [plannedRowIndices, setPlannedRowIndices] = useState<number[]>(draft.plannedRowIndices ?? []);
   const [currentPuntIdx, setCurrentPuntIdx] = useState(draft.currentPuntIdx);
@@ -148,9 +150,14 @@ export default function PuntingSessionPage() {
   puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState("");
+  const [weatherLocked, setWeatherLocked] = useState(false);
+
+  // Guard: skip sync callbacks that arrive shortly after a local save
+  const lastLocalSave = useRef(0);
 
   // Poll for draft changes from other devices
   useTeamDraftSync<SessionDraft>("punt_session_draft", (cloudDraft) => {
+    if (Date.now() - lastLocalSave.current < 8000) return;
     if (cloudDraft && cloudDraft.rows) {
       setRows(cloudDraft.rows);
       setManualEntry(cloudDraft.manualEntry);
@@ -191,14 +198,38 @@ export default function PuntingSessionPage() {
     }
   }, []);
 
+  // Auto-decimal: user types digits, we insert decimal 2 places from right
+  // e.g. "456" → "4.56", "12" → "0.12", "1" → "0.01"
+  function formatAutoDecimal(raw: string): string {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    const padded = digits.padStart(3, "0");
+    const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
+    return `${whole}.${padded.slice(-2)}`;
+  }
+  function handleAutoDecimalChange(setter: (v: string) => void) {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      const digits = e.target.value.replace(/\D/g, "");
+      setter(digits ? formatAutoDecimal(digits) : "");
+    };
+  }
+  // Convert a decimal string like "4.56" to raw digits "456" for editing
+  function toRawDigits(val: number | string): string {
+    const n = typeof val === "string" ? parseFloat(val) : val;
+    if (!n && n !== 0) return "";
+    return Math.round(n * 100).toString();
+  }
+
   // Session card state
   const [yards, setYards] = useState("");
   const [hangTime, setHangTime] = useState("");
   const [opTime, setOpTime] = useState("");
   const [directionalAccuracy, setDirectionalAccuracy] = useState<0 | 0.5 | 1>(1);
+  const [starred, setStarred] = useState(false);
 
   // Persist draft on every relevant state change
   useEffect(() => {
+    lastLocalSave.current = Date.now();
     saveDraft({
       rows,
       manualEntry,
@@ -231,7 +262,7 @@ export default function PuntingSessionPage() {
 
   // ── Table helpers ────────────────────────────────────────────
   const updateRow = useCallback(
-    (idx: number, field: keyof LogRow, value: string) => {
+    (idx: number, field: keyof LogRow, value: string | boolean) => {
       setRows((prev) => {
         const next = [...prev];
         next[idx] = { ...next[idx], [field]: value };
@@ -325,6 +356,7 @@ export default function PuntingSessionPage() {
       athlete: r.athlete,
       type: r.type as PuntType,
       hash: r.hash as PuntHash,
+      starred: r.starred || undefined,
     }));
 
     setPlannedPunts(planned);
@@ -341,6 +373,7 @@ export default function PuntingSessionPage() {
     setHangTime("");
     setOpTime("");
     setDirectionalAccuracy(1);
+    setStarred(!!planned[isContinuing ? sessionPunts.length : 0]?.starred);
     setSessionActive(true);
   };
 
@@ -381,6 +414,7 @@ export default function PuntingSessionPage() {
       opTime: parseFloat(r.opTime) || 0,
       landingZones: [],
       directionalAccuracy: parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1,
+      starred: r.starred || undefined,
     }));
 
     // Outlier check across all punts
@@ -434,6 +468,7 @@ export default function PuntingSessionPage() {
       opTime: otVal,
       landingZones: [],
       directionalAccuracy,
+      starred: starred || undefined,
     };
 
     // Outlier check
@@ -463,6 +498,7 @@ export default function PuntingSessionPage() {
     setHangTime("");
     setOpTime("");
     setDirectionalAccuracy(1);
+    setStarred(false);
     setShowAthleteDropdown(false);
   };
 
@@ -488,11 +524,11 @@ export default function PuntingSessionPage() {
     setSessionPunts([]);
     setPendingPunts(null);
     setSessionActive(false);
-    setManualEntry(false);
     setPlannedPunts([]);
     setPlannedRowIndices([]);
     setWeather("");
     setCurrentPuntIdx(0);
+    // Rows (practice log) are kept — user can clear manually
   };
 
   const handleBackToLog = () => {
@@ -570,7 +606,6 @@ export default function PuntingSessionPage() {
                       });
                       return plannedPunts.map((p, i) => {
                         const isCurrent = i === currentPuntIdx && !allPuntsLogged;
-                        const isDone = i < sessionPunts.length;
                         const hex = colorMap[p.athlete];
                         return (
                           <button
@@ -579,31 +614,39 @@ export default function PuntingSessionPage() {
                               setCurrentPuntIdx(i);
                               setShowAthleteDropdown(false);
                               if (i < sessionPunts.length) {
-                                // Pre-fill with logged data
                                 const logged = sessionPunts[i];
                                 setYards(String(logged.yards));
                                 setHangTime(String(logged.hangTime));
                                 setOpTime(String(logged.opTime));
                                 setDirectionalAccuracy(logged.directionalAccuracy);
+                                setStarred(!!logged.starred);
                                 setEditingPuntIdx(i);
                               } else {
                                 setYards("");
                                 setHangTime("");
                                 setOpTime("");
                                 setDirectionalAccuracy(1);
+                                setStarred(!!plannedPunts[i]?.starred);
                                 setEditingPuntIdx(null);
                               }
                             }}
-                            className={clsx(
-                              "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer",
-                              isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]"
-                            )}
-                            style={{
-                              backgroundColor: isDone || isCurrent ? hex : `${hex}33`,
-                              color: isDone || isCurrent ? "#0f172a" : "#94a3b8",
-                            }}
+                            className="flex flex-col items-center gap-0.5 cursor-pointer transition-all"
                           >
-                            {i + 1}
+                            <div
+                              className={clsx(
+                                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]"
+                              )}
+                              style={{
+                                backgroundColor: hex,
+                                color: "#0f172a",
+                              }}
+                            >
+                              {i + 1}
+                            </div>
+                            <span className="text-[8px] font-semibold leading-none" style={{ color: hex }}>
+                              {p.athlete}
+                            </span>
                           </button>
                         );
                       });
@@ -693,9 +736,9 @@ export default function PuntingSessionPage() {
                         <p className="label">Yards</p>
                         <input
                           className="input text-center text-lg font-bold"
-                          type="number"
-                          min={0}
-                          max={99}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           placeholder="yds"
                           value={yards}
                           onChange={(e) => setYards(e.target.value)}
@@ -705,26 +748,22 @@ export default function PuntingSessionPage() {
                         <p className="label">Hang Time (s)</p>
                         <input
                           className="input text-center text-lg font-bold"
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          max={9}
+                          type="text"
+                          inputMode="numeric"
                           placeholder="sec"
                           value={hangTime}
-                          onChange={(e) => setHangTime(e.target.value)}
+                          onChange={handleAutoDecimalChange(setHangTime)}
                         />
                       </div>
                       <div>
                         <p className="label">Opp Time (s)</p>
                         <input
                           className="input text-center text-lg font-bold"
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          max={9}
+                          type="text"
+                          inputMode="numeric"
                           placeholder="sec"
                           value={opTime}
-                          onChange={(e) => setOpTime(e.target.value)}
+                          onChange={handleAutoDecimalChange(setOpTime)}
                         />
                       </div>
                     </div>
@@ -769,14 +808,28 @@ export default function PuntingSessionPage() {
                       </div>
                     </div>
 
-                    {/* Log button */}
-                    <button
-                      onClick={handleLogPunt}
-                      disabled={!yards || !hangTime || !opTime}
-                      className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      LOG PUNT
-                    </button>
+                    {/* Star + Log button */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setStarred((v) => !v)}
+                        className={clsx(
+                          "px-3 py-3 rounded-input text-lg transition-all border",
+                          starred
+                            ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
+                            : "bg-surface-2 text-muted border-border hover:text-amber-400"
+                        )}
+                        title={starred ? "Live rep (starred)" : "Mark as live rep"}
+                      >
+                        {starred ? "★" : "☆"}
+                      </button>
+                      <button
+                        onClick={handleLogPunt}
+                        disabled={!yards || !hangTime || !opTime}
+                        className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        LOG PUNT
+                      </button>
+                    </div>
                   </>
                 )}
 
@@ -837,17 +890,19 @@ export default function PuntingSessionPage() {
 
           {/* Right: Live stats */}
           <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <StatCard label="Avg Yards" value={avgYards} accent glow />
-              <StatCard
-                label="Avg Hang"
-                value={totals.att > 0 ? `${avgHang}s` : "—"}
-              />
-              <StatCard
-                label="Long Punt"
-                value={totals.long > 0 ? `${totals.long} yd` : "—"}
-              />
-            </div>
+            {(() => {
+              const sAtt = sessionPunts.length;
+              const sAvgYds = sAtt > 0 ? (sessionPunts.reduce((s, p) => s + p.yards, 0) / sAtt).toFixed(1) : "—";
+              const sAvgHT = sAtt > 0 ? (sessionPunts.reduce((s, p) => s + p.hangTime, 0) / sAtt).toFixed(2) : "—";
+              const sLong = sessionPunts.reduce((max, p) => Math.max(max, p.yards), 0);
+              return (
+                <div className="grid grid-cols-3 gap-2">
+                  <StatCard label="Avg Yards" value={sAvgYds} accent glow />
+                  <StatCard label="Avg Hang" value={sAtt > 0 ? `${sAvgHT}s` : "—"} />
+                  <StatCard label="Long Punt" value={sLong > 0 ? `${sLong} yd` : "—"} />
+                </div>
+              );
+            })()}
             <PuntFieldStrip punts={sessionPunts} />
           </div>
         </main>
@@ -876,17 +931,41 @@ export default function PuntingSessionPage() {
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         {/* Left: Practice Log Table */}
         <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
-          {/* Weather input */}
-          <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
-            <input
-              type="text"
-              value={weather}
-              onChange={(e) => setWeather(e.target.value)}
-              readOnly={isAthlete}
-              placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
-              className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-            />
+          {/* Weather input / display */}
+          <div className="px-4 py-2 border-b border-border shrink-0">
+            {weatherLocked || isAthlete ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
+                  {weather && <p className="text-xs text-slate-300">{weather}</p>}
+                  {!weather && isAthlete && <p className="text-xs text-muted italic">No weather set</p>}
+                </div>
+                {!isAthlete && (
+                  <button
+                    onClick={() => setWeatherLocked(false)}
+                    className="text-muted hover:text-slate-300 transition-colors p-1"
+                    title="Edit weather"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+                <input
+                  type="text"
+                  value={weather}
+                  onChange={(e) => setWeather(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setWeatherLocked(true); } }}
+                  placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+                  className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+                  autoFocus={weather === ""}
+                />
+              </div>
+            )}
           </div>
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
@@ -946,6 +1025,7 @@ export default function PuntingSessionPage() {
                       </th>
                     </>
                   )}
+                  <th className="bg-surface-2 text-amber-400 font-bold py-2 px-1 text-center w-8 border-b border-border">★</th>
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
                 </tr>
               </thead>
@@ -1031,7 +1111,7 @@ export default function PuntingSessionPage() {
                         <>
                           <td className="py-1 px-1">
                             <input
-                              type="number" min={0} max={99} placeholder="yds"
+                              type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
                               value={row.yards}
                               onChange={(e) => updateRow(idx, "yards", e.target.value)}
                               readOnly={isAthlete}
@@ -1040,18 +1120,24 @@ export default function PuntingSessionPage() {
                           </td>
                           <td className="py-1 px-1">
                             <input
-                              type="number" min={0} max={9} step="0.01" placeholder="sec"
+                              type="text" inputMode="numeric" placeholder="sec"
                               value={row.hangTime}
-                              onChange={(e) => updateRow(idx, "hangTime", e.target.value)}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, "");
+                                updateRow(idx, "hangTime", digits ? formatAutoDecimal(digits) : "");
+                              }}
                               readOnly={isAthlete}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
                           <td className="py-1 px-1">
                             <input
-                              type="number" min={0} max={9} step="0.01" placeholder="sec"
+                              type="text" inputMode="numeric" placeholder="sec"
                               value={row.opTime}
-                              onChange={(e) => updateRow(idx, "opTime", e.target.value)}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, "");
+                                updateRow(idx, "opTime", digits ? formatAutoDecimal(digits) : "");
+                              }}
                               readOnly={isAthlete}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
@@ -1072,6 +1158,21 @@ export default function PuntingSessionPage() {
                         </>
                       )}
                       <td className="py-1 px-1 text-center">
+                        {!isAthlete ? (
+                          <button
+                            onClick={() => updateRow(idx, "starred", !row.starred)}
+                            className={clsx(
+                              "text-sm transition-colors",
+                              row.starred ? "text-amber-400" : "text-muted/40 hover:text-amber-400"
+                            )}
+                          >
+                            {row.starred ? "★" : "☆"}
+                          </button>
+                        ) : row.starred ? (
+                          <span className="text-sm text-amber-400">★</span>
+                        ) : null}
+                      </td>
+                      <td className="py-1 px-1 text-center">
                         {isLocked ? (
                           !isAthlete && (
                             <div className="flex items-center gap-0.5 justify-center">
@@ -1085,6 +1186,7 @@ export default function PuntingSessionPage() {
                                     athlete: r.athlete,
                                     type: r.type as PuntType,
                                     hash: r.hash as PuntHash,
+                                    starred: r.starred || undefined,
                                   }));
                                   setPlannedPunts(planned);
                                   setPlannedRowIndices(filled.map(({ i: ri }) => ri));
@@ -1097,11 +1199,13 @@ export default function PuntingSessionPage() {
                                     setHangTime(String(logged.hangTime));
                                     setOpTime(String(logged.opTime));
                                     setDirectionalAccuracy(logged.directionalAccuracy);
+                                    setStarred(!!logged.starred);
                                   } else {
                                     setYards("");
                                     setHangTime("");
                                     setOpTime("");
                                     setDirectionalAccuracy(1);
+                                    setStarred(false);
                                   }
                                   setSessionActive(true);
                                 }}

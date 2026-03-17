@@ -62,7 +62,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="coach@school.edu"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setPassword(""); }}
                 required
                 autoComplete="email"
               />

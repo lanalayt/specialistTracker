@@ -131,10 +131,8 @@ export function SnapEntryCard({ athletes, snapCount, onAdd }: SnapEntryCardProps
         <div className="flex items-center gap-3">
           <input
             className="input w-32 text-center text-xl font-bold"
-            type="number"
-            step="0.01"
-            min={0}
-            max={3}
+            type="text"
+            inputMode="decimal"
             placeholder="0.74"
             value={time}
             onChange={(e) => setTime(e.target.value)}

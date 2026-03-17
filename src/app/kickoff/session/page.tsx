@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { ZoneBarChart } from "@/components/ui/Chart";
@@ -118,6 +118,7 @@ export default function KickoffSessionPage() {
   const [showReset, setShowReset] = useState(false);
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState("");
+  const [weatherLocked, setWeatherLocked] = useState(false);
 
   // Session card state
   const [distance, setDistance] = useState("");
@@ -125,8 +126,12 @@ export default function KickoffSessionPage() {
   const [direction, setDirection] = useState<KickoffDirection>("middle");
   const [score, setScore] = useState<number>(0);
 
+  // Guard: skip sync callbacks that arrive shortly after a local save
+  const lastLocalSave = useRef(0);
+
   // Poll for draft changes from other devices
   useTeamDraftSync<SessionDraft>("kickoff_session_draft", (cloudDraft) => {
+    if (Date.now() - lastLocalSave.current < 8000) return;
     if (cloudDraft && cloudDraft.rows) {
       setRows(cloudDraft.rows);
       setManualEntry(cloudDraft.manualEntry);
@@ -140,6 +145,7 @@ export default function KickoffSessionPage() {
 
   // Persist draft on every relevant state change
   useEffect(() => {
+    lastLocalSave.current = Date.now();
     saveDraft({
       rows,
       manualEntry,
@@ -447,11 +453,11 @@ export default function KickoffSessionPage() {
     setSessionKicks([]);
     setPendingKicks(null);
     setSessionActive(false);
-    setManualEntry(false);
     setPlannedKicks([]);
     setPlannedRowIndices([]);
     setWeather("");
     setCurrentKickIdx(0);
+    // Rows (practice log) are kept — user can clear manually
   };
 
   const handleBackToLog = () => {
@@ -522,7 +528,6 @@ export default function KickoffSessionPage() {
                       });
                       return plannedKicks.map((k, i) => {
                         const isCurrent = i === currentKickIdx && !allKicksLogged;
-                        const isDone = i < sessionKicks.length;
                         const hex = colorMap[k.athlete];
                         return (
                           <button
@@ -545,16 +550,23 @@ export default function KickoffSessionPage() {
                                 setEditingKickIdx(null);
                               }
                             }}
-                            className={clsx(
-                              "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer",
-                              isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]"
-                            )}
-                            style={{
-                              backgroundColor: isDone || isCurrent ? hex : `${hex}33`,
-                              color: isDone || isCurrent ? "#0f172a" : "#94a3b8",
-                            }}
+                            className="flex flex-col items-center gap-0.5 cursor-pointer transition-all"
                           >
-                            {i + 1}
+                            <div
+                              className={clsx(
+                                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]"
+                              )}
+                              style={{
+                                backgroundColor: hex,
+                                color: "#0f172a",
+                              }}
+                            >
+                              {i + 1}
+                            </div>
+                            <span className="text-[8px] font-semibold leading-none" style={{ color: hex }}>
+                              {k.athlete}
+                            </span>
                           </button>
                         );
                       });
@@ -623,9 +635,9 @@ export default function KickoffSessionPage() {
                         <p className="label">Distance (yds)</p>
                         <input
                           className="input text-center text-lg font-bold"
-                          type="number"
-                          min={0}
-                          max={99}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           placeholder="yds"
                           value={distance}
                           onChange={(e) => setDistance(e.target.value)}
@@ -635,10 +647,8 @@ export default function KickoffSessionPage() {
                         <p className="label">Hang Time (s)</p>
                         <input
                           className="input text-center text-lg font-bold"
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          max={9}
+                          type="text"
+                          inputMode="decimal"
                           placeholder="sec"
                           value={hangTime}
                           onChange={(e) => setHangTime(e.target.value)}
@@ -756,12 +766,27 @@ export default function KickoffSessionPage() {
 
           {/* Right: Live stats */}
           <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <StatCard label="TB Rate" value={tbRate} accent glow />
-              <StatCard label="Avg Dist" value={avgDist ? `${avgDist} yd` : "—"} />
-              <StatCard label="Avg Hang" value={avgHang ? `${avgHang}s` : "—"} />
-            </div>
-            <ZoneBarChart data={zoneData} />
+            {(() => {
+              const sAtt = sessionKicks.length;
+              const sTB = sessionKicks.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
+              const sTBRate = sAtt > 0 ? `${Math.round((sTB / sAtt) * 100)}%` : "—";
+              const sAvgDist = sAtt > 0 ? (sessionKicks.reduce((s, k) => s + (k.distance || 0), 0) / sAtt).toFixed(1) : "—";
+              const sAvgHang = sAtt > 0 ? (sessionKicks.reduce((s, k) => s + (k.hangTime || 0), 0) / sAtt).toFixed(2) : "—";
+              const sZoneData = KICKOFF_ZONES.map((z) => ({
+                zone: z === "TB" ? "TB" : `Zone ${z}`,
+                count: sessionKicks.filter((k) => k.landingZone === z).length,
+              }));
+              return (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    <StatCard label="TB Rate" value={sTBRate} accent glow />
+                    <StatCard label="Avg Dist" value={sAtt > 0 ? `${sAvgDist} yd` : "—"} />
+                    <StatCard label="Avg Hang" value={sAtt > 0 ? `${sAvgHang}s` : "—"} />
+                  </div>
+                  <ZoneBarChart data={sZoneData} />
+                </>
+              );
+            })()}
           </div>
         </main>
 
@@ -789,17 +814,41 @@ export default function KickoffSessionPage() {
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         {/* Left: Practice Log Table */}
         <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
-          {/* Weather input */}
-          <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
-            <input
-              type="text"
-              value={weather}
-              onChange={(e) => setWeather(e.target.value)}
-              readOnly={isAthlete}
-              placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
-              className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-            />
+          {/* Weather input / display */}
+          <div className="px-4 py-2 border-b border-border shrink-0">
+            {weatherLocked || isAthlete ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <p className="text-[10px] text-muted">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
+                  {weather && <p className="text-xs text-slate-300">{weather}</p>}
+                  {!weather && isAthlete && <p className="text-xs text-muted italic">No weather set</p>}
+                </div>
+                {!isAthlete && (
+                  <button
+                    onClick={() => setWeatherLocked(false)}
+                    className="text-muted hover:text-slate-300 transition-colors p-1"
+                    title="Edit weather"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+                <input
+                  type="text"
+                  value={weather}
+                  onChange={(e) => setWeather(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setWeatherLocked(true); } }}
+                  placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+                  className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+                  autoFocus={weather === ""}
+                />
+              </div>
+            )}
           </div>
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
@@ -924,7 +973,7 @@ export default function KickoffSessionPage() {
                         <>
                           <td className="py-1 px-1">
                             <input
-                              type="number" min={0} max={99} placeholder="yds"
+                              type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
                               value={row.distance}
                               onChange={(e) => updateRow(idx, "distance", e.target.value)}
                               readOnly={isAthlete}
@@ -933,7 +982,7 @@ export default function KickoffSessionPage() {
                           </td>
                           <td className="py-1 px-1">
                             <input
-                              type="number" min={0} max={9} step="0.01" placeholder="sec"
+                              type="text" inputMode="decimal" placeholder="sec"
                               value={row.hangTime}
                               onChange={(e) => updateRow(idx, "hangTime", e.target.value)}
                               readOnly={isAthlete}

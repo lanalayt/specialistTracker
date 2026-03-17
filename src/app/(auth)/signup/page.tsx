@@ -72,7 +72,7 @@ export default function SignupPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             {/* Role selector */}
             <div>
               <label className="label">I am a</label>
@@ -149,6 +149,7 @@ export default function SignupPage() {
                 value={form.email}
                 onChange={(e) => update("email", e.target.value)}
                 required
+                autoComplete="new-email"
               />
             </div>
 
@@ -162,6 +163,7 @@ export default function SignupPage() {
                   value={form.password}
                   onChange={(e) => update("password", e.target.value)}
                   required
+                  autoComplete="new-password"
                 />
               </div>
               <div>
@@ -173,6 +175,7 @@ export default function SignupPage() {
                   value={form.confirm}
                   onChange={(e) => update("confirm", e.target.value)}
                   required
+                  autoComplete="new-password"
                 />
               </div>
             </div>

@@ -218,6 +218,129 @@ interface ZoneBarChartProps {
   className?: string;
 }
 
+// ─── Generic line trend chart ────────────────────────────────────────────────
+
+export interface LineTrendDataPoint {
+  label: string;
+  [key: string]: string | number;
+}
+
+interface LineTrendChartProps {
+  data: LineTrendDataPoint[];
+  dataKey: string;
+  title: string;
+  unit?: string;
+  domain?: [number, number];
+  className?: string;
+}
+
+export function LineTrendChart({ data, dataKey, title, unit = "", domain, className }: LineTrendChartProps) {
+  return (
+    <div className={clsx("card", className)}>
+      <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">
+        {title}
+      </p>
+      {data.length === 0 ? (
+        <div className="h-40 flex items-center justify-center text-muted text-xs">
+          No sessions yet
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={180}>
+          <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+            <defs>
+              <linearGradient id={`grad_${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={ACCENT} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={ACCENT} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1f2f42" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: MUTED, fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              domain={domain}
+              tick={{ fill: MUTED, fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v) => `${v}${unit}`}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Area
+              type="monotone"
+              dataKey={dataKey}
+              stroke={ACCENT}
+              strokeWidth={2.5}
+              fill={`url(#grad_${dataKey})`}
+              dot={{ fill: ACCENT, r: 4, strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: ACCENT, stroke: SURFACE2, strokeWidth: 2 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+// ─── Multi-line trend chart ─────────────────────────────────────────────────
+
+interface MultiLineTrendChartProps {
+  data: LineTrendDataPoint[];
+  dataKeys: { key: string; color: string }[];
+  title: string;
+  unit?: string;
+  domain?: [number, number];
+  className?: string;
+}
+
+export function MultiLineTrendChart({ data, dataKeys, title, unit = "", domain, className }: MultiLineTrendChartProps) {
+  return (
+    <div className={clsx("card", className)}>
+      <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">
+        {title}
+      </p>
+      {data.length === 0 ? (
+        <div className="h-40 flex items-center justify-center text-muted text-xs">
+          No sessions yet
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={180}>
+          <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1f2f42" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: MUTED, fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              domain={domain}
+              tick={{ fill: MUTED, fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v) => `${v}${unit}`}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            {dataKeys.map((dk) => (
+              <Line
+                key={dk.key}
+                type="monotone"
+                dataKey={dk.key}
+                stroke={dk.color}
+                strokeWidth={2}
+                dot={{ fill: dk.color, r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: dk.color, stroke: SURFACE2, strokeWidth: 2 }}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
 export function ZoneBarChart({ data, className }: ZoneBarChartProps) {
   const colors = [ACCENT, "#3b82f6", "#8b5cf6", "#f59e0b", MISS, "#06b6d4", "#84cc16"];
 

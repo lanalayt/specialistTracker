@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLongSnap } from "@/lib/longSnapContext";
+import { useAuth } from "@/lib/auth";
 import type { LongSnapEntry, SnapBenchmark, Session } from "@/types";
 import clsx from "clsx";
 
@@ -20,10 +21,12 @@ const BM_COLORS: Record<SnapBenchmark, string> = {
 };
 
 export default function LongSnapHistoryPage() {
-  const { history, updateSessionWeather } = useLongSnap();
+  const { history, updateSessionWeather, deleteSession } = useLongSnap();
+  const { isAthlete } = useAuth();
   const [selectedId, setSelectedId] = useState<string | null>(
     history[history.length - 1]?.id ?? null
   );
+  const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
 
   const selected = history.find((s) => s.id === selectedId);
   const snaps = (selected?.entries ?? []) as LongSnapEntry[];
@@ -71,23 +74,60 @@ export default function LongSnapHistoryPage() {
           </div>
         ) : (
           <>
-            <div className="mb-4">
-              <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
-              <p className="text-xs text-muted mt-0.5">{snaps.length} snap{snaps.length !== 1 ? "s" : ""}</p>
-              {selected.weather && (
-                <p className="text-xs text-muted mt-1">Weather: {selected.weather}</p>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
+                <p className="text-xs text-muted mt-0.5">{snaps.length} snap{snaps.length !== 1 ? "s" : ""}</p>
+              </div>
+              {!isAthlete && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
+                      deleteSession(selected.id);
+                      setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
+                    }
+                  }}
+                  className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all ml-3 shrink-0"
+                >
+                  Delete Session
+                </button>
               )}
             </div>
-            {/* Editable weather */}
-            <div className="mb-4 flex items-center gap-2">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
-              <input
-                type="text"
-                value={selected.weather ?? ""}
-                onChange={(e) => updateSessionWeather(selected.id, e.target.value)}
-                placeholder="Add weather notes..."
-                className="flex-1 max-w-xs bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-              />
+            {/* Weather display / edit */}
+            <div className="mb-4">
+              {!isAthlete && editingWeatherId === selected.id ? (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
+                  <input
+                    type="text"
+                    value={selected.weather ?? ""}
+                    onChange={(e) => updateSessionWeather(selected.id, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setEditingWeatherId(null); } }}
+                    placeholder="Add weather notes..."
+                    className="flex-1 max-w-xs bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  {selected.weather ? (
+                    <p className="text-xs text-slate-300">{selected.weather}</p>
+                  ) : (
+                    <p className="text-xs text-muted italic">No weather set</p>
+                  )}
+                  {!isAthlete && (
+                    <button
+                      onClick={() => setEditingWeatherId(selected.id)}
+                      className="text-muted hover:text-slate-300 transition-colors p-1"
+                      title="Edit weather"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                        <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="card-2 overflow-x-auto">
               <table className="w-full text-sm">

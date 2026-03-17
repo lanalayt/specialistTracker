@@ -1,8 +1,10 @@
 "use client";
 
+import { useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { useTeamLogo } from "@/lib/useTeamLogo";
 import clsx from "clsx";
 
 const NAV_ITEMS = [
@@ -22,18 +24,47 @@ const COACH_ITEMS = [
 export function Sidebar() {
   const pathname = usePathname();
   const { user, isCoach, signOut, setDemoRole } = useAuth();
+  const { logo, uploadLogo } = useTeamLogo();
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
+
+  const handleLogoClick = () => {
+    if (isCoach) fileRef.current?.click();
+  };
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-56 bg-surface border-r border-border flex flex-col z-40 hidden lg:flex">
       {/* Logo */}
       <div className="p-5 border-b border-border">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center text-bg font-bold text-sm">
-            ST
-          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadLogo(f);
+              e.target.value = "";
+            }}
+          />
+          <button
+            onClick={handleLogoClick}
+            className={clsx(
+              "w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0",
+              isCoach && "cursor-pointer hover:ring-2 hover:ring-accent/50 transition-all",
+              !logo && "bg-accent text-bg font-bold text-sm"
+            )}
+            title={isCoach ? "Upload team logo" : undefined}
+          >
+            {logo ? (
+              <img src={logo} alt="Team logo" className="w-full h-full object-cover" />
+            ) : (
+              "ST"
+            )}
+          </button>
           <div>
             <p className="text-sm font-bold text-slate-100 leading-none">Specialist</p>
             <p className="text-xs text-muted leading-none mt-0.5">Tracker</p>

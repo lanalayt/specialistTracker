@@ -1,16 +1,45 @@
 "use client";
 
+import { useMemo } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { ZoneBarChart } from "@/components/ui/Chart";
 import { KICKOFF_ZONES } from "@/types";
+import type { KickoffEntry, KickoffAthleteStats } from "@/types";
+import { emptyKickoffStats, processKickoff } from "@/lib/stats";
+import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
+
+function computeFilteredKOStats(
+  athletes: string[],
+  history: { entries?: KickoffEntry[] }[]
+): Record<string, KickoffAthleteStats> {
+  let statsMap: Record<string, KickoffAthleteStats> = {};
+  athletes.forEach((a) => { statsMap[a] = emptyKickoffStats(); });
+  history.forEach((session) => {
+    const entries = (session.entries ?? []) as KickoffEntry[];
+    entries.forEach((e) => {
+      statsMap = processKickoff(e, statsMap);
+    });
+  });
+  return statsMap;
+}
 
 export default function KickoffStatisticsPage() {
-  const { athletes, stats } = useKickoff();
+  const { athletes, stats, history } = useKickoff();
+  const dateFilter = useDateRangeFilter();
+
+  const filteredHistory = useMemo(() => {
+    return dateFilter.filterByDate(history as { date?: string; entries?: KickoffEntry[] }[]);
+  }, [history, dateFilter.mode, dateFilter.range]) as { entries?: KickoffEntry[] }[];
+
+  const displayStats = useMemo(() => {
+    if (dateFilter.mode === "all") return stats;
+    return computeFilteredKOStats(athletes, filteredHistory);
+  }, [dateFilter.mode, filteredHistory, stats, athletes]);
 
   const totals = athletes.reduce(
     (acc, a) => {
-      const s = stats[a];
+      const s = displayStats[a];
       if (!s) return acc;
       return {
         att: acc.att + s.overall.att,
@@ -29,11 +58,13 @@ export default function KickoffStatisticsPage() {
 
   const zoneData = KICKOFF_ZONES.map((z) => ({
     zone: z === "TB" ? "TB" : `Zone ${z}`,
-    count: athletes.reduce((acc, a) => acc + (stats[a]?.byZone[z] ?? 0), 0),
+    count: athletes.reduce((acc, a) => acc + (displayStats[a]?.byZone[z] ?? 0), 0),
   }));
 
   return (
     <main className="p-4 lg:p-6 space-y-6 max-w-4xl overflow-y-auto">
+      <DateRangeFilter {...dateFilter} />
+
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="TB Rate" value={tbRate} accent glow />
         <StatCard label="Avg Dist" value={avgDist ? `${avgDist} yd` : "—"} />
@@ -58,7 +89,7 @@ export default function KickoffStatisticsPage() {
             </thead>
             <tbody>
               {athletes.map((a) => {
-                const s = stats[a];
+                const s = displayStats[a];
                 if (!s) return null;
                 const tbPct = s.overall.att > 0 ? `${Math.round((s.overall.touchbacks / s.overall.att) * 100)}%` : "—";
                 return (
