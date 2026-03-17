@@ -21,7 +21,7 @@ const INIT_ROWS = 12;
 // Outlier detection for FG distance
 function checkFGOutliers(dist: number): string[] {
   const warnings: string[] = [];
-  if (dist < 7 || dist > 80) warnings.push(`Distance ${dist} yd seems unusual (expected 7–80)`);
+  if (dist > 0 && (dist < 7 || dist > 80)) warnings.push(`Distance ${dist} yd seems unusual (expected 7–80)`);
   return warnings;
 }
 const MAX_SCORE = 4;
@@ -41,7 +41,7 @@ interface SessionDraft {
   rows: LogRow[];
   manualEntry: boolean;
   sessionActive: boolean;
-  plannedKicks: { athlete: string; dist: number; pos: FGPosition; starred?: boolean }[];
+  plannedKicks: { athlete: string; dist: number; pos: FGPosition; isPAT?: boolean; starred?: boolean }[];
   plannedRowIndices: number[];
   currentKickIdx: number;
   sessionKicks: FGKick[];
@@ -150,7 +150,7 @@ export default function KickingSessionPage() {
   const [manualEntry, setManualEntry] = useState(draft.manualEntry);
   const [sessionActive, setSessionActive] = useState(draft.sessionActive);
   const [plannedKicks, setPlannedKicks] = useState<
-    { athlete: string; dist: number; pos: FGPosition; starred?: boolean }[]
+    { athlete: string; dist: number; pos: FGPosition; isPAT?: boolean; starred?: boolean }[]
   >(draft.plannedKicks);
   const [plannedRowIndices, setPlannedRowIndices] = useState<number[]>(draft.plannedRowIndices ?? []);
   const [currentKickIdx, setCurrentKickIdx] = useState(draft.currentKickIdx);
@@ -337,8 +337,9 @@ export default function KickingSessionPage() {
 
     const planned = filled.map(({ r }) => ({
       athlete: r.athlete,
-      dist: parseInt(r.dist) || 0,
+      dist: r.pos === "PAT" ? 0 : (parseInt(r.dist) || 0),
       pos: r.pos as FGPosition,
+      isPAT: r.pos === "PAT" || undefined,
       starred: r.starred || undefined,
     }));
 
@@ -388,16 +389,18 @@ export default function KickingSessionPage() {
     const kicks: FGKick[] = filled.map(({ r }) => ({
       athleteId: r.athlete,
       athlete: r.athlete,
-      dist: parseInt(r.dist) || 0,
+      dist: r.pos === "PAT" ? 0 : (parseInt(r.dist) || 0),
       pos: r.pos as FGPosition,
       result: r.result as FGResult,
       score: parseInt(r.score) || 0,
+      isPAT: r.pos === "PAT" || undefined,
       starred: r.starred || undefined,
     }));
 
-    // Outlier check across all kicks
+    // Outlier check across all kicks (skip PATs)
     const allWarnings: string[] = [];
     kicks.forEach((k, i) => {
+      if (k.isPAT) return;
       const w = checkFGOutliers(k.dist);
       if (w.length > 0) allWarnings.push(`Row ${i + 1}: ${w.join(", ")}`);
     });
@@ -416,15 +419,16 @@ export default function KickingSessionPage() {
     const kick: FGKick = {
       athleteId: plan.athlete,
       athlete: plan.athlete,
-      dist: plan.dist,
+      dist: plan.isPAT ? 0 : plan.dist,
       pos: plan.pos,
       result,
       score,
+      isPAT: plan.isPAT || undefined,
       starred: starred || undefined,
     };
 
-    // Outlier check
-    const warnings = checkFGOutliers(plan.dist);
+    // Outlier check (skip for PATs)
+    const warnings = plan.isPAT ? [] : checkFGOutliers(plan.dist);
     if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
 
     if (editingKickIdx !== null) {
@@ -457,7 +461,7 @@ export default function KickingSessionPage() {
   const showEntryCard = (!allKicksLogged || isEditing) && plannedKicks[currentKickIdx];
   const currentPlan = plannedKicks[currentKickIdx];
 
-  const updateCurrentPlan = (field: "athlete" | "dist" | "pos", value: string | number) => {
+  const updateCurrentPlan = (field: "athlete" | "dist" | "pos" | "isPAT", value: string | number | boolean) => {
     setPlannedKicks((prev) => {
       const next = [...prev];
       next[currentKickIdx] = { ...next[currentKickIdx], [field]: value };
@@ -466,8 +470,8 @@ export default function KickingSessionPage() {
     // Sync back to the planning table row
     const rowIdx = plannedRowIndices[currentKickIdx];
     if (rowIdx != null) {
-      const rowField = field === "dist" ? "dist" : field;
-      const rowValue = field === "dist" ? String(value) : String(value);
+      const rowField = field === "dist" ? "dist" : field === "isPAT" ? "pos" : field;
+      const rowValue = field === "isPAT" ? (value ? "PAT" : "") : String(value);
       setRows((prev) => {
         const next = [...prev];
         next[rowIdx] = { ...next[rowIdx], [rowField]: rowValue };
@@ -477,11 +481,11 @@ export default function KickingSessionPage() {
   };
 
   const [showAthleteDropdown, setShowAthleteDropdown] = useState(false);
-  const [distInput, setDistInput] = useState(currentPlan?.dist?.toString() ?? "");
+  const [distInput, setDistInput] = useState(currentPlan?.isPAT ? "" : (currentPlan?.dist?.toString() ?? ""));
 
   // Sync distInput when moving to a different kick or entering session
   useEffect(() => {
-    setDistInput(currentPlan?.dist?.toString() ?? "");
+    setDistInput(currentPlan?.isPAT ? "" : (currentPlan?.dist?.toString() ?? ""));
   }, [currentKickIdx, sessionActive, plannedKicks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteKick = (idx: number) => {
@@ -590,7 +594,7 @@ export default function KickingSessionPage() {
                             key={i}
                             onClick={() => {
                               setCurrentKickIdx(i);
-                              setDistInput(plannedKicks[i].dist.toString());
+                              setDistInput(plannedKicks[i].isPAT ? "" : plannedKicks[i].dist.toString());
                               setShowAthleteDropdown(false);
                               if (i < sessionKicks.length) {
                                 const logged = sessionKicks[i];
@@ -665,39 +669,46 @@ export default function KickingSessionPage() {
 
                     {/* LOS + Distance + Position */}
                     <div className="flex gap-4 items-start">
-                      <div className="shrink-0">
-                        <p className="text-[10px] font-semibold text-warn uppercase tracking-wider mb-1 block">
-                          LOS
-                        </p>
-                        <div className="w-20 text-center text-base font-bold text-warn bg-warn/10 border border-warn/30 rounded-input py-1.5 flex items-center justify-center">
-                          {distInput && !isNaN(parseInt(distInput)) ? calcLOS(parseInt(distInput)) : "—"}
-                        </div>
-                      </div>
-                      <div className="shrink-0">
-                        <p className="label">Distance (yd)</p>
-                        <input
-                          className="input w-20 text-center text-lg font-bold"
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={distInput}
-                          onChange={(e) => {
-                            setDistInput(e.target.value);
-                            const v = parseInt(e.target.value);
-                            if (!isNaN(v) && v > 0) updateCurrentPlan("dist", v);
-                          }}
-                        />
-                      </div>
+                      {!currentPlan.isPAT && (
+                        <>
+                          <div className="shrink-0">
+                            <p className="text-[10px] font-semibold text-warn uppercase tracking-wider mb-1 block">
+                              LOS
+                            </p>
+                            <div className="w-20 text-center text-base font-bold text-warn bg-warn/10 border border-warn/30 rounded-input py-1.5 flex items-center justify-center">
+                              {distInput && !isNaN(parseInt(distInput)) ? calcLOS(parseInt(distInput)) : "—"}
+                            </div>
+                          </div>
+                          <div className="shrink-0">
+                            <p className="label">Distance (yd)</p>
+                            <input
+                              className="input w-20 text-center text-lg font-bold"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={distInput}
+                              onChange={(e) => {
+                                setDistInput(e.target.value);
+                                const v = parseInt(e.target.value);
+                                if (!isNaN(v) && v > 0) updateCurrentPlan("dist", v);
+                              }}
+                            />
+                          </div>
+                        </>
+                      )}
                       <div className="flex-1">
                         <p className="label">Position</p>
                         <div className="flex gap-1.5">
                           {POSITIONS.map((p) => (
                             <button
                               key={p}
-                              onClick={() => updateCurrentPlan("pos", p)}
+                              onClick={() => {
+                                updateCurrentPlan("pos", p);
+                                updateCurrentPlan("isPAT", false);
+                              }}
                               className={clsx(
                                 "flex-1 py-2 rounded-input text-xs font-semibold text-center transition-all",
-                                currentPlan.pos === p
+                                currentPlan.pos === p && !currentPlan.isPAT
                                   ? "bg-accent/20 text-accent border border-accent/50"
                                   : "bg-surface-2 text-muted border border-border hover:text-white"
                               )}
@@ -705,6 +716,22 @@ export default function KickingSessionPage() {
                               {p}
                             </button>
                           ))}
+                          <button
+                            onClick={() => {
+                              updateCurrentPlan("pos", "PAT" as FGPosition);
+                              updateCurrentPlan("isPAT", true);
+                              updateCurrentPlan("dist", 0);
+                              setDistInput("");
+                            }}
+                            className={clsx(
+                              "flex-1 py-2 rounded-input text-xs font-semibold text-center transition-all",
+                              currentPlan.isPAT
+                                ? "bg-amber-500/20 text-amber-400 border border-amber-500/50"
+                                : "bg-surface-2 text-muted border border-border hover:text-white"
+                            )}
+                          >
+                            PAT
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -718,7 +745,7 @@ export default function KickingSessionPage() {
                       const next = plannedKicks[nextIdx];
                       return (
                         <p className="text-[10px] text-muted text-left">
-                          Next: <span className="text-slate-400 font-semibold">{next.athlete}</span> — {next.dist}yd (LOS {calcLOS(next.dist)}) · {next.pos}
+                          Next: <span className="text-slate-400 font-semibold">{next.athlete}</span> — {next.isPAT ? "PAT" : `${next.dist}yd (LOS ${calcLOS(next.dist)}) · ${next.pos}`}
                         </p>
                       );
                     })()}
@@ -1086,7 +1113,9 @@ export default function KickingSessionPage() {
                       </td>
                       <td className="py-1 px-1">
                         {isLocked ? (
-                          <span className="text-xs text-slate-400 text-center block">{row.dist}</span>
+                          <span className="text-xs text-slate-400 text-center block">{row.pos === "PAT" ? "—" : row.dist}</span>
+                        ) : row.pos === "PAT" ? (
+                          <span className="text-xs text-muted text-center block py-1">—</span>
                         ) : (
                           <input
                             type="text"
@@ -1106,7 +1135,10 @@ export default function KickingSessionPage() {
                         ) : (
                           <select
                             value={row.pos}
-                            onChange={(e) => updateRow(idx, "pos", e.target.value)}
+                            onChange={(e) => {
+                              updateRow(idx, "pos", e.target.value);
+                              if (e.target.value === "PAT") updateRow(idx, "dist", "");
+                            }}
                             disabled={isAthlete}
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
@@ -1114,6 +1146,7 @@ export default function KickingSessionPage() {
                             {POSITIONS.map((p) => (
                               <option key={p} value={p}>{p}</option>
                             ))}
+                            <option value="PAT">PAT</option>
                           </select>
                         )}
                       </td>
@@ -1182,14 +1215,15 @@ export default function KickingSessionPage() {
                                     .filter(({ r }) => r.athlete || r.dist || r.pos);
                                   const planned = filled.map(({ r }) => ({
                                     athlete: r.athlete,
-                                    dist: parseInt(r.dist) || 0,
+                                    dist: r.pos === "PAT" ? 0 : (parseInt(r.dist) || 0),
                                     pos: r.pos as FGPosition,
+                                    isPAT: r.pos === "PAT" || undefined,
                                     starred: r.starred || undefined,
                                   }));
                                   setPlannedKicks(planned);
                                   setPlannedRowIndices(filled.map(({ i: ri }) => ri));
                                   setCurrentKickIdx(filledIdx);
-                                  setDistInput(planned[filledIdx]?.dist.toString() ?? "");
+                                  setDistInput(planned[filledIdx]?.isPAT ? "" : (planned[filledIdx]?.dist.toString() ?? ""));
                                   setEditingKickIdx(filledIdx);
                                   const logged = sessionKicks[filledIdx];
                                   if (logged) {
