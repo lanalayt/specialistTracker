@@ -452,7 +452,10 @@ export default function KickingSessionPage() {
 
     setResult(null);
     setScore(0);
-    setStarred(false);
+    const nextIdx = editingKickIdx !== null
+      ? (sessionKicks.length < plannedKicks.length ? sessionKicks.length : currentKickIdx)
+      : currentKickIdx + 1;
+    setStarred(!!plannedKicks[nextIdx]?.starred);
     setShowAthleteDropdown(false);
   };
 

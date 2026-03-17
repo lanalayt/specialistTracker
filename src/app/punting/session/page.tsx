@@ -497,7 +497,10 @@ export default function PuntingSessionPage() {
     setHangTime("");
     setOpTime("");
     setDirectionalAccuracy(1);
-    setStarred(false);
+    const nextIdx = editingPuntIdx !== null
+      ? (sessionPunts.length < plannedPunts.length ? sessionPunts.length : currentPuntIdx)
+      : currentPuntIdx + 1;
+    setStarred(!!plannedPunts[nextIdx]?.starred);
     setShowAthleteDropdown(false);
   };
 
