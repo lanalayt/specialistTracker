@@ -37,6 +37,12 @@ interface LogRow {
   starred?: boolean;
 }
 
+interface PartialKickInput {
+  result: FGResult | null;
+  score: number;
+  starred: boolean;
+}
+
 interface SessionDraft {
   rows: LogRow[];
   manualEntry: boolean;
@@ -45,6 +51,7 @@ interface SessionDraft {
   plannedRowIndices: number[];
   currentKickIdx: number;
   sessionKicks: FGKick[];
+  partialInputs?: Record<number, PartialKickInput>;
 }
 
 const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", result: "", score: "", starred: false });
@@ -155,9 +162,10 @@ export default function KickingSessionPage() {
   const [plannedRowIndices, setPlannedRowIndices] = useState<number[]>(draft.plannedRowIndices ?? []);
   const [currentKickIdx, setCurrentKickIdx] = useState(draft.currentKickIdx);
   const [sessionKicks, setSessionKicks] = useState<FGKick[]>(draft.sessionKicks);
-  const [result, setResult] = useState<FGResult | null>(null);
-  const [score, setScore] = useState<number>(0);
-  const [starred, setStarred] = useState(false);
+  const [partialInputs, setPartialInputs] = useState<Record<number, PartialKickInput>>(draft.partialInputs ?? {});
+  const [result, setResult] = useState<FGResult | null>(draft.partialInputs?.[draft.currentKickIdx]?.result ?? null);
+  const [score, setScore] = useState<number>(draft.partialInputs?.[draft.currentKickIdx]?.score ?? 0);
+  const [starred, setStarred] = useState(draft.partialInputs?.[draft.currentKickIdx]?.starred ?? false);
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [showReset, setShowReset] = useState(false);
   const [snapDistance, setSnapDistance] = useState(() => loadSnapDistance());
@@ -181,6 +189,7 @@ export default function KickingSessionPage() {
       setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
       setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
       setSessionKicks(cloudDraft.sessionKicks ?? []);
+      if (cloudDraft.partialInputs) setPartialInputs(cloudDraft.partialInputs);
     }
   });
 
@@ -218,6 +227,10 @@ export default function KickingSessionPage() {
   // Persist draft on every relevant state change
   useEffect(() => {
     lastLocalSave.current = Date.now();
+    // Merge current input fields into partialInputs for the active kick
+    const mergedPartials = sessionActive && currentKickIdx >= sessionKicks.length
+      ? { ...partialInputs, [currentKickIdx]: { result, score, starred } }
+      : partialInputs;
     saveDraft({
       rows,
       manualEntry,
@@ -226,8 +239,9 @@ export default function KickingSessionPage() {
       plannedRowIndices,
       currentKickIdx,
       sessionKicks,
+      partialInputs: mergedPartials,
     });
-  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks]);
+  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, partialInputs, result, score, starred]);
 
   const totals = athletes.reduce(
     (acc, a) => {
@@ -450,12 +464,25 @@ export default function KickingSessionPage() {
       }
     }
 
-    setResult(null);
-    setScore(0);
+    // Clear partial for logged kick, load partial for next kick if it exists
     const nextIdx = editingKickIdx !== null
       ? (sessionKicks.length < plannedKicks.length ? sessionKicks.length : currentKickIdx)
       : currentKickIdx + 1;
-    setStarred(!!plannedKicks[nextIdx]?.starred);
+    setPartialInputs((prev) => {
+      const next = { ...prev };
+      delete next[currentKickIdx];
+      return next;
+    });
+    const nextPartial = partialInputs[nextIdx];
+    if (nextPartial) {
+      setResult(nextPartial.result);
+      setScore(nextPartial.score);
+      setStarred(nextPartial.starred);
+    } else {
+      setResult(null);
+      setScore(0);
+      setStarred(!!plannedKicks[nextIdx]?.starred);
+    }
     setShowAthleteDropdown(false);
   };
 
@@ -512,6 +539,7 @@ export default function KickingSessionPage() {
     setPlannedKicks([]);
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
+    setPartialInputs({});
     setWeather("");
     // Rows (practice log) are kept — user can clear manually
   };
@@ -535,6 +563,7 @@ export default function KickingSessionPage() {
     setPlannedKicks([]);
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
+    setPartialInputs({});
     setShowReset(false);
   };
 
@@ -545,6 +574,7 @@ export default function KickingSessionPage() {
     setPlannedKicks([]);
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
+    setPartialInputs({});
   };
 
   // ════════════════════════════════════════════════════════════
@@ -596,6 +626,10 @@ export default function KickingSessionPage() {
                           <button
                             key={i}
                             onClick={() => {
+                              // Save current partial input before switching
+                              if (currentKickIdx >= sessionKicks.length) {
+                                setPartialInputs((prev) => ({ ...prev, [currentKickIdx]: { result, score, starred } }));
+                              }
                               setCurrentKickIdx(i);
                               setDistInput(plannedKicks[i].isPAT ? "" : plannedKicks[i].dist.toString());
                               setShowAthleteDropdown(false);
@@ -606,9 +640,16 @@ export default function KickingSessionPage() {
                                 setStarred(!!logged.starred);
                                 setEditingKickIdx(i);
                               } else {
-                                setResult(null);
-                                setScore(0);
-                                setStarred(!!plannedKicks[i]?.starred);
+                                const partial = partialInputs[i];
+                                if (partial) {
+                                  setResult(partial.result);
+                                  setScore(partial.score);
+                                  setStarred(partial.starred);
+                                } else {
+                                  setResult(null);
+                                  setScore(0);
+                                  setStarred(!!plannedKicks[i]?.starred);
+                                }
                                 setEditingKickIdx(null);
                               }
                             }}

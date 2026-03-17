@@ -39,6 +39,14 @@ interface LogRow {
   starred?: boolean;
 }
 
+interface PartialPuntInput {
+  yards: string;
+  hangTime: string;
+  opTime: string;
+  directionalAccuracy: 0 | 0.5 | 1;
+  starred: boolean;
+}
+
 interface SessionDraft {
   rows: LogRow[];
   manualEntry: boolean;
@@ -47,6 +55,7 @@ interface SessionDraft {
   plannedRowIndices: number[];
   currentPuntIdx: number;
   sessionPunts: PuntEntry[];
+  partialInputs?: Record<number, PartialPuntInput>;
 }
 
 const emptyRow = (): LogRow => ({
@@ -166,6 +175,7 @@ export default function PuntingSessionPage() {
       setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
       setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
       setSessionPunts(cloudDraft.sessionPunts ?? []);
+      if (cloudDraft.partialInputs) setPartialInputs(cloudDraft.partialInputs);
     }
   });
 
@@ -221,15 +231,21 @@ export default function PuntingSessionPage() {
   }
 
   // Session card state
-  const [yards, setYards] = useState("");
-  const [hangTime, setHangTime] = useState("");
-  const [opTime, setOpTime] = useState("");
-  const [directionalAccuracy, setDirectionalAccuracy] = useState<0 | 0.5 | 1>(1);
-  const [starred, setStarred] = useState(false);
+  const [partialInputs, setPartialInputs] = useState<Record<number, PartialPuntInput>>(draft.partialInputs ?? {});
+  const initPartial = draft.partialInputs?.[draft.currentPuntIdx];
+  const [yards, setYards] = useState(initPartial?.yards ?? "");
+  const [hangTime, setHangTime] = useState(initPartial?.hangTime ?? "");
+  const [opTime, setOpTime] = useState(initPartial?.opTime ?? "");
+  const [directionalAccuracy, setDirectionalAccuracy] = useState<0 | 0.5 | 1>(initPartial?.directionalAccuracy ?? 1);
+  const [starred, setStarred] = useState(initPartial?.starred ?? false);
 
   // Persist draft on every relevant state change
   useEffect(() => {
     lastLocalSave.current = Date.now();
+    // Merge current input fields into partialInputs for the active punt
+    const mergedPartials = sessionActive && currentPuntIdx >= sessionPunts.length
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }
+      : partialInputs;
     saveDraft({
       rows,
       manualEntry,
@@ -238,8 +254,9 @@ export default function PuntingSessionPage() {
       plannedRowIndices,
       currentPuntIdx,
       sessionPunts,
+      partialInputs: mergedPartials,
     });
-  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts]);
+  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred]);
 
   const totals = athletes.reduce(
     (acc, a) => {
@@ -493,14 +510,29 @@ export default function PuntingSessionPage() {
       }
     }
 
-    setYards("");
-    setHangTime("");
-    setOpTime("");
-    setDirectionalAccuracy(1);
+    // Clear partial for logged punt, load partial for next punt if it exists
     const nextIdx = editingPuntIdx !== null
       ? (sessionPunts.length < plannedPunts.length ? sessionPunts.length : currentPuntIdx)
       : currentPuntIdx + 1;
-    setStarred(!!plannedPunts[nextIdx]?.starred);
+    setPartialInputs((prev) => {
+      const next = { ...prev };
+      delete next[currentPuntIdx];
+      return next;
+    });
+    const nextPartial = partialInputs[nextIdx];
+    if (nextPartial) {
+      setYards(nextPartial.yards);
+      setHangTime(nextPartial.hangTime);
+      setOpTime(nextPartial.opTime);
+      setDirectionalAccuracy(nextPartial.directionalAccuracy);
+      setStarred(nextPartial.starred);
+    } else {
+      setYards("");
+      setHangTime("");
+      setOpTime("");
+      setDirectionalAccuracy(1);
+      setStarred(!!plannedPunts[nextIdx]?.starred);
+    }
     setShowAthleteDropdown(false);
   };
 
@@ -530,6 +562,7 @@ export default function PuntingSessionPage() {
     setPlannedRowIndices([]);
     setWeather("");
     setCurrentPuntIdx(0);
+    setPartialInputs({});
     // Rows (practice log) are kept — user can clear manually
   };
 
@@ -552,6 +585,7 @@ export default function PuntingSessionPage() {
     setPlannedPunts([]);
     setPlannedRowIndices([]);
     setCurrentPuntIdx(0);
+    setPartialInputs({});
     setShowReset(false);
   };
 
@@ -562,6 +596,7 @@ export default function PuntingSessionPage() {
     setPlannedPunts([]);
     setPlannedRowIndices([]);
     setCurrentPuntIdx(0);
+    setPartialInputs({});
   };
 
   // ════════════════════════════════════════════════════════════
@@ -613,6 +648,10 @@ export default function PuntingSessionPage() {
                           <button
                             key={i}
                             onClick={() => {
+                              // Save current partial input before switching
+                              if (currentPuntIdx >= sessionPunts.length) {
+                                setPartialInputs((prev) => ({ ...prev, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }));
+                              }
                               setCurrentPuntIdx(i);
                               setShowAthleteDropdown(false);
                               if (i < sessionPunts.length) {
@@ -624,11 +663,20 @@ export default function PuntingSessionPage() {
                                 setStarred(!!logged.starred);
                                 setEditingPuntIdx(i);
                               } else {
-                                setYards("");
-                                setHangTime("");
-                                setOpTime("");
-                                setDirectionalAccuracy(1);
-                                setStarred(!!plannedPunts[i]?.starred);
+                                const partial = partialInputs[i];
+                                if (partial) {
+                                  setYards(partial.yards);
+                                  setHangTime(partial.hangTime);
+                                  setOpTime(partial.opTime);
+                                  setDirectionalAccuracy(partial.directionalAccuracy);
+                                  setStarred(partial.starred);
+                                } else {
+                                  setYards("");
+                                  setHangTime("");
+                                  setOpTime("");
+                                  setDirectionalAccuracy(1);
+                                  setStarred(!!plannedPunts[i]?.starred);
+                                }
                                 setEditingPuntIdx(null);
                               }
                             }}
