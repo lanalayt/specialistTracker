@@ -37,17 +37,16 @@ export function PuntFieldStrip({ punts }: PuntFieldStripProps) {
   const inside20Pct = att > 0 ? Math.round((in20 / att) * 100) : 0;
   const tbPct = att > 0 ? Math.round((counts.TB / att) * 100) : 0;
   const totalReturn = punts.reduce((acc, p) => acc + (p.returnYards || 0), 0);
-  const totalYards = punts.reduce((acc, p) => acc + p.yards, 0);
-  const avgYards = att > 0 ? (totalYards / att).toFixed(1) : "—";
-  const avgNet = att > 0 ? ((totalYards - totalReturn) / att).toFixed(1) : "—";
+  const puntsWithYards = punts.filter((p) => p.yards > 0);
+  const totalYards = puntsWithYards.reduce((acc, p) => acc + p.yards, 0);
+  const avgYards = puntsWithYards.length > 0 ? (totalYards / puntsWithYards.length).toFixed(1) : "—";
+  const avgNet = puntsWithYards.length > 0 ? ((totalYards - totalReturn) / puntsWithYards.length).toFixed(1) : "—";
 
   // Directional accuracy stats
-  const totalDA = punts.reduce((acc, p) => {
-    const da = p.directionalAccuracy !== undefined ? p.directionalAccuracy : 0.5;
-    return acc + da;
-  }, 0);
-  const criticalCount = punts.filter((p) => p.directionalAccuracy === 0).length;
-  const avgDA = att > 0 ? (totalDA / att).toFixed(2) : "—";
+  const puntsWithDA = punts.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
+  const totalDA = puntsWithDA.reduce((acc, p) => acc + p.directionalAccuracy, 0);
+  const criticalCount = puntsWithDA.filter((p) => p.directionalAccuracy === 0).length;
+  const avgDA = puntsWithDA.length > 0 ? (totalDA / puntsWithDA.length).toFixed(2) : "—";
 
   // Pooch avg yard line
   const poochPunts = punts.filter((p) => (p.type === "POOCH_BLUE" || p.type === "POOCH_RED") && p.poochLandingYardLine != null);

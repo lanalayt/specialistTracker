@@ -21,9 +21,9 @@ const SESSION_STORAGE_KEY = "puntSessionDraft";
 // Outlier detection for punt values
 function checkPuntOutliers(yards: number, hangTime: number, opTime: number): string[] {
   const warnings: string[] = [];
-  if (yards < 1 || yards > 80) warnings.push(`Yards ${yards} seems unusual (expected 1–80)`);
-  if (hangTime < 1.0 || hangTime > 6.0) warnings.push(`Hang Time ${hangTime}s seems unusual (expected 1.0–6.0)`);
-  if (opTime < 0.8 || opTime > 3.0) warnings.push(`Punter Opp ${opTime}s seems unusual (expected 0.8–3.0)`);
+  if (yards > 0 && (yards < 1 || yards > 80)) warnings.push(`Yards ${yards} seems unusual (expected 1–80)`);
+  if (hangTime > 0 && (hangTime < 1.0 || hangTime > 6.0)) warnings.push(`Hang Time ${hangTime}s seems unusual (expected 1.0–6.0)`);
+  if (opTime > 0 && (opTime < 0.8 || opTime > 3.0)) warnings.push(`Punter Opp ${opTime}s seems unusual (expected 0.8–3.0)`);
   return warnings;
 }
 
@@ -248,17 +248,19 @@ export default function PuntingSessionPage() {
       return {
         att: acc.att + s.overall.att,
         totalYards: acc.totalYards + s.overall.totalYards,
+        yardsAtt: acc.yardsAtt + (s.overall.yardsAtt ?? s.overall.att),
         totalHang: acc.totalHang + s.overall.totalHang,
+        hangAtt: acc.hangAtt + (s.overall.hangAtt ?? s.overall.att),
         long: Math.max(acc.long, s.overall.long),
       };
     },
-    { att: 0, totalYards: 0, totalHang: 0, long: 0 }
+    { att: 0, totalYards: 0, yardsAtt: 0, totalHang: 0, hangAtt: 0, long: 0 }
   );
 
   const avgYards =
-    totals.att > 0 ? (totals.totalYards / totals.att).toFixed(1) : "—";
+    totals.yardsAtt > 0 ? (totals.totalYards / totals.yardsAtt).toFixed(1) : "—";
   const avgHang =
-    totals.att > 0 ? (totals.totalHang / totals.att).toFixed(2) : "—";
+    totals.hangAtt > 0 ? (totals.totalHang / totals.hangAtt).toFixed(2) : "—";
 
   // ── Table helpers ────────────────────────────────────────────
   const updateRow = useCallback(
@@ -342,7 +344,7 @@ export default function PuntingSessionPage() {
 
     const errors = new Set<number>();
     filled.forEach(({ r, i }) => {
-      if (!r.athlete || !r.type || !r.hash) errors.add(i);
+      if (!r.athlete) errors.add(i);
     });
 
     if (errors.size > 0) {
@@ -354,8 +356,8 @@ export default function PuntingSessionPage() {
 
     const planned = filled.map(({ r }) => ({
       athlete: r.athlete,
-      type: r.type as PuntType,
-      hash: r.hash as PuntHash,
+      type: (r.type || "") as PuntType,
+      hash: (r.hash || "") as PuntHash,
       starred: r.starred || undefined,
     }));
 
@@ -392,9 +394,7 @@ export default function PuntingSessionPage() {
 
     const errors = new Set<number>();
     filled.forEach(({ r, i }) => {
-      const hasAll =
-        r.athlete && r.type && r.hash && r.yards && r.hangTime && r.opTime && r.directionalAccuracy !== "";
-      if (!hasAll) errors.add(i);
+      if (!r.athlete) errors.add(i);
     });
 
     if (errors.size > 0) {
@@ -453,7 +453,6 @@ export default function PuntingSessionPage() {
 
   // ── Session card: log current punt ───────────────────────────
   const handleLogPunt = () => {
-    if (!yards || !hangTime || !opTime) return;
     const plan = plannedPunts[currentPuntIdx];
     const ydsVal = parseInt(yards) || 0;
     const htVal = parseFloat(hangTime) || 0;
@@ -892,9 +891,11 @@ export default function PuntingSessionPage() {
           <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
             {(() => {
               const sAtt = sessionPunts.length;
-              const sAvgYds = sAtt > 0 ? (sessionPunts.reduce((s, p) => s + p.yards, 0) / sAtt).toFixed(1) : "—";
-              const sAvgHT = sAtt > 0 ? (sessionPunts.reduce((s, p) => s + p.hangTime, 0) / sAtt).toFixed(2) : "—";
-              const sLong = sessionPunts.reduce((max, p) => Math.max(max, p.yards), 0);
+              const ydsCount = sessionPunts.filter((p) => p.yards > 0).length;
+              const htCount = sessionPunts.filter((p) => p.hangTime > 0).length;
+              const sAvgYds = ydsCount > 0 ? (sessionPunts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0) / ydsCount).toFixed(1) : "—";
+              const sAvgHT = htCount > 0 ? (sessionPunts.reduce((s, p) => s + (p.hangTime > 0 ? p.hangTime : 0), 0) / htCount).toFixed(2) : "—";
+              const sLong = sessionPunts.reduce((max, p) => Math.max(max, p.yards || 0), 0);
               return (
                 <div className="grid grid-cols-3 gap-2">
                   <StatCard label="Avg Yards" value={sAvgYds} accent glow />

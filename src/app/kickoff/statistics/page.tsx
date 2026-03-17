@@ -46,15 +46,17 @@ export default function KickoffStatisticsPage() {
         touchbacks: acc.touchbacks + s.overall.touchbacks,
         oob: acc.oob + s.overall.oob,
         totalDist: acc.totalDist + s.overall.totalDist,
+        distAtt: acc.distAtt + (s.overall.distAtt ?? s.overall.att),
         totalHang: acc.totalHang + s.overall.totalHang,
+        hangAtt: acc.hangAtt + (s.overall.hangAtt ?? s.overall.att),
       };
     },
-    { att: 0, touchbacks: 0, oob: 0, totalDist: 0, totalHang: 0 }
+    { att: 0, touchbacks: 0, oob: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0 }
   );
 
   const tbRate = totals.att > 0 ? `${Math.round((totals.touchbacks / totals.att) * 100)}%` : "—";
-  const avgDist = totals.att > 0 ? (totals.totalDist / totals.att).toFixed(1) : "—";
-  const avgHang = totals.att > 0 ? (totals.totalHang / totals.att).toFixed(2) : "—";
+  const avgDist = totals.distAtt > 0 ? (totals.totalDist / totals.distAtt).toFixed(1) : "—";
+  const avgHang = totals.hangAtt > 0 ? (totals.totalHang / totals.hangAtt).toFixed(2) : "—";
 
   const zoneData = KICKOFF_ZONES.map((z) => ({
     zone: z === "TB" ? "TB" : `Zone ${z}`,

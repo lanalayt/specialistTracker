@@ -20,8 +20,8 @@ const MAX_SCORE = 4;
 // Outlier detection for kickoff values
 function checkKickoffOutliers(distance: number, hangTime: number): string[] {
   const warnings: string[] = [];
-  if (distance < 1 || distance > 90) warnings.push(`Distance ${distance} yd seems unusual (expected 1–90)`);
-  if (hangTime < 0.5 || hangTime > 5.0) warnings.push(`Hang Time ${hangTime}s seems unusual (expected 0.5–5.0)`);
+  if (distance > 0 && (distance < 1 || distance > 90)) warnings.push(`Distance ${distance} yd seems unusual (expected 1–90)`);
+  if (hangTime > 0 && (hangTime < 0.5 || hangTime > 5.0)) warnings.push(`Hang Time ${hangTime}s seems unusual (expected 0.5–5.0)`);
   return warnings;
 }
 const SESSION_STORAGE_KEY = "kickoffSessionDraft";
@@ -286,7 +286,7 @@ export default function KickoffSessionPage() {
 
     const errors = new Set<number>();
     filled.forEach(({ r, i }) => {
-      if (!r.athlete || !r.type) errors.add(i);
+      if (!r.athlete) errors.add(i);
     });
 
     if (errors.size > 0) {
@@ -333,8 +333,7 @@ export default function KickoffSessionPage() {
 
     const errors = new Set<number>();
     filled.forEach(({ r, i }) => {
-      const hasAll = r.athlete && r.type && r.distance && r.hangTime && r.direction && r.score !== "";
-      if (!hasAll) errors.add(i);
+      if (!r.athlete) errors.add(i);
     });
 
     if (errors.size > 0) {
@@ -389,7 +388,7 @@ export default function KickoffSessionPage() {
 
   // ── Session card: log current kick ───────────────────────────
   const handleLogKick = () => {
-    if (!distance || !hangTime) return;
+    // distance and hangTime are optional
     const plan = plannedKicks[currentKickIdx];
     const distVal = parseInt(distance) || 0;
     const htVal = parseFloat(hangTime) || 0;
@@ -770,8 +769,10 @@ export default function KickoffSessionPage() {
               const sAtt = sessionKicks.length;
               const sTB = sessionKicks.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
               const sTBRate = sAtt > 0 ? `${Math.round((sTB / sAtt) * 100)}%` : "—";
-              const sAvgDist = sAtt > 0 ? (sessionKicks.reduce((s, k) => s + (k.distance || 0), 0) / sAtt).toFixed(1) : "—";
-              const sAvgHang = sAtt > 0 ? (sessionKicks.reduce((s, k) => s + (k.hangTime || 0), 0) / sAtt).toFixed(2) : "—";
+              const kicksWithDist = sessionKicks.filter((k) => k.distance > 0);
+              const kicksWithHang = sessionKicks.filter((k) => k.hangTime > 0);
+              const sAvgDist = kicksWithDist.length > 0 ? (kicksWithDist.reduce((s, k) => s + k.distance, 0) / kicksWithDist.length).toFixed(1) : "—";
+              const sAvgHang = kicksWithHang.length > 0 ? (kicksWithHang.reduce((s, k) => s + k.hangTime, 0) / kicksWithHang.length).toFixed(2) : "—";
               const sZoneData = KICKOFF_ZONES.map((z) => ({
                 zone: z === "TB" ? "TB" : `Zone ${z}`,
                 count: sessionKicks.filter((k) => k.landingZone === z).length,

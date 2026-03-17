@@ -195,6 +195,12 @@ export function processPunt(
   const { athlete, yards, hangTime, type, hash } = punt;
   const opTime = punt.opTime || 0;
 
+  // Determine which metrics have data (0 = not entered for numeric fields)
+  const hasYards = yards > 0;
+  const hasHang = hangTime > 0;
+  const hasOT = opTime > 0;
+  const hasDA = punt.directionalAccuracy != null && punt.directionalAccuracy >= 0;
+
   // Migration: old entries may have single landingZone instead of landingZones array
   const landingZones: PuntLandingZone[] = Array.isArray(punt.landingZones)
     ? punt.landingZones
@@ -208,7 +214,7 @@ export function processPunt(
       ? punt.directionalAccuracy
       : 0.5; // neutral fallback for old entries
 
-  const isCritical = directionalAccuracy === 0 ? 1 : 0;
+  const isCritical = hasDA && directionalAccuracy === 0 ? 1 : 0;
   const returnYards = punt.returnYards;
   const { poochLandingYardLine } = punt;
 
@@ -237,12 +243,16 @@ export function processPunt(
 
   s.overall = {
     att: s.overall.att + 1,
-    totalYards: s.overall.totalYards + yards,
-    totalHang: s.overall.totalHang + hangTime,
-    totalOpTime: (s.overall.totalOpTime || 0) + opTime,
-    totalDirectionalAccuracy: s.overall.totalDirectionalAccuracy + directionalAccuracy,
+    totalYards: s.overall.totalYards + (hasYards ? yards : 0),
+    yardsAtt: (s.overall.yardsAtt || 0) + (hasYards ? 1 : 0),
+    totalHang: s.overall.totalHang + (hasHang ? hangTime : 0),
+    hangAtt: (s.overall.hangAtt || 0) + (hasHang ? 1 : 0),
+    totalOpTime: (s.overall.totalOpTime || 0) + (hasOT ? opTime : 0),
+    opTimeAtt: (s.overall.opTimeAtt || 0) + (hasOT ? 1 : 0),
+    totalDirectionalAccuracy: s.overall.totalDirectionalAccuracy + (hasDA ? directionalAccuracy : 0),
+    daAtt: (s.overall.daAtt || 0) + (hasDA ? 1 : 0),
     criticalDirections: s.overall.criticalDirections + isCritical,
-    long: Math.max(s.overall.long, yards),
+    long: hasYards ? Math.max(s.overall.long, yards) : s.overall.long,
     totalReturnYards: s.overall.totalReturnYards + (returnYards || 0),
     poochYardLineTotal: s.overall.poochYardLineTotal + (hasPoochYL ? poochLandingYardLine! : 0),
     poochYardLineAtt: s.overall.poochYardLineAtt + (hasPoochYL ? 1 : 0),
@@ -250,15 +260,24 @@ export function processPunt(
 
   const updateBucket = (b: PuntStatBucket | undefined) => ({
     att: (b?.att || 0) + 1,
-    totalYards: (b?.totalYards || 0) + yards,
-    totalHang: (b?.totalHang || 0) + hangTime,
-    totalOpTime: (b?.totalOpTime || 0) + opTime,
-    totalDirectionalAccuracy: (b?.totalDirectionalAccuracy || 0) + directionalAccuracy,
+    totalYards: (b?.totalYards || 0) + (hasYards ? yards : 0),
+    yardsAtt: (b?.yardsAtt || 0) + (hasYards ? 1 : 0),
+    totalHang: (b?.totalHang || 0) + (hasHang ? hangTime : 0),
+    hangAtt: (b?.hangAtt || 0) + (hasHang ? 1 : 0),
+    totalOpTime: (b?.totalOpTime || 0) + (hasOT ? opTime : 0),
+    opTimeAtt: (b?.opTimeAtt || 0) + (hasOT ? 1 : 0),
+    totalDirectionalAccuracy: (b?.totalDirectionalAccuracy || 0) + (hasDA ? directionalAccuracy : 0),
+    daAtt: (b?.daAtt || 0) + (hasDA ? 1 : 0),
     criticalDirections: (b?.criticalDirections || 0) + isCritical,
   });
 
-  s.byType = { ...s.byType, [type]: updateBucket(s.byType[type]) };
-  s.byHash = { ...s.byHash, [hash]: updateBucket(s.byHash[hash]) };
+  // Only update byType/byHash if those fields were provided
+  if (type) {
+    s.byType = { ...s.byType, [type]: updateBucket(s.byType[type]) };
+  }
+  if (hash) {
+    s.byHash = { ...s.byHash, [hash]: updateBucket(s.byHash[hash]) };
+  }
 
   // Landing zones (multi-select array)
   const newByLanding = { ...s.byLanding };
@@ -346,6 +365,9 @@ export function processKickoff(
   const { athlete, distance, hangTime, landingZone, result, returnYards } =
     entry;
 
+  const hasDist = distance > 0;
+  const hasHang = hangTime > 0;
+
   if (!statsMap[athlete]) {
     statsMap = { ...statsMap, [athlete]: emptyKickoffStats() };
   }
@@ -355,8 +377,10 @@ export function processKickoff(
     att: s.overall.att + 1,
     touchbacks: s.overall.touchbacks + (result === "TB" ? 1 : 0),
     oob: s.overall.oob + (result === "OOB" ? 1 : 0),
-    totalDist: s.overall.totalDist + distance,
-    totalHang: s.overall.totalHang + hangTime,
+    totalDist: s.overall.totalDist + (hasDist ? distance : 0),
+    distAtt: (s.overall.distAtt || 0) + (hasDist ? 1 : 0),
+    totalHang: s.overall.totalHang + (hasHang ? hangTime : 0),
+    hangAtt: (s.overall.hangAtt || 0) + (hasHang ? 1 : 0),
     totalReturn: s.overall.totalReturn + (returnYards ?? 0),
   };
 

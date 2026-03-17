@@ -323,10 +323,9 @@ export default function KickingSessionPage() {
 
     if (filled.length === 0) return;
 
-    // Only validate non-locked rows for new session, validate all for continue
     const errors = new Set<number>();
     filled.forEach(({ r, i }) => {
-      if (!r.athlete || !r.dist || !r.pos) errors.add(i);
+      if (!r.athlete) errors.add(i);
     });
 
     if (errors.size > 0) {
@@ -376,7 +375,7 @@ export default function KickingSessionPage() {
 
     const errors = new Set<number>();
     filled.forEach(({ r, i }) => {
-      if (!r.athlete || !r.dist || !r.pos || !r.result || r.score === "") errors.add(i);
+      if (!r.athlete || !r.result) errors.add(i);
     });
 
     if (errors.size > 0) {

@@ -185,10 +185,10 @@ function PuntingAnalytics() {
     return {
       athlete: a,
       att: o.att,
-      avgDist: o.att > 0 ? (o.totalYards / o.att).toFixed(1) : "—",
-      avgHT: o.att > 0 ? (o.totalHang / o.att).toFixed(2) : "—",
-      avgOT: o.att > 0 ? (o.totalOpTime / o.att).toFixed(2) : "—",
-      da: o.att > 0 ? `${Math.round((o.totalDirectionalAccuracy / o.att) * 100)}%` : "—",
+      avgDist: (o.yardsAtt ?? o.att) > 0 ? (o.totalYards / (o.yardsAtt ?? o.att)).toFixed(1) : "—",
+      avgHT: (o.hangAtt ?? o.att) > 0 ? (o.totalHang / (o.hangAtt ?? o.att)).toFixed(2) : "—",
+      avgOT: (o.opTimeAtt ?? o.att) > 0 ? (o.totalOpTime / (o.opTimeAtt ?? o.att)).toFixed(2) : "—",
+      da: (o.daAtt ?? o.att) > 0 ? `${Math.round((o.totalDirectionalAccuracy / (o.daAtt ?? o.att)) * 100)}%` : "—",
       long: o.long,
       critDir: o.criticalDirections,
     };

@@ -104,9 +104,13 @@ export interface PuntEntry {
 export interface PuntStatBucket {
   att: number;
   totalYards: number;
+  yardsAtt?: number;
   totalHang: number;
+  hangAtt?: number;
   totalOpTime: number;
+  opTimeAtt?: number;
   totalDirectionalAccuracy: number;
+  daAtt?: number;
   criticalDirections: number;
 }
 
@@ -142,7 +146,9 @@ export interface KickoffAthleteStats {
     touchbacks: number;
     oob: number;
     totalDist: number;
+    distAtt?: number;
     totalHang: number;
+    hangAtt?: number;
     totalReturn: number;
   };
   byZone: Record<KickoffLandingZone, number>;

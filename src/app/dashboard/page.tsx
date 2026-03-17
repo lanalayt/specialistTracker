@@ -48,13 +48,15 @@ function PuntHighlights() {
       return {
         att: acc.att + s.overall.att,
         totalYards: acc.totalYards + s.overall.totalYards,
+        yardsAtt: acc.yardsAtt + (s.overall.yardsAtt ?? s.overall.att),
         totalDA: acc.totalDA + s.overall.totalDirectionalAccuracy,
+        daAtt: acc.daAtt + (s.overall.daAtt ?? s.overall.att),
       };
     },
-    { att: 0, totalYards: 0, totalDA: 0 }
+    { att: 0, totalYards: 0, yardsAtt: 0, totalDA: 0, daAtt: 0 }
   );
-  const avgYards = overall.att > 0 ? (overall.totalYards / overall.att).toFixed(1) : "—";
-  const avgDA = overall.att > 0 ? (overall.totalDA / overall.att).toFixed(2) : "—";
+  const avgYards = overall.yardsAtt > 0 ? (overall.totalYards / overall.yardsAtt).toFixed(1) : "—";
+  const avgDA = overall.daAtt > 0 ? (overall.totalDA / overall.daAtt).toFixed(2) : "—";
   return (
     <>
       <StatCard label="Avg Yards" value={avgYards} />

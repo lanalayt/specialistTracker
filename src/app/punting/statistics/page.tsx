@@ -37,23 +37,27 @@ const POS_LABELS: Record<PuntHash, string> = {
 };
 
 function avgYds(b: PuntStatBucket): string {
-  if (b.att === 0) return "—";
-  return (b.totalYards / b.att).toFixed(1);
+  const count = b.yardsAtt ?? b.att;
+  if (count === 0) return "—";
+  return (b.totalYards / count).toFixed(1);
 }
 
 function avgHT(b: PuntStatBucket): string {
-  if (b.att === 0) return "—";
-  return (b.totalHang / b.att).toFixed(2);
+  const count = b.hangAtt ?? b.att;
+  if (count === 0) return "—";
+  return (b.totalHang / count).toFixed(2);
 }
 
 function avgOT(b: PuntStatBucket): string {
-  if (b.att === 0) return "—";
-  return (b.totalOpTime / b.att).toFixed(2);
+  const count = b.opTimeAtt ?? b.att;
+  if (count === 0) return "—";
+  return (b.totalOpTime / count).toFixed(2);
 }
 
 function avgDA(b: PuntStatBucket): string {
-  if (b.att === 0) return "—";
-  return `${Math.round((b.totalDirectionalAccuracy / b.att) * 100)}%`;
+  const count = b.daAtt ?? b.att;
+  if (count === 0) return "—";
+  return `${Math.round((b.totalDirectionalAccuracy / count) * 100)}%`;
 }
 
 function CollapsibleSection({
