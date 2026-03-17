@@ -700,7 +700,7 @@ export default function KickoffSessionPage() {
                     {/* Log button */}
                     <button
                       onClick={handleLogKick}
-                      disabled={!distance || !hangTime}
+                      disabled={false}
                       className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       LOG KICKOFF

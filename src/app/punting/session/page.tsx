@@ -823,7 +823,7 @@ export default function PuntingSessionPage() {
                       </button>
                       <button
                         onClick={handleLogPunt}
-                        disabled={!yards || !hangTime || !opTime}
+                        disabled={false}
                         className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         LOG PUNT
