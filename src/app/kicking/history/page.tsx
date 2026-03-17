@@ -187,7 +187,7 @@ export default function KickingHistoryPage() {
                 <tbody>
                   {kicks.map((k, i) => (
                     <tr key={i} className="hover:bg-surface/30 transition-colors">
-                      <td className="table-cell text-left text-muted">{i + 1}</td>
+                      <td className="table-cell text-left text-muted">{i + 1}{k.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                       <td className="table-name">{k.athlete}</td>
                       <td className="table-cell">{k.dist} yd</td>
                       <td className="table-cell text-muted">{k.pos}</td>

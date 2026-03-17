@@ -180,7 +180,7 @@ export default function PuntHistoryPage() {
                 <tbody>
                   {punts.map((p, i) => (
                     <tr key={i} className="hover:bg-surface/30">
-                      <td className="table-cell text-left text-muted">{i + 1}</td>
+                      <td className="table-cell text-left text-muted">{i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                       <td className="table-name">{p.athlete}</td>
                       <td className="table-cell text-muted">{p.type || "—"}</td>
                       <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
