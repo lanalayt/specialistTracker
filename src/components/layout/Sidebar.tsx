@@ -126,7 +126,7 @@ export function Sidebar() {
           </div>
           <button
             onClick={signOut}
-            className="text-muted hover:text-slate-300 text-xs transition-colors"
+            className="text-muted hover:text-white text-xs transition-colors"
             title="Sign out"
           >
             ↩

@@ -295,7 +295,7 @@ function AnalyticsContent() {
   const [activeTab, setActiveTab] = useState<Tab>("kicking");
 
   return (
-    <div className="lg:pl-56 min-h-screen pb-20 lg:pb-0">
+    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
       <Header title="Analytics" />
 
       <main className="p-4 lg:p-6 space-y-5 max-w-6xl">
@@ -316,7 +316,7 @@ function AnalyticsContent() {
                 "flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all",
                 activeTab === tab.id
                   ? "bg-accent text-bg"
-                  : "text-muted hover:text-slate-300"
+                  : "text-muted hover:text-white"
               )}
             >
               <span>{tab.icon}</span>
@@ -341,7 +341,7 @@ export default function AnalyticsPage() {
       <PuntProvider>
         <KickoffProvider>
           <LongSnapProvider>
-            <div className="flex">
+            <div className="flex overflow-x-hidden max-w-[100vw]">
               <Sidebar />
               <AnalyticsContent />
               <MobileNav />

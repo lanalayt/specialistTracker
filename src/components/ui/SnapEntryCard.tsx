@@ -115,7 +115,7 @@ export function SnapEntryCard({ athletes, snapCount, onAdd }: SnapEntryCardProps
                 "flex-1 py-2.5 rounded-input text-sm font-semibold transition-all",
                 snapType === t
                   ? "bg-accent/20 text-accent border border-accent/50"
-                  : "bg-surface-2 text-muted border border-border hover:text-slate-300"
+                  : "bg-surface-2 text-muted border border-border hover:text-white"
               )}
             >
               {t}
@@ -157,7 +157,7 @@ export function SnapEntryCard({ athletes, snapCount, onAdd }: SnapEntryCardProps
                 "py-3 rounded-input text-xs font-bold border transition-all flex flex-col items-center gap-1",
                 accuracy === value
                   ? ACC_ACTIVE_COLORS[value]
-                  : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                  : "bg-surface-2 text-muted border-border hover:text-white"
               )}
             >
               <span className="text-base leading-none">{icon}</span>

@@ -66,7 +66,7 @@ export function KickEntryCard({ athletes, kickCount, onAdd }: KickEntryCardProps
               "text-xs px-2.5 py-1 rounded-pill border font-semibold transition-all",
               isPAT
                 ? "bg-accent/20 text-accent border-accent/50"
-                : "border-border text-muted hover:text-slate-300"
+                : "border-border text-muted hover:text-white"
             )}
           >
             {isPAT ? "PAT ●" : "PAT"}
@@ -123,7 +123,7 @@ export function KickEntryCard({ athletes, kickCount, onAdd }: KickEntryCardProps
                   "flex-1 py-2 rounded-input text-xs font-semibold transition-all",
                   pos === p
                     ? "bg-accent/20 text-accent border border-accent/50"
-                    : "bg-surface-2 text-muted hover:text-slate-300 border border-border"
+                    : "bg-surface-2 text-muted hover:text-white border border-border"
                 )}
               >
                 {p}

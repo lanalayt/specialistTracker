@@ -12,9 +12,9 @@ export default function KickoffLayout({ children }: { children: React.ReactNode 
   const isHub = pathname === "/kickoff";
   return (
     <KickoffProvider>
-      <div className="flex">
+      <div className="flex overflow-x-hidden max-w-[100vw]">
         <Sidebar />
-        <div className="lg:pl-56 flex-1 flex flex-col min-h-screen pb-20 lg:pb-0">
+        <div className="lg:pl-56 flex-1 flex flex-col min-h-screen pb-20 lg:pb-0 min-w-0">
           <Header title="Kickoff" />
           {!isHub && <SportSubNav basePath="/kickoff" />}
           <AthleteViewOnly>{children}</AthleteViewOnly>

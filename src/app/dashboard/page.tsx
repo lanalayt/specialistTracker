@@ -114,7 +114,7 @@ function DashboardContent() {
   const { history } = useFG();
 
   return (
-    <div className="lg:pl-56 min-h-screen pb-20 lg:pb-0">
+    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
       <Header title="Dashboard" />
 
       <main className="p-4 lg:p-6 space-y-6 max-w-6xl">
@@ -203,7 +203,7 @@ export default function DashboardPage() {
       <PuntProvider>
         <KickoffProvider>
           <LongSnapProvider>
-            <div className="flex">
+            <div className="flex overflow-x-hidden max-w-[100vw]">
               <Sidebar />
               <DashboardContent />
               <MobileNav />

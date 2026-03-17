@@ -77,7 +77,7 @@ export function Header({ title }: { title?: string }) {
           </div>
           <button
             onClick={signOut}
-            className="text-muted hover:text-slate-300 text-xs transition-colors hidden sm:block"
+            className="text-muted hover:text-white text-xs transition-colors hidden sm:block"
           >
             Sign out
           </button>

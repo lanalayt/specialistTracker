@@ -118,7 +118,7 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
                 "flex-1 py-1.5 rounded-input text-xs font-semibold transition-all",
                 hash === h
                   ? "bg-accent/20 text-accent border border-accent/50"
-                  : "bg-surface-2 text-muted border border-border hover:text-slate-300"
+                  : "bg-surface-2 text-muted border border-border hover:text-white"
               )}
             >
               {POS_LABELS[h]}
@@ -134,7 +134,7 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
                 "flex-1 py-1.5 rounded-input text-[10px] font-semibold transition-all",
                 type === t
                   ? "bg-accent/20 text-accent border border-accent/50"
-                  : "bg-surface-2 text-muted border border-border hover:text-slate-300"
+                  : "bg-surface-2 text-muted border border-border hover:text-white"
               )}
             >
               {TYPE_LABELS[t]}
@@ -195,7 +195,7 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
                   "py-1.5 rounded-input text-xs font-semibold border transition-all",
                   active
                     ? LANDING_COLORS_ACTIVE[z]
-                    : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                    : "bg-surface-2 text-muted border-border hover:text-white"
                 )}
               >
                 {LANDING_LABELS[z]}
@@ -247,7 +247,7 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
               "py-2 rounded-input text-xs font-semibold border transition-all",
               directionalAccuracy === 1
                 ? "bg-make/20 text-make border-make/50"
-                : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                : "bg-surface-2 text-muted border-border hover:text-white"
             )}
           >
             ✓ Good
@@ -258,7 +258,7 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
               "py-2 rounded-input text-xs font-semibold border transition-all",
               directionalAccuracy === 0.5
                 ? "bg-warn/20 text-warn border-warn/50"
-                : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                : "bg-surface-2 text-muted border-border hover:text-white"
             )}
           >
             → Mid
@@ -269,7 +269,7 @@ export function PuntEntryCard({ athletes, puntCount, onAdd }: PuntEntryCardProps
               "py-2 rounded-input text-xs font-semibold border transition-all",
               directionalAccuracy === 0
                 ? "bg-miss/20 text-miss border-miss/50"
-                : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                : "bg-surface-2 text-muted border-border hover:text-white"
             )}
           >
             ✗ Critical

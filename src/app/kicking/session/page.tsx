@@ -565,7 +565,7 @@ export default function KickingSessionPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={handleBackToLog}
-                        className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-slate-300 hover:bg-surface-2 font-semibold transition-all"
+                        className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
                       >
                         ← Back to Log
                       </button>
@@ -700,7 +700,7 @@ export default function KickingSessionPage() {
                                 "flex-1 py-2 rounded-input text-xs font-semibold text-center transition-all",
                                 currentPlan.pos === p
                                   ? "bg-accent/20 text-accent border border-accent/50"
-                                  : "bg-surface-2 text-muted border border-border hover:text-slate-300"
+                                  : "bg-surface-2 text-muted border border-border hover:text-white"
                               )}
                             >
                               {p}
@@ -960,7 +960,7 @@ export default function KickingSessionPage() {
                 {!isAthlete && (
                   <button
                     onClick={() => setWeatherLocked(false)}
-                    className="text-muted hover:text-slate-300 transition-colors p-1"
+                    className="text-muted hover:text-white transition-colors p-1"
                     title="Edit weather"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
@@ -1002,7 +1002,7 @@ export default function KickingSessionPage() {
             {!isAthlete && (
               <button
                 onClick={addRow}
-                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-slate-300 hover:bg-surface-2 font-semibold transition-all"
+                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
               >
                 + Row
               </button>
@@ -1284,7 +1284,7 @@ export default function KickingSessionPage() {
                       "text-xs py-2 px-5 rounded-input border font-semibold transition-all",
                       manualEntry
                         ? "bg-accent/20 text-accent border-accent/50"
-                        : "border-border text-muted hover:text-slate-300 hover:bg-surface-2"
+                        : "border-border text-muted hover:text-white hover:bg-surface-2"
                     )}
                   >
                     {manualEntry ? "Manual Entry ●" : "Manual Entry"}

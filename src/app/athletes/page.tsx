@@ -29,7 +29,7 @@ function AthletesContent() {
   };
 
   return (
-    <div className="lg:pl-56 min-h-screen pb-20 lg:pb-0">
+    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
       <Header title="Athletes" />
 
       <main className="p-4 lg:p-6 max-w-2xl space-y-6">
@@ -101,7 +101,7 @@ function AthletesContent() {
                         "text-xs px-3 py-1 rounded-input border transition-all",
                         confirmRemove === a
                           ? "bg-miss/20 border-miss/40 text-miss"
-                          : "border-border text-muted hover:text-slate-300 hover:bg-surface-2"
+                          : "border-border text-muted hover:text-white hover:bg-surface-2"
                       )}
                     >
                       {confirmRemove === a ? "Confirm Remove" : "Remove"}
@@ -125,7 +125,7 @@ function AthletesContent() {
 export default function AthletesPage() {
   return (
     <FGProvider>
-      <div className="flex">
+      <div className="flex overflow-x-hidden max-w-[100vw]">
         <Sidebar />
         <AthletesContent />
         <MobileNav />

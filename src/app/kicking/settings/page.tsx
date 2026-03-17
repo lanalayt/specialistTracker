@@ -100,7 +100,7 @@ export default function FGSettingsPage() {
                 "flex-1 py-3 rounded-input text-sm font-bold transition-all",
                 snapDistance === d
                   ? "bg-accent text-slate-900"
-                  : "bg-surface-2 text-muted border border-border hover:text-slate-300 hover:border-accent/50"
+                  : "bg-surface-2 text-muted border border-border hover:text-white hover:border-accent/50"
               )}
             >
               {d}
@@ -118,7 +118,7 @@ export default function FGSettingsPage() {
               "py-4 rounded-input text-sm font-bold border transition-all",
               makeMode === "simple"
                 ? "bg-accent/20 text-accent border-accent/50"
-                : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                : "bg-surface-2 text-muted border-border hover:text-white"
             )}
           >
             <span className="block text-base mb-1">Simple</span>
@@ -132,7 +132,7 @@ export default function FGSettingsPage() {
               "py-4 rounded-input text-sm font-bold border transition-all",
               makeMode === "detailed"
                 ? "bg-accent/20 text-accent border-accent/50"
-                : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                : "bg-surface-2 text-muted border-border hover:text-white"
             )}
           >
             <span className="block text-base mb-1">Detailed</span>
@@ -152,7 +152,7 @@ export default function FGSettingsPage() {
               "py-4 rounded-input text-sm font-bold border transition-all",
               missMode === "simple"
                 ? "bg-accent/20 text-accent border-accent/50"
-                : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                : "bg-surface-2 text-muted border-border hover:text-white"
             )}
           >
             <span className="block text-base mb-1">Simple</span>
@@ -166,7 +166,7 @@ export default function FGSettingsPage() {
               "py-4 rounded-input text-sm font-bold border transition-all",
               missMode === "detailed"
                 ? "bg-accent/20 text-accent border-accent/50"
-                : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                : "bg-surface-2 text-muted border-border hover:text-white"
             )}
           >
             <span className="block text-base mb-1">Detailed</span>

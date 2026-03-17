@@ -84,7 +84,7 @@ export default function SignupPage() {
                     "py-3 rounded-input text-sm font-bold border transition-all",
                     role === "coach"
                       ? "bg-accent/20 text-accent border-accent/50"
-                      : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                      : "bg-surface-2 text-muted border-border hover:text-white"
                   )}
                 >
                   Coach
@@ -96,7 +96,7 @@ export default function SignupPage() {
                     "py-3 rounded-input text-sm font-bold border transition-all",
                     role === "athlete"
                       ? "bg-accent/20 text-accent border-accent/50"
-                      : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                      : "bg-surface-2 text-muted border-border hover:text-white"
                   )}
                 >
                   Athlete

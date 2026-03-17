@@ -310,7 +310,7 @@ export default function KickingStatisticsPage() {
                 "px-4 py-1.5 text-xs font-semibold transition-colors",
                 tab === "all"
                   ? "bg-accent text-slate-900"
-                  : "text-muted hover:text-slate-300"
+                  : "text-muted hover:text-white"
               )}
             >
               All Stats

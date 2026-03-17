@@ -140,7 +140,7 @@ export function DateRangeFilter({
                 m.id !== "all" && "border-l border-border",
                 mode === m.id
                   ? "bg-accent text-slate-900"
-                  : "text-muted hover:text-slate-300"
+                  : "text-muted hover:text-white"
               )}
             >
               {m.label}
@@ -150,21 +150,21 @@ export function DateRangeFilter({
 
         {mode === "week" && (
           <div className="flex items-center gap-1.5">
-            <button onClick={prevWeek} className="text-muted hover:text-slate-300 text-sm px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors">‹</button>
+            <button onClick={prevWeek} className="text-muted hover:text-white text-sm px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors">‹</button>
             <span className="text-xs text-slate-300 font-medium min-w-[120px] text-center">
               {formatShortDate(weekAnchor)} – {formatShortDate(getSunday(weekAnchor))}
             </span>
-            <button onClick={nextWeek} className="text-muted hover:text-slate-300 text-sm px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors">›</button>
+            <button onClick={nextWeek} className="text-muted hover:text-white text-sm px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors">›</button>
           </div>
         )}
 
         {mode === "month" && (
           <div className="flex items-center gap-1.5">
-            <button onClick={prevMonth} className="text-muted hover:text-slate-300 text-sm px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors">‹</button>
+            <button onClick={prevMonth} className="text-muted hover:text-white text-sm px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors">‹</button>
             <span className="text-xs text-slate-300 font-medium min-w-[120px] text-center">
               {formatMonthYear(monthAnchor)}
             </span>
-            <button onClick={nextMonth} className="text-muted hover:text-slate-300 text-sm px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors">›</button>
+            <button onClick={nextMonth} className="text-muted hover:text-white text-sm px-1.5 py-0.5 rounded hover:bg-surface-2 transition-colors">›</button>
           </div>
         )}
 

@@ -15,7 +15,7 @@
   --miss: #ef4444;
   --warn: #f59e0b;
   --text: #f1f5f9;
-  --muted: #64748b;
+  --muted: #8494a7;
 }
 
 * {
@@ -27,7 +27,6 @@
 html,
 body {
   max-width: 100vw;
-  overflow-x: hidden;
   background-color: var(--bg);
   color: var(--text);
   font-family: 'Inter', sans-serif;
@@ -61,16 +60,16 @@ body {
     @apply bg-accent text-bg font-semibold px-5 py-2.5 rounded-input text-sm transition-all hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-ghost {
-    @apply border border-border text-slate-300 font-medium px-5 py-2.5 rounded-input text-sm transition-all hover:bg-surface-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply border border-border text-slate-100 font-medium px-5 py-2.5 rounded-input text-sm transition-all hover:bg-surface-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-danger {
     @apply bg-miss/20 border border-miss/40 text-miss font-medium px-5 py-2.5 rounded-input text-sm transition-all hover:bg-miss/30 active:scale-95 disabled:opacity-50;
   }
   .input {
-    @apply bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all w-full placeholder:text-muted;
+    @apply bg-surface-2 border border-border text-slate-100 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all w-full placeholder:text-muted;
   }
   .select {
-    @apply bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all w-full;
+    @apply bg-surface-2 border border-border text-slate-100 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition-all w-full;
   }
   .label {
     @apply text-xs font-medium text-muted uppercase tracking-wider mb-1.5 block;
@@ -85,7 +84,7 @@ body {
     @apply inline-flex items-center gap-1 bg-warn/15 text-warn text-xs font-semibold px-2 py-0.5 rounded-pill;
   }
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium text-muted transition-all hover:text-slate-200 hover:bg-surface-2;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium text-muted transition-all hover:text-white hover:bg-surface-2;
   }
   .nav-link-active {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-semibold text-accent bg-accent/10;
@@ -94,7 +93,7 @@ body {
     @apply text-xs font-semibold text-muted uppercase tracking-wider text-right py-2 px-3;
   }
   .table-cell {
-    @apply text-sm text-slate-200 text-right py-2 px-3 border-t border-border/50;
+    @apply text-sm text-slate-100 text-right py-2 px-3 border-t border-border/50;
   }
   .table-name {
     @apply text-sm font-medium text-slate-100 text-left py-2 px-3 border-t border-border/50;

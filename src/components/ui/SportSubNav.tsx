@@ -39,7 +39,7 @@ export function SportSubNav({ basePath, extraTabs }: SportSubNavProps) {
                 "px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px",
                 isActive
                   ? "text-accent border-accent"
-                  : "text-muted border-transparent hover:text-slate-300"
+                  : "text-muted border-transparent hover:text-white"
               )}
             >
               {tab.label}

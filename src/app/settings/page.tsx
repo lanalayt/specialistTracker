@@ -103,7 +103,7 @@ function SettingsContent() {
   };
 
   return (
-    <div className="lg:pl-56 min-h-screen pb-20 lg:pb-0">
+    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
       <Header title="Settings" />
 
       <main className="p-4 lg:p-6 max-w-2xl space-y-6">
@@ -263,7 +263,7 @@ function SettingsContent() {
 
 export default function SettingsPage() {
   return (
-    <div className="flex">
+    <div className="flex overflow-x-hidden max-w-[100vw]">
       <Sidebar />
       <SettingsContent />
       <MobileNav />

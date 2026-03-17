@@ -12,9 +12,9 @@ export default function LongSnapLayout({ children }: { children: React.ReactNode
   const isHub = pathname === "/longsnap";
   return (
     <LongSnapProvider>
-      <div className="flex">
+      <div className="flex overflow-x-hidden max-w-[100vw]">
         <Sidebar />
-        <div className="lg:pl-56 flex-1 flex flex-col min-h-screen pb-20 lg:pb-0">
+        <div className="lg:pl-56 flex-1 flex flex-col min-h-screen pb-20 lg:pb-0 min-w-0">
           <Header title="Long Snapping" />
           {!isHub && <SportSubNav basePath="/longsnap" />}
           <AthleteViewOnly>{children}</AthleteViewOnly>

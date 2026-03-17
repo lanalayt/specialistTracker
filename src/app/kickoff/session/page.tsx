@@ -508,7 +508,7 @@ export default function KickoffSessionPage() {
                       )}
                       <button
                         onClick={handleBackToLog}
-                        className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-slate-300 hover:bg-surface-2 font-semibold transition-all"
+                        className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
                       >
                         ← Back to Log
                       </button>
@@ -620,7 +620,7 @@ export default function KickoffSessionPage() {
                               "px-3 py-2 rounded-input text-xs font-semibold text-center transition-all",
                               currentPlan.type === t
                                 ? "bg-accent/20 text-accent border border-accent/50"
-                                : "bg-surface-2 text-muted border border-border hover:text-slate-300"
+                                : "bg-surface-2 text-muted border border-border hover:text-white"
                             )}
                           >
                             {TYPE_LABELS[t]}
@@ -668,7 +668,7 @@ export default function KickoffSessionPage() {
                               "py-3 rounded-input text-xs font-bold border transition-all",
                               direction === d
                                 ? "bg-accent/20 text-accent border-accent/50"
-                                : "bg-surface-2 text-muted border-border hover:text-slate-300"
+                                : "bg-surface-2 text-muted border-border hover:text-white"
                             )}
                           >
                             {DIR_LABELS[d]} {d.charAt(0).toUpperCase() + d.slice(1)}
@@ -689,7 +689,7 @@ export default function KickoffSessionPage() {
                               "w-9 h-9 rounded-full text-sm font-bold transition-all",
                               score === i
                                 ? "bg-accent text-slate-900 shadow-lg"
-                                : "bg-surface-2 text-muted border border-border hover:text-slate-300"
+                                : "bg-surface-2 text-muted border border-border hover:text-white"
                             )}
                           >
                             {i}
@@ -826,7 +826,7 @@ export default function KickoffSessionPage() {
                 {!isAthlete && (
                   <button
                     onClick={() => setWeatherLocked(false)}
-                    className="text-muted hover:text-slate-300 transition-colors p-1"
+                    className="text-muted hover:text-white transition-colors p-1"
                     title="Edit weather"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
@@ -868,7 +868,7 @@ export default function KickoffSessionPage() {
             {!isAthlete && (
               <button
                 onClick={addRow}
-                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-slate-300 hover:bg-surface-2 font-semibold transition-all"
+                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
               >
                 + Row
               </button>
@@ -1126,7 +1126,7 @@ export default function KickoffSessionPage() {
                     "text-xs py-2 px-5 rounded-input border font-semibold transition-all",
                     manualEntry
                       ? "bg-accent/20 text-accent border-accent/50"
-                      : "border-border text-muted hover:text-slate-300 hover:bg-surface-2"
+                      : "border-border text-muted hover:text-white hover:bg-surface-2"
                   )}
                 >
                   {manualEntry ? "Manual Entry ●" : "Manual Entry"}

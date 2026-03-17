@@ -162,7 +162,7 @@ export default function LongSnapSessionPage() {
               {!isAthlete && (
                 <button
                   onClick={() => setWeatherLocked(false)}
-                  className="text-muted hover:text-slate-300 transition-colors p-1"
+                  className="text-muted hover:text-white transition-colors p-1"
                   title="Edit weather"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
