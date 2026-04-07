@@ -162,13 +162,31 @@ function PuntStatsView({
   puntTypes,
   typeLabels,
   label,
+  history,
+  puntFilter,
 }: {
   athletes: string[];
   statsMap: Record<string, PuntAthleteStats>;
   puntTypes: { id: string; label: string }[];
   typeLabels: Record<string, string>;
   label: string;
+  history: { entries?: PuntEntry[] }[];
+  puntFilter?: (p: PuntEntry) => boolean;
 }) {
+  // Compute per-type stats maps for accurate position breakdowns
+  const typeStatsMaps = useMemo(() => {
+    const result: Record<string, Record<string, PuntAthleteStats>> = {};
+    puntTypes.forEach(({ id: type }) => {
+      if (!athletes.some((a) => statsMap[a]?.byType[type]?.att > 0)) return;
+      result[type] = computeFilteredPuntStats(
+        athletes,
+        history,
+        (p) => p.type === type && (puntFilter ? puntFilter(p) : true)
+      );
+    });
+    return result;
+  }, [athletes, history, puntTypes, statsMap, puntFilter]);
+
   return (
     <div className="space-y-4">
       {/* Overall */}
@@ -180,7 +198,7 @@ function PuntStatsView({
       {/* By Type */}
       <CollapsibleSection title="By Type">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {puntTypes.map(({ id: type }) => (
+          {puntTypes.filter(({ id: type }) => athletes.some((a) => statsMap[a]?.byType[type]?.att > 0)).map(({ id: type }) => (
             <div key={type} className="card-2">
               <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
               <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
@@ -202,15 +220,21 @@ function PuntStatsView({
       </CollapsibleSection>
 
       {/* Per-Type Position Breakdown */}
-      {puntTypes.map(({ id: type }) => (
+      {puntTypes.filter(({ id: type }) => athletes.some((a) => statsMap[a]?.byType[type]?.att > 0)).map(({ id: type }) => (
         <CollapsibleSection key={type} title={`${typeLabels[type] ?? type} — By Position`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {PUNT_HASHES.map((hash) => (
-              <div key={hash} className="card-2">
-                <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
-                <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byHash[hash]} />
-              </div>
-            ))}
+            {PUNT_HASHES.map((hash) => {
+              const typeStats = typeStatsMaps[type];
+              if (!typeStats) return null;
+              const hasData = athletes.some((a) => typeStats[a]?.byHash[hash]?.att > 0);
+              if (!hasData) return null;
+              return (
+                <div key={hash} className="card-2">
+                  <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
+                  <PuntStatTable athletes={athletes} statsMap={typeStats} getBucket={(s) => s.byHash[hash]} />
+                </div>
+              );
+            })}
           </div>
         </CollapsibleSection>
       ))}
@@ -344,11 +368,27 @@ export default function PuntingStatisticsPage() {
       )}
 
       {tab === "all" && (
-        <PuntStatsView athletes={athletes} statsMap={displayStats} puntTypes={puntTypes} typeLabels={typeLabels} label="Punts" />
+        <PuntStatsView
+          athletes={athletes}
+          statsMap={displayStats}
+          puntTypes={puntTypes}
+          typeLabels={typeLabels}
+          label="Punts"
+          history={filteredHistory}
+          puntFilter={!hasStarred || includeLiveReps ? undefined : (p) => !p.starred}
+        />
       )}
 
       {tab === "starred" && starredStats && (
-        <PuntStatsView athletes={athletes} statsMap={starredStats} puntTypes={puntTypes} typeLabels={typeLabels} label="Live Reps" />
+        <PuntStatsView
+          athletes={athletes}
+          statsMap={starredStats}
+          puntTypes={puntTypes}
+          typeLabels={typeLabels}
+          label="Live Reps"
+          history={filteredHistory}
+          puntFilter={(p) => !!p.starred}
+        />
       )}
     </main>
   );

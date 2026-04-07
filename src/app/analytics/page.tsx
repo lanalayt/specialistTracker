@@ -85,8 +85,8 @@ function KickingAnalytics() {
             <thead>
               <tr>
                 <th className="table-header text-left">Athlete</th>
-                <th className="table-header">Att</th>
                 <th className="table-header">Made</th>
+                <th className="table-header">Att</th>
                 <th className="table-header">Make%</th>
                 <th className="table-header">Avg Score</th>
                 <th className="table-header">Long FG</th>
@@ -96,8 +96,8 @@ function KickingAnalytics() {
               {athleteRows.map((r) => (
                 <tr key={r.athlete} className="hover:bg-surface-2 transition-colors">
                   <td className="table-name font-semibold">{r.athlete}</td>
-                  <td className="table-cell">{r.att || "—"}</td>
                   <td className="table-cell">{r.made || "—"}</td>
+                  <td className="table-cell">{r.att || "—"}</td>
                   <td className="table-cell make-pct">{makePct(r.att, r.made)}</td>
                   <td className="table-cell text-muted">
                     {r.att > 0 ? (r.score / r.att).toFixed(1) : "—"}

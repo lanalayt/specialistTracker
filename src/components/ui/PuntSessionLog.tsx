@@ -55,7 +55,7 @@ export function PuntSessionLog({ punts, onDelete }: PuntSessionLogProps) {
             key={idx}
             className="flex items-center px-4 py-2.5 hover:bg-surface-2/30 transition-colors"
           >
-            <span className="text-xs text-muted w-6 shrink-0">#{idx + 1}</span>
+            <span className="text-xs text-muted w-6 shrink-0">#{p.kickNum ?? idx + 1}</span>
             <span className="text-sm font-medium text-slate-200 w-20 shrink-0 truncate">
               {p.athlete}
             </span>

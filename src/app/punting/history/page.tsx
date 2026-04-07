@@ -165,6 +165,49 @@ export default function PuntHistoryPage() {
                 </div>
               )}
             </div>
+            {/* Per-athlete recap stats */}
+            {(() => {
+              const byAthlete: Record<string, PuntEntry[]> = {};
+              punts.forEach((p) => {
+                if (!byAthlete[p.athlete]) byAthlete[p.athlete] = [];
+                byAthlete[p.athlete].push(p);
+              });
+              const athleteNames = Object.keys(byAthlete);
+              if (athleteNames.length === 0) return null;
+              return (
+                <div className="mb-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                  {athleteNames.map((name) => {
+                    const ap = byAthlete[name];
+                    const att = ap.length;
+                    const yardsEntries = ap.filter((p) => p.yards > 0);
+                    const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
+                    const hangEntries = ap.filter((p) => p.hangTime > 0);
+                    const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+                    const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
+                    const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
+                    const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
+                    const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
+                    const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
+                    const dirScore = daEntries.reduce((s, p) => s + p.directionalAccuracy, 0);
+                    const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
+                    return (
+                      <div key={name} className="card-2 p-3">
+                        <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                        <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                          <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
+                          <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                          <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
+                          <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
+                          <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>
+                          <div><span className="text-muted">Dir Score</span> <span className="text-slate-200 font-medium ml-1">{dirScoreDisplay}</span></div>
+                          <div><span className="text-muted">Crit</span> <span className={`font-medium ml-1 ${criticals > 0 ? "text-miss" : "text-slate-200"}`}>{criticals}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             <div className="card-2 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -175,17 +218,19 @@ export default function PuntHistoryPage() {
                     <th className="table-header">Yds</th>
                     <th className="table-header">Hang</th>
                     <th className="table-header">OT</th>
+                    <th className="table-header">Dir</th>
                   </tr>
                 </thead>
                 <tbody>
                   {punts.map((p, i) => (
                     <tr key={i} className="hover:bg-surface/30">
-                      <td className="table-cell text-left text-muted">{i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
+                      <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                       <td className="table-name">{p.athlete}</td>
                       <td className="table-cell text-muted">{p.type || "—"}</td>
                       <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
                       <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
                       <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
+                      <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

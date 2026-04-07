@@ -151,8 +151,11 @@ export default function PuntingSessionPage() {
   >(draft.plannedPunts);
   const [plannedRowIndices, setPlannedRowIndices] = useState<number[]>(draft.plannedRowIndices ?? []);
   const [currentPuntIdx, setCurrentPuntIdx] = useState(draft.currentPuntIdx);
-  const [sessionPunts, setSessionPunts] = useState<PuntEntry[]>(draft.sessionPunts);
+  const [sessionPunts, setSessionPunts] = useState<PuntEntry[]>(() =>
+    (draft.sessionPunts ?? []).map((p, i) => p.kickNum != null ? p : { ...p, kickNum: i + 1 })
+  );
   const [pendingPunts, setPendingPunts] = useState<PuntEntry[] | null>(null);
+  const [committed, setCommitted] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
   const typeLabels: Record<string, string> = {};
@@ -243,7 +246,7 @@ export default function PuntingSessionPage() {
   useEffect(() => {
     lastLocalSave.current = Date.now();
     // Merge current input fields into partialInputs for the active punt
-    const mergedPartials = sessionActive && currentPuntIdx >= sessionPunts.length
+    const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
       ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }
       : partialInputs;
     saveDraft({
@@ -257,6 +260,18 @@ export default function PuntingSessionPage() {
       partialInputs: mergedPartials,
     });
   }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred]);
+
+  // ── Kick numbering helpers (track by planned position) ──────
+  const loggedKickNums = new Set(sessionPunts.map(p => p.kickNum));
+  const isPlannedLogged = (i: number) => loggedKickNums.has(i + 1);
+  const getLoggedPunt = (i: number) => sessionPunts.find(p => p.kickNum === i + 1);
+  const getLoggedPuntArrayIdx = (i: number) => sessionPunts.findIndex(p => p.kickNum === i + 1);
+  const findNextUnlogged = (after: number = -1) => {
+    for (let j = after + 1; j < plannedPunts.length; j++) {
+      if (!isPlannedLogged(j)) return j;
+    }
+    return -1;
+  };
 
   const totals = athletes.reduce(
     (acc, a) => {
@@ -348,7 +363,7 @@ export default function PuntingSessionPage() {
 
   const filledIndices = getFilledRowIndices();
   const lockedRowSet = new Set(
-    isContinuing ? filledIndices.slice(0, sessionPunts.length) : []
+    isContinuing ? filledIndices.filter((_, pi) => sessionPunts.some(p => p.kickNum === pi + 1)) : []
   );
 
   // ── Start / Continue Session ────────────────────────────────
@@ -382,23 +397,27 @@ export default function PuntingSessionPage() {
     setPlannedRowIndices(filled.map(({ i }) => i));
 
     if (isContinuing) {
-      setCurrentPuntIdx(sessionPunts.length);
+      const firstUnlogged = planned.findIndex((_, i) => !sessionPunts.some(p => p.kickNum === i + 1));
+      setCurrentPuntIdx(firstUnlogged >= 0 ? firstUnlogged : planned.length - 1);
     } else {
       setCurrentPuntIdx(0);
       setSessionPunts([]);
     }
 
+    const startIdx = isContinuing
+      ? (planned.findIndex((_, i) => !sessionPunts.some(p => p.kickNum === i + 1)) ?? 0)
+      : 0;
     setYards("");
     setHangTime("");
     setOpTime("");
     setDirectionalAccuracy(1);
-    setStarred(!!planned[isContinuing ? sessionPunts.length : 0]?.starred);
+    setStarred(!!planned[startIdx >= 0 ? startIdx : 0]?.starred);
     setSessionActive(true);
   };
 
   // ── Unlock a locked row (remove its logged result and all after) ──
   const handleUnlockRow = (filledIdx: number) => {
-    setSessionPunts((prev) => prev.slice(0, filledIdx));
+    setSessionPunts((prev) => prev.filter(p => (p.kickNum ?? 0) < filledIdx + 1));
   };
 
   // ── Manual Entry: commit directly from table ─────────────────
@@ -485,6 +504,7 @@ export default function PuntingSessionPage() {
       landingZones: [],
       directionalAccuracy,
       starred: starred || undefined,
+      kickNum: currentPuntIdx + 1,
     };
 
     // Outlier check
@@ -499,27 +519,36 @@ export default function PuntingSessionPage() {
         return next;
       });
       setEditingPuntIdx(null);
-      // Jump back to the next unlogged punt
-      const nextUnlogged = sessionPunts.length;
-      setCurrentPuntIdx(Math.min(nextUnlogged, plannedPunts.length - 1));
+      const nxt = findNextUnlogged(currentPuntIdx);
+      setCurrentPuntIdx(nxt >= 0 ? nxt : (findNextUnlogged(-1) >= 0 ? findNextUnlogged(-1) : plannedPunts.length - 1));
     } else {
-      const newPunts = [...sessionPunts, punt];
-      setSessionPunts(newPunts);
-      if (currentPuntIdx + 1 < plannedPunts.length) {
-        setCurrentPuntIdx(currentPuntIdx + 1);
+      setSessionPunts((prev) => [...prev, punt]);
+      // Auto-advance to next unlogged planned punt
+      let nextIdx = currentPuntIdx + 1;
+      while (nextIdx < plannedPunts.length && isPlannedLogged(nextIdx)) {
+        nextIdx++;
+      }
+      if (nextIdx < plannedPunts.length) {
+        setCurrentPuntIdx(nextIdx);
       }
     }
 
     // Clear partial for logged punt, load partial for next punt if it exists
-    const nextIdx = editingPuntIdx !== null
-      ? (sessionPunts.length < plannedPunts.length ? sessionPunts.length : currentPuntIdx)
-      : currentPuntIdx + 1;
+    let advanceIdx: number;
+    if (editingPuntIdx !== null) {
+      const nxt = findNextUnlogged(currentPuntIdx);
+      advanceIdx = nxt >= 0 ? nxt : (findNextUnlogged(-1) >= 0 ? findNextUnlogged(-1) : currentPuntIdx);
+    } else {
+      let ni = currentPuntIdx + 1;
+      while (ni < plannedPunts.length && isPlannedLogged(ni)) ni++;
+      advanceIdx = ni < plannedPunts.length ? ni : currentPuntIdx;
+    }
     setPartialInputs((prev) => {
       const next = { ...prev };
       delete next[currentPuntIdx];
       return next;
     });
-    const nextPartial = partialInputs[nextIdx];
+    const nextPartial = partialInputs[advanceIdx];
     if (nextPartial) {
       setYards(nextPartial.yards);
       setHangTime(nextPartial.hangTime);
@@ -531,20 +560,50 @@ export default function PuntingSessionPage() {
       setHangTime("");
       setOpTime("");
       setDirectionalAccuracy(1);
-      setStarred(!!plannedPunts[nextIdx]?.starred);
+      setStarred(!!plannedPunts[advanceIdx]?.starred);
     }
     setShowAthleteDropdown(false);
   };
 
-  const allPuntsLogged = plannedPunts.length > 0 && sessionPunts.length === plannedPunts.length;
+  const allPuntsLogged = plannedPunts.length > 0 && sessionPunts.length >= plannedPunts.length;
   const isEditing = editingPuntIdx !== null;
   const showEntryCard = (!allPuntsLogged || isEditing) && plannedPunts[currentPuntIdx];
 
   const handleDeletePunt = (idx: number) => {
+    const deleted = sessionPunts[idx];
     setSessionPunts((prev) => prev.filter((_, i) => i !== idx));
-    if (sessionPunts.length - 1 < plannedPunts.length) {
-      setCurrentPuntIdx(Math.min(sessionPunts.length - 1, plannedPunts.length - 1));
+    if (deleted?.kickNum) {
+      setCurrentPuntIdx(deleted.kickNum - 1);
+      setEditingPuntIdx(null);
     }
+  };
+
+  const handleRemoveFromPlan = () => {
+    const kickNum = currentPuntIdx + 1;
+    const rowIdx = plannedRowIndices[currentPuntIdx];
+    setSessionPunts((prev) => prev.filter(p => p.kickNum !== kickNum));
+    setPlannedPunts((prev) => prev.filter((_, i) => i !== currentPuntIdx));
+    const newRowIndices = plannedRowIndices.filter((_, i) => i !== currentPuntIdx);
+    setPlannedRowIndices(newRowIndices);
+    if (rowIdx != null) {
+      setRows((prev) => prev.filter((_, i) => i !== rowIdx));
+      setPlannedRowIndices((prev) => prev.map(ri => ri > rowIdx ? ri - 1 : ri));
+    }
+    setSessionPunts((prev) => prev.map(p => {
+      if (p.kickNum && p.kickNum > kickNum) return { ...p, kickNum: p.kickNum - 1 };
+      return p;
+    }));
+    const newLen = plannedPunts.length - 1;
+    if (newLen === 0) {
+      setSessionActive(false);
+    } else {
+      setCurrentPuntIdx(Math.min(currentPuntIdx, newLen - 1));
+    }
+    setEditingPuntIdx(null);
+    setYards("");
+    setHangTime("");
+    setOpTime("");
+    setDirectionalAccuracy(1);
   };
 
   const handleCommitReady = () => {
@@ -555,18 +614,22 @@ export default function PuntingSessionPage() {
   const handleConfirmCommit = () => {
     if (!pendingPunts) return;
     commitPractice(pendingPunts, undefined, weather);
-    setSessionPunts([]);
     setPendingPunts(null);
-    setSessionActive(false);
-    setPlannedPunts([]);
-    setPlannedRowIndices([]);
-    setWeather("");
-    setCurrentPuntIdx(0);
-    setPartialInputs({});
-    // Rows (practice log) are kept — user can clear manually
+    setCommitted(true);
   };
 
   const handleBackToLog = () => {
+    setSessionActive(false);
+  };
+
+  const handleNewSession = () => {
+    setSessionPunts([]);
+    setPlannedPunts([]);
+    setPlannedRowIndices([]);
+    setCurrentPuntIdx(0);
+    setPartialInputs({});
+    setWeather("");
+    setCommitted(false);
     setSessionActive(false);
   };
 
@@ -610,6 +673,103 @@ export default function PuntingSessionPage() {
           <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
             <div className="overflow-y-auto border-b border-border">
               <div className="p-4 space-y-4">
+                {committed ? (
+                  <>
+                    {/* ── Committed Recap ── */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-make uppercase tracking-wider">Session Committed</p>
+                          <p className="text-lg font-bold text-slate-100 mt-1">
+                            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                          </p>
+                          {weather && <p className="text-xs text-muted mt-0.5">{weather}</p>}
+                        </div>
+                        <button
+                          onClick={handleNewSession}
+                          className="text-xs px-3 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                        >
+                          New Session
+                        </button>
+                      </div>
+
+                      {/* Per-athlete recap cards */}
+                      {(() => {
+                        const byAthlete: Record<string, PuntEntry[]> = {};
+                        sessionPunts.forEach((p) => {
+                          if (!byAthlete[p.athlete]) byAthlete[p.athlete] = [];
+                          byAthlete[p.athlete].push(p);
+                        });
+                        const athleteNames = Object.keys(byAthlete);
+                        if (athleteNames.length === 0) return null;
+                        return (
+                          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                            {athleteNames.map((name) => {
+                              const ap = byAthlete[name];
+                              const att = ap.length;
+                              const yardsEntries = ap.filter((p) => p.yards > 0);
+                              const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
+                              const hangEntries = ap.filter((p) => p.hangTime > 0);
+                              const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+                              const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
+                              const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
+                              const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
+                              const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
+                              const dirScore = daEntries.reduce((s, p) => s + p.directionalAccuracy, 0);
+                              const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
+                              const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
+                              return (
+                                <div key={name} className="card-2 p-3">
+                                  <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                                  <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                                    <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
+                                    <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                                    <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
+                                    <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
+                                    <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>
+                                    <div><span className="text-muted">Dir Score</span> <span className="text-slate-200 font-medium ml-1">{dirScoreDisplay}</span></div>
+                                    <div><span className="text-muted">Crit</span> <span className={`font-medium ml-1 ${criticals > 0 ? "text-miss" : "text-slate-200"}`}>{criticals}</span></div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Full punt table */}
+                      <div className="card-2 overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr>
+                              <th className="table-header text-left">#</th>
+                              <th className="table-header text-left">Athlete</th>
+                              <th className="table-header">Type</th>
+                              <th className="table-header">Yds</th>
+                              <th className="table-header">Hang</th>
+                              <th className="table-header">OT</th>
+                              <th className="table-header">Dir</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sessionPunts.map((p, i) => (
+                              <tr key={i} className="hover:bg-surface/30">
+                                <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
+                                <td className="table-name">{p.athlete}</td>
+                                <td className="table-cell text-muted">{typeLabels[p.type] ?? (p.type || "—")}</td>
+                                <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
+                                <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
+                                <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
+                                <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                <>
                 {/* Header */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -643,25 +803,26 @@ export default function PuntingSessionPage() {
                       });
                       return plannedPunts.map((p, i) => {
                         const isCurrent = i === currentPuntIdx && !allPuntsLogged;
+                        const isLogged = isPlannedLogged(i);
                         const hex = colorMap[p.athlete];
                         return (
                           <button
                             key={i}
                             onClick={() => {
                               // Save current partial input before switching
-                              if (currentPuntIdx >= sessionPunts.length) {
+                              if (!isPlannedLogged(currentPuntIdx)) {
                                 setPartialInputs((prev) => ({ ...prev, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }));
                               }
                               setCurrentPuntIdx(i);
                               setShowAthleteDropdown(false);
-                              if (i < sessionPunts.length) {
-                                const logged = sessionPunts[i];
+                              const logged = getLoggedPunt(i);
+                              if (logged) {
                                 setYards(String(logged.yards));
                                 setHangTime(String(logged.hangTime));
                                 setOpTime(String(logged.opTime));
                                 setDirectionalAccuracy(logged.directionalAccuracy);
                                 setStarred(!!logged.starred);
-                                setEditingPuntIdx(i);
+                                setEditingPuntIdx(getLoggedPuntArrayIdx(i));
                               } else {
                                 const partial = partialInputs[i];
                                 if (partial) {
@@ -685,14 +846,15 @@ export default function PuntingSessionPage() {
                             <div
                               className={clsx(
                                 "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
-                                isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]"
+                                isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]",
+                                isLogged && "opacity-50"
                               )}
                               style={{
                                 backgroundColor: hex,
                                 color: "#0f172a",
                               }}
                             >
-                              {i + 1}
+                              {isLogged ? "✓" : i + 1}
                             </div>
                             <span className="text-[8px] font-semibold leading-none" style={{ color: hex }}>
                               {p.athlete}
@@ -858,7 +1020,7 @@ export default function PuntingSessionPage() {
                       </div>
                     </div>
 
-                    {/* Star + Log button */}
+                    {/* Star + Log button + Remove */}
                     <div className="flex gap-2">
                       <button
                         onClick={() => setStarred((v) => !v)}
@@ -879,6 +1041,17 @@ export default function PuntingSessionPage() {
                       >
                         LOG PUNT
                       </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Remove punt #${currentPuntIdx + 1} (${currentPlan?.athlete}) from the plan?`)) {
+                            handleRemoveFromPlan();
+                          }
+                        }}
+                        className="px-3 py-3 rounded-input text-xs border border-miss/30 text-miss/60 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
+                        title="Remove this punt from plan"
+                      >
+                        ✕
+                      </button>
                     </div>
                   </>
                 )}
@@ -894,47 +1067,64 @@ export default function PuntingSessionPage() {
                     </p>
                   </div>
                 )}
+                </>
+                )}
               </div>
             </div>
 
-            {/* Session log header */}
-            <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
-              <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-                Session Log
-                {sessionPunts.length > 0 && (
-                  <span className="text-accent ml-2">
-                    ({sessionPunts.length})
-                  </span>
-                )}
-              </p>
-            </div>
+            {!committed && (
+              <>
+                {/* Session log header */}
+                <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
+                  <p className="text-xs font-semibold text-muted uppercase tracking-wider">
+                    Session Log
+                    {sessionPunts.length > 0 && (
+                      <span className="text-accent ml-2">
+                        ({sessionPunts.length})
+                      </span>
+                    )}
+                  </p>
+                </div>
 
-            {/* Session log */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-              <PuntSessionLog punts={sessionPunts} onDelete={handleDeletePunt} />
-            </div>
+                {/* Session log */}
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <PuntSessionLog punts={sessionPunts} onDelete={handleDeletePunt} />
+                </div>
+              </>
+            )}
 
             {/* Footer */}
             <div className="border-t border-border p-3 flex items-center gap-2 shrink-0 flex-wrap">
-              <div className="flex gap-2">
-                {canUndo && (
+              {committed ? (
+                <button
+                  onClick={handleNewSession}
+                  className="btn-primary text-xs py-2 px-5 ml-auto"
+                >
+                  New Session
+                </button>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    {canUndo && (
+                      <button
+                        onClick={handleUndo}
+                        className="btn-ghost text-xs py-1.5 px-3"
+                      >
+                        ↩ Undo
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1" />
                   <button
-                    onClick={handleUndo}
-                    className="btn-ghost text-xs py-1.5 px-3"
+                    onClick={handleCommitReady}
+                    disabled={sessionPunts.length === 0}
+                    className="btn-primary text-xs py-2 px-5"
                   >
-                    ↩ Undo
+                    Commit Session
+                    {sessionPunts.length > 0 && ` (${sessionPunts.length})`}
                   </button>
-                )}
-              </div>
-              <div className="flex-1" />
-              <button
-                onClick={handleCommitReady}
-                disabled={sessionPunts.length === 0}
-                className="btn-primary text-xs py-2 px-5"
-              >
-                Commit Session
-                {sessionPunts.length > 0 && ` (${sessionPunts.length})`}
-              </button>
+                </>
+              )}
             </div>
           </div>
 

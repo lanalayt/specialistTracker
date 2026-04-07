@@ -172,6 +172,57 @@ export default function KickingHistoryPage() {
                 </div>
               )}
             </div>
+            {/* Per-athlete recap stats */}
+            {(() => {
+              const byAthlete: Record<string, FGKick[]> = {};
+              kicks.forEach((k) => {
+                if (!byAthlete[k.athlete]) byAthlete[k.athlete] = [];
+                byAthlete[k.athlete].push(k);
+              });
+              const athleteNames = Object.keys(byAthlete);
+              if (athleteNames.length === 0) return null;
+              return (
+                <div className="mb-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                  {athleteNames.map((name) => {
+                    const ak = byAthlete[name];
+                    const fgKicks = ak.filter((k) => !k.isPAT);
+                    const patKicks = ak.filter((k) => k.isPAT);
+                    const fgAtt = fgKicks.length;
+                    const fgMade = fgKicks.filter((k) => k.result.startsWith("Y")).length;
+                    const fgPct = fgAtt > 0 ? `${Math.round((fgMade / fgAtt) * 100)}%` : "—";
+                    const fgAvgSc = fgAtt > 0 ? (fgKicks.reduce((s, k) => s + k.score, 0) / fgAtt).toFixed(1) : "—";
+                    const fgMadeKicks = fgKicks.filter((k) => k.result.startsWith("Y"));
+                    const long = fgMadeKicks.length > 0 ? Math.max(...fgMadeKicks.map((k) => k.dist)) : 0;
+                    const patAtt = patKicks.length;
+                    const patMade = patKicks.filter((k) => k.result.startsWith("Y")).length;
+                    const patPct = patAtt > 0 ? `${Math.round((patMade / patAtt) * 100)}%` : "—";
+                    return (
+                      <div key={name} className="card-2 p-3">
+                        <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                        <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">FG</p>
+                        <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                          <div><span className="text-muted">Made</span> <span className="text-make font-medium ml-1">{fgMade}</span></div>
+                          <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{fgAtt}</span></div>
+                          <div><span className="text-muted">Pct</span> <span className="text-accent font-medium ml-1">{fgPct}</span></div>
+                          <div><span className="text-muted">Score</span> <span className="text-slate-200 font-medium ml-1">{fgAvgSc}</span></div>
+                          <div><span className="text-muted">Long</span> <span className="text-slate-200 font-medium ml-1">{long > 0 ? `${long}` : "—"}</span></div>
+                        </div>
+                        {patAtt > 0 && (
+                          <>
+                            <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mt-2.5 mb-1">PAT</p>
+                            <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                              <div><span className="text-muted">Made</span> <span className="text-make font-medium ml-1">{patMade}</span></div>
+                              <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{patAtt}</span></div>
+                              <div><span className="text-muted">Pct</span> <span className="text-accent font-medium ml-1">{patPct}</span></div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             <div className="card-2 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -187,7 +238,7 @@ export default function KickingHistoryPage() {
                 <tbody>
                   {kicks.map((k, i) => (
                     <tr key={i} className="hover:bg-surface/30 transition-colors">
-                      <td className="table-cell text-left text-muted">{i + 1}{k.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
+                      <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}{k.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                       <td className="table-name">{k.athlete}</td>
                       <td className="table-cell">{k.dist} yd</td>
                       <td className="table-cell text-muted">{k.pos}</td>

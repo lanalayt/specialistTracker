@@ -28,7 +28,7 @@ export type KickoffLandingZone =
   | "4"
   | "5"
   | "OOB";
-export type KickoffDirection = "left" | "middle" | "right";
+export type KickoffDirection = "left" | "middle" | "right" | "OB" | "0.5" | "1";
 
 // Long Snap
 export type SnapType = "PUNT" | "FG" | "PAT";
@@ -78,6 +78,7 @@ export interface FGKick {
   score: number;
   isPAT?: boolean;
   starred?: boolean;
+  kickNum?: number;
 }
 
 // ─── Punt entry ─────────────────────────────────────────────────────────────
@@ -97,6 +98,7 @@ export interface PuntEntry {
   directionalAccuracy: 0 | 0.5 | 1;
   poochLandingYardLine?: number;
   starred?: boolean;
+  kickNum?: number;
 }
 
 // ─── Punt stats ─────────────────────────────────────────────────────────────
@@ -136,6 +138,7 @@ export interface KickoffEntry {
   landingZone?: KickoffLandingZone;
   result?: "TB" | "RETURN" | "OOB";
   returnYards?: number;
+  kickNum?: number;
 }
 
 // ─── Kickoff stats ──────────────────────────────────────────────────────────
@@ -294,7 +297,7 @@ export const PUNT_LANDING_ZONES: PuntLandingZone[] = [
   "fairCatch",
 ];
 export const KICKOFF_TYPES: KickoffType[] = ["REG", "ONSIDE", "SQUIB", "FREE"];
-export const KICKOFF_DIRECTIONS: KickoffDirection[] = ["left", "middle", "right"];
+export const KICKOFF_DIRECTIONS: KickoffDirection[] = ["1", "0.5", "OB"];
 export const KICKOFF_ZONES: KickoffLandingZone[] = [
   "TB",
   "1",

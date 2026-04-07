@@ -15,7 +15,6 @@ import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
 import { useTeamDraftSync } from "@/lib/useTeamDraftSync";
 
 const INIT_ROWS = 12;
-const MAX_SCORE = 4;
 
 // Outlier detection for kickoff values
 function checkKickoffOutliers(distance: number, hangTime: number): string[] {
@@ -32,7 +31,6 @@ interface LogRow {
   distance: string;
   hangTime: string;
   direction: string;
-  score: string;
 }
 
 interface SessionDraft {
@@ -51,7 +49,6 @@ const emptyRow = (): LogRow => ({
   distance: "",
   hangTime: "",
   direction: "",
-  score: "",
 });
 
 function loadDraft(): SessionDraft | null {
@@ -72,23 +69,73 @@ function saveDraft(draft: SessionDraft) {
   }
 }
 
-const TYPE_LABELS: Record<KickoffType, string> = {
+const DEFAULT_KO_TYPES = [
+  { id: "BLUE", label: "Blue" },
+  { id: "RED", label: "Red" },
+  { id: "SQUIB", label: "Squib" },
+  { id: "SKY", label: "Sky" },
+  { id: "ONSIDE", label: "Onside" },
+];
+
+const DEFAULT_KO_DIRS = [
+  { id: "1", label: "1.0" },
+  { id: "0.5", label: "0.5" },
+  { id: "OB", label: "OB" },
+];
+
+function loadKickoffSettings(): { types: { id: string; label: string }[]; directions: { id: string; label: string }[] } {
+  if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS };
+  try {
+    const raw = localStorage.getItem("kickoffSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        types: parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES,
+        directions: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : DEFAULT_KO_DIRS,
+      };
+    }
+  } catch {}
+  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS };
+}
+
+// Legacy labels for old data
+const TYPE_LABELS: Record<string, string> = {
   REG: "Regular",
   ONSIDE: "Onside",
   SQUIB: "Squib",
   FREE: "Free",
 };
 
-const DIR_LABELS: Record<KickoffDirection, string> = {
+const DIR_LABELS: Record<string, string> = {
   left: "←",
   middle: "↑",
   right: "→",
+  "1": "1.0 ✓",
+  "0.5": "0.5",
+  "OB": "OB",
 };
 
 export default function KickoffSessionPage() {
   const { athletes, stats, canUndo, undoLastCommit, commitPractice } =
     useKickoff();
   const { isAthlete } = useAuth();
+
+  // ── Custom kickoff types + directions from settings ──────────────────
+  const [koTypes, setKoTypes] = useState(() => loadKickoffSettings().types);
+  const [koDirs, setKoDirs] = useState(() => loadKickoffSettings().directions);
+  const koTypeLabels: Record<string, string> = {};
+  koTypes.forEach((t) => { koTypeLabels[t.id] = t.label; });
+  const koDirLabels: Record<string, string> = {};
+  koDirs.forEach((d) => { koDirLabels[d.id] = d.label; });
+
+  useEffect(() => {
+    import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
+      loadSettingsFromCloud<{ kickoffTypes?: { id: string; label: string }[]; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
+        if (cloud?.kickoffTypes?.length) setKoTypes(cloud.kickoffTypes);
+        if (cloud?.directionMetrics?.length) setKoDirs(cloud.directionMetrics);
+      });
+    });
+  }, []);
 
   // ── Initialize all state from localStorage ──────────────────
   const [draft] = useState<SessionDraft>(() => {
@@ -113,8 +160,11 @@ export default function KickoffSessionPage() {
   >(draft.plannedKicks);
   const [plannedRowIndices, setPlannedRowIndices] = useState<number[]>(draft.plannedRowIndices ?? []);
   const [currentKickIdx, setCurrentKickIdx] = useState(draft.currentKickIdx);
-  const [sessionKicks, setSessionKicks] = useState<KickoffEntry[]>(draft.sessionKicks);
+  const [sessionKicks, setSessionKicks] = useState<KickoffEntry[]>(() =>
+    (draft.sessionKicks ?? []).map((k, i) => k.kickNum != null ? k : { ...k, kickNum: i + 1 })
+  );
   const [pendingKicks, setPendingKicks] = useState<KickoffEntry[] | null>(null);
+  const [committed, setCommitted] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState("");
@@ -123,8 +173,8 @@ export default function KickoffSessionPage() {
   // Session card state
   const [distance, setDistance] = useState("");
   const [hangTime, setHangTime] = useState("");
-  const [direction, setDirection] = useState<KickoffDirection>("middle");
-  const [score, setScore] = useState<number>(0);
+  const [direction, setDirection] = useState<KickoffDirection>("1");
+  // score removed — not used for kickoff
 
   // Guard: skip sync callbacks that arrive shortly after a local save
   const lastLocalSave = useRef(0);
@@ -179,6 +229,18 @@ export default function KickoffSessionPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Kick numbering helpers (track by planned position) ──────
+  const loggedKickNums = new Set(sessionKicks.map(k => k.kickNum));
+  const isPlannedLogged = (i: number) => loggedKickNums.has(i + 1);
+  const getLoggedKick = (i: number) => sessionKicks.find(k => k.kickNum === i + 1);
+  const getLoggedKickArrayIdx = (i: number) => sessionKicks.findIndex(k => k.kickNum === i + 1);
+  const findNextUnlogged = (after: number = -1) => {
+    for (let j = after + 1; j < plannedKicks.length; j++) {
+      if (!isPlannedLogged(j)) return j;
+    }
+    return -1;
+  };
 
   const totals = athletes.reduce(
     (acc, a) => {
@@ -257,7 +319,7 @@ export default function KickoffSessionPage() {
 
   const planningFields = (r: LogRow) => r.athlete || r.type;
   const allFields = (r: LogRow) =>
-    r.athlete || r.type || r.distance || r.hangTime || r.direction || r.score;
+    r.athlete || r.type || r.distance || r.hangTime || r.direction;
 
   const filledRows = rows
     .map((r, i) => ({ r, i }))
@@ -273,7 +335,7 @@ export default function KickoffSessionPage() {
 
   const filledIndices = getFilledRowIndices();
   const lockedRowSet = new Set(
-    isContinuing ? filledIndices.slice(0, sessionKicks.length) : []
+    isContinuing ? filledIndices.filter((_, pi) => sessionKicks.some(k => k.kickNum === pi + 1)) : []
   );
 
   // ── Start / Continue Session ────────────────────────────────
@@ -305,7 +367,8 @@ export default function KickoffSessionPage() {
     setPlannedRowIndices(filled.map(({ i }) => i));
 
     if (isContinuing) {
-      setCurrentKickIdx(sessionKicks.length);
+      const firstUnlogged = planned.findIndex((_, i) => !sessionKicks.some(k => k.kickNum === i + 1));
+      setCurrentKickIdx(firstUnlogged >= 0 ? firstUnlogged : planned.length - 1);
     } else {
       setCurrentKickIdx(0);
       setSessionKicks([]);
@@ -313,14 +376,13 @@ export default function KickoffSessionPage() {
 
     setDistance("");
     setHangTime("");
-    setDirection("middle");
-    setScore(0);
+    setDirection("1" as KickoffDirection);
     setSessionActive(true);
   };
 
   // ── Unlock a locked row ──
   const handleUnlockRow = (filledIdx: number) => {
-    setSessionKicks((prev) => prev.slice(0, filledIdx));
+    setSessionKicks((prev) => prev.filter(k => (k.kickNum ?? 0) < filledIdx + 1));
   };
 
   // ── Manual Entry: commit directly from table ─────────────────
@@ -349,8 +411,8 @@ export default function KickoffSessionPage() {
       type: r.type as KickoffType,
       distance: parseInt(r.distance) || 0,
       hangTime: parseFloat(r.hangTime) || 0,
-      direction: r.direction as KickoffDirection,
-      score: parseInt(r.score) || 0,
+      direction: (r.direction || "1") as KickoffDirection,
+      score: 0,
     }));
 
     // Outlier check across all kickoffs
@@ -399,7 +461,8 @@ export default function KickoffSessionPage() {
       distance: distVal,
       hangTime: htVal,
       direction,
-      score,
+      score: 0,
+      kickNum: currentKickIdx + 1,
     };
 
     // Outlier check
@@ -413,32 +476,64 @@ export default function KickoffSessionPage() {
         return next;
       });
       setEditingKickIdx(null);
-      const nextUnlogged = sessionKicks.length;
-      setCurrentKickIdx(Math.min(nextUnlogged, plannedKicks.length - 1));
+      const nxt = findNextUnlogged(currentKickIdx);
+      setCurrentKickIdx(nxt >= 0 ? nxt : (findNextUnlogged(-1) >= 0 ? findNextUnlogged(-1) : plannedKicks.length - 1));
     } else {
-      const newKicks = [...sessionKicks, kick];
-      setSessionKicks(newKicks);
-      if (currentKickIdx + 1 < plannedKicks.length) {
-        setCurrentKickIdx(currentKickIdx + 1);
+      setSessionKicks((prev) => [...prev, kick]);
+      // Auto-advance to next unlogged planned kick
+      let nextIdx = currentKickIdx + 1;
+      while (nextIdx < plannedKicks.length && isPlannedLogged(nextIdx)) {
+        nextIdx++;
+      }
+      if (nextIdx < plannedKicks.length) {
+        setCurrentKickIdx(nextIdx);
       }
     }
 
     setDistance("");
     setHangTime("");
-    setDirection("middle");
-    setScore(0);
+    setDirection("1" as KickoffDirection);
     setShowAthleteDropdown(false);
   };
 
-  const allKicksLogged = plannedKicks.length > 0 && sessionKicks.length === plannedKicks.length;
+  const allKicksLogged = plannedKicks.length > 0 && sessionKicks.length >= plannedKicks.length;
   const isEditing = editingKickIdx !== null;
   const showEntryCard = (!allKicksLogged || isEditing) && plannedKicks[currentKickIdx];
 
   const handleDeleteKick = (idx: number) => {
+    const deleted = sessionKicks[idx];
     setSessionKicks((prev) => prev.filter((_, i) => i !== idx));
-    if (sessionKicks.length - 1 < plannedKicks.length) {
-      setCurrentKickIdx(Math.min(sessionKicks.length - 1, plannedKicks.length - 1));
+    if (deleted?.kickNum) {
+      setCurrentKickIdx(deleted.kickNum - 1);
+      setEditingKickIdx(null);
     }
+  };
+
+  const handleRemoveFromPlan = () => {
+    const kickNum = currentKickIdx + 1;
+    const rowIdx = plannedRowIndices[currentKickIdx];
+    setSessionKicks((prev) => prev.filter(k => k.kickNum !== kickNum));
+    setPlannedKicks((prev) => prev.filter((_, i) => i !== currentKickIdx));
+    const newRowIndices = plannedRowIndices.filter((_, i) => i !== currentKickIdx);
+    setPlannedRowIndices(newRowIndices);
+    if (rowIdx != null) {
+      setRows((prev) => prev.filter((_, i) => i !== rowIdx));
+      setPlannedRowIndices((prev) => prev.map(ri => ri > rowIdx ? ri - 1 : ri));
+    }
+    setSessionKicks((prev) => prev.map(k => {
+      if (k.kickNum && k.kickNum > kickNum) return { ...k, kickNum: k.kickNum - 1 };
+      return k;
+    }));
+    const newLen = plannedKicks.length - 1;
+    if (newLen === 0) {
+      setSessionActive(false);
+    } else {
+      setCurrentKickIdx(Math.min(currentKickIdx, newLen - 1));
+    }
+    setEditingKickIdx(null);
+    setDistance("");
+    setHangTime("");
+    setDirection("1" as KickoffDirection);
   };
 
   const handleCommitReady = () => {
@@ -449,17 +544,21 @@ export default function KickoffSessionPage() {
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;
     commitPractice(pendingKicks, undefined, weather);
-    setSessionKicks([]);
     setPendingKicks(null);
-    setSessionActive(false);
-    setPlannedKicks([]);
-    setPlannedRowIndices([]);
-    setWeather("");
-    setCurrentKickIdx(0);
-    // Rows (practice log) are kept — user can clear manually
+    setCommitted(true);
   };
 
   const handleBackToLog = () => {
+    setSessionActive(false);
+  };
+
+  const handleNewSession = () => {
+    setSessionKicks([]);
+    setPlannedKicks([]);
+    setPlannedRowIndices([]);
+    setCurrentKickIdx(0);
+    setWeather("");
+    setCommitted(false);
     setSessionActive(false);
   };
 
@@ -488,6 +587,92 @@ export default function KickoffSessionPage() {
           <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
             <div className="overflow-y-auto border-b border-border">
               <div className="p-4 space-y-4">
+                {committed ? (
+                  <>
+                    {/* ── Committed Recap ── */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-make uppercase tracking-wider">Session Committed</p>
+                          <p className="text-lg font-bold text-slate-100 mt-1">
+                            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                          </p>
+                          {weather && <p className="text-xs text-muted mt-0.5">{weather}</p>}
+                        </div>
+                        <button
+                          onClick={handleNewSession}
+                          className="text-xs px-3 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                        >
+                          New Session
+                        </button>
+                      </div>
+
+                      {/* Per-athlete recap cards */}
+                      {(() => {
+                        const byAthlete: Record<string, KickoffEntry[]> = {};
+                        sessionKicks.forEach((k) => {
+                          if (!byAthlete[k.athlete]) byAthlete[k.athlete] = [];
+                          byAthlete[k.athlete].push(k);
+                        });
+                        const athleteNames = Object.keys(byAthlete);
+                        if (athleteNames.length === 0) return null;
+                        return (
+                          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                            {athleteNames.map((name) => {
+                              const ak = byAthlete[name];
+                              const att = ak.length;
+                              const distEntries = ak.filter((k) => k.distance > 0);
+                              const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : "—";
+                              const hangEntries = ak.filter((k) => k.hangTime > 0);
+                              const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, k) => s + k.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+                              const tbCount = ak.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
+                              return (
+                                <div key={name} className="card-2 p-3">
+                                  <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                                  <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                                    <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
+                                    <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                                    <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
+                                    <div><span className="text-muted">TB</span> <span className="text-make font-medium ml-1">{tbCount}</span></div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Full kickoff table */}
+                      <div className="card-2 overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr>
+                              <th className="table-header text-left">#</th>
+                              <th className="table-header text-left">Athlete</th>
+                              <th className="table-header">Type</th>
+                              <th className="table-header">Dist</th>
+                              <th className="table-header">Hang</th>
+                              <th className="table-header">Dir</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sessionKicks.map((k, i) => (
+                              <tr key={i} className="hover:bg-surface/30 transition-colors">
+                                <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}</td>
+                                <td className="table-name">{k.athlete}</td>
+                                <td className="table-cell text-muted">{koTypeLabels[k.type] ?? TYPE_LABELS[k.type] ?? k.type}</td>
+                                <td className="table-cell">{k.distance > 0 ? `${k.distance} yd` : "—"}</td>
+                                <td className="table-cell text-muted">{k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s` : "—"}</td>
+                                <td className="table-cell text-muted">{koDirLabels[k.direction] ?? k.direction}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                <>
                 {/* Header */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -500,11 +685,14 @@ export default function KickoffSessionPage() {
                     </p>
                     <div className="flex items-center gap-2">
                       {/* Next kick preview */}
-                      {!allKicksLogged && !isEditing && currentKickIdx + 1 < plannedKicks.length && (
-                        <span className="text-[10px] text-muted">
-                          Next: {plannedKicks[currentKickIdx + 1].athlete} — {TYPE_LABELS[plannedKicks[currentKickIdx + 1].type]}
-                        </span>
-                      )}
+                      {!allKicksLogged && !isEditing && (() => {
+                        const nxt = findNextUnlogged(currentKickIdx);
+                        return nxt >= 0 && plannedKicks[nxt] ? (
+                          <span className="text-[10px] text-muted">
+                            Next: {plannedKicks[nxt].athlete} — {koTypeLabels[plannedKicks[nxt].type] ?? TYPE_LABELS[plannedKicks[nxt].type] ?? plannedKicks[nxt].type}
+                          </span>
+                        ) : null;
+                      })()}
                       <button
                         onClick={handleBackToLog}
                         className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
@@ -527,6 +715,7 @@ export default function KickoffSessionPage() {
                       });
                       return plannedKicks.map((k, i) => {
                         const isCurrent = i === currentKickIdx && !allKicksLogged;
+                        const isLogged = isPlannedLogged(i);
                         const hex = colorMap[k.athlete];
                         return (
                           <button
@@ -534,18 +723,16 @@ export default function KickoffSessionPage() {
                             onClick={() => {
                               setCurrentKickIdx(i);
                               setShowAthleteDropdown(false);
-                              if (i < sessionKicks.length) {
-                                const logged = sessionKicks[i];
+                              const logged = getLoggedKick(i);
+                              if (logged) {
                                 setDistance(String(logged.distance));
                                 setHangTime(String(logged.hangTime));
                                 setDirection(logged.direction);
-                                setScore(logged.score);
-                                setEditingKickIdx(i);
+                                setEditingKickIdx(getLoggedKickArrayIdx(i));
                               } else {
                                 setDistance("");
                                 setHangTime("");
-                                setDirection("middle");
-                                setScore(0);
+                                setDirection("1" as KickoffDirection);
                                 setEditingKickIdx(null);
                               }
                             }}
@@ -554,14 +741,15 @@ export default function KickoffSessionPage() {
                             <div
                               className={clsx(
                                 "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
-                                isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]"
+                                isCurrent && "ring-2 ring-white ring-offset-1 ring-offset-[var(--bg)]",
+                                isLogged && "opacity-50"
                               )}
                               style={{
                                 backgroundColor: hex,
                                 color: "#0f172a",
                               }}
                             >
-                              {i + 1}
+                              {isLogged ? "✓" : i + 1}
                             </div>
                             <span className="text-[8px] font-semibold leading-none" style={{ color: hex }}>
                               {k.athlete}
@@ -610,19 +798,19 @@ export default function KickoffSessionPage() {
                     {/* Editable: Type */}
                     <div>
                       <p className="label">Type</p>
-                      <div className="flex gap-1.5">
-                        {KICKOFF_TYPES.map((t) => (
+                      <div className="flex flex-wrap gap-1.5">
+                        {koTypes.map(({ id, label }) => (
                           <button
-                            key={t}
-                            onClick={() => updateCurrentPlan("type", t)}
+                            key={id}
+                            onClick={() => updateCurrentPlan("type", id)}
                             className={clsx(
                               "px-3 py-2 rounded-input text-xs font-semibold text-center transition-all",
-                              currentPlan.type === t
+                              currentPlan.type === id
                                 ? "bg-accent/20 text-accent border border-accent/50"
                                 : "bg-surface-2 text-muted border border-border hover:text-white"
                             )}
                           >
-                            {TYPE_LABELS[t]}
+                            {label}
                           </button>
                         ))}
                       </div>
@@ -658,53 +846,45 @@ export default function KickoffSessionPage() {
                     {/* Direction */}
                     <div>
                       <p className="label">Direction</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {KICKOFF_DIRECTIONS.map((d) => (
+                      <div className="flex flex-wrap gap-2">
+                        {koDirs.map(({ id, label }) => (
                           <button
-                            key={d}
-                            onClick={() => setDirection(d)}
+                            key={id}
+                            onClick={() => setDirection(id as KickoffDirection)}
                             className={clsx(
-                              "py-3 rounded-input text-xs font-bold border transition-all",
-                              direction === d
+                              "px-3 py-3 rounded-input text-xs font-bold border transition-all",
+                              direction === id
                                 ? "bg-accent/20 text-accent border-accent/50"
                                 : "bg-surface-2 text-muted border-border hover:text-white"
                             )}
                           >
-                            {DIR_LABELS[d]} {d.charAt(0).toUpperCase() + d.slice(1)}
+                            {label}
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Score */}
-                    <div>
-                      <p className="label">Score</p>
-                      <div className="flex gap-1.5">
-                        {Array.from({ length: MAX_SCORE + 1 }, (_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setScore(i)}
-                            className={clsx(
-                              "w-9 h-9 rounded-full text-sm font-bold transition-all",
-                              score === i
-                                ? "bg-accent text-slate-900 shadow-lg"
-                                : "bg-surface-2 text-muted border border-border hover:text-white"
-                            )}
-                          >
-                            {i}
-                          </button>
-                        ))}
-                      </div>
+                    {/* Log button + Remove */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleLogKick}
+                        disabled={false}
+                        className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        LOG KICKOFF
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Remove kickoff #${currentKickIdx + 1} (${currentPlan.athlete}) from the plan?`)) {
+                            handleRemoveFromPlan();
+                          }
+                        }}
+                        className="px-3 py-3 rounded-input text-xs border border-miss/30 text-miss/60 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
+                        title="Remove this kickoff from plan"
+                      >
+                        ✕
+                      </button>
                     </div>
-
-                    {/* Log button */}
-                    <button
-                      onClick={handleLogKick}
-                      disabled={false}
-                      className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      LOG KICKOFF
-                    </button>
                   </>
                 )}
 
@@ -719,47 +899,64 @@ export default function KickoffSessionPage() {
                     </p>
                   </div>
                 )}
+                </>
+                )}
               </div>
             </div>
 
-            {/* Session log header */}
-            <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
-              <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-                Session Log
-                {sessionKicks.length > 0 && (
-                  <span className="text-accent ml-2">
-                    ({sessionKicks.length})
-                  </span>
-                )}
-              </p>
-            </div>
+            {!committed && (
+              <>
+                {/* Session log header */}
+                <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
+                  <p className="text-xs font-semibold text-muted uppercase tracking-wider">
+                    Session Log
+                    {sessionKicks.length > 0 && (
+                      <span className="text-accent ml-2">
+                        ({sessionKicks.length})
+                      </span>
+                    )}
+                  </p>
+                </div>
 
-            {/* Session log */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-              <KickoffSessionLog kicks={sessionKicks} onDelete={handleDeleteKick} />
-            </div>
+                {/* Session log */}
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <KickoffSessionLog kicks={sessionKicks} onDelete={handleDeleteKick} />
+                </div>
+              </>
+            )}
 
             {/* Footer */}
             <div className="border-t border-border p-3 flex items-center gap-2 shrink-0 flex-wrap">
-              <div className="flex gap-2">
-                {canUndo && (
+              {committed ? (
+                <button
+                  onClick={handleNewSession}
+                  className="btn-primary text-xs py-2 px-5 ml-auto"
+                >
+                  New Session
+                </button>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    {canUndo && (
+                      <button
+                        onClick={handleUndo}
+                        className="btn-ghost text-xs py-1.5 px-3"
+                      >
+                        ↩ Undo
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1" />
                   <button
-                    onClick={handleUndo}
-                    className="btn-ghost text-xs py-1.5 px-3"
+                    onClick={handleCommitReady}
+                    disabled={sessionKicks.length === 0}
+                    className="btn-primary text-xs py-2 px-5"
                   >
-                    ↩ Undo
+                    Commit Session
+                    {sessionKicks.length > 0 && ` (${sessionKicks.length})`}
                   </button>
-                )}
-              </div>
-              <div className="flex-1" />
-              <button
-                onClick={handleCommitReady}
-                disabled={sessionKicks.length === 0}
-                className="btn-primary text-xs py-2 px-5"
-              >
-                Commit Session
-                {sessionKicks.length > 0 && ` (${sessionKicks.length})`}
-              </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -901,9 +1098,6 @@ export default function KickoffSessionPage() {
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                         Dir
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
-                        Score
-                      </th>
                     </>
                   )}
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
@@ -955,7 +1149,7 @@ export default function KickoffSessionPage() {
                       </td>
                       <td className="py-1 px-1">
                         {isLocked ? (
-                          <span className="text-xs text-slate-400 text-center block">{TYPE_LABELS[row.type as KickoffType] ?? row.type}</span>
+                          <span className="text-xs text-slate-400 text-center block">{koTypeLabels[row.type] ?? TYPE_LABELS[row.type as KickoffType] ?? row.type}</span>
                         ) : (
                           <select
                             value={row.type}
@@ -964,8 +1158,8 @@ export default function KickoffSessionPage() {
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
-                            {KICKOFF_TYPES.map((t) => (
-                              <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                            {koTypes.map(({ id, label }) => (
+                              <option key={id} value={id}>{label}</option>
                             ))}
                           </select>
                         )}
@@ -998,21 +1192,8 @@ export default function KickoffSessionPage() {
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                             >
                               <option value="">—</option>
-                              {KICKOFF_DIRECTIONS.map((d) => (
-                                <option key={d} value={d}>{DIR_LABELS[d]} {d}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-1 px-1">
-                            <select
-                              value={row.score}
-                              onChange={(e) => updateRow(idx, "score", e.target.value)}
-                              disabled={isAthlete}
-                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
-                            >
-                              <option value="">—</option>
-                              {Array.from({ length: MAX_SCORE + 1 }, (_, i) => (
-                                <option key={i} value={String(i)}>{i}</option>
+                              {koDirs.map(({ id, label }) => (
+                                <option key={id} value={id}>{label}</option>
                               ))}
                             </select>
                           </td>
@@ -1040,12 +1221,10 @@ export default function KickoffSessionPage() {
                                     setDistance(String(logged.distance));
                                     setHangTime(String(logged.hangTime));
                                     setDirection(logged.direction);
-                                    setScore(logged.score);
                                   } else {
                                     setDistance("");
                                     setHangTime("");
-                                    setDirection("middle");
-                                    setScore(0);
+                                    setDirection("1" as KickoffDirection);
                                   }
                                   setSessionActive(true);
                                 }}

@@ -181,7 +181,7 @@ export default function KickoffHistoryPage() {
                 <tbody>
                   {entries.map((e, i) => (
                     <tr key={i} className="hover:bg-surface/30">
-                      <td className="table-cell text-left text-muted">{i + 1}</td>
+                      <td className="table-cell text-left text-muted">{e.kickNum ?? i + 1}</td>
                       <td className="table-name">{e.athlete}</td>
                       <td className="table-cell">{e.distance > 0 ? `${e.distance} yd` : "—"}</td>
                       <td className="table-cell text-muted">{e.hangTime > 0 ? `${e.hangTime.toFixed(2)}s` : "—"}</td>
