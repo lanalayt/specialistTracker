@@ -35,6 +35,29 @@ function isPoochType(type: string | undefined | null): boolean {
   return type.toUpperCase().includes("POOCH");
 }
 
+// Parse a yard-line input into an absolute field position 0..100
+// where 0 = own goal line and 100 = opponent goal line.
+//
+// Sign convention:
+//   "-20"  = own 20     → 20
+//   "+25"  = opponent 25 → 75 (100 - 25)
+//   "50"   = midfield    → 50
+//   "20"   = own 20 (default to own side if no sign)
+//   "0"    = own goal    → 0
+//
+// Returns NaN for invalid input (caller should handle).
+function parseYardLine(input: string | undefined | null): number {
+  if (input == null) return NaN;
+  const trimmed = String(input).trim();
+  if (!trimmed) return NaN;
+  const match = trimmed.match(/^([+-]?)(\d+)$/);
+  if (!match) return NaN;
+  const sign = match[1] || "-"; // default to own side
+  const n = parseInt(match[2], 10);
+  if (isNaN(n) || n < 0 || n > 50) return NaN;
+  return sign === "-" ? n : 100 - n;
+}
+
 // ── Table row (planning phase) ────────────────────────────────
 interface LogRow {
   athlete: string;
@@ -474,8 +497,13 @@ export default function PuntingSessionPage() {
       setErrorRows((prev) => new Set([...prev, rowIdx]));
       return;
     }
-    const losVal = r.los !== "" && r.los != null ? parseInt(r.los) || 0 : 0;
-    const landingYLVal = r.landingYL !== "" && r.landingYL != null ? parseInt(r.landingYL) || 0 : 0;
+    const losVal = parseYardLine(r.los);
+    const landingYLVal = parseYardLine(r.landingYL);
+    if (isNaN(losVal) || isNaN(landingYLVal)) {
+      alert("LOS and Landing YL must be yard lines 0–50. Use - for own side and + for opponent side (e.g. -20 or +25).");
+      setErrorRows((prev) => new Set([...prev, rowIdx]));
+      return;
+    }
     const gross = Math.max(0, landingYLVal - losVal);
     const htVal = parseFloat(r.hangTime) || 0;
     const retVal = r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined;
@@ -1611,8 +1639,8 @@ export default function PuntingSessionPage() {
                   </th>
                   {manualEntry && sessionMode === "game" && (
                     <>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">LOS</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Land YL</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]" title="LOS yard line. Use -X for own side, +X for opponent side">LOS ±</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]" title="Landing yard line. Use -X for own side, +X for opponent side">Land YL ±</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Hang Time</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>
@@ -1725,19 +1753,21 @@ export default function PuntingSessionPage() {
                           <>
                             <td className="py-1 px-1">
                               <input
-                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yd"
+                                type="text" inputMode="text" placeholder="-20"
                                 value={row.los ?? ""}
                                 onChange={(e) => updateRow(idx, "los", e.target.value)}
                                 readOnly={isAthlete || isSaved}
+                                title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
                             <td className="py-1 px-1">
                               <input
-                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yd"
+                                type="text" inputMode="text" placeholder="+25"
                                 value={row.landingYL ?? ""}
                                 onChange={(e) => updateRow(idx, "landingYL", e.target.value)}
                                 readOnly={isAthlete || isSaved}
+                                title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
