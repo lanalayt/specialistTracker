@@ -1,12 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFG } from "@/lib/fgContext";
 import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
+import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { FGFieldView } from "@/components/ui/FGFieldView";
 import type { FGKick, Session } from "@/types";
 import clsx from "clsx";
+
+function formatResult(result: string, makeMode: "simple" | "detailed"): string {
+  if (result.startsWith("Y")) {
+    if (makeMode === "simple") return "✓";
+    if (result === "YL") return "✓L";
+    if (result === "YR") return "✓R";
+    return "✓M"; // YC
+  }
+  // Misses
+  if (result === "XL") return "✗L";
+  if (result === "XR") return "✗R";
+  if (result === "XS") return "✗ Short";
+  return result;
+}
 
 function formatDateForInput(iso: string): string {
   const d = new Date(iso);
@@ -23,6 +38,25 @@ function formatLabel(dateStr: string): string {
 
 export default function KickingHistoryPage() {
   const { history, updateSessionDate, updateSessionWeather, deleteSession } = useFG();
+  const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() => {
+    if (typeof window === "undefined") return "detailed";
+    try {
+      const raw = localStorage.getItem("fgSettings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return parsed.makeMode === "simple" ? "simple" : "detailed";
+      }
+    } catch {}
+    return "detailed";
+  });
+
+  useEffect(() => {
+    loadSettingsFromCloud<{ makeMode?: string }>("fgSettings").then((cloud) => {
+      if (cloud?.makeMode === "simple" || cloud?.makeMode === "detailed") {
+        setMakeMode(cloud.makeMode);
+      }
+    });
+  }, []);
   const { isAthlete } = useAuth();
   const [modeFilter, setModeFilter] = useState<"practice" | "game">("practice");
   const filteredHistory = history.filter((s) =>
@@ -283,7 +317,7 @@ export default function KickingHistoryPage() {
                       <td className="table-cell text-muted">{k.pos}</td>
                       <td className="table-cell">
                         <span className={clsx("text-xs font-semibold", k.result.startsWith("Y") ? "text-make" : "text-miss")}>
-                          {k.result}
+                          {formatResult(k.result, makeMode)}
                         </span>
                       </td>
                       <td className="table-cell">{k.score}</td>
