@@ -1664,7 +1664,9 @@ export default function PuntingSessionPage() {
                       </th>
                     </>
                   )}
-                  <th className="bg-surface-2 text-amber-400 font-bold py-2 px-1 text-center w-8 border-b border-border">★</th>
+                  {sessionMode !== "game" && (
+                    <th className="bg-surface-2 text-amber-400 font-bold py-2 px-1 text-center w-8 border-b border-border">★</th>
+                  )}
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
                 </tr>
               </thead>
@@ -1900,21 +1902,23 @@ export default function PuntingSessionPage() {
                           </td>
                         </>
                       )}
-                      <td className="py-1 px-1 text-center">
-                        {!isAthlete ? (
-                          <button
-                            onClick={() => updateRow(idx, "starred", !row.starred)}
-                            className={clsx(
-                              "text-sm transition-colors",
-                              row.starred ? "text-amber-400" : "text-muted/40 hover:text-amber-400"
-                            )}
-                          >
-                            {row.starred ? "★" : "☆"}
-                          </button>
-                        ) : row.starred ? (
-                          <span className="text-sm text-amber-400">★</span>
-                        ) : null}
-                      </td>
+                      {sessionMode !== "game" && (
+                        <td className="py-1 px-1 text-center">
+                          {!isAthlete ? (
+                            <button
+                              onClick={() => updateRow(idx, "starred", !row.starred)}
+                              className={clsx(
+                                "text-sm transition-colors",
+                                row.starred ? "text-amber-400" : "text-muted/40 hover:text-amber-400"
+                              )}
+                            >
+                              {row.starred ? "★" : "☆"}
+                            </button>
+                          ) : row.starred ? (
+                            <span className="text-sm text-amber-400">★</span>
+                          ) : null}
+                        </td>
+                      )}
                       <td className="py-1 px-1 text-center">
                         {isLocked ? (
                           !isAthlete && (
