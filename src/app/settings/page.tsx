@@ -9,6 +9,10 @@ import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 import { localGet, localSet, STORAGE_KEYS, setCloudUserId } from "@/lib/amplify";
 import { cloudSetImmediate, cloudGet } from "@/lib/supabaseData";
 import { getCloudKey } from "@/lib/amplify";
+import { FGProvider, useFG } from "@/lib/fgContext";
+import { PuntProvider, usePunt } from "@/lib/puntContext";
+import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
+import { createArchive } from "@/lib/archiveManager";
 import clsx from "clsx";
 
 const SPORT_OPTIONS = [
@@ -20,12 +24,53 @@ const SPORT_OPTIONS = [
 
 function SettingsContent() {
   const { user, isCoach } = useAuth();
+  const fg = useFG();
+  const punt = usePunt();
+  const kickoff = useKickoff();
   const [teamName, setTeamName] = useState("Special Teams");
   const [school, setSchool] = useState("My School");
   const [enabledSports, setEnabledSports] = useState<string[]>(["KICKING", "PUNTING", "KICKOFF", "LONGSNAP"]);
   const [saved, setSaved] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
+
+  // Archive UI state
+  const [archiveName, setArchiveName] = useState("");
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveDone, setArchiveDone] = useState(false);
+
+  const handleArchiveClick = () => {
+    if (!archiveName.trim()) {
+      alert("Please enter a name for the archive.");
+      return;
+    }
+    setShowArchiveConfirm(true);
+  };
+
+  const handleConfirmArchive = async () => {
+    setArchiving(true);
+    try {
+      await createArchive(
+        archiveName.trim(),
+        { athletes: fg.athletes, stats: fg.stats, history: fg.history },
+        { athletes: punt.athletes, stats: punt.stats, history: punt.history },
+        { athletes: kickoff.athletes, stats: kickoff.stats, history: kickoff.history }
+      );
+      fg.resetStatsKeepAthletes();
+      punt.resetStatsKeepAthletes();
+      kickoff.resetStatsKeepAthletes();
+      setShowArchiveConfirm(false);
+      setArchiveName("");
+      setArchiveDone(true);
+      setTimeout(() => setArchiveDone(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert("Archive failed. Check console.");
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   const handleSyncToCloud = async () => {
     if (!user?.id || user.id === "local-dev") return;
@@ -222,6 +267,36 @@ function SettingsContent() {
             </div>
           )}
 
+          {/* Archive Stats */}
+          <div className="card space-y-3">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">
+              Archive Stats
+            </p>
+            <p className="text-xs text-muted">
+              Save a snapshot of all current stats (FG, Punt, Kickoff) under a name, then reset all stats back to 0. Archived snapshots stay available under Archived Stats in the sidebar.
+            </p>
+            <div className="flex gap-2">
+              <input
+                className="input flex-1"
+                placeholder="e.g. 2025 Season, Fall Camp, etc."
+                value={archiveName}
+                onChange={(e) => setArchiveName(e.target.value)}
+              />
+              <button
+                onClick={handleArchiveClick}
+                disabled={!archiveName.trim() || archiving}
+                className={clsx(
+                  "px-4 py-2 rounded-input text-sm font-semibold transition-all",
+                  archiveDone
+                    ? "bg-make text-slate-900"
+                    : "bg-amber-500/20 text-amber-400 border border-amber-500/50 hover:bg-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                )}
+              >
+                {archiveDone ? "✓ Archived!" : "Archive"}
+              </button>
+            </div>
+          </div>
+
           {/* Cloud Sync */}
           <div className="card space-y-3">
             <p className="text-xs font-semibold text-muted uppercase tracking-wider">
@@ -257,16 +332,56 @@ function SettingsContent() {
           </div>
         </RoleGuard>
       </main>
+
+      {/* Archive confirmation modal */}
+      {showArchiveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="card max-w-sm w-full space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Confirm Archive</p>
+              <h3 className="text-base font-bold text-slate-100 mt-1">Archive all current stats?</h3>
+            </div>
+            <p className="text-xs text-muted">
+              This will save a snapshot named <span className="text-accent font-semibold">&quot;{archiveName}&quot;</span> containing all current FG, Punt, and Kickoff stats and session history, then reset all current stats and history back to zero. Athletes will be kept.
+            </p>
+            <p className="text-xs text-muted">
+              You can view archived snapshots under <span className="text-slate-300">Archived Stats</span> in the sidebar.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowArchiveConfirm(false)}
+                disabled={archiving}
+                className="flex-1 py-2 rounded-input text-sm font-semibold border border-border text-muted hover:text-white hover:bg-surface-2 transition-all disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmArchive}
+                disabled={archiving}
+                className="flex-1 py-2 rounded-input text-sm font-bold bg-amber-500 text-slate-900 hover:bg-amber-400 transition-all disabled:opacity-40 disabled:cursor-wait"
+              >
+                {archiving ? "Archiving..." : "Confirm Archive"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function SettingsPage() {
   return (
-    <div className="flex overflow-x-hidden max-w-[100vw]">
-      <Sidebar />
-      <SettingsContent />
-      <MobileNav />
-    </div>
+    <FGProvider>
+      <PuntProvider>
+        <KickoffProvider>
+          <div className="flex overflow-x-hidden max-w-[100vw]">
+            <Sidebar />
+            <SettingsContent />
+            <MobileNav />
+          </div>
+        </KickoffProvider>
+      </PuntProvider>
+    </FGProvider>
   );
 }

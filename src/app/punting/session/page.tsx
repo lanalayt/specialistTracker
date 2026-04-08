@@ -69,6 +69,8 @@ interface SessionDraft {
   committed?: boolean;
   committedWeather?: string;
   sessionMode?: "practice" | "game";
+  opponent?: string;
+  gameTime?: string;
 }
 
 const emptyRow = (): LogRow => ({
@@ -171,6 +173,8 @@ export default function PuntingSessionPage() {
   const [pendingPunts, setPendingPunts] = useState<PuntEntry[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(draft.sessionMode ?? "practice");
+  const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
+  const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
   const [showReset, setShowReset] = useState(false);
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
   const typeLabels: Record<string, string> = {};
@@ -286,8 +290,10 @@ export default function PuntingSessionPage() {
       committed,
       committedWeather: committed ? weather : undefined,
       sessionMode,
+      opponent,
+      gameTime,
     });
-  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, weather, sessionMode]);
+  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, weather, sessionMode, opponent, gameTime]);
 
   // ── Kick numbering helpers (track by planned position) ──────
   const loggedKickNums = new Set(sessionPunts.map(p => p.kickNum));
@@ -678,7 +684,7 @@ export default function PuntingSessionPage() {
 
   const handleConfirmCommit = () => {
     if (!pendingPunts) return;
-    commitPractice(pendingPunts, undefined, weather, sessionMode);
+    commitPractice(pendingPunts, undefined, weather, sessionMode, opponent, gameTime);
     setPendingPunts(null);
     setCommitted(true);
   };
@@ -697,6 +703,8 @@ export default function PuntingSessionPage() {
     setCommitted(false);
     setSessionActive(false);
     setSessionMode("practice");
+    setOpponent("");
+    setGameTime("");
   };
 
   const handleUndo = () => {
@@ -745,14 +753,18 @@ export default function PuntingSessionPage() {
             isGame ? "border-red-500/30" : "border-border"
           )}>
             {isGame && (
-              <div className="bg-red-500 text-white px-4 py-2 flex items-center justify-center gap-2 shrink-0 shadow-lg">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
-                </span>
-                <span className="text-sm font-black uppercase tracking-widest">GAME MODE — PUNT</span>
-                <span className="text-xs opacity-80 ml-2">
+              <div className="bg-red-500 text-white px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 shrink-0 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                  </span>
+                  <span className="text-sm font-black uppercase tracking-widest">GAME — PUNT</span>
+                </div>
+                {opponent && <span className="text-sm font-bold">vs {opponent}</span>}
+                <span className="text-xs opacity-80">
                   {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  {gameTime && ` · ${gameTime}`}
                 </span>
               </div>
             )}
@@ -764,9 +776,15 @@ export default function PuntingSessionPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs font-semibold text-make uppercase tracking-wider">Session Committed</p>
+                          <p className="text-xs font-semibold text-make uppercase tracking-wider">
+                            {sessionMode === "game" ? "Game Committed" : "Session Committed"}
+                          </p>
+                          {sessionMode === "game" && opponent && (
+                            <p className="text-lg font-black text-red-400 mt-1">vs {opponent}</p>
+                          )}
                           <p className="text-lg font-bold text-slate-100 mt-1">
                             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                            {gameTime && <span className="text-muted text-sm font-normal"> · {gameTime}</span>}
                           </p>
                           {weather && <p className="text-xs text-muted mt-0.5">{weather}</p>}
                         </div>
@@ -1399,28 +1417,48 @@ export default function PuntingSessionPage() {
           </div>
           {/* Practice / Game mode toggle */}
           {!isAthlete && !isContinuing && (
-            <div className="px-4 py-2 border-b border-border shrink-0 flex items-center gap-2">
-              <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Mode</span>
-              <div className="flex rounded-input border border-border overflow-hidden">
-                <button
-                  onClick={() => setSessionMode("practice")}
-                  className={clsx(
-                    "px-3 py-1 text-xs font-semibold transition-colors",
-                    sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-                  )}
-                >
-                  Practice
-                </button>
-                <button
-                  onClick={() => setSessionMode("game")}
-                  className={clsx(
-                    "px-3 py-1 text-xs font-semibold transition-colors border-l border-border",
-                    sessionMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
-                  )}
-                >
-                  GAME
-                </button>
+            <div className="px-4 py-2 border-b border-border shrink-0 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Mode</span>
+                <div className="flex rounded-input border border-border overflow-hidden">
+                  <button
+                    onClick={() => setSessionMode("practice")}
+                    className={clsx(
+                      "px-3 py-1 text-xs font-semibold transition-colors",
+                      sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                    )}
+                  >
+                    Practice
+                  </button>
+                  <button
+                    onClick={() => setSessionMode("game")}
+                    className={clsx(
+                      "px-3 py-1 text-xs font-semibold transition-colors border-l border-border",
+                      sessionMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
+                    )}
+                  >
+                    GAME
+                  </button>
+                </div>
               </div>
+              {sessionMode === "game" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={opponent}
+                    onChange={(e) => setOpponent(e.target.value)}
+                    placeholder="vs Opponent"
+                    className="bg-surface-2 border border-red-500/40 text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-red-500/60 placeholder:text-muted"
+                  />
+                  <input
+                    type="text"
+                    value={gameTime}
+                    onChange={(e) => setGameTime(e.target.value)}
+                    placeholder="Game time (e.g. 7:00 PM)"
+                    className="bg-surface-2 border border-red-500/40 text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-red-500/60 placeholder:text-muted"
+                  />
+                </div>
+              )}
             </div>
           )}
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">

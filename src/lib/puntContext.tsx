@@ -31,9 +31,10 @@ interface PuntStateData {
 interface PuntContextValue extends PuntStateData {
   addAthletes: (names: string[]) => void;
   removeAthlete: (name: string) => void;
-  commitPractice: (entries: PuntEntry[], label?: string, weather?: string, mode?: SessionMode) => Session;
+  commitPractice: (entries: PuntEntry[], label?: string, weather?: string, mode?: SessionMode, opponent?: string, gameTime?: string) => Session;
   undoLastCommit: () => boolean;
   resetAll: () => void;
+  resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   deleteSession: (sessionId: string) => void;
@@ -150,7 +151,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const commitPractice = useCallback((entries: PuntEntry[], label?: string, weather?: string, mode: SessionMode = "practice"): Session => {
+  const commitPractice = useCallback((entries: PuntEntry[], label?: string, weather?: string, mode: SessionMode = "practice", opponent?: string, gameTime?: string): Session => {
     const session: Session = {
       id: genId(),
       teamId: "local",
@@ -159,6 +160,8 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       date: new Date().toISOString(),
       weather: weather || undefined,
       mode,
+      opponent: opponent || undefined,
+      gameTime: gameTime || undefined,
       entries,
     };
     setState((prev) => {
@@ -266,9 +269,26 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     setState(next);
   }, []);
 
+  const resetStatsKeepAthletes = useCallback(() => {
+    setState((prev) => {
+      const freshStats: Record<string, PuntAthleteStats> = {};
+      prev.athletes.forEach((a) => { freshStats[a] = emptyPuntStats(); });
+      const next: PuntStateData = {
+        athletes: prev.athletes,
+        stats: freshStats,
+        snapshot: null,
+        history: [],
+      };
+      localSet("PUNT", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSetImmediate(tid, "punt_data", next);
+      return next;
+    });
+  }, []);
+
   return (
     <PuntContext.Provider value={{
-      ...state, addAthletes, removeAthlete, commitPractice,
+      ...state, addAthletes, removeAthlete, commitPractice, resetStatsKeepAthletes,
       undoLastCommit, resetAll, updateSessionDate, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
     }}>
       {children}

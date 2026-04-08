@@ -21,8 +21,9 @@ interface KickoffStateData {
 interface KickoffContextValue extends KickoffStateData {
   addAthletes: (names: string[]) => void;
   removeAthlete: (name: string) => void;
-  commitPractice: (entries: KickoffEntry[], label?: string, weather?: string, mode?: SessionMode) => Session;
+  commitPractice: (entries: KickoffEntry[], label?: string, weather?: string, mode?: SessionMode, opponent?: string, gameTime?: string) => Session;
   undoLastCommit: () => boolean;
+  resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   deleteSession: (sessionId: string) => void;
@@ -127,11 +128,13 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string, mode: SessionMode = "practice"): Session => {
+  const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string, mode: SessionMode = "practice", opponent?: string, gameTime?: string): Session => {
     const session: Session = {
       id: genId(), teamId: "local", sport: "KICKOFF",
       label: label ?? sessionLabel(), date: new Date().toISOString(),
-      weather: weather || undefined, mode, entries,
+      weather: weather || undefined, mode,
+      opponent: opponent || undefined, gameTime: gameTime || undefined,
+      entries,
     };
     setState((prev) => {
       const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
@@ -228,9 +231,26 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const resetStatsKeepAthletes = useCallback(() => {
+    setState((prev) => {
+      const freshStats: Record<string, KickoffAthleteStats> = {};
+      prev.athletes.forEach((a) => { freshStats[a] = emptyKickoffStats(); });
+      const next: KickoffStateData = {
+        athletes: prev.athletes,
+        stats: freshStats,
+        snapshot: null,
+        history: [],
+      };
+      localSet("KICKOFF", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSetImmediate(tid, "kickoff_data", next);
+      return next;
+    });
+  }, []);
+
   return (
     <KickoffContext.Provider value={{
-      ...state, addAthletes, removeAthlete, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
+      ...state, addAthletes, removeAthlete, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, deleteSession, resetStatsKeepAthletes, canUndo: state.snapshot !== null,
     }}>
       {children}
     </KickoffContext.Provider>

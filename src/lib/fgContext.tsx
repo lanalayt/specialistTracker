@@ -31,9 +31,10 @@ interface FGStateData {
 interface FGContextValue extends FGStateData {
   addAthletes: (names: string[]) => void;
   removeAthlete: (name: string) => void;
-  commitPractice: (kicks: FGKick[], label?: string, weather?: string, mode?: SessionMode) => Session;
+  commitPractice: (kicks: FGKick[], label?: string, weather?: string, mode?: SessionMode, opponent?: string, gameTime?: string) => Session;
   undoLastCommit: () => boolean;
   resetAll: () => void;
+  resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   deleteSession: (sessionId: string) => void;
@@ -168,7 +169,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
   );
 
   const commitPractice = useCallback(
-    (kicks: FGKick[], label?: string, weather?: string, mode: SessionMode = "practice"): Session => {
+    (kicks: FGKick[], label?: string, weather?: string, mode: SessionMode = "practice", opponent?: string, gameTime?: string): Session => {
       const session: Session = {
         id: genId(),
         teamId: "local",
@@ -177,6 +178,8 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         date: new Date().toISOString(),
         weather: weather || undefined,
         mode,
+        opponent: opponent || undefined,
+        gameTime: gameTime || undefined,
         entries: kicks,
       };
 
@@ -281,6 +284,23 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
     save(next);
   }, [save]);
 
+  const resetStatsKeepAthletes = useCallback(() => {
+    setState((prev) => {
+      const freshStats: Record<string, AthleteStats> = {};
+      prev.athletes.forEach((a) => { freshStats[a] = emptyAthleteStats(); });
+      const next: FGStateData = {
+        athletes: prev.athletes,
+        stats: freshStats,
+        snapshot: null,
+        history: [],
+      };
+      localSet("FG", next);
+      const _t = getTeamId();
+      if (_t && _t !== "local-dev") teamSetImmediate(_t, "fg_data", next);
+      return next;
+    });
+  }, []);
+
   return (
     <FGContext.Provider
       value={{
@@ -289,6 +309,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         removeAthlete,
         commitPractice,
         undoLastCommit,
+        resetStatsKeepAthletes,
         resetAll,
         updateSessionDate,
         updateSessionWeather,

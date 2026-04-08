@@ -124,8 +124,16 @@ export default function PuntHistoryPage() {
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selected.mode === "game" && selected.opponent && (
+                    <span className="px-2 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-400 text-[10px] font-black uppercase tracking-wider">
+                      GAME vs {selected.opponent}
+                    </span>
+                  )}
                   <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
+                  {selected.mode === "game" && selected.gameTime && (
+                    <span className="text-xs text-muted">· {selected.gameTime}</span>
+                  )}
                   {!isAthlete && (
                     <button
                       onClick={() => setEditingId(selected.id)}

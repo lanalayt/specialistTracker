@@ -204,6 +204,8 @@ export interface Session {
   date: string;
   weather?: string;
   mode?: SessionMode; // undefined = practice (legacy)
+  opponent?: string;
+  gameTime?: string;
   entries?: FGKick[] | PuntEntry[] | KickoffEntry[] | LongSnapEntry[];
 }
 

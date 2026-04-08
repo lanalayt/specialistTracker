@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: "/kickoff", label: "Kickoff", icon: "🎯" },
   { href: "/longsnap", label: "Long Snap", icon: "📏" },
   { href: "/analytics", label: "Analytics", icon: "📊" },
+  { href: "/archives", label: "Archived Stats", icon: "🗄" },
 ];
 
 const COACH_ITEMS = [
