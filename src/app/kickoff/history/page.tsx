@@ -22,29 +22,53 @@ function formatLabel(dateStr: string): string {
 export default function KickoffHistoryPage() {
   const { history, updateSessionDate, updateSessionWeather, deleteSession } = useKickoff();
   const { isAthlete } = useAuth();
+  const [modeFilter, setModeFilter] = useState<"practice" | "game">("practice");
+  const filteredHistory = history.filter((s) =>
+    modeFilter === "game" ? s.mode === "game" : s.mode !== "game"
+  );
   const [selectedId, setSelectedId] = useState<string | null>(
-    history[history.length - 1]?.id ?? null
+    filteredHistory[filteredHistory.length - 1]?.id ?? null
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
 
-  const selected = history.find((s) => s.id === selectedId);
+  const selected = filteredHistory.find((s) => s.id === selectedId);
   const entries = (selected?.entries ?? []) as KickoffEntry[];
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
       {/* Session list */}
       <div className="lg:w-64 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto shrink-0">
-        <div className="p-4 border-b border-border">
+        <div className="p-4 border-b border-border space-y-2">
+          <div className="flex rounded-input border border-border overflow-hidden">
+            <button
+              onClick={() => { setModeFilter("practice"); setSelectedId(null); }}
+              className={clsx(
+                "flex-1 px-2 py-1 text-[10px] font-semibold transition-colors",
+                modeFilter === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+              )}
+            >
+              Practice
+            </button>
+            <button
+              onClick={() => { setModeFilter("game"); setSelectedId(null); }}
+              className={clsx(
+                "flex-1 px-2 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+                modeFilter === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
+              )}
+            >
+              GAME
+            </button>
+          </div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-            Sessions ({history.length})
+            Sessions ({filteredHistory.length})
           </p>
         </div>
-        {history.length === 0 ? (
-          <p className="text-xs text-muted p-4">No sessions yet</p>
+        {filteredHistory.length === 0 ? (
+          <p className="text-xs text-muted p-4">No {modeFilter} sessions yet</p>
         ) : (
           <div className="divide-y divide-border/30">
-            {[...history].reverse().map((s: Session) => {
+            {[...filteredHistory].reverse().map((s: Session) => {
               const se = (s.entries ?? []) as KickoffEntry[];
               return (
                 <button
@@ -52,7 +76,7 @@ export default function KickoffHistoryPage() {
                   onClick={() => setSelectedId(s.id)}
                   className={clsx(
                     "w-full text-left px-4 py-3 transition-colors hover:bg-surface-2",
-                    selectedId === s.id && "bg-accent/10 border-l-2 border-accent"
+                    selectedId === s.id && (modeFilter === "game" ? "bg-red-500/10 border-l-2 border-red-500" : "bg-accent/10 border-l-2 border-accent")
                   )}
                 >
                   <p className="text-sm font-semibold text-slate-200">{s.label}</p>
@@ -165,6 +189,47 @@ export default function KickoffHistoryPage() {
                 </div>
               )}
             </div>
+            {/* Per-athlete recap stats */}
+            {(() => {
+              const dirToNum = (d: string): number | null => {
+                if (d === "1") return 1;
+                if (d === "0.5") return 0.5;
+                if (d === "OB") return 0;
+                return null;
+              };
+              const byAthlete: Record<string, KickoffEntry[]> = {};
+              entries.forEach((e) => {
+                if (!byAthlete[e.athlete]) byAthlete[e.athlete] = [];
+                byAthlete[e.athlete].push(e);
+              });
+              const athleteNames = Object.keys(byAthlete);
+              if (athleteNames.length === 0) return null;
+              return (
+                <div className="mb-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                  {athleteNames.map((name) => {
+                    const ak = byAthlete[name];
+                    const att = ak.length;
+                    const distEntries = ak.filter((e) => e.distance > 0);
+                    const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, e) => s + e.distance, 0) / distEntries.length).toFixed(1) : "—";
+                    const hangEntries = ak.filter((e) => e.hangTime > 0);
+                    const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, e) => s + e.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+                    const dirVals = ak.map((e) => dirToNum(e.direction)).filter((v): v is number => v != null);
+                    const avgDir = dirVals.length > 0 ? (dirVals.reduce((s, v) => s + v, 0) / dirVals.length).toFixed(2) : "—";
+                    return (
+                      <div key={name} className="card-2 p-3">
+                        <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                          <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
+                          <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                          <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
+                          <div><span className="text-muted">Dir</span> <span className="text-accent font-medium ml-1">{avgDir}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             <div className="card-2 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -173,9 +238,7 @@ export default function KickoffHistoryPage() {
                     <th className="table-header text-left">Athlete</th>
                     <th className="table-header">Dist</th>
                     <th className="table-header">Hang</th>
-                    <th className="table-header">Zone</th>
-                    <th className="table-header">Result</th>
-                    <th className="table-header">Ret Yds</th>
+                    <th className="table-header">Dir</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -185,15 +248,9 @@ export default function KickoffHistoryPage() {
                       <td className="table-name">{e.athlete}</td>
                       <td className="table-cell">{e.distance > 0 ? `${e.distance} yd` : "—"}</td>
                       <td className="table-cell text-muted">{e.hangTime > 0 ? `${e.hangTime.toFixed(2)}s` : "—"}</td>
-                      <td className="table-cell text-muted">{e.landingZone}</td>
-                      <td className="table-cell">
-                        <span className={clsx("text-xs font-semibold",
-                          e.result === "TB" ? "text-make" : e.result === "OOB" ? "text-miss" : "text-slate-300"
-                        )}>
-                          {e.result}
-                        </span>
-                      </td>
-                      <td className="table-cell text-muted">{(e.returnYards ?? 0) > 0 ? `${e.returnYards} yd` : "—"}</td>
+                      <td className={clsx("table-cell font-bold",
+                        e.direction === "1" ? "text-make" : e.direction === "OB" ? "text-miss" : e.direction === "0.5" ? "text-amber-400" : "text-muted"
+                      )}>{e.direction || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

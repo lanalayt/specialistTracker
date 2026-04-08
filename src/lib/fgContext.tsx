@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useEffect,
 } from "react";
-import type { FGKick, AthleteStats, Session } from "@/types";
+import type { FGKick, AthleteStats, Session, SessionMode } from "@/types";
 import {
   emptyAthleteStats,
   processKick,
@@ -17,7 +17,8 @@ import {
 } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
+import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import { useAuth } from "@/lib/auth";
 
 interface FGStateData {
@@ -30,7 +31,7 @@ interface FGStateData {
 interface FGContextValue extends FGStateData {
   addAthletes: (names: string[]) => void;
   removeAthlete: (name: string) => void;
-  commitPractice: (kicks: FGKick[], label?: string, weather?: string) => Session;
+  commitPractice: (kicks: FGKick[], label?: string, weather?: string, mode?: SessionMode) => Session;
   undoLastCommit: () => boolean;
   resetAll: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
@@ -63,7 +64,12 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       let saved: FGStateData | null = null;
-      const tid = getTeamId();
+      // Wait briefly for team ID to be set by AppProviders after auth resolves
+      let tid = getTeamId();
+      for (let i = 0; i < 10 && !tid; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        tid = getTeamId();
+      }
 
       // Try team_data first (shared across team members)
       if (tid && tid !== "local-dev") {
@@ -99,6 +105,22 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
 
     loadData();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll team_data for remote updates (changes made on other devices)
+  useTeamDataSync<FGStateData>("fg_data", (remote) => {
+    if (!remote) return;
+    const stats = { ...remote.stats };
+    (remote.athletes || []).forEach((a) => {
+      if (!stats[a]) {
+        stats[a] = emptyAthleteStats();
+      } else if (!stats[a].pat) {
+        stats[a] = { ...stats[a], pat: { att: 0, made: 0, score: 0 } };
+      }
+    });
+    const migrated = { ...remote, stats };
+    setState(migrated);
+    localSet("FG", migrated);
+  });
 
   const save = useCallback((next: FGStateData) => {
     setState(next);
@@ -146,7 +168,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
   );
 
   const commitPractice = useCallback(
-    (kicks: FGKick[], label?: string, weather?: string): Session => {
+    (kicks: FGKick[], label?: string, weather?: string, mode: SessionMode = "practice"): Session => {
       const session: Session = {
         id: genId(),
         teamId: "local",
@@ -154,19 +176,26 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         label: label ?? sessionLabel(),
         date: new Date().toISOString(),
         weather: weather || undefined,
+        mode,
         entries: kicks,
       };
 
       setState((prev) => {
         const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
         const newHistory = [...prev.history, session];
+        // Cached stats represent PRACTICE only. Game sessions are stored in
+        // history but not added to cached stats.
         let newStats = { ...prev.stats };
-        kicks.forEach((k) => {
-          newStats = processKick(k, newStats);
-        });
+        if (mode !== "game") {
+          kicks.forEach((k) => {
+            newStats = processKick(k, newStats);
+          });
+        }
         const next = { ...prev, stats: newStats, history: newHistory, snapshot };
         localSet("FG", next);
-        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
+        // Critical: committed session must reach cloud immediately, not debounced
+        const _t = getTeamId();
+        if (_t && _t !== "local-dev") teamSetImmediate(_t, "fg_data", next);
         return next;
       });
 
@@ -180,9 +209,12 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => {
       if (!prev.snapshot) return prev;
       const newHistory = JSON.parse(JSON.stringify(prev.snapshot)) as Session[];
+      // Cached stats = practice sessions only
       const newStats = recomputeFGStats(
         prev.athletes,
-        newHistory.map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
+        newHistory
+          .filter((s) => s.mode !== "game")
+          .map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
       );
       const next = {
         ...prev,
@@ -233,7 +265,9 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
       const newStats = recomputeFGStats(
         prev.athletes,
-        newHistory.map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
+        newHistory
+          .filter((s) => s.mode !== "game")
+          .map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
       );
       const next = { ...prev, history: newHistory, stats: newStats };
       localSet("FG", next);

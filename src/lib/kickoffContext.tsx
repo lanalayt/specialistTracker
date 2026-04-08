@@ -3,11 +3,12 @@
 import React, {
   createContext, useContext, useState, useCallback, useEffect,
 } from "react";
-import type { KickoffEntry, KickoffAthleteStats, Session } from "@/types";
+import type { KickoffEntry, KickoffAthleteStats, Session, SessionMode } from "@/types";
 import { emptyKickoffStats, processKickoff, recomputeKickoffStats, genId, sessionLabel } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
+import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import { useAuth } from "@/lib/auth";
 
 interface KickoffStateData {
@@ -18,7 +19,9 @@ interface KickoffStateData {
 }
 
 interface KickoffContextValue extends KickoffStateData {
-  commitPractice: (entries: KickoffEntry[], label?: string, weather?: string) => Session;
+  addAthletes: (names: string[]) => void;
+  removeAthlete: (name: string) => void;
+  commitPractice: (entries: KickoffEntry[], label?: string, weather?: string, mode?: SessionMode) => Session;
   undoLastCommit: () => boolean;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
@@ -48,7 +51,12 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     async function loadData() {
       let saved: KickoffStateData | null = null;
 
-      const tid = getTeamId();
+      // Wait briefly for team ID to be set by AppProviders after auth resolves
+      let tid = getTeamId();
+      for (let i = 0; i < 10 && !tid; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        tid = getTeamId();
+      }
 
       // Try team_data first (shared across team members)
       if (tid && tid !== "local-dev") {
@@ -79,21 +87,64 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     loadData();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string): Session => {
+  // Poll team_data for remote updates (changes made on other devices)
+  useTeamDataSync<KickoffStateData>("kickoff_data", (remote) => {
+    if (!remote) return;
+    const stats = { ...remote.stats };
+    (remote.athletes || []).forEach((a) => {
+      if (!stats[a]) stats[a] = emptyKickoffStats();
+    });
+    const migrated = { ...remote, stats };
+    setState(migrated);
+    localSet("KICKOFF", migrated);
+  });
+
+  const addAthletes = useCallback((names: string[]) => {
+    setState((prev) => {
+      const existing = new Set(prev.athletes);
+      const toAdd = names.filter((n) => n.trim() && !existing.has(n.trim()));
+      if (toAdd.length === 0) return prev;
+      const newAthletes = [...prev.athletes, ...toAdd.map((n) => n.trim())];
+      const newStats = { ...prev.stats };
+      toAdd.forEach((a) => {
+        if (!newStats[a.trim()]) newStats[a.trim()] = emptyKickoffStats();
+      });
+      const next = { ...prev, athletes: newAthletes, stats: newStats };
+      localSet("KICKOFF", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", next);
+      return next;
+    });
+  }, []);
+
+  const removeAthlete = useCallback((name: string) => {
+    setState((prev) => {
+      const next = { ...prev, athletes: prev.athletes.filter((a) => a !== name) };
+      localSet("KICKOFF", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", next);
+      return next;
+    });
+  }, []);
+
+  const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string, mode: SessionMode = "practice"): Session => {
     const session: Session = {
       id: genId(), teamId: "local", sport: "KICKOFF",
       label: label ?? sessionLabel(), date: new Date().toISOString(),
-      weather: weather || undefined, entries,
+      weather: weather || undefined, mode, entries,
     };
     setState((prev) => {
       const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
       let newStats = { ...prev.stats };
-      entries.forEach((e) => { newStats = processKickoff(e, newStats); });
+      if (mode !== "game") {
+        entries.forEach((e) => { newStats = processKickoff(e, newStats); });
+      }
       const next = { ...prev, stats: newStats, history: [...prev.history, session], snapshot };
       localSet("KICKOFF", next);
       const tid = getTeamId();
       if (tid && tid !== "local-dev") {
-        teamSet(tid, "kickoff_data", next);
+        // Critical: committed session must reach cloud immediately, not debounced
+        teamSetImmediate(tid, "kickoff_data", next);
       }
       return next;
     });
@@ -107,7 +158,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       const newHistory = JSON.parse(JSON.stringify(prev.snapshot)) as Session[];
       const newStats = defaultState().stats;
       prev.athletes.forEach((a) => { newStats[a] = emptyKickoffStats(); });
-      newHistory.forEach((s) => {
+      newHistory.filter((s) => s.mode !== "game").forEach((s) => {
         (s.entries as KickoffEntry[])?.forEach((e) => {
           Object.assign(newStats, processKickoff(e, newStats));
         });
@@ -165,7 +216,9 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
       const newStats = recomputeKickoffStats(
         prev.athletes,
-        newHistory.map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
+        newHistory
+          .filter((s) => s.mode !== "game")
+          .map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
       );
       const next = { ...prev, history: newHistory, stats: newStats };
       localSet("KICKOFF", next);
@@ -177,7 +230,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <KickoffContext.Provider value={{
-      ...state, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
+      ...state, addAthletes, removeAthlete, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
     }}>
       {children}
     </KickoffContext.Provider>

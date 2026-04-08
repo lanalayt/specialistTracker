@@ -61,47 +61,16 @@ export async function teamGetWithTimestamp<T>(
   }
 }
 
-/** Write to team_data (debounced) */
-export function teamSet<T>(teamId: string, dataKey: string, value: T): void {
-  if (!teamId || teamId === "local-dev") return;
-
-  const timerKey = `team:${teamId}:${dataKey}`;
-  if (debounceTimers[timerKey]) {
-    clearTimeout(debounceTimers[timerKey]);
-  }
-
-  debounceTimers[timerKey] = setTimeout(async () => {
-    try {
-      const supabase = createClient();
-      await supabase
-        .from("team_data")
-        .upsert(
-          {
-            team_id: teamId,
-            data_key: dataKey,
-            data: value as unknown as Record<string, unknown>,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "team_id,data_key" }
-        );
-    } catch (err) {
-      console.warn("[TeamSync] Failed to save:", err);
-    }
-  }, DEBOUNCE_MS);
+// Track last successful write timestamp per key, so polling can skip stale fetches
+const lastWriteTimestamp: Record<string, number> = {};
+export function getLastWriteTimestamp(teamId: string, dataKey: string): number {
+  return lastWriteTimestamp[`${teamId}:${dataKey}`] ?? 0;
 }
 
-/** Write immediately (no debounce) */
-export async function teamSetImmediate<T>(teamId: string, dataKey: string, value: T): Promise<void> {
-  if (!teamId || teamId === "local-dev") return;
-
-  const timerKey = `team:${teamId}:${dataKey}`;
-  if (debounceTimers[timerKey]) {
-    clearTimeout(debounceTimers[timerKey]);
-  }
-
+async function writeWithRetry<T>(teamId: string, dataKey: string, value: T, attempt = 0): Promise<boolean> {
   try {
     const supabase = createClient();
-    await supabase
+    const { error } = await supabase
       .from("team_data")
       .upsert(
         {
@@ -112,7 +81,42 @@ export async function teamSetImmediate<T>(teamId: string, dataKey: string, value
         },
         { onConflict: "team_id,data_key" }
       );
+    if (error) throw error;
+    lastWriteTimestamp[`${teamId}:${dataKey}`] = Date.now();
+    return true;
   } catch (err) {
-    console.warn("[TeamSync] Failed to save:", err);
+    if (attempt < 2) {
+      // Retry up to 2 times with backoff
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      return writeWithRetry(teamId, dataKey, value, attempt + 1);
+    }
+    console.warn(`[TeamSync] Failed to save ${dataKey} after retries:`, err);
+    return false;
   }
+}
+
+/** Write to team_data (debounced with retry) */
+export function teamSet<T>(teamId: string, dataKey: string, value: T): void {
+  if (!teamId || teamId === "local-dev") return;
+
+  const timerKey = `team:${teamId}:${dataKey}`;
+  if (debounceTimers[timerKey]) {
+    clearTimeout(debounceTimers[timerKey]);
+  }
+
+  debounceTimers[timerKey] = setTimeout(() => {
+    writeWithRetry(teamId, dataKey, value);
+  }, DEBOUNCE_MS);
+}
+
+/** Write immediately (no debounce, with retry) */
+export async function teamSetImmediate<T>(teamId: string, dataKey: string, value: T): Promise<boolean> {
+  if (!teamId || teamId === "local-dev") return false;
+
+  const timerKey = `team:${teamId}:${dataKey}`;
+  if (debounceTimers[timerKey]) {
+    clearTimeout(debounceTimers[timerKey]);
+  }
+
+  return writeWithRetry(teamId, dataKey, value);
 }

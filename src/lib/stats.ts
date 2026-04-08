@@ -195,8 +195,11 @@ export function processPunt(
   const { athlete, yards, hangTime, type, hash } = punt;
   const opTime = punt.opTime || 0;
 
+  // Pooch punts do NOT contribute to distance/long averages.
+  // They have their own poochLandingYardLine tracking.
+  const isPooch = typeof type === "string" && type.toUpperCase().includes("POOCH");
   // Determine which metrics have data (0 = not entered for numeric fields)
-  const hasYards = yards > 0;
+  const hasYards = yards > 0 && !isPooch;
   const hasHang = hangTime > 0;
   const hasOT = opTime > 0;
   const hasDA = punt.directionalAccuracy != null && punt.directionalAccuracy >= 0;

@@ -41,6 +41,9 @@ interface SessionDraft {
   plannedRowIndices: number[];
   currentKickIdx: number;
   sessionKicks: KickoffEntry[];
+  committed?: boolean;
+  committedWeather?: string;
+  sessionMode?: "practice" | "game";
 }
 
 const emptyRow = (): LogRow => ({
@@ -164,10 +167,11 @@ export default function KickoffSessionPage() {
     (draft.sessionKicks ?? []).map((k, i) => k.kickNum != null ? k : { ...k, kickNum: i + 1 })
   );
   const [pendingKicks, setPendingKicks] = useState<KickoffEntry[] | null>(null);
-  const [committed, setCommitted] = useState(false);
+  const [committed, setCommitted] = useState(draft.committed ?? false);
+  const [sessionMode, setSessionMode] = useState<"practice" | "game">(draft.sessionMode ?? "practice");
   const [showReset, setShowReset] = useState(false);
   const drag = useDragReorder(rows, setRows);
-  const [weather, setWeather] = useState("");
+  const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
 
   // Session card state
@@ -190,6 +194,8 @@ export default function KickoffSessionPage() {
       setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
       setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
       setSessionKicks(cloudDraft.sessionKicks ?? []);
+      setCommitted(cloudDraft.committed ?? false);
+      if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
     }
   });
 
@@ -204,8 +210,11 @@ export default function KickoffSessionPage() {
       plannedRowIndices,
       currentKickIdx,
       sessionKicks,
+      committed,
+      committedWeather: committed ? weather : undefined,
+      sessionMode,
     });
-  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks]);
+  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, committed, weather, sessionMode]);
 
   // Load draft from cloud if local is empty
   useEffect(() => {
@@ -223,6 +232,8 @@ export default function KickoffSessionPage() {
             setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
             setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
             setSessionKicks(cloudDraft.sessionKicks ?? []);
+            setCommitted(cloudDraft.committed ?? false);
+            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
           }
         }
       });
@@ -543,7 +554,7 @@ export default function KickoffSessionPage() {
 
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;
-    commitPractice(pendingKicks, undefined, weather);
+    commitPractice(pendingKicks, undefined, weather, sessionMode);
     setPendingKicks(null);
     setCommitted(true);
   };
@@ -560,6 +571,7 @@ export default function KickoffSessionPage() {
     setWeather("");
     setCommitted(false);
     setSessionActive(false);
+    setSessionMode("practice");
   };
 
   const handleUndo = () => {
@@ -580,11 +592,30 @@ export default function KickoffSessionPage() {
   //  SESSION MODE — step-through card view
   // ════════════════════════════════════════════════════════════
   if (sessionActive) {
+    const isGame = sessionMode === "game";
     return (
       <>
-        <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+        <main className={clsx(
+          "flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0",
+          isGame && "bg-gradient-to-b from-red-950/30 to-transparent"
+        )}>
           {/* Left: Entry card + Session log */}
-          <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
+          <div className={clsx(
+            "lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r min-h-0",
+            isGame ? "border-red-500/30" : "border-border"
+          )}>
+            {isGame && (
+              <div className="bg-red-500 text-white px-4 py-2 flex items-center justify-center gap-2 shrink-0 shadow-lg">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                </span>
+                <span className="text-sm font-black uppercase tracking-widest">GAME MODE — KO</span>
+                <span className="text-xs opacity-80 ml-2">
+                  {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </span>
+              </div>
+            )}
             <div className="overflow-y-auto border-b border-border">
               <div className="p-4 space-y-4">
                 {committed ? (
@@ -603,7 +634,7 @@ export default function KickoffSessionPage() {
                           onClick={handleNewSession}
                           className="text-xs px-3 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
                         >
-                          New Session
+                          ← Back to Log
                         </button>
                       </div>
 
@@ -932,7 +963,7 @@ export default function KickoffSessionPage() {
                   onClick={handleNewSession}
                   className="btn-primary text-xs py-2 px-5 ml-auto"
                 >
-                  New Session
+                  ← Back to Log
                 </button>
               ) : (
                 <>
@@ -1048,6 +1079,32 @@ export default function KickoffSessionPage() {
               </div>
             )}
           </div>
+          {/* Practice / Game mode toggle */}
+          {!isAthlete && !isContinuing && (
+            <div className="px-4 py-2 border-b border-border shrink-0 flex items-center gap-2">
+              <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Mode</span>
+              <div className="flex rounded-input border border-border overflow-hidden">
+                <button
+                  onClick={() => setSessionMode("practice")}
+                  className={clsx(
+                    "px-3 py-1 text-xs font-semibold transition-colors",
+                    sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                  )}
+                >
+                  Practice
+                </button>
+                <button
+                  onClick={() => setSessionMode("game")}
+                  className={clsx(
+                    "px-3 py-1 text-xs font-semibold transition-colors border-l border-border",
+                    sessionMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
+                  )}
+                >
+                  GAME
+                </button>
+              </div>
+            </div>
+          )}
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               {!manualEntry && (
@@ -1056,7 +1113,7 @@ export default function KickoffSessionPage() {
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
                 </span>
               )}
-              {manualEntry ? "Practice Log" : "Live Practice Log"}
+              {sessionMode === "game" ? (manualEntry ? "Game Log" : "Live Game Log") : (manualEntry ? "Practice Log" : "Live Practice Log")}
               {isContinuing && (
                 <span className="text-accent text-xs font-normal">
                   ({sessionKicks.length} logged)

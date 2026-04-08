@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useEffect,
 } from "react";
-import type { PuntEntry, PuntAthleteStats, Session } from "@/types";
+import type { PuntEntry, PuntAthleteStats, Session, SessionMode } from "@/types";
 import {
   emptyPuntStats,
   processPunt,
@@ -17,7 +17,8 @@ import {
 } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
+import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import { useAuth } from "@/lib/auth";
 
 interface PuntStateData {
@@ -30,7 +31,7 @@ interface PuntStateData {
 interface PuntContextValue extends PuntStateData {
   addAthletes: (names: string[]) => void;
   removeAthlete: (name: string) => void;
-  commitPractice: (entries: PuntEntry[], label?: string, weather?: string) => Session;
+  commitPractice: (entries: PuntEntry[], label?: string, weather?: string, mode?: SessionMode) => Session;
   undoLastCommit: () => boolean;
   resetAll: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
@@ -60,7 +61,12 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       let saved: PuntStateData | null = null;
-      const tid = getTeamId();
+      // Wait briefly for team ID to be set by AppProviders after auth resolves
+      let tid = getTeamId();
+      for (let i = 0; i < 10 && !tid; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        tid = getTeamId();
+      }
 
       // Try team_data first (shared across team members)
       if (tid && tid !== "local-dev") {
@@ -102,6 +108,18 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     loadData();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Poll team_data for remote updates (changes made on other devices)
+  useTeamDataSync<PuntStateData>("punt_data", (remote) => {
+    if (!remote) return;
+    const stats = { ...remote.stats };
+    (remote.athletes || []).forEach((a) => {
+      if (!stats[a]) stats[a] = emptyPuntStats();
+    });
+    const migrated = { ...remote, stats };
+    setState(migrated);
+    localSet("PUNT", migrated);
+  });
+
   const addAthletes = useCallback((names: string[]) => {
     setState((prev) => {
       const existing = new Set(prev.athletes);
@@ -132,7 +150,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const commitPractice = useCallback((entries: PuntEntry[], label?: string, weather?: string): Session => {
+  const commitPractice = useCallback((entries: PuntEntry[], label?: string, weather?: string, mode: SessionMode = "practice"): Session => {
     const session: Session = {
       id: genId(),
       teamId: "local",
@@ -140,18 +158,22 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       label: label ?? sessionLabel(),
       date: new Date().toISOString(),
       weather: weather || undefined,
+      mode,
       entries,
     };
     setState((prev) => {
       const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
       const newHistory = [...prev.history, session];
       let newStats = { ...prev.stats };
-      entries.forEach((e) => { newStats = processPunt(e, newStats); });
+      if (mode !== "game") {
+        entries.forEach((e) => { newStats = processPunt(e, newStats); });
+      }
       const next = { ...prev, stats: newStats, history: newHistory, snapshot };
       localSet("PUNT", next);
       const tid = getTeamId();
       if (tid && tid !== "local-dev") {
-        teamSet(tid, "punt_data", next);
+        // Critical: committed session must reach cloud immediately, not debounced
+        teamSetImmediate(tid, "punt_data", next);
       }
       return next;
     });
@@ -165,7 +187,9 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       const newHistory = JSON.parse(JSON.stringify(prev.snapshot)) as Session[];
       const newStats = recomputePuntStats(
         prev.athletes,
-        newHistory.map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] }))
+        newHistory
+          .filter((s) => s.mode !== "game")
+          .map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] }))
       );
       const next = { ...prev, history: newHistory, snapshot: null, stats: newStats };
       localSet("PUNT", next);
@@ -220,7 +244,9 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
       const newStats = recomputePuntStats(
         prev.athletes,
-        newHistory.map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] }))
+        newHistory
+          .filter((s) => s.mode !== "game")
+          .map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] }))
       );
       const next = { ...prev, history: newHistory, stats: newStats };
       localSet("PUNT", next);

@@ -99,6 +99,9 @@ export interface PuntEntry {
   poochLandingYardLine?: number;
   starred?: boolean;
   kickNum?: number;
+  // Game mode: absolute field position 0..100 (own goal line to opponent goal line)
+  los?: number;
+  landingYL?: number;
 }
 
 // ─── Punt stats ─────────────────────────────────────────────────────────────
@@ -191,6 +194,8 @@ export interface LongSnapAthleteStats {
 
 // ─── Session ─────────────────────────────────────────────────────────────────
 
+export type SessionMode = "practice" | "game";
+
 export interface Session {
   id: string;
   teamId: string;
@@ -198,6 +203,7 @@ export interface Session {
   label: string;
   date: string;
   weather?: string;
+  mode?: SessionMode; // undefined = practice (legacy)
   entries?: FGKick[] | PuntEntry[] | KickoffEntry[] | LongSnapEntry[];
 }
 

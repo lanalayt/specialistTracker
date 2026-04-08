@@ -22,29 +22,53 @@ function formatLabel(dateStr: string): string {
 export default function PuntHistoryPage() {
   const { history, updateSessionDate, updateSessionWeather, deleteSession } = usePunt();
   const { isAthlete } = useAuth();
+  const [modeFilter, setModeFilter] = useState<"practice" | "game">("practice");
+  const filteredHistory = history.filter((s) =>
+    modeFilter === "game" ? s.mode === "game" : s.mode !== "game"
+  );
   const [selectedId, setSelectedId] = useState<string | null>(
-    history[history.length - 1]?.id ?? null
+    filteredHistory[filteredHistory.length - 1]?.id ?? null
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
 
-  const selected = history.find((s) => s.id === selectedId);
+  const selected = filteredHistory.find((s) => s.id === selectedId);
   const punts = (selected?.entries ?? []) as PuntEntry[];
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
       {/* Session list */}
       <div className="lg:w-64 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto shrink-0">
-        <div className="p-4 border-b border-border">
+        <div className="p-4 border-b border-border space-y-2">
+          <div className="flex rounded-input border border-border overflow-hidden">
+            <button
+              onClick={() => { setModeFilter("practice"); setSelectedId(null); }}
+              className={clsx(
+                "flex-1 px-2 py-1 text-[10px] font-semibold transition-colors",
+                modeFilter === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+              )}
+            >
+              Practice
+            </button>
+            <button
+              onClick={() => { setModeFilter("game"); setSelectedId(null); }}
+              className={clsx(
+                "flex-1 px-2 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+                modeFilter === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
+              )}
+            >
+              GAME
+            </button>
+          </div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-            Sessions ({history.length})
+            Sessions ({filteredHistory.length})
           </p>
         </div>
-        {history.length === 0 ? (
-          <p className="text-xs text-muted p-4">No sessions yet</p>
+        {filteredHistory.length === 0 ? (
+          <p className="text-xs text-muted p-4">No {modeFilter} sessions yet</p>
         ) : (
           <div className="divide-y divide-border/30">
-            {[...history].reverse().map((s: Session) => {
+            {[...filteredHistory].reverse().map((s: Session) => {
               const sp = (s.entries ?? []) as PuntEntry[];
               return (
                 <button
@@ -52,7 +76,7 @@ export default function PuntHistoryPage() {
                   onClick={() => setSelectedId(s.id)}
                   className={clsx(
                     "w-full text-left px-4 py-3 transition-colors hover:bg-surface-2",
-                    selectedId === s.id && "bg-accent/10 border-l-2 border-accent"
+                    selectedId === s.id && (modeFilter === "game" ? "bg-red-500/10 border-l-2 border-red-500" : "bg-accent/10 border-l-2 border-accent")
                   )}
                 >
                   <p className="text-sm font-semibold text-slate-200">{s.label}</p>

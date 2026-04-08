@@ -187,6 +187,26 @@ function PuntStatsView({
     return result;
   }, [athletes, history, puntTypes, statsMap, puntFilter]);
 
+  // Compute per-athlete pooch landing YL from filtered history
+  const poochYLStats = useMemo(() => {
+    const result: Record<string, { att: number; total: number }> = {};
+    athletes.forEach((a) => { result[a] = { att: 0, total: 0 }; });
+    history.forEach((session) => {
+      (session.entries ?? []).forEach((p) => {
+        if (puntFilter && !puntFilter(p)) return;
+        const isPooch = typeof p.type === "string" && p.type.toUpperCase().includes("POOCH");
+        if (!isPooch) return;
+        if (p.poochLandingYardLine == null) return;
+        if (!result[p.athlete]) result[p.athlete] = { att: 0, total: 0 };
+        result[p.athlete].att += 1;
+        result[p.athlete].total += p.poochLandingYardLine;
+      });
+    });
+    return result;
+  }, [athletes, history, puntFilter]);
+
+  const hasPoochData = Object.values(poochYLStats).some((s) => s.att > 0);
+
   return (
     <div className="space-y-4">
       {/* Overall */}
@@ -194,6 +214,35 @@ function PuntStatsView({
         <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall {label}</p>
         <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.overall} />
       </section>
+
+      {/* Pooch Landing Yard Line */}
+      {hasPoochData && (
+        <section className="card-2">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Pooch — Avg Landing YL</p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr>
+                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
+                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Pooches</th>
+                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {athletes.filter((a) => poochYLStats[a]?.att > 0).map((a) => {
+                const s = poochYLStats[a];
+                const avg = (s.total / s.att).toFixed(1);
+                return (
+                  <tr key={a} className="hover:bg-surface/30 transition-colors">
+                    <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a}</td>
+                    <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{s.att}</td>
+                    <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{avg}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {/* By Type */}
       <CollapsibleSection title="By Type">
@@ -247,6 +296,7 @@ export default function PuntingStatisticsPage() {
   const [puntTypes, setPuntTypes] = useState(DEFAULT_PUNT_TYPES);
   const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"all" | "starred">("all");
+  const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
   const dateFilter = useDateRangeFilter();
 
   const [includeLiveReps, setIncludeLiveReps] = useState(() => {
@@ -270,9 +320,13 @@ export default function PuntingStatisticsPage() {
     setTypeLabels(map);
   }, []);
 
+  const modeHistory = useMemo(() => {
+    return history.filter((s) => gameMode === "game" ? s.mode === "game" : s.mode !== "game");
+  }, [history, gameMode]);
+
   const filteredHistory = useMemo(() => {
-    return dateFilter.filterByDate(history as { date?: string; entries?: PuntEntry[] }[]);
-  }, [history, dateFilter.mode, dateFilter.range]) as { entries?: PuntEntry[] }[];
+    return dateFilter.filterByDate(modeHistory as { date?: string; entries?: PuntEntry[] }[]);
+  }, [modeHistory, dateFilter.mode, dateFilter.range]) as { entries?: PuntEntry[] }[];
 
   const hasStarred = useMemo(() => {
     return filteredHistory.some((s) =>
@@ -281,9 +335,9 @@ export default function PuntingStatisticsPage() {
   }, [filteredHistory]);
 
   const baseStats = useMemo(() => {
-    if (dateFilter.mode === "all") return stats;
+    if (gameMode === "practice" && dateFilter.mode === "all") return stats;
     return computeFilteredPuntStats(athletes, filteredHistory, () => true);
-  }, [dateFilter.mode, filteredHistory, stats, athletes]);
+  }, [gameMode, dateFilter.mode, filteredHistory, stats, athletes]);
 
   const displayStats = useMemo(() => {
     if (!hasStarred || includeLiveReps) return baseStats;
@@ -295,18 +349,40 @@ export default function PuntingStatisticsPage() {
     return computeFilteredPuntStats(athletes, filteredHistory, (p) => !!p.starred);
   }, [hasStarred, athletes, filteredHistory]);
 
-  const hasData = athletes.some((a) => stats[a]?.overall.att > 0);
-
-  if (!hasData) {
-    return (
-      <main className="p-4 lg:p-6 max-w-5xl">
-        <p className="text-sm text-muted">No punting data yet. Commit a practice to see statistics.</p>
-      </main>
-    );
-  }
+  const hasAnyData = history.length > 0;
 
   return (
     <main className="p-4 lg:p-6 space-y-4 max-w-5xl overflow-y-auto">
+      {/* Practice / Game mode toggle */}
+      <div className="flex rounded-input border border-border overflow-hidden w-fit">
+        <button
+          onClick={() => setGameMode("practice")}
+          className={clsx(
+            "px-4 py-1.5 text-xs font-semibold transition-colors",
+            gameMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+          )}
+        >
+          Practice Stats
+        </button>
+        <button
+          onClick={() => setGameMode("game")}
+          className={clsx(
+            "px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+            gameMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
+          )}
+        >
+          GAME Stats
+        </button>
+      </div>
+
+      {!hasAnyData && (
+        <p className="text-sm text-muted">No punting data yet. Commit a session to see statistics.</p>
+      )}
+
+      {hasAnyData && modeHistory.length === 0 && (
+        <p className="text-sm text-muted">No {gameMode} sessions yet.</p>
+      )}
+
       {/* Header with date filter + export */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />

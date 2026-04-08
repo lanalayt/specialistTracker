@@ -246,6 +246,7 @@ function FGStatsView({
 export default function KickingStatisticsPage() {
   const { athletes, stats, history } = useFG();
   const [tab, setTab] = useState<"all" | "starred">("all");
+  const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
   const dateFilter = useDateRangeFilter();
 
   const [includeLiveReps, setIncludeLiveReps] = useState(() => {
@@ -261,9 +262,13 @@ export default function KickingStatisticsPage() {
     try { localStorage.setItem("fg_include_live_reps", String(val)); } catch {}
   };
 
+  const modeHistory = useMemo(() => {
+    return history.filter((s) => gameMode === "game" ? s.mode === "game" : s.mode !== "game");
+  }, [history, gameMode]);
+
   const filteredHistory = useMemo(() => {
-    return dateFilter.filterByDate(history as { date?: string; entries?: FGKick[] }[]);
-  }, [history, dateFilter.mode, dateFilter.range]) as { entries?: FGKick[] }[];
+    return dateFilter.filterByDate(modeHistory as { date?: string; entries?: FGKick[] }[]);
+  }, [modeHistory, dateFilter.mode, dateFilter.range]) as { entries?: FGKick[] }[];
 
   const hasStarred = useMemo(() => {
     return filteredHistory.some((s) =>
@@ -272,9 +277,10 @@ export default function KickingStatisticsPage() {
   }, [filteredHistory]);
 
   const baseStats = useMemo(() => {
-    if (dateFilter.mode === "all") return stats;
+    // Use cached stats only when showing practice + all dates (what cache represents)
+    if (gameMode === "practice" && dateFilter.mode === "all") return stats;
     return computeFilteredStats(athletes, filteredHistory, () => true);
-  }, [dateFilter.mode, filteredHistory, stats, athletes]);
+  }, [gameMode, dateFilter.mode, filteredHistory, stats, athletes]);
 
   const displayStats = useMemo(() => {
     if (!hasStarred || includeLiveReps) return baseStats;
@@ -286,18 +292,40 @@ export default function KickingStatisticsPage() {
     return computeFilteredStats(athletes, filteredHistory, (k) => !!k.starred);
   }, [hasStarred, athletes, filteredHistory]);
 
-  const hasData = athletes.some((a) => stats[a]?.overall.att > 0);
-
-  if (!hasData) {
-    return (
-      <main className="p-4 lg:p-6 max-w-5xl">
-        <p className="text-sm text-muted">No kicking data yet. Commit a practice to see statistics.</p>
-      </main>
-    );
-  }
+  const hasAnyData = history.length > 0;
 
   return (
     <main className="p-4 lg:p-6 space-y-4 max-w-5xl overflow-y-auto">
+      {/* Practice / Game mode toggle */}
+      <div className="flex rounded-input border border-border overflow-hidden w-fit">
+        <button
+          onClick={() => setGameMode("practice")}
+          className={clsx(
+            "px-4 py-1.5 text-xs font-semibold transition-colors",
+            gameMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+          )}
+        >
+          Practice Stats
+        </button>
+        <button
+          onClick={() => setGameMode("game")}
+          className={clsx(
+            "px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+            gameMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
+          )}
+        >
+          GAME Stats
+        </button>
+      </div>
+
+      {!hasAnyData && (
+        <p className="text-sm text-muted">No kicking data yet. Commit a session to see statistics.</p>
+      )}
+
+      {hasAnyData && modeHistory.length === 0 && (
+        <p className="text-sm text-muted">No {gameMode} sessions yet.</p>
+      )}
+
       {/* Header with date filter + export */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />

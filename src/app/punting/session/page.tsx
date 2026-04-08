@@ -6,6 +6,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
 import { PuntSessionSummary } from "@/components/ui/PuntSessionSummary";
 import { PuntFieldStrip } from "@/components/ui/PuntFieldStrip";
+import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, PuntType, PuntHash } from "@/types";
 import { PUNT_HASHES } from "@/types";
 import clsx from "clsx";
@@ -27,6 +28,13 @@ function checkPuntOutliers(yards: number, hangTime: number, opTime: number): str
   return warnings;
 }
 
+// Pooch punt types are tracked separately — distance is not counted in
+// overall averages. Instead we track the yard line where the ball landed.
+function isPoochType(type: string | undefined | null): boolean {
+  if (!type) return false;
+  return type.toUpperCase().includes("POOCH");
+}
+
 // ── Table row (planning phase) ────────────────────────────────
 interface LogRow {
   athlete: string;
@@ -36,6 +44,7 @@ interface LogRow {
   hangTime: string;
   opTime: string;
   directionalAccuracy: string;
+  poochYL?: string;
   starred?: boolean;
 }
 
@@ -45,6 +54,7 @@ interface PartialPuntInput {
   opTime: string;
   directionalAccuracy: 0 | 0.5 | 1;
   starred: boolean;
+  poochYL?: string;
 }
 
 interface SessionDraft {
@@ -56,6 +66,9 @@ interface SessionDraft {
   currentPuntIdx: number;
   sessionPunts: PuntEntry[];
   partialInputs?: Record<number, PartialPuntInput>;
+  committed?: boolean;
+  committedWeather?: string;
+  sessionMode?: "practice" | "game";
 }
 
 const emptyRow = (): LogRow => ({
@@ -66,6 +79,7 @@ const emptyRow = (): LogRow => ({
   hangTime: "",
   opTime: "",
   directionalAccuracy: "",
+  poochYL: "",
   starred: false,
 });
 
@@ -155,13 +169,14 @@ export default function PuntingSessionPage() {
     (draft.sessionPunts ?? []).map((p, i) => p.kickNum != null ? p : { ...p, kickNum: i + 1 })
   );
   const [pendingPunts, setPendingPunts] = useState<PuntEntry[] | null>(null);
-  const [committed, setCommitted] = useState(false);
+  const [committed, setCommitted] = useState(draft.committed ?? false);
+  const [sessionMode, setSessionMode] = useState<"practice" | "game">(draft.sessionMode ?? "practice");
   const [showReset, setShowReset] = useState(false);
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
   const typeLabels: Record<string, string> = {};
   puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
   const drag = useDragReorder(rows, setRows);
-  const [weather, setWeather] = useState("");
+  const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
 
   // Guard: skip sync callbacks that arrive shortly after a local save
@@ -179,6 +194,8 @@ export default function PuntingSessionPage() {
       setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
       setSessionPunts(cloudDraft.sessionPunts ?? []);
       if (cloudDraft.partialInputs) setPartialInputs(cloudDraft.partialInputs);
+      setCommitted(cloudDraft.committed ?? false);
+      if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
     }
   });
 
@@ -205,6 +222,8 @@ export default function PuntingSessionPage() {
             setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
             setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
             setSessionPunts(cloudDraft.sessionPunts ?? []);
+            setCommitted(cloudDraft.committed ?? false);
+            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
           }
         }
       });
@@ -241,6 +260,12 @@ export default function PuntingSessionPage() {
   const [opTime, setOpTime] = useState(initPartial?.opTime ?? "");
   const [directionalAccuracy, setDirectionalAccuracy] = useState<0 | 0.5 | 1>(initPartial?.directionalAccuracy ?? 1);
   const [starred, setStarred] = useState(initPartial?.starred ?? false);
+  // Game-mode only: LOS and Landing yard line (absolute 0..100 field positions)
+  const [los, setLos] = useState<string>("");
+  const [landingYL, setLandingYL] = useState<string>("");
+  const [returnYardsInput, setReturnYardsInput] = useState<string>("");
+  // Pooch punt only: yard line where ball landed (practice log mode)
+  const [poochYL, setPoochYL] = useState<string>(initPartial?.poochYL ?? "");
 
   // Persist draft on every relevant state change
   useEffect(() => {
@@ -258,8 +283,11 @@ export default function PuntingSessionPage() {
       currentPuntIdx,
       sessionPunts,
       partialInputs: mergedPartials,
+      committed,
+      committedWeather: committed ? weather : undefined,
+      sessionMode,
     });
-  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred]);
+  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, weather, sessionMode]);
 
   // ── Kick numbering helpers (track by planned position) ──────
   const loggedKickNums = new Set(sessionPunts.map(p => p.kickNum));
@@ -347,7 +375,7 @@ export default function PuntingSessionPage() {
 
   const planningFields = (r: LogRow) => r.athlete || r.type || r.hash;
   const allFields = (r: LogRow) =>
-    r.athlete || r.type || r.hash || r.yards || r.hangTime || r.opTime || r.directionalAccuracy;
+    r.athlete || r.type || r.hash || r.yards || r.hangTime || r.opTime || r.directionalAccuracy || r.poochYL;
 
   const filledRows = rows
     .map((r, i) => ({ r, i }))
@@ -440,18 +468,23 @@ export default function PuntingSessionPage() {
 
     setErrorRows(new Set());
 
-    const punts: PuntEntry[] = filled.map(({ r }) => ({
-      athleteId: r.athlete,
-      athlete: r.athlete,
-      type: r.type as PuntType,
-      hash: r.hash as PuntHash,
-      yards: parseInt(r.yards) || 0,
-      hangTime: parseFloat(r.hangTime) || 0,
-      opTime: parseFloat(r.opTime) || 0,
-      landingZones: [],
-      directionalAccuracy: parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1,
-      starred: r.starred || undefined,
-    }));
+    const punts: PuntEntry[] = filled.map(({ r }) => {
+      const isPooch = isPoochType(r.type);
+      return {
+        athleteId: r.athlete,
+        athlete: r.athlete,
+        type: r.type as PuntType,
+        hash: r.hash as PuntHash,
+        // Pooch punts: no distance contribution
+        yards: isPooch ? 0 : (parseInt(r.yards) || 0),
+        hangTime: parseFloat(r.hangTime) || 0,
+        opTime: parseFloat(r.opTime) || 0,
+        landingZones: [],
+        directionalAccuracy: parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1,
+        starred: r.starred || undefined,
+        poochLandingYardLine: isPooch && r.poochYL ? (parseInt(r.poochYL) || 0) : undefined,
+      };
+    });
 
     // Outlier check across all punts
     const allWarnings: string[] = [];
@@ -490,9 +523,24 @@ export default function PuntingSessionPage() {
   // ── Session card: log current punt ───────────────────────────
   const handleLogPunt = () => {
     const plan = plannedPunts[currentPuntIdx];
-    const ydsVal = parseInt(yards) || 0;
     const htVal = parseFloat(hangTime) || 0;
     const otVal = parseFloat(opTime) || 0;
+    const losVal = los !== "" ? parseInt(los) || 0 : undefined;
+    const landingYLVal = landingYL !== "" ? parseInt(landingYL) || 0 : undefined;
+    // In game mode, compute gross yards automatically from LOS and landing YL
+    let ydsVal = parseInt(yards) || 0;
+    let retVal: number | undefined = undefined;
+    if (sessionMode === "game" && losVal != null && landingYLVal != null) {
+      ydsVal = Math.max(0, landingYLVal - losVal);
+      retVal = returnYardsInput !== "" ? parseInt(returnYardsInput) || 0 : undefined;
+    }
+    // Pooch punts (practice mode): don't track distance — track landing YL only
+    const isPooch = isPoochType(plan.type);
+    let poochYLVal: number | undefined = undefined;
+    if (isPooch && sessionMode !== "game") {
+      poochYLVal = poochYL !== "" ? parseInt(poochYL) || 0 : undefined;
+      ydsVal = 0; // pooch punts do not contribute to distance averages
+    }
     const punt: PuntEntry = {
       athleteId: plan.athlete,
       athlete: plan.athlete,
@@ -505,6 +553,10 @@ export default function PuntingSessionPage() {
       directionalAccuracy,
       starred: starred || undefined,
       kickNum: currentPuntIdx + 1,
+      los: losVal,
+      landingYL: landingYLVal,
+      returnYards: retVal,
+      poochLandingYardLine: poochYLVal,
     };
 
     // Outlier check
@@ -561,6 +613,19 @@ export default function PuntingSessionPage() {
       setOpTime("");
       setDirectionalAccuracy(1);
       setStarred(!!plannedPunts[advanceIdx]?.starred);
+      setPoochYL("");
+    }
+    // Game mode: after logging, seed next LOS with (landingYL - returnYards),
+    // and clear landing YL + return for the next punt.
+    if (sessionMode === "game") {
+      const landed = landingYL !== "" ? parseInt(landingYL) || 0 : undefined;
+      const ret = returnYardsInput !== "" ? parseInt(returnYardsInput) || 0 : 0;
+      if (landed != null) {
+        // Next punting team LOS = where the return ended = landing - return
+        setLos(String(Math.max(0, landed - ret)));
+      }
+      setLandingYL("");
+      setReturnYardsInput("");
     }
     setShowAthleteDropdown(false);
   };
@@ -613,7 +678,7 @@ export default function PuntingSessionPage() {
 
   const handleConfirmCommit = () => {
     if (!pendingPunts) return;
-    commitPractice(pendingPunts, undefined, weather);
+    commitPractice(pendingPunts, undefined, weather, sessionMode);
     setPendingPunts(null);
     setCommitted(true);
   };
@@ -631,6 +696,7 @@ export default function PuntingSessionPage() {
     setWeather("");
     setCommitted(false);
     setSessionActive(false);
+    setSessionMode("practice");
   };
 
   const handleUndo = () => {
@@ -666,11 +732,30 @@ export default function PuntingSessionPage() {
   //  SESSION MODE — step-through card view
   // ════════════════════════════════════════════════════════════
   if (sessionActive) {
+    const isGame = sessionMode === "game";
     return (
       <>
-        <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+        <main className={clsx(
+          "flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0",
+          isGame && "bg-gradient-to-b from-red-950/30 to-transparent"
+        )}>
           {/* Left: Entry card + Session log */}
-          <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
+          <div className={clsx(
+            "lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r min-h-0",
+            isGame ? "border-red-500/30" : "border-border"
+          )}>
+            {isGame && (
+              <div className="bg-red-500 text-white px-4 py-2 flex items-center justify-center gap-2 shrink-0 shadow-lg">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                </span>
+                <span className="text-sm font-black uppercase tracking-widest">GAME MODE — PUNT</span>
+                <span className="text-xs opacity-80 ml-2">
+                  {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </span>
+              </div>
+            )}
             <div className="overflow-y-auto border-b border-border">
               <div className="p-4 space-y-4">
                 {committed ? (
@@ -689,7 +774,7 @@ export default function PuntingSessionPage() {
                           onClick={handleNewSession}
                           className="text-xs px-3 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
                         >
-                          New Session
+                          ← Back to Log
                         </button>
                       </div>
 
@@ -942,20 +1027,77 @@ export default function PuntingSessionPage() {
                       </div>
                     </div>
 
+                    {/* Game mode: LOS + Landing YL (auto-calculates distance) */}
+                    {sessionMode === "game" && (
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <p className="label">LOS</p>
+                          <input
+                            className="input text-center text-lg font-bold"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="yd"
+                            value={los}
+                            onChange={(e) => setLos(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <p className="label">Landing YL</p>
+                          <input
+                            className="input text-center text-lg font-bold"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="yd"
+                            value={landingYL}
+                            onChange={(e) => setLandingYL(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <p className="label">Distance</p>
+                          <div className="input text-center text-lg font-bold text-accent">
+                            {(() => {
+                              const l = parseInt(los) || 0;
+                              const ly = parseInt(landingYL) || 0;
+                              const d = Math.max(0, ly - l);
+                              return d > 0 ? `${d}` : "—";
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Yards + Hang Time + Opp Time */}
                     <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <p className="label">Yards</p>
-                        <input
-                          className="input text-center text-lg font-bold"
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder="yds"
-                          value={yards}
-                          onChange={(e) => setYards(e.target.value)}
-                        />
-                      </div>
+                      {sessionMode !== "game" && !isPoochType(currentPlan?.type) && (
+                        <div>
+                          <p className="label">Yards</p>
+                          <input
+                            className="input text-center text-lg font-bold"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="yds"
+                            value={yards}
+                            onChange={(e) => setYards(e.target.value)}
+                          />
+                        </div>
+                      )}
+                      {sessionMode !== "game" && isPoochType(currentPlan?.type) && (
+                        <div>
+                          <p className="label">Landing YL</p>
+                          <input
+                            className="input text-center text-lg font-bold text-accent"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="yd"
+                            value={poochYL}
+                            onChange={(e) => setPoochYL(e.target.value)}
+                          />
+                        </div>
+                      )}
                       <div>
                         <p className="label">Hang Time (s)</p>
                         <input
@@ -978,7 +1120,37 @@ export default function PuntingSessionPage() {
                           onChange={handleAutoDecimalChange(setOpTime)}
                         />
                       </div>
+                      {sessionMode === "game" && (
+                        <div>
+                          <p className="label">Return Yds</p>
+                          <input
+                            className="input text-center text-lg font-bold"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="ret"
+                            value={returnYardsInput}
+                            onChange={(e) => setReturnYardsInput(e.target.value)}
+                          />
+                        </div>
+                      )}
                     </div>
+
+                    {/* Game mode: Net yards auto display */}
+                    {sessionMode === "game" && (
+                      <div className="text-xs text-muted text-center">
+                        Net: <span className="text-slate-200 font-semibold">
+                          {(() => {
+                            const l = parseInt(los) || 0;
+                            const ly = parseInt(landingYL) || 0;
+                            const ret = parseInt(returnYardsInput) || 0;
+                            const gross = Math.max(0, ly - l);
+                            const net = gross - ret;
+                            return gross > 0 ? `${net} yd` : "—";
+                          })()}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Directional Accuracy */}
                     <div>
@@ -1100,7 +1272,7 @@ export default function PuntingSessionPage() {
                   onClick={handleNewSession}
                   className="btn-primary text-xs py-2 px-5 ml-auto"
                 >
-                  New Session
+                  ← Back to Log
                 </button>
               ) : (
                 <>
@@ -1145,7 +1317,23 @@ export default function PuntingSessionPage() {
                 </div>
               );
             })()}
-            <PuntFieldStrip punts={sessionPunts} />
+            {sessionMode === "game" ? (
+              <PuntFieldView
+                punts={sessionPunts.filter((p) => p.los != null && p.landingYL != null)}
+                currentPunt={
+                  los !== "" && landingYL !== "" && parseInt(landingYL) > parseInt(los)
+                    ? {
+                        los: parseInt(los) || 0,
+                        landingYL: parseInt(landingYL) || 0,
+                        hash: currentPlan?.hash || "M",
+                        direction: directionalAccuracy,
+                      }
+                    : null
+                }
+              />
+            ) : (
+              <PuntFieldStrip punts={sessionPunts} />
+            )}
           </div>
         </main>
 
@@ -1209,6 +1397,32 @@ export default function PuntingSessionPage() {
               </div>
             )}
           </div>
+          {/* Practice / Game mode toggle */}
+          {!isAthlete && !isContinuing && (
+            <div className="px-4 py-2 border-b border-border shrink-0 flex items-center gap-2">
+              <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Mode</span>
+              <div className="flex rounded-input border border-border overflow-hidden">
+                <button
+                  onClick={() => setSessionMode("practice")}
+                  className={clsx(
+                    "px-3 py-1 text-xs font-semibold transition-colors",
+                    sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                  )}
+                >
+                  Practice
+                </button>
+                <button
+                  onClick={() => setSessionMode("game")}
+                  className={clsx(
+                    "px-3 py-1 text-xs font-semibold transition-colors border-l border-border",
+                    sessionMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
+                  )}
+                >
+                  GAME
+                </button>
+              </div>
+            </div>
+          )}
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               {!manualEntry && (
@@ -1217,7 +1431,7 @@ export default function PuntingSessionPage() {
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
                 </span>
               )}
-              {manualEntry ? "Practice Log" : "Live Practice Log"}
+              {sessionMode === "game" ? (manualEntry ? "Game Log" : "Live Game Log") : (manualEntry ? "Practice Log" : "Live Practice Log")}
               {isContinuing && (
                 <span className="text-accent text-xs font-normal">
                   ({sessionPunts.length} logged)
@@ -1352,13 +1566,24 @@ export default function PuntingSessionPage() {
                       {manualEntry && (
                         <>
                           <td className="py-1 px-1">
-                            <input
-                              type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
-                              value={row.yards}
-                              onChange={(e) => updateRow(idx, "yards", e.target.value)}
-                              readOnly={isAthlete}
-                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
-                            />
+                            {isPoochType(row.type) ? (
+                              <input
+                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="YL"
+                                value={row.poochYL ?? ""}
+                                onChange={(e) => updateRow(idx, "poochYL", e.target.value)}
+                                readOnly={isAthlete}
+                                title="Pooch landing yard line"
+                                className="w-full bg-transparent border border-accent/40 rounded px-1 py-1 text-xs text-accent text-center focus:outline-none focus:border-accent/60"
+                              />
+                            ) : (
+                              <input
+                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
+                                value={row.yards}
+                                onChange={(e) => updateRow(idx, "yards", e.target.value)}
+                                readOnly={isAthlete}
+                                className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
+                              />
+                            )}
                           </td>
                           <td className="py-1 px-1">
                             <input

@@ -5,27 +5,48 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { FGProvider, useFG } from "@/lib/fgContext";
+import { PuntProvider, usePunt } from "@/lib/puntContext";
+import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import clsx from "clsx";
 
 function AthletesContent() {
-  const { athletes, stats, addAthletes, removeAthlete } = useFG();
+  const fg = useFG();
+  const punt = usePunt();
+  const kickoff = useKickoff();
   const [newName, setNewName] = useState("");
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+
+  // Master list = union of all sports' athletes, preserving order
+  const allAthletes = Array.from(
+    new Set([...fg.athletes, ...punt.athletes, ...kickoff.athletes])
+  );
 
   const handleAdd = () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    addAthletes([trimmed]);
+    fg.addAthletes([trimmed]);
+    punt.addAthletes([trimmed]);
+    kickoff.addAthletes([trimmed]);
     setNewName("");
   };
 
   const handleRemove = (name: string) => {
     if (confirmRemove === name) {
-      removeAthlete(name);
+      fg.removeAthlete(name);
+      punt.removeAthlete(name);
+      kickoff.removeAthlete(name);
       setConfirmRemove(null);
     } else {
       setConfirmRemove(name);
     }
+  };
+
+  const inSports = (name: string): string[] => {
+    const sports: string[] = [];
+    if (fg.athletes.includes(name)) sports.push("FG");
+    if (punt.athletes.includes(name)) sports.push("Punt");
+    if (kickoff.athletes.includes(name)) sports.push("KO");
+    return sports;
   };
 
   return (
@@ -36,7 +57,7 @@ function AthletesContent() {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-100">Athletes</h1>
           <p className="text-sm text-muted mt-1">
-            Manage athletes across all sport modules
+            Master list across all phases. Adding adds to every phase; removing removes from every phase.
           </p>
         </div>
 
@@ -66,14 +87,13 @@ function AthletesContent() {
         {/* Athlete list */}
         <div className="card space-y-1">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-            Athletes ({athletes.length})
+            Athletes ({allAthletes.length})
           </p>
-          {athletes.length === 0 ? (
+          {allAthletes.length === 0 ? (
             <p className="text-sm text-muted py-2">No athletes yet</p>
           ) : (
-            athletes.map((a) => {
-              const s = stats[a];
-              const hasData = s && s.overall.att > 0;
+            allAthletes.map((a) => {
+              const sports = inSports(a);
               return (
                 <div
                   key={a}
@@ -84,14 +104,15 @@ function AthletesContent() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-100">{a}</p>
-                    {hasData && (
-                      <p className="text-xs text-muted">
-                        {s.overall.att} kicks · {Math.round((s.overall.made / s.overall.att) * 100)}% make
-                      </p>
-                    )}
-                    {!hasData && (
-                      <p className="text-xs text-muted">No kicks yet</p>
-                    )}
+                    <div className="flex gap-1 mt-1">
+                      {sports.length === 0 ? (
+                        <span className="text-[10px] text-muted italic">not on any roster</span>
+                      ) : sports.map((sp) => (
+                        <span key={sp} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold border border-accent/20">
+                          {sp}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <RoleGuard coachOnly>
                     <button
@@ -113,9 +134,8 @@ function AthletesContent() {
           )}
         </div>
 
-        {/* Note about data retention */}
         <p className="text-xs text-muted">
-          Removing an athlete from the list preserves their historical stats. Their kicks remain in session history and cumulative stats.
+          Removing an athlete takes them off every phase roster but preserves their historical stats in session history.
         </p>
       </main>
     </div>
@@ -125,11 +145,15 @@ function AthletesContent() {
 export default function AthletesPage() {
   return (
     <FGProvider>
-      <div className="flex overflow-x-hidden max-w-[100vw]">
-        <Sidebar />
-        <AthletesContent />
-        <MobileNav />
-      </div>
+      <PuntProvider>
+        <KickoffProvider>
+          <div className="flex overflow-x-hidden max-w-[100vw]">
+            <Sidebar />
+            <AthletesContent />
+            <MobileNav />
+          </div>
+        </KickoffProvider>
+      </PuntProvider>
     </FGProvider>
   );
 }
