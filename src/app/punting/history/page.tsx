@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePunt } from "@/lib/puntContext";
 import { useAuth } from "@/lib/auth";
+import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, Session } from "@/types";
 import clsx from "clsx";
 
@@ -197,6 +198,14 @@ export default function PuntHistoryPage() {
                 </div>
               )}
             </div>
+            {/* Game chart — field view for games */}
+            {selected.mode === "game" && punts.some((p) => p.los != null && p.landingYL != null) && (
+              <div className="mb-4">
+                <PuntFieldView
+                  punts={punts.filter((p) => p.los != null && p.landingYL != null)}
+                />
+              </div>
+            )}
             {/* Per-athlete recap stats */}
             {(() => {
               const byAthlete: Record<string, PuntEntry[]> = {};

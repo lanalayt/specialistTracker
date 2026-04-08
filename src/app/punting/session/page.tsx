@@ -46,6 +46,10 @@ interface LogRow {
   directionalAccuracy: string;
   poochYL?: string;
   starred?: boolean;
+  // Game-mode only
+  los?: string;
+  landingYL?: string;
+  returnYards?: string;
 }
 
 interface PartialPuntInput {
@@ -83,6 +87,9 @@ const emptyRow = (): LogRow => ({
   directionalAccuracy: "",
   poochYL: "",
   starred: false,
+  los: "",
+  landingYL: "",
+  returnYards: "",
 });
 
 function loadDraft(): SessionDraft | null {
@@ -175,6 +182,11 @@ export default function PuntingSessionPage() {
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(draft.sessionMode ?? "practice");
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
+
+  // Game mode forces manual entry (no live session)
+  useEffect(() => {
+    if (sessionMode === "game" && !manualEntry) setManualEntry(true);
+  }, [sessionMode, manualEntry]);
   const [showReset, setShowReset] = useState(false);
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
   const typeLabels: Record<string, string> = {};
@@ -455,6 +467,61 @@ export default function PuntingSessionPage() {
   };
 
   // ── Manual Entry: commit directly from table ─────────────────
+  // ── Game mode: save a single row to sessionPunts without committing the whole session ──
+  const handleSaveGameRow = (rowIdx: number) => {
+    const r = rows[rowIdx];
+    if (!r || !r.athlete) {
+      setErrorRows((prev) => new Set([...prev, rowIdx]));
+      return;
+    }
+    const losVal = r.los !== "" && r.los != null ? parseInt(r.los) || 0 : 0;
+    const landingYLVal = r.landingYL !== "" && r.landingYL != null ? parseInt(r.landingYL) || 0 : 0;
+    const gross = Math.max(0, landingYLVal - losVal);
+    const htVal = parseFloat(r.hangTime) || 0;
+    const retVal = r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined;
+    const daVal = r.directionalAccuracy !== "" && r.directionalAccuracy != null ? (parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1) : 1;
+    // Filled index (position among filled rows)
+    const filledIdx = filledIndices.indexOf(rowIdx);
+    const kickNum = filledIdx >= 0 ? filledIdx + 1 : sessionPunts.length + 1;
+    const punt: PuntEntry = {
+      athleteId: r.athlete,
+      athlete: r.athlete,
+      type: r.type as PuntType,
+      hash: r.hash as PuntHash,
+      yards: gross,
+      hangTime: htVal,
+      opTime: 0,
+      landingZones: [],
+      directionalAccuracy: daVal,
+      kickNum,
+      los: losVal,
+      landingYL: landingYLVal,
+      returnYards: retVal,
+    };
+    setSessionPunts((prev) => {
+      // Replace if already saved for this kickNum, else append
+      const existing = prev.findIndex((p) => p.kickNum === kickNum);
+      if (existing >= 0) {
+        const next = [...prev];
+        next[existing] = punt;
+        return next;
+      }
+      return [...prev, punt];
+    });
+    setErrorRows((prev) => {
+      const next = new Set(prev);
+      next.delete(rowIdx);
+      return next;
+    });
+  };
+
+  const handleUnsaveGameRow = (rowIdx: number) => {
+    const filledIdx = filledIndices.indexOf(rowIdx);
+    if (filledIdx < 0) return;
+    const kickNum = filledIdx + 1;
+    setSessionPunts((prev) => prev.filter((p) => p.kickNum !== kickNum));
+  };
+
   const handleManualCommit = () => {
     const filled = rows
       .map((r, i) => ({ r, i }))
@@ -1318,39 +1385,78 @@ export default function PuntingSessionPage() {
             </div>
           </div>
 
-          {/* Right: Live stats */}
-          <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-            {(() => {
-              const sAtt = sessionPunts.length;
-              const ydsCount = sessionPunts.filter((p) => p.yards > 0).length;
-              const htCount = sessionPunts.filter((p) => p.hangTime > 0).length;
-              const sAvgYds = ydsCount > 0 ? (sessionPunts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0) / ydsCount).toFixed(1) : "—";
-              const sAvgHT = htCount > 0 ? (sessionPunts.reduce((s, p) => s + (p.hangTime > 0 ? p.hangTime : 0), 0) / htCount).toFixed(2) : "—";
-              const sLong = sessionPunts.reduce((max, p) => Math.max(max, p.yards || 0), 0);
-              return (
-                <div className="grid grid-cols-3 gap-2">
-                  <StatCard label="Avg Yards" value={sAvgYds} accent glow />
-                  <StatCard label="Avg Hang" value={sAtt > 0 ? `${sAvgHT}s` : "—"} />
-                  <StatCard label="Long Punt" value={sLong > 0 ? `${sLong} yd` : "—"} />
-                </div>
-              );
-            })()}
+          {/* Right: Live stats + field view */}
+          <div className={clsx(
+            "lg:w-[40%] overflow-y-auto p-4 space-y-3",
+            isGame && "bg-gradient-to-b from-red-950/20 to-transparent"
+          )}>
             {sessionMode === "game" ? (
-              <PuntFieldView
-                punts={sessionPunts.filter((p) => p.los != null && p.landingYL != null)}
-                currentPunt={
-                  los !== "" && landingYL !== "" && parseInt(landingYL) > parseInt(los)
-                    ? {
-                        los: parseInt(los) || 0,
-                        landingYL: parseInt(landingYL) || 0,
-                        hash: currentPlan?.hash || "M",
-                        direction: directionalAccuracy,
-                      }
-                    : null
-                }
-              />
+              <>
+                {/* Game-specific stat cards */}
+                {(() => {
+                  const punts = sessionPunts;
+                  const sAtt = punts.length;
+                  const ydsCount = punts.filter((p) => p.yards > 0).length;
+                  const totalGross = punts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
+                  const totalRet = punts.reduce((s, p) => s + (p.returnYards || 0), 0);
+                  const avgGross = ydsCount > 0 ? (totalGross / ydsCount).toFixed(1) : "—";
+                  const avgNet = ydsCount > 0 ? ((totalGross - totalRet) / ydsCount).toFixed(1) : "—";
+                  const htCount = punts.filter((p) => p.hangTime > 0).length;
+                  const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
+                  // Inside-20 = landing YL >= 80 (opponent 20 or closer to end zone)
+                  const inside20 = punts.filter((p) => (p.landingYL ?? 0) >= 80).length;
+                  // Pin inside 5 = landing YL >= 95
+                  const pin5 = punts.filter((p) => (p.landingYL ?? 0) >= 95).length;
+                  const daCount = punts.filter((p) => p.directionalAccuracy != null).length;
+                  const daSum = punts.reduce((s, p) => s + (p.directionalAccuracy ?? 0), 0);
+                  const dirPct = daCount > 0 ? `${Math.round((daSum / daCount) * 100)}%` : "—";
+                  return (
+                    <>
+                      <div className="text-[10px] font-black text-red-400 uppercase tracking-widest">Game Stats · {sAtt} punt{sAtt !== 1 ? "s" : ""}</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <StatCard label="Avg Gross" value={avgGross} accent glow />
+                        <StatCard label="Avg Net" value={avgNet} />
+                        <StatCard label="Avg Hang" value={avgHang !== "—" ? `${avgHang}s` : "—"} />
+                        <StatCard label="Dir %" value={dirPct} />
+                        <StatCard label="Inside 20" value={inside20} />
+                        <StatCard label="Pin < 5" value={pin5} />
+                      </div>
+                    </>
+                  );
+                })()}
+                <PuntFieldView
+                  punts={sessionPunts.filter((p) => p.los != null && p.landingYL != null)}
+                  currentPunt={
+                    los !== "" && landingYL !== "" && parseInt(landingYL) > parseInt(los)
+                      ? {
+                          los: parseInt(los) || 0,
+                          landingYL: parseInt(landingYL) || 0,
+                          hash: currentPlan?.hash || "M",
+                          direction: directionalAccuracy,
+                        }
+                      : null
+                  }
+                />
+              </>
             ) : (
-              <PuntFieldStrip punts={sessionPunts} />
+              <>
+                {(() => {
+                  const sAtt = sessionPunts.length;
+                  const ydsCount = sessionPunts.filter((p) => p.yards > 0).length;
+                  const htCount = sessionPunts.filter((p) => p.hangTime > 0).length;
+                  const sAvgYds = ydsCount > 0 ? (sessionPunts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0) / ydsCount).toFixed(1) : "—";
+                  const sAvgHT = htCount > 0 ? (sessionPunts.reduce((s, p) => s + (p.hangTime > 0 ? p.hangTime : 0), 0) / htCount).toFixed(2) : "—";
+                  const sLong = sessionPunts.reduce((max, p) => Math.max(max, p.yards || 0), 0);
+                  return (
+                    <div className="grid grid-cols-3 gap-2">
+                      <StatCard label="Avg Yards" value={sAvgYds} accent glow />
+                      <StatCard label="Avg Hang" value={sAtt > 0 ? `${sAvgHT}s` : "—"} />
+                      <StatCard label="Long Punt" value={sLong > 0 ? `${sLong} yd` : "—"} />
+                    </div>
+                  );
+                })()}
+                <PuntFieldStrip punts={sessionPunts} />
+              </>
             )}
           </div>
         </main>
@@ -1415,31 +1521,31 @@ export default function PuntingSessionPage() {
               </div>
             )}
           </div>
-          {/* Practice / Game mode toggle */}
+          {/* Practice / Game mode toggle — prominent */}
           {!isAthlete && !isContinuing && (
-            <div className="px-4 py-2 border-b border-border shrink-0 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Mode</span>
-                <div className="flex rounded-input border border-border overflow-hidden">
-                  <button
-                    onClick={() => setSessionMode("practice")}
-                    className={clsx(
-                      "px-3 py-1 text-xs font-semibold transition-colors",
-                      sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-                    )}
-                  >
-                    Practice
-                  </button>
-                  <button
-                    onClick={() => setSessionMode("game")}
-                    className={clsx(
-                      "px-3 py-1 text-xs font-semibold transition-colors border-l border-border",
-                      sessionMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
-                    )}
-                  >
-                    GAME
-                  </button>
-                </div>
+            <div className={clsx(
+              "px-4 py-3 border-b shrink-0 space-y-2 transition-colors",
+              sessionMode === "game" ? "bg-red-500/10 border-red-500/40" : "border-border"
+            )}>
+              <div className="flex rounded-input border border-border overflow-hidden">
+                <button
+                  onClick={() => setSessionMode("practice")}
+                  className={clsx(
+                    "flex-1 px-3 py-2 text-sm font-bold transition-colors",
+                    sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                  )}
+                >
+                  PRACTICE
+                </button>
+                <button
+                  onClick={() => setSessionMode("game")}
+                  className={clsx(
+                    "flex-1 px-3 py-2 text-sm font-bold transition-colors border-l border-border",
+                    sessionMode === "game" ? "bg-red-500 text-white shadow-lg shadow-red-500/30" : "text-red-400/60 hover:text-red-400"
+                  )}
+                >
+                  🏈 GAME
+                </button>
               </div>
               {sessionMode === "game" && (
                 <div className="grid grid-cols-2 gap-2">
@@ -1503,7 +1609,17 @@ export default function PuntingSessionPage() {
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                     Pos
                   </th>
-                  {manualEntry && (
+                  {manualEntry && sessionMode === "game" && (
+                    <>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">LOS</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Land YL</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Hang Time</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
+                    </>
+                  )}
+                  {manualEntry && sessionMode !== "game" && (
                     <>
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                         Yards
@@ -1601,7 +1717,88 @@ export default function PuntingSessionPage() {
                           </select>
                         )}
                       </td>
-                      {manualEntry && (
+                      {manualEntry && sessionMode === "game" && (() => {
+                        const filledIdx = filledIndices.indexOf(idx);
+                        const kickNum = filledIdx + 1;
+                        const isSaved = sessionPunts.some((p) => p.kickNum === kickNum);
+                        return (
+                          <>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yd"
+                                value={row.los ?? ""}
+                                onChange={(e) => updateRow(idx, "los", e.target.value)}
+                                readOnly={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yd"
+                                value={row.landingYL ?? ""}
+                                onChange={(e) => updateRow(idx, "landingYL", e.target.value)}
+                                readOnly={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text" inputMode="numeric" placeholder="sec"
+                                value={row.hangTime}
+                                onChange={(e) => {
+                                  const digits = e.target.value.replace(/\D/g, "");
+                                  updateRow(idx, "hangTime", digits ? formatAutoDecimal(digits) : "");
+                                }}
+                                readOnly={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
+                                value={row.returnYards ?? ""}
+                                onChange={(e) => updateRow(idx, "returnYards", e.target.value)}
+                                readOnly={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <select
+                                value={row.directionalAccuracy}
+                                onChange={(e) => updateRow(idx, "directionalAccuracy", e.target.value)}
+                                disabled={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              >
+                                <option value="">—</option>
+                                {DA_OPTIONS.map((o) => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-1 px-1 text-center">
+                              {isSaved ? (
+                                <button
+                                  onClick={() => handleUnsaveGameRow(idx)}
+                                  className="text-[10px] px-1 text-make/60 hover:text-miss transition-colors"
+                                  title="Unsave this punt"
+                                >
+                                  ✓ Saved
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleSaveGameRow(idx)}
+                                  disabled={isAthlete || !row.athlete}
+                                  className="text-[10px] px-2 py-1 rounded bg-red-500 text-white font-bold hover:bg-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                  title="Add this punt to the game"
+                                >
+                                  Save
+                                </button>
+                              )}
+                            </td>
+                          </>
+                        );
+                      })()}
+                      {manualEntry && sessionMode !== "game" && (
                         <>
                           <td className="py-1 px-1">
                             {isPoochType(row.type) ? (
@@ -1785,7 +1982,7 @@ export default function PuntingSessionPage() {
                   Clear Log
                 </button>
               </div>
-              {!isContinuing && (
+              {!isContinuing && sessionMode !== "game" && (
                 <button
                   onClick={() => setManualEntry((v) => !v)}
                   className={clsx(
@@ -1798,7 +1995,15 @@ export default function PuntingSessionPage() {
                   {manualEntry ? "Manual Entry ●" : "Manual Entry"}
                 </button>
               )}
-              {manualEntry && !isContinuing ? (
+              {sessionMode === "game" ? (
+                <button
+                  onClick={handleCommitReady}
+                  disabled={sessionPunts.length === 0}
+                  className="btn-primary text-xs py-2 px-5 bg-red-500 hover:bg-red-400 disabled:opacity-40"
+                >
+                  Commit Game{sessionPunts.length > 0 ? ` (${sessionPunts.length})` : ""}
+                </button>
+              ) : manualEntry && !isContinuing ? (
                 <button
                   onClick={handleManualCommit}
                   disabled={filledCount === 0}
@@ -1821,9 +2026,47 @@ export default function PuntingSessionPage() {
           </div>
         </div>
 
-        {/* Right: Today's session stats by athlete */}
+        {/* Right: Game field view OR practice stats */}
         <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-          {(() => {
+          {sessionMode === "game" ? (
+            <>
+              <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">
+                Game Chart · {sessionPunts.length} punt{sessionPunts.length !== 1 ? "s" : ""}
+              </p>
+              {(() => {
+                const punts = sessionPunts;
+                const sAtt = punts.length;
+                const ydsCount = punts.filter((p) => p.yards > 0).length;
+                const totalGross = punts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
+                const totalRet = punts.reduce((s, p) => s + (p.returnYards || 0), 0);
+                const avgGross = ydsCount > 0 ? (totalGross / ydsCount).toFixed(1) : "—";
+                const avgNet = ydsCount > 0 ? ((totalGross - totalRet) / ydsCount).toFixed(1) : "—";
+                const htCount = punts.filter((p) => p.hangTime > 0).length;
+                const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
+                const inside20 = punts.filter((p) => (p.landingYL ?? 0) >= 80).length;
+                const pin5 = punts.filter((p) => (p.landingYL ?? 0) >= 95).length;
+                const daCount = punts.filter((p) => p.directionalAccuracy != null).length;
+                const daSum = punts.reduce((s, p) => s + (p.directionalAccuracy ?? 0), 0);
+                const dirPct = daCount > 0 ? `${Math.round((daSum / daCount) * 100)}%` : "—";
+                if (sAtt === 0) {
+                  return <p className="text-xs text-muted">Save a punt to see it on the field and calculate stats.</p>;
+                }
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatCard label="Avg Gross" value={avgGross} accent glow />
+                    <StatCard label="Avg Net" value={avgNet} />
+                    <StatCard label="Avg Hang" value={avgHang !== "—" ? `${avgHang}s` : "—"} />
+                    <StatCard label="Dir %" value={dirPct} />
+                    <StatCard label="Inside 20" value={inside20} />
+                    <StatCard label="Pin < 5" value={pin5} />
+                  </div>
+                );
+              })()}
+              <PuntFieldView
+                punts={sessionPunts.filter((p) => p.los != null && p.landingYL != null)}
+              />
+            </>
+          ) : (() => {
             const todayPunts = sessionPunts;
             const athleteNames = [...new Set(todayPunts.map((p) => p.athlete))];
 

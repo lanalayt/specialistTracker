@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { usePunt } from "@/lib/puntContext";
+import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import { processPunt, emptyPuntStats } from "@/lib/stats";
 import { PUNT_HASHES } from "@/types";
 import type { PuntHash, PuntStatBucket, PuntAthleteStats, PuntEntry } from "@/types";
@@ -207,6 +208,18 @@ function PuntStatsView({
 
   const hasPoochData = Object.values(poochYLStats).some((s) => s.att > 0);
 
+  // All game punts with LOS + landing YL for the field view
+  const gamePunts = useMemo(() => {
+    const all: PuntEntry[] = [];
+    history.forEach((session) => {
+      (session.entries ?? []).forEach((p) => {
+        if (puntFilter && !puntFilter(p)) return;
+        if (p.los != null && p.landingYL != null) all.push(p);
+      });
+    });
+    return all;
+  }, [history, puntFilter]);
+
   return (
     <div className="space-y-4">
       {/* Overall */}
@@ -214,6 +227,14 @@ function PuntStatsView({
         <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall {label}</p>
         <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.overall} />
       </section>
+
+      {/* Game chart — shows all punts with LOS + landing YL */}
+      {gamePunts.length > 0 && (
+        <section className="card-2">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Game Chart — All Punts</p>
+          <PuntFieldView punts={gamePunts} />
+        </section>
+      )}
 
       {/* Pooch Landing Yard Line */}
       {hasPoochData && (
