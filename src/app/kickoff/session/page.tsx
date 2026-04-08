@@ -6,6 +6,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { ZoneBarChart } from "@/components/ui/Chart";
 import { KickoffSessionLog } from "@/components/ui/KickoffSessionLog";
 import { KickoffSessionSummary } from "@/components/ui/KickoffSessionSummary";
+import { KickoffFieldView } from "@/components/ui/KickoffFieldView";
 import type { KickoffEntry, KickoffType, KickoffDirection } from "@/types";
 import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES } from "@/types";
 import clsx from "clsx";
@@ -31,6 +32,11 @@ interface LogRow {
   distance: string;
   hangTime: string;
   direction: string;
+  // Game mode only
+  los?: string;
+  landingYL?: string;
+  returnYards?: string;
+  touchback?: boolean;
 }
 
 interface SessionDraft {
@@ -54,6 +60,10 @@ const emptyRow = (): LogRow => ({
   distance: "",
   hangTime: "",
   direction: "",
+  los: "",
+  landingYL: "",
+  returnYards: "",
+  touchback: false,
 });
 
 function loadDraft(): SessionDraft | null {
@@ -87,6 +97,19 @@ const DEFAULT_KO_DIRS = [
   { id: "0.5", label: "0.5" },
   { id: "OB", label: "OB" },
 ];
+
+// Parse a yard-line input ("-20", "+25", "50") into 0..100 field position
+function parseYardLine(input: string | undefined | null): number {
+  if (input == null) return NaN;
+  const trimmed = String(input).trim();
+  if (!trimmed) return NaN;
+  const match = trimmed.match(/^([+-]?)(\d+)$/);
+  if (!match) return NaN;
+  const sign = match[1] || "-";
+  const n = parseInt(match[2], 10);
+  if (isNaN(n) || n < 0 || n > 50) return NaN;
+  return sign === "-" ? n : 100 - n;
+}
 
 function loadKickoffSettings(): { types: { id: string; label: string }[]; directions: { id: string; label: string }[] } {
   if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS };
@@ -173,6 +196,11 @@ export default function KickoffSessionPage() {
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(draft.sessionMode ?? "practice");
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
+
+  // Game mode forces manual entry (no live session)
+  useEffect(() => {
+    if (sessionMode === "game" && !manualEntry) setManualEntry(true);
+  }, [sessionMode, manualEntry]);
   const [showReset, setShowReset] = useState(false);
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
@@ -285,7 +313,7 @@ export default function KickoffSessionPage() {
 
   // ── Table helpers ────────────────────────────────────────────
   const updateRow = useCallback(
-    (idx: number, field: keyof LogRow, value: string) => {
+    (idx: number, field: keyof LogRow, value: string | boolean) => {
       setRows((prev) => {
         const next = [...prev];
         next[idx] = { ...next[idx], [field]: value };
@@ -400,6 +428,63 @@ export default function KickoffSessionPage() {
   // ── Unlock a locked row ──
   const handleUnlockRow = (filledIdx: number) => {
     setSessionKicks((prev) => prev.filter(k => (k.kickNum ?? 0) < filledIdx + 1));
+  };
+
+  // ── Game mode: save a single row to sessionKicks ──
+  // Kickoffs always tee from own 35 (field position 35). Distance determines landing.
+  const handleSaveGameRow = (rowIdx: number) => {
+    const r = rows[rowIdx];
+    if (!r || !r.athlete) {
+      setErrorRows((prev) => new Set([...prev, rowIdx]));
+      return;
+    }
+    const distance = parseInt(r.distance) || 0;
+    if (distance <= 0) {
+      alert("Distance is required.");
+      setErrorRows((prev) => new Set([...prev, rowIdx]));
+      return;
+    }
+    const htVal = parseFloat(r.hangTime) || 0;
+    const retVal = r.touchback ? 0 : (r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined);
+    const losVal = 35; // kickoff spot — own 35
+    const landingYLVal = Math.min(100, losVal + distance);
+    const filledIdx = filledIndices.indexOf(rowIdx);
+    const kickNum = filledIdx >= 0 ? filledIdx + 1 : sessionKicks.length + 1;
+    const kick: KickoffEntry = {
+      athleteId: r.athlete,
+      athlete: r.athlete,
+      type: r.type as KickoffType,
+      distance,
+      hangTime: htVal,
+      direction: (r.direction || "1") as KickoffDirection,
+      score: 0,
+      kickNum,
+      los: losVal,
+      landingYL: landingYLVal,
+      returnYards: retVal,
+      result: r.touchback ? "TB" : undefined,
+    };
+    setSessionKicks((prev) => {
+      const existing = prev.findIndex((k) => k.kickNum === kickNum);
+      if (existing >= 0) {
+        const next = [...prev];
+        next[existing] = kick;
+        return next;
+      }
+      return [...prev, kick];
+    });
+    setErrorRows((prev) => {
+      const next = new Set(prev);
+      next.delete(rowIdx);
+      return next;
+    });
+  };
+
+  const handleUnsaveGameRow = (rowIdx: number) => {
+    const filledIdx = filledIndices.indexOf(rowIdx);
+    if (filledIdx < 0) return;
+    const kickNum = filledIdx + 1;
+    setSessionKicks((prev) => prev.filter((k) => k.kickNum !== kickNum));
   };
 
   // ── Manual Entry: commit directly from table ─────────────────
@@ -1182,7 +1267,17 @@ export default function KickoffSessionPage() {
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">
                     Type
                   </th>
-                  {manualEntry && (
+                  {manualEntry && sessionMode === "game" && (
+                    <>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dist</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">HT</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Touchback">TB</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dir</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
+                    </>
+                  )}
+                  {manualEntry && sessionMode !== "game" && (
                     <>
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                         Dist
@@ -1259,7 +1354,83 @@ export default function KickoffSessionPage() {
                           </select>
                         )}
                       </td>
-                      {manualEntry && (
+                      {manualEntry && sessionMode === "game" && (() => {
+                        const isSaved = sessionKicks.some((k) => k.kickNum === filledIdx + 1);
+                        return (
+                          <>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
+                                value={row.distance}
+                                onChange={(e) => updateRow(idx, "distance", e.target.value)}
+                                readOnly={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text" inputMode="decimal" placeholder="sec"
+                                value={row.hangTime}
+                                onChange={(e) => updateRow(idx, "hangTime", e.target.value)}
+                                readOnly={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
+                                value={row.returnYards ?? ""}
+                                onChange={(e) => updateRow(idx, "returnYards", e.target.value)}
+                                readOnly={isAthlete || isSaved || !!row.touchback}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : row.touchback ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1 text-center">
+                              <input
+                                type="checkbox"
+                                checked={!!row.touchback}
+                                disabled={isAthlete || isSaved}
+                                onChange={(e) => updateRow(idx, "touchback", e.target.checked)}
+                                title="Touchback"
+                                className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <select
+                                value={row.direction}
+                                onChange={(e) => updateRow(idx, "direction", e.target.value)}
+                                disabled={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              >
+                                <option value="">—</option>
+                                {koDirs.map(({ id, label }) => (
+                                  <option key={id} value={id}>{label}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-1 px-1 text-center">
+                              {isSaved ? (
+                                <button
+                                  onClick={() => handleUnsaveGameRow(idx)}
+                                  className="text-[10px] px-1 text-make/60 hover:text-miss transition-colors"
+                                  title="Unlock this kickoff"
+                                >
+                                  ✓ Saved
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleSaveGameRow(idx)}
+                                  disabled={isAthlete || !row.athlete}
+                                  className="text-[10px] px-2 py-1 rounded bg-red-500 text-white font-bold hover:bg-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Save
+                                </button>
+                              )}
+                            </td>
+                          </>
+                        );
+                      })()}
+                      {manualEntry && sessionMode !== "game" && (
                         <>
                           <td className="py-1 px-1">
                             <input
@@ -1298,43 +1469,55 @@ export default function KickoffSessionPage() {
                         {isLocked ? (
                           !isAthlete && (
                             <div className="flex items-center gap-0.5 justify-center">
-                              <button
-                                onClick={() => {
-                                  const filled = rows
-                                    .map((r, ri) => ({ r, i: ri }))
-                                    .filter(({ r }) => r.athlete || r.type);
-                                  const planned = filled.map(({ r }) => ({
-                                    athlete: r.athlete,
-                                    type: r.type as KickoffType,
-                                  }));
-                                  setPlannedKicks(planned);
-                                  setPlannedRowIndices(filled.map(({ i: ri }) => ri));
-                                  setCurrentKickIdx(filledIdx);
-                                  setEditingKickIdx(filledIdx);
-                                  const logged = sessionKicks[filledIdx];
-                                  if (logged) {
-                                    setDistance(String(logged.distance));
-                                    setHangTime(String(logged.hangTime));
-                                    setDirection(logged.direction);
-                                  } else {
-                                    setDistance("");
-                                    setHangTime("");
-                                    setDirection("1" as KickoffDirection);
-                                  }
-                                  setSessionActive(true);
-                                }}
-                                className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
-                                title="Edit this kickoff's result"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => handleUnlockRow(filledIdx)}
-                                className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
-                                title="Unlock (removes this result and all after it)"
-                              >
-                                🔒
-                              </button>
+                              {sessionMode === "game" ? (
+                                <button
+                                  onClick={() => handleUnsaveGameRow(idx)}
+                                  className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
+                                  title="Unlock this kickoff for editing"
+                                >
+                                  ✏️
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      const filled = rows
+                                        .map((r, ri) => ({ r, i: ri }))
+                                        .filter(({ r }) => r.athlete || r.type);
+                                      const planned = filled.map(({ r }) => ({
+                                        athlete: r.athlete,
+                                        type: r.type as KickoffType,
+                                      }));
+                                      setPlannedKicks(planned);
+                                      setPlannedRowIndices(filled.map(({ i: ri }) => ri));
+                                      setCurrentKickIdx(filledIdx);
+                                      setEditingKickIdx(filledIdx);
+                                      const logged = sessionKicks[filledIdx];
+                                      if (logged) {
+                                        setDistance(String(logged.distance));
+                                        setHangTime(String(logged.hangTime));
+                                        setDirection(logged.direction);
+                                      } else {
+                                        setDistance("");
+                                        setHangTime("");
+                                        setDirection("1" as KickoffDirection);
+                                      }
+                                      setSessionActive(true);
+                                    }}
+                                    className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
+                                    title="Edit this kickoff's result"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => handleUnlockRow(filledIdx)}
+                                    className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
+                                    title="Unlock (removes this result and all after it)"
+                                  >
+                                    🔒
+                                  </button>
+                                </>
+                              )}
                             </div>
                           )
                         ) : (
@@ -1394,7 +1577,7 @@ export default function KickoffSessionPage() {
                   Clear Log
                 </button>
               </div>
-              {!isContinuing && (
+              {!isContinuing && sessionMode !== "game" && (
                 <button
                   onClick={() => setManualEntry((v) => !v)}
                   className={clsx(
@@ -1407,7 +1590,15 @@ export default function KickoffSessionPage() {
                   {manualEntry ? "Manual Entry ●" : "Manual Entry"}
                 </button>
               )}
-              {manualEntry && !isContinuing ? (
+              {sessionMode === "game" ? (
+                <button
+                  onClick={handleCommitReady}
+                  disabled={sessionKicks.length === 0}
+                  className="btn-primary text-xs py-2 px-5 bg-red-500 hover:bg-red-400 disabled:opacity-40"
+                >
+                  Commit Game{sessionKicks.length > 0 ? ` (${sessionKicks.length})` : ""}
+                </button>
+              ) : manualEntry && !isContinuing ? (
                 <button
                   onClick={handleManualCommit}
                   disabled={filledCount === 0}
@@ -1430,14 +1621,49 @@ export default function KickoffSessionPage() {
           </div>
         </div>
 
-        {/* Right: Season stats */}
-        <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <StatCard label="TB Rate" value={tbRate} accent glow />
-            <StatCard label="Avg Dist" value={avgDist ? `${avgDist} yd` : "—"} />
-            <StatCard label="Avg Hang" value={avgHang ? `${avgHang}s` : "—"} />
-          </div>
-          <ZoneBarChart data={zoneData} />
+        {/* Right: Field view (game) or Season stats */}
+        <div className={clsx("lg:w-[40%] overflow-y-auto p-4 space-y-3", sessionMode === "game" && "bg-gradient-to-b from-red-950/20 to-transparent")}>
+          {sessionMode === "game" ? (
+            <>
+              <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">
+                Game Chart · {sessionKicks.length} kickoff{sessionKicks.length !== 1 ? "s" : ""}
+              </p>
+              {(() => {
+                const kicks = sessionKicks;
+                const sAtt = kicks.length;
+                const distCount = kicks.filter((k) => k.distance > 0).length;
+                const avgDistG = distCount > 0 ? (kicks.reduce((s, k) => s + k.distance, 0) / distCount).toFixed(1) : "—";
+                const htCount = kicks.filter((k) => k.hangTime > 0).length;
+                const avgHangG = htCount > 0 ? (kicks.reduce((s, k) => s + k.hangTime, 0) / htCount).toFixed(2) : "—";
+                const dirToNum = (d: string): number | null => d === "1" ? 1 : d === "0.5" ? 0.5 : d === "OB" ? 0 : null;
+                const dirVals = kicks.map((k) => dirToNum(k.direction)).filter((v): v is number => v != null);
+                const dirPct = dirVals.length > 0 ? `${Math.round((dirVals.reduce((s, v) => s + v, 0) / dirVals.length) * 100)}%` : "—";
+                const totalRet = kicks.reduce((s, k) => s + (k.returnYards || 0), 0);
+                const avgRet = sAtt > 0 ? (totalRet / sAtt).toFixed(1) : "—";
+                if (sAtt === 0) {
+                  return <p className="text-xs text-muted">Save a kickoff to see it on the field.</p>;
+                }
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatCard label="Avg Dist" value={avgDistG} accent glow />
+                    <StatCard label="Avg Hang" value={avgHangG !== "—" ? `${avgHangG}s` : "—"} />
+                    <StatCard label="Dir %" value={dirPct} />
+                    <StatCard label="Avg Ret" value={avgRet} />
+                  </div>
+                );
+              })()}
+              <KickoffFieldView kicks={sessionKicks.filter((k) => k.los != null && k.landingYL != null)} />
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <StatCard label="TB Rate" value={tbRate} accent glow />
+                <StatCard label="Avg Dist" value={avgDist ? `${avgDist} yd` : "—"} />
+                <StatCard label="Avg Hang" value={avgHang ? `${avgHang}s` : "—"} />
+              </div>
+              <ZoneBarChart data={zoneData} />
+            </>
+          )}
         </div>
       </main>
 

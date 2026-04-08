@@ -102,6 +102,7 @@ export interface PuntEntry {
   // Game mode: absolute field position 0..100 (own goal line to opponent goal line)
   los?: number;
   landingYL?: number;
+  fairCatch?: boolean;
 }
 
 // ─── Punt stats ─────────────────────────────────────────────────────────────
@@ -142,6 +143,9 @@ export interface KickoffEntry {
   result?: "TB" | "RETURN" | "OOB";
   returnYards?: number;
   kickNum?: number;
+  // Game mode only: absolute field positions 0..100
+  los?: number;
+  landingYL?: number;
 }
 
 // ─── Kickoff stats ──────────────────────────────────────────────────────────

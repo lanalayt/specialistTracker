@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFG } from "@/lib/fgContext";
 import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
+import { FGFieldView } from "@/components/ui/FGFieldView";
 import type { FGKick, Session } from "@/types";
 import clsx from "clsx";
 
@@ -204,6 +205,12 @@ export default function KickingHistoryPage() {
                 </div>
               )}
             </div>
+            {/* Game field view */}
+            {selected.mode === "game" && kicks.length > 0 && (
+              <div className="mb-4">
+                <FGFieldView kicks={kicks} />
+              </div>
+            )}
             {/* Per-athlete recap stats */}
             {(() => {
               const byAthlete: Record<string, FGKick[]> = {};

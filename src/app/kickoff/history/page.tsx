@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
 import { useAuth } from "@/lib/auth";
+import { KickoffFieldView } from "@/components/ui/KickoffFieldView";
 import type { KickoffEntry, Session } from "@/types";
 import clsx from "clsx";
 
@@ -197,6 +198,12 @@ export default function KickoffHistoryPage() {
                 </div>
               )}
             </div>
+            {/* Game field view */}
+            {selected.mode === "game" && entries.some((e) => e.los != null && e.landingYL != null) && (
+              <div className="mb-4">
+                <KickoffFieldView kicks={entries.filter((e) => e.los != null && e.landingYL != null)} />
+              </div>
+            )}
             {/* Per-athlete recap stats */}
             {(() => {
               const dirToNum = (d: string): number | null => {

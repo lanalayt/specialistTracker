@@ -5,6 +5,7 @@ import { useFG } from "@/lib/fgContext";
 import { LiveFGStats } from "@/components/ui/LiveSessionStats";
 import { SessionLog } from "@/components/ui/SessionLog";
 import { SessionSummary } from "@/components/ui/SessionSummary";
+import { FGFieldView } from "@/components/ui/FGFieldView";
 import { StatCard } from "@/components/ui/StatCard";
 import { makePct } from "@/lib/stats";
 import type { FGKick, FGPosition, FGResult } from "@/types";
@@ -178,6 +179,11 @@ export default function KickingSessionPage() {
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(draft.sessionMode ?? "practice");
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
+
+  // Game mode forces manual entry (no live session)
+  useEffect(() => {
+    if (sessionMode === "game" && !manualEntry) setManualEntry(true);
+  }, [sessionMode, manualEntry]);
   const [showReset, setShowReset] = useState(false);
   const [snapDistance, setSnapDistance] = useState(() => loadSnapDistance());
   const drag = useDragReorder(rows, setRows);
@@ -413,6 +419,50 @@ export default function KickingSessionPage() {
   const handleUnlockRow = (filledIdx: number) => {
     // Remove the sessionKick at this planned index and all after it
     setSessionKicks((prev) => prev.filter(k => (k.kickNum ?? 0) < filledIdx + 1));
+  };
+
+  // ── Game mode: save a single row to sessionKicks ──
+  const handleSaveGameRow = (rowIdx: number) => {
+    const r = rows[rowIdx];
+    if (!r || !r.athlete || !r.result) {
+      setErrorRows((prev) => new Set([...prev, rowIdx]));
+      return;
+    }
+    const filledIdx = filledIndices.indexOf(rowIdx);
+    const kickNum = filledIdx >= 0 ? filledIdx + 1 : sessionKicks.length + 1;
+    const isPAT = r.pos === "PAT";
+    const kick: FGKick = {
+      athleteId: r.athlete,
+      athlete: r.athlete,
+      dist: isPAT ? 0 : (parseInt(r.dist) || 0),
+      pos: r.pos as FGPosition,
+      result: r.result as FGResult,
+      score: parseInt(r.score) || 0,
+      isPAT: isPAT || undefined,
+      starred: r.starred || undefined,
+      kickNum,
+    };
+    setSessionKicks((prev) => {
+      const existing = prev.findIndex((k) => k.kickNum === kickNum);
+      if (existing >= 0) {
+        const next = [...prev];
+        next[existing] = kick;
+        return next;
+      }
+      return [...prev, kick];
+    });
+    setErrorRows((prev) => {
+      const next = new Set(prev);
+      next.delete(rowIdx);
+      return next;
+    });
+  };
+
+  const handleUnsaveGameRow = (rowIdx: number) => {
+    const filledIdx = filledIndices.indexOf(rowIdx);
+    if (filledIdx < 0) return;
+    const kickNum = filledIdx + 1;
+    setSessionKicks((prev) => prev.filter((k) => k.kickNum !== kickNum));
   };
 
   // ── Manual Entry: commit directly from table ─────────────────
@@ -1397,7 +1447,14 @@ export default function KickingSessionPage() {
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">
                     Pos
                   </th>
-                  {manualEntry && (
+                  {manualEntry && sessionMode === "game" && (
+                    <>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-24 border-b border-red-500/40 text-[10px]">Result</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Score</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
+                    </>
+                  )}
+                  {manualEntry && sessionMode !== "game" && (
                     <>
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-24 border-b border-border">
                         Result
@@ -1495,7 +1552,66 @@ export default function KickingSessionPage() {
                           </select>
                         )}
                       </td>
-                      {manualEntry && (
+                      {manualEntry && sessionMode === "game" && (() => {
+                        const isSaved = sessionKicks.some((k) => k.kickNum === filledIdx + 1);
+                        return (
+                          <>
+                            <td className="py-1 px-1">
+                              <select
+                                value={row.result}
+                                onChange={(e) => {
+                                  updateRow(idx, "result", e.target.value);
+                                  if (e.target.value.startsWith("X")) updateRow(idx, "score", "0");
+                                }}
+                                disabled={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              >
+                                <option value="">—</option>
+                                {(() => {
+                                  const makes = makeMode === "simple" ? ["YC"] : ["YL", "YC", "YR"];
+                                  const misses = missMode === "simple" ? ["XS"] : ["XL", "XS", "XR"];
+                                  return [...makes, ...misses].map((r) => (
+                                    <option key={r} value={r}>{RESULT_LABELS[r]}</option>
+                                  ));
+                                })()}
+                              </select>
+                            </td>
+                            <td className="py-1 px-1">
+                              <select
+                                value={row.score}
+                                onChange={(e) => updateRow(idx, "score", e.target.value)}
+                                disabled={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              >
+                                <option value="">—</option>
+                                {SCORE_OPTIONS.map((s) => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-1 px-1 text-center">
+                              {isSaved ? (
+                                <button
+                                  onClick={() => handleUnsaveGameRow(idx)}
+                                  className="text-[10px] px-1 text-make/60 hover:text-miss transition-colors"
+                                  title="Unlock this kick"
+                                >
+                                  ✓ Saved
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleSaveGameRow(idx)}
+                                  disabled={isAthlete || !row.athlete || !row.result}
+                                  className="text-[10px] px-2 py-1 rounded bg-red-500 text-white font-bold hover:bg-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Save
+                                </button>
+                              )}
+                            </td>
+                          </>
+                        );
+                      })()}
+                      {manualEntry && sessionMode !== "game" && (
                         <>
                           <td className="py-1 px-1">
                             <select
@@ -1553,47 +1669,59 @@ export default function KickingSessionPage() {
                         {!isAthlete && (
                           isLocked ? (
                             <div className="flex items-center gap-0.5 justify-center">
-                              <button
-                                onClick={() => {
-                                  const filled = rows
-                                    .map((r, ri) => ({ r, i: ri }))
-                                    .filter(({ r }) => r.athlete || r.dist || r.pos);
-                                  const planned = filled.map(({ r }) => ({
-                                    athlete: r.athlete,
-                                    dist: r.pos === "PAT" ? 0 : (parseInt(r.dist) || 0),
-                                    pos: r.pos as FGPosition,
-                                    isPAT: r.pos === "PAT" || undefined,
-                                    starred: r.starred || undefined,
-                                  }));
-                                  setPlannedKicks(planned);
-                                  setPlannedRowIndices(filled.map(({ i: ri }) => ri));
-                                  setCurrentKickIdx(filledIdx);
-                                  setDistInput(planned[filledIdx]?.isPAT ? "" : (planned[filledIdx]?.dist.toString() ?? ""));
-                                  setEditingKickIdx(filledIdx);
-                                  const logged = sessionKicks[filledIdx];
-                                  if (logged) {
-                                    setResult(logged.result);
-                                    setScore(logged.score);
-                                    setStarred(!!logged.starred);
-                                  } else {
-                                    setResult(null);
-                                    setScore(0);
-                                    setStarred(!!planned[filledIdx]?.starred);
-                                  }
-                                  setSessionActive(true);
-                                }}
-                                className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
-                                title="Edit this kick's result"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => handleUnlockRow(filledIdx)}
-                                className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
-                                title="Unlock (removes this result and all after it)"
-                              >
-                                🔒
-                              </button>
+                              {sessionMode === "game" ? (
+                                <button
+                                  onClick={() => handleUnsaveGameRow(idx)}
+                                  className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
+                                  title="Unlock this kick for editing"
+                                >
+                                  ✏️
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      const filled = rows
+                                        .map((r, ri) => ({ r, i: ri }))
+                                        .filter(({ r }) => r.athlete || r.dist || r.pos);
+                                      const planned = filled.map(({ r }) => ({
+                                        athlete: r.athlete,
+                                        dist: r.pos === "PAT" ? 0 : (parseInt(r.dist) || 0),
+                                        pos: r.pos as FGPosition,
+                                        isPAT: r.pos === "PAT" || undefined,
+                                        starred: r.starred || undefined,
+                                      }));
+                                      setPlannedKicks(planned);
+                                      setPlannedRowIndices(filled.map(({ i: ri }) => ri));
+                                      setCurrentKickIdx(filledIdx);
+                                      setDistInput(planned[filledIdx]?.isPAT ? "" : (planned[filledIdx]?.dist.toString() ?? ""));
+                                      setEditingKickIdx(filledIdx);
+                                      const logged = sessionKicks[filledIdx];
+                                      if (logged) {
+                                        setResult(logged.result);
+                                        setScore(logged.score);
+                                        setStarred(!!logged.starred);
+                                      } else {
+                                        setResult(null);
+                                        setScore(0);
+                                        setStarred(!!planned[filledIdx]?.starred);
+                                      }
+                                      setSessionActive(true);
+                                    }}
+                                    className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
+                                    title="Edit this kick's result"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => handleUnlockRow(filledIdx)}
+                                    className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
+                                    title="Unlock (removes this result and all after it)"
+                                  >
+                                    🔒
+                                  </button>
+                                </>
+                              )}
                             </div>
                           ) : (
                             <button
@@ -1655,7 +1783,7 @@ export default function KickingSessionPage() {
                     Clear Log
                   </button>
                 </div>
-                {!isContinuing && (
+                {!isContinuing && sessionMode !== "game" && (
                   <button
                     onClick={() => setManualEntry((v) => !v)}
                     className={clsx(
@@ -1668,7 +1796,15 @@ export default function KickingSessionPage() {
                     {manualEntry ? "Manual Entry ●" : "Manual Entry"}
                   </button>
                 )}
-                {manualEntry && !isContinuing ? (
+                {sessionMode === "game" ? (
+                  <button
+                    onClick={handleCommitReady}
+                    disabled={sessionKicks.length === 0}
+                    className="btn-primary text-xs py-2 px-5 bg-red-500 hover:bg-red-400 disabled:opacity-40"
+                  >
+                    Commit Game{sessionKicks.length > 0 ? ` (${sessionKicks.length})` : ""}
+                  </button>
+                ) : manualEntry && !isContinuing ? (
                   <button
                     onClick={handleManualCommit}
                     disabled={filledCount === 0}
@@ -1692,21 +1828,48 @@ export default function KickingSessionPage() {
           </div>
         </div>
 
-        {/* Right: Season stats */}
-        <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <StatCard
-              label="Season %"
-              value={makePct(totals.att, totals.made)}
-              accent
-              glow
-            />
-            <StatCard label="Attempts" value={totals.att || "—"} />
-            <StatCard
-              label="Long FG"
-              value={totals.longFG > 0 ? `${totals.longFG} yd` : "—"}
-            />
-          </div>
+        {/* Right: Field view (game) or Season stats */}
+        <div className={clsx("lg:w-[40%] overflow-y-auto p-4 space-y-3", sessionMode === "game" && "bg-gradient-to-b from-red-950/20 to-transparent")}>
+          {sessionMode === "game" ? (
+            <>
+              <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">
+                Game Chart · {sessionKicks.length} kick{sessionKicks.length !== 1 ? "s" : ""}
+              </p>
+              {(() => {
+                const kicks = sessionKicks.filter((k) => !k.isPAT);
+                const att = kicks.length;
+                const made = kicks.filter((k) => k.result.startsWith("Y")).length;
+                const longFG = kicks.reduce((m, k) => k.result.startsWith("Y") ? Math.max(m, k.dist) : m, 0);
+                const avgSc = att > 0 ? (kicks.reduce((s, k) => s + k.score, 0) / att).toFixed(1) : "—";
+                if (sessionKicks.length === 0) {
+                  return <p className="text-xs text-muted">Save a kick to see it on the field.</p>;
+                }
+                return (
+                  <div className="grid grid-cols-3 gap-2">
+                    <StatCard label="Made" value={`${made}/${att}`} accent glow />
+                    <StatCard label="%" value={makePct(att, made)} />
+                    <StatCard label="Long" value={longFG > 0 ? `${longFG}` : "—"} />
+                    <StatCard label="Avg Score" value={avgSc} />
+                  </div>
+                );
+              })()}
+              <FGFieldView kicks={sessionKicks} />
+            </>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              <StatCard
+                label="Season %"
+                value={makePct(totals.att, totals.made)}
+                accent
+                glow
+              />
+              <StatCard label="Attempts" value={totals.att || "—"} />
+              <StatCard
+                label="Long FG"
+                value={totals.longFG > 0 ? `${totals.longFG} yd` : "—"}
+              />
+            </div>
+          )}
         </div>
       </main>
 

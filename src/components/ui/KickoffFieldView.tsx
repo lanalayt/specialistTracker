@@ -1,27 +1,21 @@
 "use client";
 
 import React from "react";
-import type { PuntEntry } from "@/types";
+import type { KickoffEntry } from "@/types";
 
 /**
- * Side-view (west to east) field visualization for punts.
- *
- * Coordinate system:
- *   fieldX: 0..100 → own goal (left) to opponent goal (right)
- *   y: 0 (top of sky) to GROUND_Y (ground level)
- *
- * Each punt is drawn as a quadratic bezier arc from (LOS, ground) up and over
- * to (landing, ground). Arc height is proportional to hang time.
- * Return is a dashed horizontal line from landing back toward the LOS.
+ * Side-view kickoff field visualization.
+ * Renders each kickoff as a quadratic arc from the kicker's spot (own 35 by
+ * default, unless los is provided) to the landing yard line.
+ * Arc height is proportional to hang time.
  */
 
 interface Props {
-  punts: PuntEntry[];
-  currentPunt?: {
+  kicks: KickoffEntry[];
+  currentKick?: {
     los: number;
     landingYL: number;
     hangTime?: number;
-    direction?: 0 | 0.5 | 1;
   } | null;
 }
 
@@ -30,14 +24,12 @@ const H = 300;
 const PAD_X = 32;
 const GROUND_Y = 240;
 const SKY_TOP = 12;
-const FIELD_BOTTOM = 280; // below ground line, for yard labels
+const FIELD_BOTTOM = 280;
 
 function fieldXToPx(fieldX: number): number {
   return PAD_X + (fieldX / 100) * (W - 2 * PAD_X);
 }
 
-// Arc height from hang time (seconds)
-// 0s = minimal, 6s = tall
 function hangToArcHeight(hangTime: number | undefined): number {
   const h = Math.max(0.5, Math.min(hangTime ?? 3, 6));
   const maxH = GROUND_Y - SKY_TOP - 10;
@@ -50,9 +42,8 @@ function renderArc(
   landing: number,
   hangTime: number | undefined,
   returnYards: number | undefined,
-  fairCatch: boolean,
   opacity: number,
-  strokeColor = "#06b6d4",
+  strokeColor = "#f59e0b",
   strokeWidth = 2
 ) {
   if (landing <= los) return null;
@@ -60,14 +51,11 @@ function renderArc(
   const endX = fieldXToPx(landing);
   const midX = (startX + endX) / 2;
   const arcHeight = hangToArcHeight(hangTime);
-  // Quadratic bezier: for the curve to peak at (midX, groundY - arcHeight),
-  // control point needs to be at (midX, groundY - 2*arcHeight)
   const controlY = GROUND_Y - 2 * arcHeight;
   const d = `M ${startX} ${GROUND_Y} Q ${midX} ${controlY} ${endX} ${GROUND_Y}`;
 
-  // Return line: from landing back toward LOS
   let returnLine: React.ReactNode = null;
-  if (!fairCatch && (returnYards ?? 0) > 0) {
+  if ((returnYards ?? 0) > 0) {
     const retEndField = Math.max(los, landing - (returnYards ?? 0));
     const retEndX = fieldXToPx(retEndField);
     returnLine = (
@@ -76,7 +64,7 @@ function renderArc(
         y1={GROUND_Y}
         x2={retEndX}
         y2={GROUND_Y}
-        stroke="#f59e0b"
+        stroke="#f43f5e"
         strokeWidth={2}
         strokeDasharray="4,3"
         opacity={opacity}
@@ -84,37 +72,17 @@ function renderArc(
     );
   }
 
-  // FC marker
-  const fcMarker = fairCatch ? (
-    <text
-      x={endX}
-      y={GROUND_Y - 8}
-      textAnchor="middle"
-      fontSize={9}
-      fontWeight="bold"
-      fill="#a78bfa"
-      opacity={opacity}
-    >
-      FC
-    </text>
-  ) : null;
-
   return (
     <g key={key}>
-      {/* Flight arc */}
       <path d={d} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} opacity={opacity} strokeLinecap="round" />
-      {/* LOS dot (blue) */}
       <circle cx={startX} cy={GROUND_Y} r={4} fill="#60a5fa" stroke="#0f172a" strokeWidth={1} opacity={opacity} />
-      {/* Landing dot (red) */}
       <circle cx={endX} cy={GROUND_Y} r={4} fill="#ef4444" stroke="#0f172a" strokeWidth={1} opacity={opacity} />
       {returnLine}
-      {fcMarker}
     </g>
   );
 }
 
-export function PuntFieldView({ punts, currentPunt }: Props) {
-  // Yard line markers
+export function KickoffFieldView({ kicks, currentKick }: Props) {
   const yardLines: React.ReactNode[] = [];
   for (let yl = 0; yl <= 100; yl += 10) {
     const x = fieldXToPx(yl);
@@ -132,80 +100,71 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
         strokeDasharray={isGoalLine || isMidfield ? undefined : "2,3"}
       />
     );
-    // yard label at bottom
     const display = yl <= 50 ? yl : 100 - yl;
     if (yl > 0 && yl < 100) {
       yardLines.push(
-        <text
-          key={`tl-${yl}`}
-          x={x}
-          y={FIELD_BOTTOM}
-          textAnchor="middle"
-          fontSize={10}
-          fill="rgba(255,255,255,0.5)"
-          fontWeight={isMidfield ? "bold" : "normal"}
-        >
+        <text key={`tl-${yl}`} x={x} y={FIELD_BOTTOM} textAnchor="middle" fontSize={10} fill="rgba(255,255,255,0.5)" fontWeight={isMidfield ? "bold" : "normal"}>
           {display}
         </text>
       );
     }
   }
 
+  // Mark the kickoff spot (own 35 by default)
+  const kickoffSpotX = fieldXToPx(35);
+
   return (
     <div className="card-2 p-2">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider">Field View</p>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider">Field View — Kickoffs</p>
         <div className="flex items-center gap-3 text-[10px] text-muted flex-wrap">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#60a5fa]" /> LOS</span>
-          <span className="flex items-center gap-1"><span className="w-6 h-0.5 bg-[#06b6d4]" /> Flight</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#60a5fa]" /> Tee</span>
+          <span className="flex items-center gap-1"><span className="w-6 h-0.5 bg-[#f59e0b]" /> Flight</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /> Land</span>
-          <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-dashed border-[#f59e0b]" /> Return</span>
+          <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-dashed border-[#f43f5e]" /> Return</span>
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 320 }}>
         <defs>
-          <linearGradient id="pv-sky" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="ko-sky" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#0b1120" />
             <stop offset="100%" stopColor="#1e293b" />
           </linearGradient>
-          <linearGradient id="pv-turf" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="ko-turf" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#166534" />
             <stop offset="100%" stopColor="#14532d" />
           </linearGradient>
         </defs>
-        {/* Sky */}
-        <rect x={0} y={0} width={W} height={GROUND_Y} fill="url(#pv-sky)" />
-        {/* Ground (turf) */}
-        <rect x={0} y={GROUND_Y} width={W} height={H - GROUND_Y} fill="url(#pv-turf)" />
-        {/* End zones */}
+        <rect x={0} y={0} width={W} height={GROUND_Y} fill="url(#ko-sky)" />
+        <rect x={0} y={GROUND_Y} width={W} height={H - GROUND_Y} fill="url(#ko-turf)" />
         <rect x={0} y={GROUND_Y} width={fieldXToPx(0) - 0} height={H - GROUND_Y} fill="rgba(239,68,68,0.15)" />
         <rect x={fieldXToPx(100)} y={GROUND_Y} width={W - fieldXToPx(100)} height={H - GROUND_Y} fill="rgba(239,68,68,0.15)" />
-        {/* Yard lines and labels */}
         {yardLines}
-        {/* Ground line */}
         <line x1={0} y1={GROUND_Y} x2={W} y2={GROUND_Y} stroke="white" strokeWidth={2} />
 
-        {/* Past punts */}
-        {punts.map((p, i) => {
-          if (p.los == null || p.landingYL == null) return null;
-          return renderArc(
-            i,
-            p.los,
-            p.landingYL,
-            p.hangTime,
-            p.returnYards,
-            !!p.fairCatch,
-            0.6
-          );
+        {/* Default kickoff spot indicator (own 35) — only show if no actual kicks yet */}
+        {kicks.length === 0 && !currentKick && (
+          <g>
+            <line x1={kickoffSpotX} y1={GROUND_Y - 6} x2={kickoffSpotX} y2={GROUND_Y + 6} stroke="#60a5fa" strokeWidth={2} opacity={0.6} />
+            <text x={kickoffSpotX} y={GROUND_Y - 12} textAnchor="middle" fontSize={9} fill="#60a5fa" opacity={0.6}>Tee</text>
+          </g>
+        )}
+
+        {/* Past kicks */}
+        {kicks.map((k, i) => {
+          const los = k.los ?? 35; // default kickoff spot = own 35
+          const landing = k.landingYL ?? (los + (k.distance || 0));
+          if (landing <= los) return null;
+          return renderArc(i, los, landing, k.hangTime, k.returnYards, 0.6);
         })}
 
-        {/* Current punt preview */}
-        {currentPunt && currentPunt.landingYL > currentPunt.los &&
-          renderArc("preview", currentPunt.los, currentPunt.landingYL, currentPunt.hangTime, 0, false, 1, "#22d3ee", 3)
+        {/* Current kick preview */}
+        {currentKick && currentKick.landingYL > currentKick.los &&
+          renderArc("preview", currentKick.los, currentKick.landingYL, currentKick.hangTime, 0, 1, "#fbbf24", 3)
         }
       </svg>
-      {punts.length > 0 && (
-        <p className="text-[10px] text-muted text-right mt-1">{punts.length} punt{punts.length !== 1 ? "s" : ""} shown</p>
+      {kicks.length > 0 && (
+        <p className="text-[10px] text-muted text-right mt-1">{kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} shown</p>
       )}
     </div>
   );

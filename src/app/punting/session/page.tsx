@@ -73,6 +73,7 @@ interface LogRow {
   los?: string;
   landingYL?: string;
   returnYards?: string;
+  fairCatch?: boolean;
 }
 
 interface PartialPuntInput {
@@ -113,6 +114,7 @@ const emptyRow = (): LogRow => ({
   los: "",
   landingYL: "",
   returnYards: "",
+  fairCatch: false,
 });
 
 function loadDraft(): SessionDraft | null {
@@ -519,12 +521,13 @@ export default function PuntingSessionPage() {
       yards: gross,
       hangTime: htVal,
       opTime: 0,
-      landingZones: [],
+      landingZones: r.fairCatch ? ["fairCatch"] : [],
       directionalAccuracy: daVal,
       kickNum,
       los: losVal,
       landingYL: landingYLVal,
-      returnYards: retVal,
+      returnYards: r.fairCatch ? 0 : retVal,
+      fairCatch: r.fairCatch || undefined,
     };
     setSessionPunts((prev) => {
       // Replace if already saved for this kickNum, else append
@@ -1454,16 +1457,13 @@ export default function PuntingSessionPage() {
                 })()}
                 <PuntFieldView
                   punts={sessionPunts.filter((p) => p.los != null && p.landingYL != null)}
-                  currentPunt={
-                    los !== "" && landingYL !== "" && parseInt(landingYL) > parseInt(los)
-                      ? {
-                          los: parseInt(los) || 0,
-                          landingYL: parseInt(landingYL) || 0,
-                          hash: currentPlan?.hash || "M",
-                          direction: directionalAccuracy,
-                        }
-                      : null
-                  }
+                  currentPunt={(() => {
+                    const l = parseYardLine(los);
+                    const ly = parseYardLine(landingYL);
+                    if (isNaN(l) || isNaN(ly) || ly <= l) return null;
+                    const hangVal = parseFloat(hangTime) || undefined;
+                    return { los: l, landingYL: ly, hangTime: hangVal, direction: directionalAccuracy };
+                  })()}
                 />
               </>
             ) : (
@@ -1643,6 +1643,7 @@ export default function PuntingSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]" title="Landing yard line. Use -X for own side, +X for opponent side">Land YL ±</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Hang Time</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Fair Catch">FC</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
                     </>
@@ -1788,8 +1789,18 @@ export default function PuntingSessionPage() {
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
                                 value={row.returnYards ?? ""}
                                 onChange={(e) => updateRow(idx, "returnYards", e.target.value)}
-                                readOnly={isAthlete || isSaved}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                readOnly={isAthlete || isSaved || !!row.fairCatch}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : row.fairCatch ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1 text-center">
+                              <input
+                                type="checkbox"
+                                checked={!!row.fairCatch}
+                                disabled={isAthlete || isSaved}
+                                onChange={(e) => updateRow(idx, "fairCatch", e.target.checked)}
+                                title="Fair Catch"
+                                className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="py-1 px-1">
@@ -1908,51 +1919,63 @@ export default function PuntingSessionPage() {
                         {isLocked ? (
                           !isAthlete && (
                             <div className="flex items-center gap-0.5 justify-center">
-                              <button
-                                onClick={() => {
-                                  // Jump into session and edit just this one punt
-                                  const filled = rows
-                                    .map((r, ri) => ({ r, i: ri }))
-                                    .filter(({ r }) => r.athlete || r.type || r.hash);
-                                  const planned = filled.map(({ r }) => ({
-                                    athlete: r.athlete,
-                                    type: r.type as PuntType,
-                                    hash: r.hash as PuntHash,
-                                    starred: r.starred || undefined,
-                                  }));
-                                  setPlannedPunts(planned);
-                                  setPlannedRowIndices(filled.map(({ i: ri }) => ri));
-                                  setCurrentPuntIdx(filledIdx);
-                                  setEditingPuntIdx(filledIdx);
-                                  // Pre-fill with logged data
-                                  const logged = sessionPunts[filledIdx];
-                                  if (logged) {
-                                    setYards(String(logged.yards));
-                                    setHangTime(String(logged.hangTime));
-                                    setOpTime(String(logged.opTime));
-                                    setDirectionalAccuracy(logged.directionalAccuracy);
-                                    setStarred(!!logged.starred);
-                                  } else {
-                                    setYards("");
-                                    setHangTime("");
-                                    setOpTime("");
-                                    setDirectionalAccuracy(1);
-                                    setStarred(false);
-                                  }
-                                  setSessionActive(true);
-                                }}
-                                className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
-                                title="Edit this punt's result"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => handleUnlockRow(filledIdx)}
-                                className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
-                                title="Unlock (removes this result and all after it)"
-                              >
-                                🔒
-                              </button>
+                              {sessionMode === "game" ? (
+                                <button
+                                  onClick={() => handleUnsaveGameRow(idx)}
+                                  className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
+                                  title="Unlock this punt for editing"
+                                >
+                                  ✏️
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      // Jump into live session and edit just this one punt
+                                      const filled = rows
+                                        .map((r, ri) => ({ r, i: ri }))
+                                        .filter(({ r }) => r.athlete || r.type || r.hash);
+                                      const planned = filled.map(({ r }) => ({
+                                        athlete: r.athlete,
+                                        type: r.type as PuntType,
+                                        hash: r.hash as PuntHash,
+                                        starred: r.starred || undefined,
+                                      }));
+                                      setPlannedPunts(planned);
+                                      setPlannedRowIndices(filled.map(({ i: ri }) => ri));
+                                      setCurrentPuntIdx(filledIdx);
+                                      setEditingPuntIdx(filledIdx);
+                                      // Pre-fill with logged data
+                                      const logged = sessionPunts[filledIdx];
+                                      if (logged) {
+                                        setYards(String(logged.yards));
+                                        setHangTime(String(logged.hangTime));
+                                        setOpTime(String(logged.opTime));
+                                        setDirectionalAccuracy(logged.directionalAccuracy);
+                                        setStarred(!!logged.starred);
+                                      } else {
+                                        setYards("");
+                                        setHangTime("");
+                                        setOpTime("");
+                                        setDirectionalAccuracy(1);
+                                        setStarred(false);
+                                      }
+                                      setSessionActive(true);
+                                    }}
+                                    className="text-accent/60 hover:text-accent transition-colors text-[10px] leading-none px-1"
+                                    title="Edit this punt's result"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => handleUnlockRow(filledIdx)}
+                                    className="text-make/60 hover:text-warn transition-colors text-[10px] leading-none px-1"
+                                    title="Unlock (removes this result and all after it)"
+                                  >
+                                    🔒
+                                  </button>
+                                </>
+                              )}
                             </div>
                           )
                         ) : (
