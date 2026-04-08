@@ -4,36 +4,45 @@ import React from "react";
 import type { KickoffEntry } from "@/types";
 
 /**
- * Side-view kickoff field visualization.
- * Renders each kickoff as a quadratic arc from the kicker's spot (own 35 by
- * default, unless los is provided) to the landing yard line.
- * Arc height is proportional to hang time.
+ * Horizontal pseudo-3D kickoff field view.
+ * Same perspective as PuntFieldView: viewer on the near sideline looking
+ * across the field. Kicker tees from own 35 (left). Ball arcs right across
+ * the field with hang-time lift. Return line travels backward from the
+ * landing spot.
  */
 
 interface Props {
   kicks: KickoffEntry[];
   currentKick?: {
-    los: number;
-    landingYL: number;
+    los?: number;
+    landingYL?: number;
+    distance?: number;
     hangTime?: number;
   } | null;
 }
 
-const W = 720;
-const H = 300;
-const PAD_X = 32;
-const GROUND_Y = 240;
-const SKY_TOP = 12;
-const FIELD_BOTTOM = 280;
+const W = 780;
+const H = 360;
+const PAD_X = 30;
+const TOP_Y = 90;
+const BOTTOM_Y = 320;
 
-function fieldXToPx(fieldX: number): number {
-  return PAD_X + (fieldX / 100) * (W - 2 * PAD_X);
+function project(fieldX: number, fieldY: number): { x: number; y: number } {
+  const yT = Math.max(0, Math.min(1, fieldY / 53));
+  const y = TOP_Y + yT * (BOTTOM_Y - TOP_Y);
+  const nearScale = 1;
+  const farScale = 0.88;
+  const scale = farScale + yT * (nearScale - farScale);
+  const centerX = W / 2;
+  const halfWidth = (W - 2 * PAD_X) / 2 * scale;
+  const xT = (fieldX - 50) / 50;
+  const x = centerX + xT * halfWidth;
+  return { x, y };
 }
 
-function hangToArcHeight(hangTime: number | undefined): number {
+function hangLift(hangTime: number | undefined): number {
   const h = Math.max(0.5, Math.min(hangTime ?? 3, 6));
-  const maxH = GROUND_Y - SKY_TOP - 10;
-  return Math.min((h / 6) * maxH, maxH);
+  return 20 + (h / 6) * 90;
 }
 
 function renderArc(
@@ -47,23 +56,25 @@ function renderArc(
   strokeWidth = 2
 ) {
   if (landing <= los) return null;
-  const startX = fieldXToPx(los);
-  const endX = fieldXToPx(landing);
-  const midX = (startX + endX) / 2;
-  const arcHeight = hangToArcHeight(hangTime);
-  const controlY = GROUND_Y - 2 * arcHeight;
-  const d = `M ${startX} ${GROUND_Y} Q ${midX} ${controlY} ${endX} ${GROUND_Y}`;
+  const fy = 26.5;
+  const startGround = project(los, fy);
+  const endGround = project(landing, fy);
+  const midFX = (los + landing) / 2;
+  const midGround = project(midFX, fy);
+  const lift = hangLift(hangTime);
+  const cpY = ((startGround.y + endGround.y) / 2) - 2 * lift;
+  const d = `M ${startGround.x} ${startGround.y} Q ${midGround.x} ${cpY} ${endGround.x} ${endGround.y}`;
 
   let returnLine: React.ReactNode = null;
   if ((returnYards ?? 0) > 0) {
-    const retEndField = Math.max(los, landing - (returnYards ?? 0));
-    const retEndX = fieldXToPx(retEndField);
+    const retFX = Math.max(los, landing - (returnYards ?? 0));
+    const retEnd = project(retFX, fy);
     returnLine = (
       <line
-        x1={endX}
-        y1={GROUND_Y}
-        x2={retEndX}
-        y2={GROUND_Y}
+        x1={endGround.x}
+        y1={endGround.y}
+        x2={retEnd.x}
+        y2={retEnd.y}
         stroke="#f43f5e"
         strokeWidth={2}
         strokeDasharray="4,3"
@@ -72,11 +83,14 @@ function renderArc(
     );
   }
 
+  const apexShadow = <circle cx={midGround.x} cy={midGround.y} r={2} fill="rgba(0,0,0,0.3)" opacity={opacity} />;
+
   return (
     <g key={key}>
+      {apexShadow}
       <path d={d} fill="none" stroke={strokeColor} strokeWidth={strokeWidth} opacity={opacity} strokeLinecap="round" />
-      <circle cx={startX} cy={GROUND_Y} r={4} fill="#60a5fa" stroke="#0f172a" strokeWidth={1} opacity={opacity} />
-      <circle cx={endX} cy={GROUND_Y} r={4} fill="#ef4444" stroke="#0f172a" strokeWidth={1} opacity={opacity} />
+      <circle cx={startGround.x} cy={startGround.y} r={4} fill="#60a5fa" stroke="#0f172a" strokeWidth={1} opacity={opacity} />
+      <circle cx={endGround.x} cy={endGround.y} r={4} fill="#ef4444" stroke="#0f172a" strokeWidth={1} opacity={opacity} />
       {returnLine}
     </g>
   );
@@ -84,34 +98,42 @@ function renderArc(
 
 export function KickoffFieldView({ kicks, currentKick }: Props) {
   const yardLines: React.ReactNode[] = [];
-  for (let yl = 0; yl <= 100; yl += 10) {
-    const x = fieldXToPx(yl);
-    const isMidfield = yl === 50;
-    const isGoalLine = yl === 0 || yl === 100;
+  for (let fx = 0; fx <= 100; fx += 10) {
+    const far = project(fx, 0);
+    const near = project(fx, 53);
+    const isGoal = fx === 0 || fx === 100;
+    const isMid = fx === 50;
     yardLines.push(
       <line
-        key={`gl-${yl}`}
-        x1={x}
-        y1={SKY_TOP}
-        x2={x}
-        y2={GROUND_Y}
-        stroke={isGoalLine ? "rgba(255,255,255,0.55)" : isMidfield ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.12)"}
-        strokeWidth={isGoalLine ? 2 : isMidfield ? 1.5 : 1}
-        strokeDasharray={isGoalLine || isMidfield ? undefined : "2,3"}
+        key={`yl-${fx}`}
+        x1={far.x}
+        y1={far.y}
+        x2={near.x}
+        y2={near.y}
+        stroke={isGoal ? "rgba(255,255,255,0.55)" : isMid ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)"}
+        strokeWidth={isGoal ? 2 : isMid ? 1.5 : 1}
       />
     );
-    const display = yl <= 50 ? yl : 100 - yl;
-    if (yl > 0 && yl < 100) {
+    const display = fx <= 50 ? fx : 100 - fx;
+    if (fx > 0 && fx < 100) {
       yardLines.push(
-        <text key={`tl-${yl}`} x={x} y={FIELD_BOTTOM} textAnchor="middle" fontSize={10} fill="rgba(255,255,255,0.5)" fontWeight={isMidfield ? "bold" : "normal"}>
+        <text
+          key={`yt-${fx}`}
+          x={near.x}
+          y={near.y + 14}
+          textAnchor="middle"
+          fontSize={10}
+          fill="rgba(255,255,255,0.5)"
+          fontWeight={isMid ? "bold" : "normal"}
+        >
           {display}
         </text>
       );
     }
   }
 
-  // Mark the kickoff spot (own 35 by default)
-  const kickoffSpotX = fieldXToPx(35);
+  // Default tee marker at own 35
+  const teeProj = project(35, 26.5);
 
   return (
     <div className="card-2 p-2">
@@ -119,49 +141,75 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
         <p className="text-xs font-semibold text-muted uppercase tracking-wider">Field View — Kickoffs</p>
         <div className="flex items-center gap-3 text-[10px] text-muted flex-wrap">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#60a5fa]" /> Tee</span>
-          <span className="flex items-center gap-1"><span className="w-6 h-0.5 bg-[#f59e0b]" /> Flight</span>
+          <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-[#f59e0b]" /> Flight</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#ef4444]" /> Land</span>
           <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-dashed border-[#f43f5e]" /> Return</span>
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 320 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 360 }}>
         <defs>
           <linearGradient id="ko-sky" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#0b1120" />
             <stop offset="100%" stopColor="#1e293b" />
           </linearGradient>
           <linearGradient id="ko-turf" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#166534" />
-            <stop offset="100%" stopColor="#14532d" />
+            <stop offset="0%" stopColor="#14532d" />
+            <stop offset="100%" stopColor="#166534" />
           </linearGradient>
         </defs>
-        <rect x={0} y={0} width={W} height={GROUND_Y} fill="url(#ko-sky)" />
-        <rect x={0} y={GROUND_Y} width={W} height={H - GROUND_Y} fill="url(#ko-turf)" />
-        <rect x={0} y={GROUND_Y} width={fieldXToPx(0) - 0} height={H - GROUND_Y} fill="rgba(239,68,68,0.15)" />
-        <rect x={fieldXToPx(100)} y={GROUND_Y} width={W - fieldXToPx(100)} height={H - GROUND_Y} fill="rgba(239,68,68,0.15)" />
+        <rect x={0} y={0} width={W} height={TOP_Y} fill="url(#ko-sky)" />
+        {(() => {
+          const tl = project(0, 0);
+          const tr = project(100, 0);
+          const br = project(100, 53);
+          const bl = project(0, 53);
+          return (
+            <polygon
+              points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`}
+              fill="url(#ko-turf)"
+            />
+          );
+        })()}
+        {/* Sidelines + goal lines */}
+        {(() => {
+          const tl = project(0, 0);
+          const tr = project(100, 0);
+          const bl = project(0, 53);
+          const br = project(100, 53);
+          return (
+            <>
+              <line x1={tl.x} y1={tl.y} x2={tr.x} y2={tr.y} stroke="white" strokeWidth={2} />
+              <line x1={bl.x} y1={bl.y} x2={br.x} y2={br.y} stroke="white" strokeWidth={2} />
+              <line x1={tl.x} y1={tl.y} x2={bl.x} y2={bl.y} stroke="white" strokeWidth={2} />
+              <line x1={tr.x} y1={tr.y} x2={br.x} y2={br.y} stroke="white" strokeWidth={2} />
+            </>
+          );
+        })()}
         {yardLines}
-        <line x1={0} y1={GROUND_Y} x2={W} y2={GROUND_Y} stroke="white" strokeWidth={2} />
 
-        {/* Default kickoff spot indicator (own 35) — only show if no actual kicks yet */}
+        {/* Default tee indicator when empty */}
         {kicks.length === 0 && !currentKick && (
           <g>
-            <line x1={kickoffSpotX} y1={GROUND_Y - 6} x2={kickoffSpotX} y2={GROUND_Y + 6} stroke="#60a5fa" strokeWidth={2} opacity={0.6} />
-            <text x={kickoffSpotX} y={GROUND_Y - 12} textAnchor="middle" fontSize={9} fill="#60a5fa" opacity={0.6}>Tee</text>
+            <circle cx={teeProj.x} cy={teeProj.y} r={4} fill="#60a5fa" opacity={0.7} />
+            <text x={teeProj.x} y={teeProj.y - 10} textAnchor="middle" fontSize={9} fill="#60a5fa" opacity={0.8}>Tee (35)</text>
           </g>
         )}
 
         {/* Past kicks */}
         {kicks.map((k, i) => {
-          const los = k.los ?? 35; // default kickoff spot = own 35
+          const los = k.los ?? 35;
           const landing = k.landingYL ?? (los + (k.distance || 0));
           if (landing <= los) return null;
-          return renderArc(i, los, landing, k.hangTime, k.returnYards, 0.6);
+          return renderArc(i, los, landing, k.hangTime, k.returnYards, 0.65);
         })}
 
-        {/* Current kick preview */}
-        {currentKick && currentKick.landingYL > currentKick.los &&
-          renderArc("preview", currentKick.los, currentKick.landingYL, currentKick.hangTime, 0, 1, "#fbbf24", 3)
-        }
+        {/* Current preview */}
+        {currentKick && (() => {
+          const los = currentKick.los ?? 35;
+          const landing = currentKick.landingYL ?? (los + (currentKick.distance ?? 0));
+          if (landing <= los) return null;
+          return renderArc("preview", los, landing, currentKick.hangTime, 0, 1, "#fbbf24", 3);
+        })()}
       </svg>
       {kicks.length > 0 && (
         <p className="text-[10px] text-muted text-right mt-1">{kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} shown</p>

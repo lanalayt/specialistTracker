@@ -11,9 +11,18 @@ interface FGSettings {
   snapDistance: string;
   makeMode: "simple" | "detailed";
   missMode: "simple" | "detailed";
+  scoreEnabled: boolean;
+  scoreOptions: string[];
 }
 
-const DEFAULT_SETTINGS: FGSettings = { snapDistance: "7", makeMode: "detailed", missMode: "detailed" };
+const DEFAULT_SCORE_OPTIONS = ["0", "1", "2", "3", "4"];
+const DEFAULT_SETTINGS: FGSettings = {
+  snapDistance: "7",
+  makeMode: "detailed",
+  missMode: "detailed",
+  scoreEnabled: true,
+  scoreOptions: DEFAULT_SCORE_OPTIONS,
+};
 
 function loadSettingsLocal(): FGSettings {
   try {
@@ -24,6 +33,10 @@ function loadSettingsLocal(): FGSettings {
         snapDistance: parsed.snapDistance ?? "7",
         makeMode: parsed.makeMode ?? "detailed",
         missMode: parsed.missMode ?? "detailed",
+        scoreEnabled: parsed.scoreEnabled !== false, // default true
+        scoreOptions: Array.isArray(parsed.scoreOptions) && parsed.scoreOptions.length > 0
+          ? parsed.scoreOptions
+          : DEFAULT_SCORE_OPTIONS,
       };
     }
   } catch {}
@@ -34,16 +47,15 @@ export default function FGSettingsPage() {
   const [snapDistance, setSnapDistance] = useState("7");
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">("detailed");
   const [missMode, setMissMode] = useState<"simple" | "detailed">("detailed");
+  const [scoreEnabled, setScoreEnabled] = useState(true);
+  const [scoreOptions, setScoreOptions] = useState<string[]>(DEFAULT_SCORE_OPTIONS);
+  const [newScore, setNewScore] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   // Track what was last saved so we can detect changes
-  const [savedSettings, setSavedSettings] = useState<FGSettings>({
-    snapDistance: "7",
-    makeMode: "detailed",
-    missMode: "detailed",
-  });
+  const [savedSettings, setSavedSettings] = useState<FGSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     // Load from localStorage immediately, then try cloud
@@ -51,6 +63,8 @@ export default function FGSettingsPage() {
     setSnapDistance(local.snapDistance);
     setMakeMode(local.makeMode);
     setMissMode(local.missMode);
+    setScoreEnabled(local.scoreEnabled);
+    setScoreOptions(local.scoreOptions);
     setSavedSettings(local);
     setLoaded(true);
 
@@ -60,7 +74,15 @@ export default function FGSettingsPage() {
         setSnapDistance(cloud.snapDistance ?? "7");
         setMakeMode(cloud.makeMode ?? "detailed");
         setMissMode(cloud.missMode ?? "detailed");
-        setSavedSettings(cloud);
+        setScoreEnabled(cloud.scoreEnabled !== false);
+        setScoreOptions(Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS);
+        setSavedSettings({
+          snapDistance: cloud.snapDistance ?? "7",
+          makeMode: cloud.makeMode ?? "detailed",
+          missMode: cloud.missMode ?? "detailed",
+          scoreEnabled: cloud.scoreEnabled !== false,
+          scoreOptions: Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS,
+        });
       }
     });
   }, []);
@@ -71,13 +93,27 @@ export default function FGSettingsPage() {
     const changed =
       snapDistance !== savedSettings.snapDistance ||
       makeMode !== savedSettings.makeMode ||
-      missMode !== savedSettings.missMode;
+      missMode !== savedSettings.missMode ||
+      scoreEnabled !== savedSettings.scoreEnabled ||
+      JSON.stringify(scoreOptions) !== JSON.stringify(savedSettings.scoreOptions);
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [snapDistance, makeMode, missMode, savedSettings, loaded]);
+  }, [snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, savedSettings, loaded]);
+
+  const handleAddScore = () => {
+    const trimmed = newScore.trim();
+    if (!trimmed) return;
+    if (scoreOptions.includes(trimmed)) return;
+    setScoreOptions([...scoreOptions, trimmed]);
+    setNewScore("");
+  };
+
+  const handleRemoveScore = (value: string) => {
+    setScoreOptions(scoreOptions.filter((s) => s !== value));
+  };
 
   const handleSave = () => {
-    const settings: FGSettings = { snapDistance, makeMode, missMode };
+    const settings: FGSettings = { snapDistance, makeMode, missMode, scoreEnabled, scoreOptions };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -175,6 +211,71 @@ export default function FGSettingsPage() {
             </span>
           </button>
         </div>
+      </div>
+
+      <div className="card space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="label mb-0">Kick Score</p>
+          <button
+            onClick={() => setScoreEnabled((v) => !v)}
+            className={clsx(
+              "relative w-11 h-6 rounded-full transition-colors",
+              scoreEnabled ? "bg-accent" : "bg-border"
+            )}
+            aria-label="Toggle score tracking"
+          >
+            <span
+              className={clsx(
+                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                scoreEnabled ? "left-[22px]" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
+        <p className="text-xs text-muted">
+          Enable to track a numeric kick score for each attempt. Disable to hide score everywhere.
+        </p>
+        {scoreEnabled && (
+          <>
+            <p className="label">Score Options</p>
+            <div className="space-y-2">
+              {scoreOptions.map((opt) => (
+                <div key={opt} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={opt}
+                    readOnly
+                    className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none"
+                  />
+                  <button
+                    onClick={() => handleRemoveScore(opt)}
+                    className="w-8 h-8 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm"
+                    title="Remove option"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newScore}
+                onChange={(e) => setNewScore(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddScore(); }}
+                placeholder="Add score value..."
+                className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 placeholder:text-muted"
+              />
+              <button
+                onClick={handleAddScore}
+                disabled={!newScore.trim()}
+                className="px-4 py-2 rounded-input text-sm font-semibold bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                + Add
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <button

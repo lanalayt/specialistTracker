@@ -116,6 +116,33 @@ function loadMissMode(): "simple" | "detailed" {
   return "detailed";
 }
 
+function loadScoreEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = localStorage.getItem("fgSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed.scoreEnabled !== false;
+    }
+  } catch {}
+  return true;
+}
+
+function loadScoreOptions(): string[] {
+  const DEFAULT = ["0", "1", "2", "3", "4"];
+  if (typeof window === "undefined") return DEFAULT;
+  try {
+    const raw = localStorage.getItem("fgSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.scoreOptions) && parsed.scoreOptions.length > 0) {
+        return parsed.scoreOptions;
+      }
+    }
+  } catch {}
+  return DEFAULT;
+}
+
 const RESULT_LABELS: Record<string, string> = {
   YL: "Make ←",
   YC: "Make ✓",
@@ -125,7 +152,7 @@ const RESULT_LABELS: Record<string, string> = {
   XR: "Miss →",
 };
 
-const SCORE_OPTIONS = ["0", "1", "2", "3", "4"];
+// Score options loaded from fgSettings (customizable in FG Settings page)
 
 const MAKE_BTNS: { r: FGResult; label: string }[] = [
   { r: "YL", label: "← GOOD" },
@@ -189,6 +216,8 @@ export default function KickingSessionPage() {
   const drag = useDragReorder(rows, setRows);
   const [makeMode, setMakeMode] = useState(() => loadMakeMode());
   const [missMode, setMissMode] = useState(() => loadMissMode());
+  const [scoreEnabled, setScoreEnabled] = useState(() => loadScoreEnabled());
+  const [scoreOptions, setScoreOptions] = useState<string[]>(() => loadScoreOptions());
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
 
@@ -214,11 +243,13 @@ export default function KickingSessionPage() {
 
   // Load settings and draft from cloud on fresh device
   useEffect(() => {
-    loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string }>("fgSettings").then((cloud) => {
+    loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string; scoreEnabled?: boolean; scoreOptions?: string[] }>("fgSettings").then((cloud) => {
       if (cloud) {
         if (cloud.snapDistance) setSnapDistance(parseInt(cloud.snapDistance) || 7);
         if (cloud.makeMode === "simple" || cloud.makeMode === "detailed") setMakeMode(cloud.makeMode);
         if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
+        if (typeof cloud.scoreEnabled === "boolean") setScoreEnabled(cloud.scoreEnabled);
+        if (Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0) setScoreOptions(cloud.scoreOptions);
       }
     });
     // Load draft from team data if local is empty
@@ -1143,25 +1174,31 @@ export default function KickingSessionPage() {
                     </div>
 
                     {/* Score pills */}
+                    {scoreEnabled && (
                     <div>
                       <p className="label">Score</p>
-                      <div className="flex gap-1.5">
-                        {Array.from({ length: MAX_SCORE + 1 }, (_, i) => (
+                      <div className="flex gap-1.5 flex-wrap">
+                        {scoreOptions.map((opt) => {
+                          const n = parseInt(opt);
+                          const value = isNaN(n) ? 0 : n;
+                          return (
                           <button
-                            key={i}
-                            onClick={() => setScore(i)}
+                            key={opt}
+                            onClick={() => setScore(value)}
                             className={clsx(
-                              "w-9 h-9 rounded-full text-sm font-bold transition-all",
-                              score === i
+                              "min-w-[2.25rem] h-9 px-2 rounded-full text-sm font-bold transition-all",
+                              score === value
                                 ? "bg-accent text-slate-900"
                                 : "bg-surface-2 text-muted border border-border hover:border-accent/50"
                             )}
                           >
-                            {i}
+                            {opt}
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
+                    )}
 
                     {/* Star + Log button + Remove */}
                     <div className="flex gap-2">
@@ -1450,7 +1487,9 @@ export default function KickingSessionPage() {
                   {manualEntry && sessionMode === "game" && (
                     <>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-24 border-b border-red-500/40 text-[10px]">Result</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Score</th>
+                      {scoreEnabled && (
+                        <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Score</th>
+                      )}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
                     </>
                   )}
@@ -1459,9 +1498,11 @@ export default function KickingSessionPage() {
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-24 border-b border-border">
                         Result
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
-                        Score
-                      </th>
+                      {scoreEnabled && (
+                        <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
+                          Score
+                        </th>
+                      )}
                     </>
                   )}
                   {sessionMode !== "game" && (
@@ -1578,19 +1619,21 @@ export default function KickingSessionPage() {
                                 })()}
                               </select>
                             </td>
-                            <td className="py-1 px-1">
-                              <select
-                                value={row.score}
-                                onChange={(e) => updateRow(idx, "score", e.target.value)}
-                                disabled={isAthlete || isSaved}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
-                              >
-                                <option value="">—</option>
-                                {SCORE_OPTIONS.map((s) => (
-                                  <option key={s} value={s}>{s}</option>
-                                ))}
-                              </select>
-                            </td>
+                            {scoreEnabled && (
+                              <td className="py-1 px-1">
+                                <select
+                                  value={row.score}
+                                  onChange={(e) => updateRow(idx, "score", e.target.value)}
+                                  disabled={isAthlete || isSaved}
+                                  className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                >
+                                  <option value="">—</option>
+                                  {scoreOptions.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                  ))}
+                                </select>
+                              </td>
+                            )}
                             <td className="py-1 px-1 text-center">
                               {isSaved ? (
                                 <button
@@ -1637,19 +1680,21 @@ export default function KickingSessionPage() {
                               })()}
                             </select>
                           </td>
-                          <td className="py-1 px-1">
-                            <select
-                              value={row.score}
-                              onChange={(e) => updateRow(idx, "score", e.target.value)}
-                              disabled={isAthlete}
-                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
-                            >
-                              <option value="">—</option>
-                              {SCORE_OPTIONS.map((s) => (
-                                <option key={s} value={s}>{s}</option>
-                              ))}
-                            </select>
-                          </td>
+                          {scoreEnabled && (
+                            <td className="py-1 px-1">
+                              <select
+                                value={row.score}
+                                onChange={(e) => updateRow(idx, "score", e.target.value)}
+                                disabled={isAthlete}
+                                className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
+                              >
+                                <option value="">—</option>
+                                {scoreOptions.map((s) => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                            </td>
+                          )}
                         </>
                       )}
                       {sessionMode !== "game" && (
