@@ -13,6 +13,7 @@ import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { createArchive } from "@/lib/archiveManager";
+import { teamGet, getTeamId } from "@/lib/teamData";
 import clsx from "clsx";
 
 const SPORT_OPTIONS = [
@@ -33,6 +34,42 @@ function SettingsContent() {
   const [saved, setSaved] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [pullDone, setPullDone] = useState<string | null>(null);
+
+  const handlePullFromCloud = async () => {
+    setPulling(true);
+    setPullDone(null);
+    try {
+      const tid = getTeamId();
+      if (!tid || tid === "local-dev") {
+        alert("No team ID — make sure you're signed in.");
+        setPulling(false);
+        return;
+      }
+      // Fetch each phase from team_data
+      const [fgData, puntData, kickoffData] = await Promise.all([
+        teamGet<{ athletes: string[]; stats: Record<string, unknown>; history: unknown[] }>(tid, "fg_data"),
+        teamGet<{ athletes: string[]; stats: Record<string, unknown>; history: unknown[] }>(tid, "punt_data"),
+        teamGet<{ athletes: string[]; stats: Record<string, unknown>; history: unknown[] }>(tid, "kickoff_data"),
+      ]);
+      // Write to localStorage so contexts pick them up on reload
+      if (fgData) localStorage.setItem("st_fg_v1", JSON.stringify(fgData));
+      if (puntData) localStorage.setItem("st_punt_v1", JSON.stringify(puntData));
+      if (kickoffData) localStorage.setItem("st_kickoff_v1", JSON.stringify(kickoffData));
+      const fgCount = (fgData?.history as unknown[] | undefined)?.length ?? 0;
+      const puntCount = (puntData?.history as unknown[] | undefined)?.length ?? 0;
+      const koCount = (kickoffData?.history as unknown[] | undefined)?.length ?? 0;
+      setPullDone(`FG: ${fgCount} · Punt: ${puntCount} · KO: ${koCount}`);
+      // Reload so every context reads fresh data from localStorage
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      console.error(err);
+      alert("Pull failed. Check console.");
+    } finally {
+      setPulling(false);
+    }
+  };
 
   // Archive UI state
   const [archiveName, setArchiveName] = useState("");
@@ -297,10 +334,49 @@ function SettingsContent() {
             </div>
           </div>
 
+          {/* Device / Sync diagnostics */}
+          <div className="card space-y-2">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Device Sync</p>
+            <p className="text-xs text-muted">
+              Both devices need to be signed in to the <span className="text-accent font-semibold">same account</span> to share data. If one device isn&apos;t showing the same stats, verify the email below matches on both devices.
+            </p>
+            <div className="bg-surface-2 border border-border rounded-input p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted">Signed in as</span>
+                <span className="text-slate-200 font-medium truncate ml-2">{user?.email ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Role</span>
+                <span className="text-slate-200 capitalize">{user?.role ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Team ID</span>
+                <code className="text-accent text-[10px] truncate ml-2 max-w-[180px]">{getTeamId() ?? "not set"}</code>
+              </div>
+            </div>
+            <button
+              onClick={handlePullFromCloud}
+              disabled={pulling}
+              className={clsx(
+                "w-full py-3 rounded-input text-sm font-bold transition-all",
+                pullDone
+                  ? "bg-make text-slate-900"
+                  : pulling
+                    ? "bg-surface-2 text-muted border border-border cursor-wait"
+                    : "bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30"
+              )}
+            >
+              {pullDone ? `✓ Pulled! ${pullDone} — reloading…` : pulling ? "Pulling..." : "↓ Pull Latest from Cloud"}
+            </button>
+            <p className="text-[10px] text-muted">
+              Forces this device to re-download all FG, Punt, and Kickoff data from the cloud, then reloads.
+            </p>
+          </div>
+
           {/* Cloud Sync */}
           <div className="card space-y-3">
             <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Cloud Sync
+              Push Local → Cloud
             </p>
             <p className="text-xs text-muted">
               Push all local data (sessions, stats, settings) to the cloud. Use this if you have existing data in your browser that needs to be backed up.
@@ -317,7 +393,7 @@ function SettingsContent() {
                     : "bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30"
               )}
             >
-              {syncDone ? "✓ All Data Synced!" : syncing ? "Syncing..." : "Sync Local Data to Cloud"}
+              {syncDone ? "✓ All Data Synced!" : syncing ? "Syncing..." : "↑ Push Local Data to Cloud"}
             </button>
           </div>
 

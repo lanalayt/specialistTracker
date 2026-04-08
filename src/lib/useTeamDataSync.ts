@@ -3,10 +3,10 @@
 import { useEffect, useRef } from "react";
 import { teamGetWithTimestamp, getTeamId, getLastWriteTimestamp } from "@/lib/teamData";
 
-const POLL_INTERVAL = 8000; // 8 seconds
+const POLL_INTERVAL = 5000; // 5 seconds
 // Ignore remote updates that arrive within this window of a local write
 // (to avoid round-tripping our own writes back over fresh local state)
-const LOCAL_WRITE_GRACE_MS = 3000;
+const LOCAL_WRITE_GRACE_MS = 2500;
 
 /**
  * Polls team_data for committed data changes (history, stats, athletes).
