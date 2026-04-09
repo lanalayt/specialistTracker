@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { AuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
 import { setTeamId } from "@/lib/teamData";
+import { loadAndApplyTheme } from "@/lib/themeColors";
 import type { AuthUser, UserRole } from "@/types";
 
 function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
@@ -21,6 +22,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClient();
+
+  // Apply saved theme colors on mount
+  useEffect(() => {
+    loadAndApplyTheme();
+  }, []);
 
   // Listen for auth state changes
   useEffect(() => {
