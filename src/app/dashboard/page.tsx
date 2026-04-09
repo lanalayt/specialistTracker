@@ -114,17 +114,14 @@ function DashboardContent() {
 
   return (
     <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
-      <Header title="Dashboard" />
+      <Header title={schoolName} />
 
       <main className="p-4 lg:p-6 space-y-6 max-w-6xl">
         {/* Welcome */}
         <div>
           <h1 className="text-2xl font-extrabold text-slate-100">
-            {schoolName}
-          </h1>
-          <p className="text-sm text-muted mt-1">
             Special Teams Dashboard
-          </p>
+          </h1>
         </div>
 
         {/* Sport cards — icon only */}
