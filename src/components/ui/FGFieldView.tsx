@@ -1,18 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import type { FGKick, FGPosition } from "@/types";
 
 /**
- * Vertical pseudo-3D FG field view.
- * The viewer stands behind the kicker looking downfield toward the
- * goalposts. The field widens toward the bottom (close to viewer) and
- * narrows toward the top (receding distance). Each kick is an arc from
- * the kick spot at the bottom up into the end zone.
- *
- * Coordinate system (logical):
- *   fieldX: 0..100  → kick spot (0, near) to goal line (100, far)
- *   fieldY: 0..53   → sideline to sideline
+ * Focused pseudo-3D FG field view.
+ * Shows only the relevant portion: ~35 yard line down to the end zone.
+ * Includes painted yard numbers, hash marks, colored end zone with team
+ * name, pylons, and a goalpost. Made kicks arc through the uprights.
  */
 
 interface Props {
@@ -24,56 +19,68 @@ interface Props {
   } | null;
 }
 
-const W = 520;
-const H = 560;
-const HORIZON_Y = 40;
-const BOTTOM_Y = H - 20;
-const NEAR_WIDTH = W - 60;
-const FAR_WIDTH = 160;
+const W = 480;
+const H = 600;
 
-function project(fieldX: number, fieldY: number): { x: number; y: number } {
-  const t = Math.max(0, Math.min(1, fieldX / 100));
-  const y = BOTTOM_Y - t * (BOTTOM_Y - HORIZON_Y);
-  const widthAtY = NEAR_WIDTH - t * (NEAR_WIDTH - FAR_WIDTH);
-  const centerX = W / 2;
-  const normY = (fieldY - 26.5) / 53;
-  const x = centerX + normY * widthAtY;
+// Perspective: bottom = close (wide), top = far (narrow)
+const BOTTOM_Y = H - 16;
+const TOP_Y = 30;
+const NEAR_HALF_W = 210;  // half-width at bottom
+const FAR_HALF_W = 70;    // half-width at top
+const CENTER_X = W / 2;
+
+// Field range: we show from 0 (back of end zone) to MAX_DIST yards out
+const MAX_DIST = 55; // covers up to ~55 yard FG
+const ENDZONE_DEPTH = 10;
+const GOAL_LINE_DIST = ENDZONE_DEPTH; // goal line is 10 yards from back
+
+// Project a point on the field to screen coordinates
+// dist = yards from back of end zone (0 = back, 10 = goal line, 20 = 10yd line...)
+// lat = lateral position 0..53 (sideline to sideline)
+function proj(dist: number, lat: number): { x: number; y: number } {
+  const t = 1 - Math.max(0, Math.min(1, dist / MAX_DIST)); // 0=bottom, 1=top
+  const y = BOTTOM_Y - t * (BOTTOM_Y - TOP_Y);
+  const halfW = NEAR_HALF_W - t * (NEAR_HALF_W - FAR_HALF_W);
+  const normLat = (lat - 26.5) / 53; // -0.5 to 0.5
+  const x = CENTER_X + normLat * halfW * 2;
   return { x, y };
 }
 
-// Hash position → fieldY
-const HASH_Y: Record<FGPosition, number> = {
-  LH: 18,
+// Hash positions (fieldY units)
+const HASH_LEFT = 18.5;
+const HASH_RIGHT = 34.5;
+
+// Position → lateral
+const POS_LAT: Record<FGPosition, number> = {
+  LH: HASH_LEFT,
   LM: 22,
   M: 26.5,
   RM: 31,
-  RH: 35,
+  RH: HASH_RIGHT,
 };
-function hashY(pos: string | undefined): number {
-  return HASH_Y[pos as FGPosition] ?? 26.5;
+
+function posLat(pos: string | undefined): number {
+  return POS_LAT[pos as FGPosition] ?? 26.5;
 }
 
-// Result → lateral offset at the goalpost (in fieldY units)
-function resultLateralOffset(result: string): number {
+// Result → how far the ball ends up laterally from center at the uprights
+function resultEndLat(result: string): number {
   switch (result) {
-    case "YC": return 0;
-    case "YL": return -1.5;
-    case "YR": return 1.5;
-    case "XL": return -5;
-    case "XR": return 5;
-    case "XS": return 0;
-    default: return 0;
+    case "YC": return 26.5;
+    case "YL": return 25;
+    case "YR": return 28;
+    case "XL": return 20;   // wide left — outside uprights
+    case "XR": return 33;   // wide right
+    case "XS": return 26.5; // short
+    default: return 26.5;
   }
 }
 
-function isShort(result: string): boolean {
-  return result === "XS";
-}
-
-// Kick starts at fieldX = 100 - distance (so longer kicks start farther from goal)
-function kickStartFieldX(distance: number): number {
-  const clamped = Math.max(15, Math.min(distance, 65));
-  return Math.max(0, 100 - clamped);
+// Kick dist → how many yards from back of end zone the kicker stands
+// FG distance = 7 (snap) + LOS-to-goal + 10 (end zone) ... simplified:
+// the kicker is (distance - 10) yards from the goal line, so distance from back of EZ = distance
+function kickerDist(fgDist: number): number {
+  return Math.max(12, Math.min(fgDist, MAX_DIST));
 }
 
 function renderKick(
@@ -83,79 +90,141 @@ function renderKick(
 ) {
   const distance = kick.dist || 0;
   if (distance <= 0) return null;
-  const startFX = kickStartFieldX(distance);
-  const startFY = hashY(kick.pos);
-  const start = project(startFX, startFY);
 
   const isMake = typeof kick.result === "string" && kick.result.startsWith("Y");
-  const short = isShort(kick.result || "");
-  const endFX = short ? (startFX + 100) / 2 : 100; // XS lands halfway
-  const endFY = 26.5 + resultLateralOffset(kick.result || "");
-  const end = project(endFX, endFY);
+  const isShort = kick.result === "XS";
 
-  // Arc peak in the middle
-  const midFX = (startFX + endFX) / 2;
-  const midFY = (startFY + endFY) / 2;
-  const apex = project(midFX, midFY);
-  apex.y -= 60; // arc height
+  // Start: kicker position
+  const startDist = kickerDist(distance);
+  const startLat = posLat(kick.pos);
+  const start = proj(startDist, startLat);
 
-  const color = isMake ? "#34d399" : "#ef4444";
-  const d = `M ${start.x} ${start.y} Q ${apex.x} ${apex.y} ${end.x} ${end.y}`;
+  // End: for makes, land PAST the crossbar (between uprights, dist ~5)
+  // For misses: outside uprights or short
+  const endDist = isShort ? (startDist + GOAL_LINE_DIST) / 2 : 5;
+  const endLat = resultEndLat(kick.result || "");
+  const end = proj(endDist, endLat);
+
+  // Arc control point — higher arc for longer kicks
+  const midDist = (startDist + endDist) / 2;
+  const midLat = (startLat + endLat) / 2;
+  const mid = proj(midDist, midLat);
+  const arcLift = 40 + (distance / 60) * 60;
+  mid.y -= arcLift;
+
+  const color = isMake ? "#22c55e" : "#ef4444";
+  const d = `M ${start.x} ${start.y} Q ${mid.x} ${mid.y} ${end.x} ${end.y}`;
 
   return (
     <g key={key}>
-      <path d={d} fill="none" stroke={color} strokeWidth={2} opacity={opacity} strokeLinecap="round" />
+      <path d={d} fill="none" stroke={color} strokeWidth={2.5} opacity={opacity} strokeLinecap="round" />
       <circle cx={start.x} cy={start.y} r={4} fill="#60a5fa" stroke="#0f172a" strokeWidth={1} opacity={opacity} />
-      <circle cx={end.x} cy={end.y} r={4} fill={color} stroke="#0f172a" strokeWidth={1} opacity={opacity} />
+      {!isShort && (
+        <circle cx={end.x} cy={end.y} r={3} fill={color} opacity={opacity * 0.7} />
+      )}
     </g>
   );
 }
 
 export function FGFieldView({ kicks, currentKick }: Props) {
-  const yardLines: React.ReactNode[] = [];
-  // Yard lines every 10 yards (distance from goal)
-  for (let fx = 0; fx <= 100; fx += 10) {
-    const left = project(fx, 0);
-    const right = project(fx, 53);
-    const isGoal = fx === 100;
-    yardLines.push(
+  // Load team/school name for the end zone
+  const [ezName, setEzName] = useState("END ZONE");
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("st_team_v1");
+      if (raw) {
+        const t = JSON.parse(raw);
+        if (t.school) setEzName(t.school.toUpperCase());
+        else if (t.name) setEzName(t.name.toUpperCase());
+      }
+    } catch {}
+  }, []);
+
+  // Load theme accent for end zone color
+  const [ezColor, setEzColor] = useState("#991b1b");
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("st_theme");
+      if (raw) {
+        const t = JSON.parse(raw);
+        if (t.primary) setEzColor(t.primary);
+      }
+    } catch {}
+  }, []);
+
+  // Yard lines (every 5 yards from goal line outward)
+  const yardLineEls: React.ReactNode[] = [];
+  for (let yd = 0; yd <= 45; yd += 5) {
+    const dist = GOAL_LINE_DIST + yd;
+    if (dist > MAX_DIST) break;
+    const left = proj(dist, 0);
+    const right = proj(dist, 53);
+    const isGoalLine = yd === 0;
+    const isMajor = yd % 10 === 0;
+    yardLineEls.push(
       <line
-        key={`yl-${fx}`}
-        x1={left.x}
-        y1={left.y}
-        x2={right.x}
-        y2={right.y}
-        stroke={isGoal ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.22)"}
-        strokeWidth={isGoal ? 2 : 1}
+        key={`yl-${yd}`}
+        x1={left.x} y1={left.y} x2={right.x} y2={right.y}
+        stroke={isGoalLine ? "white" : "rgba(255,255,255,0.3)"}
+        strokeWidth={isGoalLine ? 3 : isMajor ? 1.5 : 0.8}
       />
     );
+    // Yard number text (painted on field) — only every 10
+    if (isMajor && yd > 0 && yd <= 40) {
+      const numLeft = proj(dist, 12);
+      const numRight = proj(dist, 41);
+      const fontSize = 11 - (dist / MAX_DIST) * 3;
+      [numLeft, numRight].forEach((p, i) => {
+        yardLineEls.push(
+          <text
+            key={`yn-${yd}-${i}`}
+            x={p.x} y={p.y + 1}
+            textAnchor="middle"
+            fontSize={fontSize}
+            fontWeight="bold"
+            fill="rgba(255,255,255,0.35)"
+          >
+            {yd}
+          </text>
+        );
+      });
+    }
   }
 
-  // Hash marks (dotted vertical lines down the field)
-  const hashMarks: React.ReactNode[] = [];
-  for (let fx = 5; fx <= 95; fx += 5) {
-    [18, 35].forEach((hy) => {
-      const a = project(fx, hy);
-      const b = project(fx, hy + 0.8);
-      hashMarks.push(
+  // Hash marks (small ticks at each yard line on the hash positions)
+  const hashEls: React.ReactNode[] = [];
+  for (let yd = 1; yd <= 45; yd++) {
+    const dist = GOAL_LINE_DIST + yd;
+    if (dist > MAX_DIST) break;
+    [HASH_LEFT, HASH_RIGHT].forEach((lat) => {
+      const a = proj(dist, lat - 0.3);
+      const b = proj(dist, lat + 0.3);
+      hashEls.push(
         <line
-          key={`hm-${fx}-${hy}`}
-          x1={a.x}
-          y1={a.y}
-          x2={b.x}
-          y2={b.y}
-          stroke="rgba(255,255,255,0.25)"
+          key={`h-${yd}-${lat}`}
+          x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+          stroke="rgba(255,255,255,0.2)"
           strokeWidth={1}
         />
       );
     });
   }
 
-  // Goalpost at the far end
-  const postBase = project(100, 26.5);
-  const postLeft = project(100, 24.1);
-  const postRight = project(100, 28.9);
-  const crossbarY = postBase.y - 18;
+  // End zone corners for pylons
+  const pylonPositions = [
+    proj(GOAL_LINE_DIST, 0),
+    proj(GOAL_LINE_DIST, 53),
+    proj(0, 0),
+    proj(0, 53),
+  ];
+
+  // Goalpost — positioned at back of end zone
+  const postDist = 2; // uprights ~2 yards from back
+  const postCenter = proj(postDist, 26.5);
+  const postL = proj(postDist, 24);
+  const postR = proj(postDist, 29);
+  const crossbarScreenY = postCenter.y;
+  const uprightTopY = crossbarScreenY - 50;
 
   const fgKicks = kicks.filter((k) => !k.isPAT);
 
@@ -165,64 +234,101 @@ export function FGFieldView({ kicks, currentKick }: Props) {
         <p className="text-xs font-semibold text-muted uppercase tracking-wider">Field View — FG</p>
         <div className="flex items-center gap-3 text-[10px] text-muted flex-wrap">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#60a5fa]" /> Spot</span>
-          <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-[#34d399]" /> Made</span>
+          <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-[#22c55e]" /> Made</span>
           <span className="flex items-center gap-1"><span className="w-4 h-0.5 bg-[#ef4444]" /> Miss</span>
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full mx-auto" style={{ maxHeight: 560 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full mx-auto" style={{ maxHeight: 600 }}>
         <defs>
-          <linearGradient id="fg-sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0b1120" />
-            <stop offset="100%" stopColor="#1e293b" />
-          </linearGradient>
-          <linearGradient id="fg-turf" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="fg-turf2" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#14532d" />
             <stop offset="100%" stopColor="#166534" />
           </linearGradient>
         </defs>
-        {/* Sky */}
-        <rect x={0} y={0} width={W} height={HORIZON_Y} fill="url(#fg-sky)" />
-        {/* Turf polygon */}
+
+        {/* Sky above the uprights */}
+        <rect x={0} y={0} width={W} height={uprightTopY} fill="#0b1120" />
+
+        {/* Field turf */}
         {(() => {
-          const tl = project(100, 0);
-          const tr = project(100, 53);
-          const br = project(0, 53);
-          const bl = project(0, 0);
+          const tl = proj(MAX_DIST, 0);
+          const tr = proj(MAX_DIST, 53);
+          const br = proj(0, 53);
+          const bl = proj(0, 0);
+          return <polygon points={`${bl.x},${bl.y} ${br.x},${br.y} ${tr.x},${tr.y} ${tl.x},${tl.y}`} fill="url(#fg-turf2)" />;
+        })()}
+
+        {/* End zone fill */}
+        {(() => {
+          const gl = proj(GOAL_LINE_DIST, 0);
+          const gr = proj(GOAL_LINE_DIST, 53);
+          const br = proj(0, 53);
+          const bl = proj(0, 0);
+          return <polygon points={`${bl.x},${bl.y} ${br.x},${br.y} ${gr.x},${gr.y} ${gl.x},${gl.y}`} fill={ezColor} opacity={0.35} />;
+        })()}
+
+        {/* End zone text */}
+        {(() => {
+          const mid = proj(GOAL_LINE_DIST / 2, 26.5);
+          const fontSize = 14;
           return (
-            <polygon
-              points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`}
-              fill="url(#fg-turf)"
-            />
+            <text
+              x={mid.x} y={mid.y + 4}
+              textAnchor="middle"
+              fontSize={fontSize}
+              fontWeight="900"
+              letterSpacing="6"
+              fill="white"
+              opacity={0.5}
+            >
+              {ezName}
+            </text>
           );
         })()}
+
         {/* Sidelines */}
         {(() => {
-          const a = project(0, 0);
-          const b = project(100, 0);
-          const c = project(100, 53);
-          const d = project(0, 53);
+          const bl = proj(MAX_DIST, 0);
+          const tl = proj(0, 0);
+          const br = proj(MAX_DIST, 53);
+          const tr = proj(0, 53);
           return (
             <>
-              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="white" strokeWidth={2} />
-              <line x1={d.x} y1={d.y} x2={c.x} y2={c.y} stroke="white" strokeWidth={2} />
+              <line x1={bl.x} y1={bl.y} x2={tl.x} y2={tl.y} stroke="white" strokeWidth={2} />
+              <line x1={br.x} y1={br.y} x2={tr.x} y2={tr.y} stroke="white" strokeWidth={2} />
             </>
           );
         })()}
-        {yardLines}
-        {hashMarks}
 
-        {/* Goalpost (in perspective) */}
+        {/* Back of end zone line */}
+        {(() => {
+          const l = proj(0, 0);
+          const r = proj(0, 53);
+          return <line x1={l.x} y1={l.y} x2={r.x} y2={r.y} stroke="white" strokeWidth={2} />;
+        })()}
+
+        {yardLineEls}
+        {hashEls}
+
+        {/* Pylons — orange squares at end zone corners */}
+        {pylonPositions.map((p, i) => (
+          <rect key={`pylon-${i}`} x={p.x - 3} y={p.y - 3} width={6} height={6} fill="#f97316" stroke="#ea580c" strokeWidth={1} rx={1} />
+        ))}
+
+        {/* Goalpost */}
         <g>
-          <line x1={postBase.x} y1={postBase.y} x2={postBase.x} y2={crossbarY} stroke="#fbbf24" strokeWidth={3} />
-          <line x1={postLeft.x} y1={crossbarY} x2={postRight.x} y2={crossbarY} stroke="#fbbf24" strokeWidth={4} />
-          <line x1={postLeft.x} y1={crossbarY} x2={postLeft.x} y2={crossbarY - 42} stroke="#fbbf24" strokeWidth={3} />
-          <line x1={postRight.x} y1={crossbarY} x2={postRight.x} y2={crossbarY - 42} stroke="#fbbf24" strokeWidth={3} />
+          {/* Base post */}
+          <line x1={postCenter.x} y1={crossbarScreenY} x2={postCenter.x} y2={crossbarScreenY + 12} stroke="#fbbf24" strokeWidth={3} />
+          {/* Crossbar */}
+          <line x1={postL.x} y1={crossbarScreenY} x2={postR.x} y2={crossbarScreenY} stroke="#fbbf24" strokeWidth={4} strokeLinecap="round" />
+          {/* Left upright */}
+          <line x1={postL.x} y1={crossbarScreenY} x2={postL.x} y2={uprightTopY} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" />
+          {/* Right upright */}
+          <line x1={postR.x} y1={crossbarScreenY} x2={postR.x} y2={uprightTopY} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" />
         </g>
 
-        {/* Past kicks */}
-        {fgKicks.map((k, i) => renderKick(i, { dist: k.dist, pos: k.pos, result: k.result }, 0.65))}
-
-        {/* Current kick preview */}
+        {/* Kicks */}
+        {fgKicks.map((k, i) => renderKick(i, { dist: k.dist, pos: k.pos, result: k.result }, 0.7))}
         {currentKick && currentKick.dist > 0 && renderKick("preview", currentKick, 1)}
       </svg>
       {fgKicks.length > 0 && (
