@@ -112,8 +112,24 @@ function SnapHighlights() {
   );
 }
 
+const SPORT_LABELS: Record<string, { label: string; icon: string; href: string }> = {
+  KICKING: { label: "FG", icon: "🏈", href: "/kicking/history" },
+  PUNTING: { label: "Punt", icon: "👟", href: "/punting/history" },
+  KICKOFF: { label: "KO", icon: "🎯", href: "/kickoff/history" },
+  LONGSNAP: { label: "Snap", icon: "📏", href: "/longsnap/history" },
+};
+
 function DashboardContent() {
-  const { history } = useFG();
+  const fg = useFG();
+  const punt = usePunt();
+  const kickoff = useKickoff();
+
+  // Merge all histories, tag with sport, sort by date descending
+  const allSessions = [
+    ...fg.history.map((s) => ({ ...s, sport: "KICKING" as const })),
+    ...punt.history.map((s) => ({ ...s, sport: "PUNTING" as const })),
+    ...kickoff.history.map((s) => ({ ...s, sport: "KICKOFF" as const })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
@@ -164,31 +180,62 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* Recent sessions */}
-        {history.length > 0 && (
+        {/* Recent sessions — all phases merged */}
+        {allSessions.length > 0 && (
           <div>
             <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
               Recent Sessions
             </h2>
             <div className="card-2 divide-y divide-border/50">
-              {[...history].reverse().slice(0, 5).map((session) => {
-                const kicks = (session.entries ?? []) as { result: string }[];
-                const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
-                return (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between py-3 px-1 first:pt-0 last:pb-0"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-200">{session.label}</p>
-                      <p className="text-xs text-muted">
-                        {kicks.length} kick{kicks.length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <span className={makes / kicks.length >= 0.7 ? "badge-make" : "badge-warn"}>
-                      {makePct(kicks.length, makes)}
+              {allSessions.slice(0, 8).map((session) => {
+                const entries = (session.entries ?? []) as unknown as Record<string, unknown>[];
+                const count = entries.length;
+                const sportInfo = SPORT_LABELS[session.sport] ?? { label: session.sport, icon: "📋", href: "#" };
+                const isGame = session.mode === "game";
+
+                // Sport-specific summary
+                let summary = `${count} entries`;
+                let badge: React.ReactNode = null;
+                if (session.sport === "KICKING") {
+                  const kicks = entries as { result: string }[];
+                  const makes = kicks.filter((k) => k.result?.startsWith("Y")).length;
+                  summary = `${count} kick${count !== 1 ? "s" : ""}`;
+                  badge = (
+                    <span className={makes / Math.max(count, 1) >= 0.7 ? "badge-make" : "badge-warn"}>
+                      {makePct(count, makes)}
                     </span>
-                  </div>
+                  );
+                } else if (session.sport === "PUNTING") {
+                  summary = `${count} punt${count !== 1 ? "s" : ""}`;
+                } else if (session.sport === "KICKOFF") {
+                  summary = `${count} kickoff${count !== 1 ? "s" : ""}`;
+                }
+
+                return (
+                  <Link
+                    key={session.id}
+                    href={sportInfo.href}
+                    className="flex items-center justify-between py-3 px-1 first:pt-0 last:pb-0 hover:bg-surface/30 transition-colors rounded"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-lg leading-none">{sportInfo.icon}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-semibold text-slate-200 truncate">{session.label}</p>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border text-muted font-semibold shrink-0">
+                            {sportInfo.label}
+                          </span>
+                          {isGame && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-400 font-bold shrink-0">
+                              GAME
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted">{summary}</p>
+                      </div>
+                    </div>
+                    {badge}
+                  </Link>
                 );
               })}
             </div>
