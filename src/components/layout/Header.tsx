@@ -8,12 +8,12 @@ import { useTeamLogo } from "@/lib/useTeamLogo";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 
-const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode; disabled?: boolean }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "⚡" },
   { href: "/kicking", label: "Kicking", iconEl: <GoalpostIcon size={20} /> },
   { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
-  { href: "/longsnap", label: "Long Snap", icon: "📏" },
+  { href: "#", label: "Long Snap", icon: "📏", disabled: true },
   { href: "/analytics", label: "Analytics", icon: "📊" },
   { href: "/archives", label: "Archived Stats", icon: "🗄" },
 ];
@@ -124,20 +124,31 @@ export function Header({ title }: { title?: string }) {
             </div>
             <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
               <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 py-1.5">Sports</p>
-              {NAV_ITEMS.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  className={clsx(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium transition-colors",
-                    isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
-                  )}
-                >
-                  {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
-                  {item.label}
-                </Link>
-              ))}
+              {NAV_ITEMS.map((item) =>
+                item.disabled ? (
+                  <div
+                    key={item.label}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium opacity-40 cursor-not-allowed"
+                  >
+                    {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+                    <span className="line-through">{item.label}</span>
+                    <span className="ml-auto text-[8px] font-bold text-warn uppercase">Under Construction</span>
+                  </div>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={clsx(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium transition-colors",
+                      isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
+                    )}
+                  >
+                    {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+                    {item.label}
+                  </Link>
+                )
+              )}
               {isCoach && (
                 <>
                   <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 pt-4 pb-1.5">Management</p>
@@ -193,21 +204,31 @@ export function MobileNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border lg:hidden z-40">
       <div className="flex">
-        {NAV_ITEMS.slice(0, 5).map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={clsx(
-              "flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors",
-              isActive(item.href) ? "text-accent" : "text-muted"
-            )}
-          >
-            {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
-            <span className="text-[9px] font-medium leading-none">
-              {item.label.split(" ")[0]}
-            </span>
-          </Link>
-        ))}
+        {NAV_ITEMS.slice(0, 5).map((item) =>
+          item.disabled ? (
+            <div
+              key={item.label}
+              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 opacity-30 cursor-not-allowed"
+            >
+              {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+              <span className="text-[7px] font-bold leading-none text-warn">SOON</span>
+            </div>
+          ) : (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={clsx(
+                "flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors",
+                isActive(item.href) ? "text-accent" : "text-muted"
+              )}
+            >
+              {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+              <span className="text-[9px] font-medium leading-none">
+                {item.label.split(" ")[0]}
+              </span>
+            </Link>
+          )
+        )}
       </div>
     </nav>
   );

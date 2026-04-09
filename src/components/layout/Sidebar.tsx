@@ -8,12 +8,12 @@ import { useTeamLogo } from "@/lib/useTeamLogo";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 
-const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode; disabled?: boolean }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "⚡" },
   { href: "/kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={20} /> },
   { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
-  { href: "/longsnap", label: "Long Snap", icon: "📏" },
+  { href: "#", label: "Long Snap", icon: "📏", disabled: true },
   { href: "/analytics", label: "Analytics", icon: "📊" },
   { href: "/archives", label: "Archived Stats", icon: "🗄" },
 ];
@@ -79,18 +79,29 @@ export function Sidebar() {
         <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 py-1.5">
           Sports
         </p>
-        {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={clsx(
-              isActive(item.href) ? "nav-link-active" : "nav-link"
-            )}
-          >
-            {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
-            {item.label}
-          </Link>
-        ))}
+        {NAV_ITEMS.map((item) =>
+          item.disabled ? (
+            <div
+              key={item.label}
+              className="nav-link opacity-40 cursor-not-allowed relative"
+            >
+              {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
+              <span className="line-through">{item.label}</span>
+              <span className="absolute right-2 text-[8px] font-bold text-warn uppercase tracking-wider">Under Construction</span>
+            </div>
+          ) : (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={clsx(
+                isActive(item.href) ? "nav-link-active" : "nav-link"
+              )}
+            >
+              {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
+              {item.label}
+            </Link>
+          )
+        )}
 
         {isCoach && (
           <>

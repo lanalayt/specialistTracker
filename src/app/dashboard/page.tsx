@@ -12,11 +12,11 @@ import { makePct } from "@/lib/stats";
 import Link from "next/link";
 import React from "react";
 
-const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string }[] = [
+const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string; disabled?: boolean }[] = [
   { href: "/kicking", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
   { href: "/punting", iconEl: <PuntFootIcon size={36} />, label: "Punting" },
   { href: "/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
-  { href: "/longsnap", icon: "📏", label: "Long Snapping" },
+  { href: "#", icon: "📏", label: "Long Snapping", disabled: true },
 ];
 
 function SeasonHighlights() {
@@ -120,18 +120,29 @@ function DashboardContent() {
             Sport Modules
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {SPORT_CARDS.map((card) => (
-              <Link
-                key={card.href}
-                href={card.href}
-                className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
-              >
-                <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
-                <h3 className="text-xs font-bold text-slate-100 group-hover:text-accent transition-colors">
-                  {card.label}
-                </h3>
-              </Link>
-            ))}
+            {SPORT_CARDS.map((card) =>
+              card.disabled ? (
+                <div
+                  key={card.label}
+                  className="card opacity-40 cursor-not-allowed flex flex-col items-center text-center py-6 relative"
+                >
+                  <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
+                  <h3 className="text-xs font-bold text-slate-100 line-through">{card.label}</h3>
+                  <span className="absolute top-2 right-2 text-[8px] font-bold text-warn uppercase">Under Construction</span>
+                </div>
+              ) : (
+                <Link
+                  key={card.href}
+                  href={card.href}
+                  className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
+                >
+                  <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
+                  <h3 className="text-xs font-bold text-slate-100 group-hover:text-accent transition-colors">
+                    {card.label}
+                  </h3>
+                </Link>
+              )
+            )}
           </div>
         </div>
 
