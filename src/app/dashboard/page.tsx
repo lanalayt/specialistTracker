@@ -7,7 +7,7 @@ import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/Spor
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
-import { LongSnapProvider, useLongSnap } from "@/lib/longSnapContext";
+import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
 import Link from "next/link";
 import React from "react";
@@ -19,98 +19,64 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
   { href: "/longsnap", icon: "📏", label: "Long Snapping" },
 ];
 
-function FGHighlights() {
-  const { athletes, stats } = useFG();
-  const overall = athletes.reduce(
+function SeasonHighlights() {
+  const { athletes: fgAthletes, stats: fgStats } = useFG();
+  const { athletes: puntAthletes, stats: puntStats } = usePunt();
+  const { athletes: koAthletes, stats: koStats } = useKickoff();
+
+  // FG
+  const fgTotals = fgAthletes.reduce(
     (acc, a) => {
-      const s = stats[a];
+      const s = fgStats[a];
       if (!s) return acc;
-      return {
-        att: acc.att + s.overall.att,
-        made: acc.made + s.overall.made,
-        longFG: Math.max(acc.longFG, s.overall.longFG),
-      };
+      return { att: acc.att + s.overall.att, made: acc.made + s.overall.made, longFG: Math.max(acc.longFG, s.overall.longFG) };
     },
     { att: 0, made: 0, longFG: 0 }
   );
-  return (
-    <>
-      <StatCard label="FG Make%" value={makePct(overall.att, overall.made)} accent />
-      <StatCard label="Long FG" value={overall.longFG > 0 ? `${overall.longFG} yd` : "—"} />
-    </>
-  );
-}
 
-function PuntHighlights() {
-  const { athletes, stats } = usePunt();
-  const overall = athletes.reduce(
+  // Punt
+  const puntTotals = puntAthletes.reduce(
     (acc, a) => {
-      const s = stats[a];
+      const s = puntStats[a];
       if (!s) return acc;
       return {
-        att: acc.att + s.overall.att,
         totalYards: acc.totalYards + s.overall.totalYards,
         yardsAtt: acc.yardsAtt + (s.overall.yardsAtt ?? s.overall.att),
-        totalDA: acc.totalDA + s.overall.totalDirectionalAccuracy,
-        daAtt: acc.daAtt + (s.overall.daAtt ?? s.overall.att),
+        totalHang: acc.totalHang + s.overall.totalHang,
+        hangAtt: acc.hangAtt + (s.overall.hangAtt ?? s.overall.att),
       };
     },
-    { att: 0, totalYards: 0, yardsAtt: 0, totalDA: 0, daAtt: 0 }
+    { totalYards: 0, yardsAtt: 0, totalHang: 0, hangAtt: 0 }
   );
-  const avgYards = overall.yardsAtt > 0 ? (overall.totalYards / overall.yardsAtt).toFixed(1) : "—";
-  const avgDA = overall.daAtt > 0 ? (overall.totalDA / overall.daAtt).toFixed(2) : "—";
-  return (
-    <>
-      <StatCard label="Avg Yards" value={avgYards} />
-      <StatCard label="Avg DA" value={avgDA} />
-    </>
-  );
-}
+  const puntAvg = puntTotals.yardsAtt > 0 ? (puntTotals.totalYards / puntTotals.yardsAtt).toFixed(1) : "—";
+  const puntHang = puntTotals.hangAtt > 0 ? `${(puntTotals.totalHang / puntTotals.hangAtt).toFixed(2)}s` : "—";
 
-function KickoffHighlights() {
-  const { athletes, stats } = useKickoff();
-  const overall = athletes.reduce(
+  // KO
+  const koTotals = koAthletes.reduce(
     (acc, a) => {
-      const s = stats[a];
+      const s = koStats[a];
       if (!s) return acc;
       return {
-        att: acc.att + s.overall.att,
-        touchbacks: acc.touchbacks + s.overall.touchbacks,
         totalDist: acc.totalDist + s.overall.totalDist,
+        distAtt: acc.distAtt + (s.overall.distAtt ?? s.overall.att),
+        totalHang: acc.totalHang + s.overall.totalHang,
+        hangAtt: acc.hangAtt + (s.overall.hangAtt ?? s.overall.att),
       };
     },
-    { att: 0, touchbacks: 0, totalDist: 0 }
+    { totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0 }
   );
-  const tbRate = overall.att > 0 ? `${Math.round((overall.touchbacks / overall.att) * 100)}%` : "—";
-  const avgDist = overall.att > 0 ? (overall.totalDist / overall.att).toFixed(1) : "—";
-  return (
-    <>
-      <StatCard label="TB Rate" value={tbRate} />
-      <StatCard label="Avg Dist" value={overall.att > 0 ? `${avgDist} yd` : "—"} />
-    </>
-  );
-}
+  const koAvgDist = koTotals.distAtt > 0 ? (koTotals.totalDist / koTotals.distAtt).toFixed(1) : "—";
+  const koHang = koTotals.hangAtt > 0 ? `${(koTotals.totalHang / koTotals.hangAtt).toFixed(2)}s` : "—";
 
-function SnapHighlights() {
-  const { athletes, stats } = useLongSnap();
-  const overall = athletes.reduce(
-    (acc, a) => {
-      const s = stats[a];
-      if (!s) return acc;
-      return {
-        att: acc.att + s.overall.att,
-        onTarget: acc.onTarget + s.overall.onTarget,
-        totalTime: acc.totalTime + s.overall.totalTime,
-      };
-    },
-    { att: 0, onTarget: 0, totalTime: 0 }
-  );
-  const avgTime = overall.att > 0 ? `${(overall.totalTime / overall.att).toFixed(2)}s` : "—";
   return (
-    <>
-      <StatCard label="On-Target%" value={makePct(overall.att, overall.onTarget)} />
-      <StatCard label="Avg Time" value={avgTime} />
-    </>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <StatCard label="FG %" value={makePct(fgTotals.att, fgTotals.made)} accent />
+      <StatCard label="Long FG" value={fgTotals.longFG > 0 ? `${fgTotals.longFG} yd` : "—"} />
+      <StatCard label="Punt Avg" value={puntAvg !== "—" ? `${puntAvg} yd` : "—"} />
+      <StatCard label="Punt Hang" value={puntHang} />
+      <StatCard label="KO Avg Dist" value={koAvgDist !== "—" ? `${koAvgDist} yd` : "—"} />
+      <StatCard label="KO Hang" value={koHang} />
+    </div>
   );
 }
 
@@ -169,17 +135,12 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* Highlights — 2 stats per sport */}
+        {/* Season Highlights */}
         <div>
           <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
             Season Highlights
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-            <FGHighlights />
-            <PuntHighlights />
-            <KickoffHighlights />
-            <SnapHighlights />
-          </div>
+          <SeasonHighlights />
         </div>
 
         {/* Recent sessions — all phases merged */}
