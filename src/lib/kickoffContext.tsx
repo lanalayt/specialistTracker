@@ -51,6 +51,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       let saved: KickoffStateData | null = null;
+      let loadedFromCloud = false;
 
       // Wait briefly for team ID to be set by AppProviders after auth resolves
       let tid = getTeamId();
@@ -62,11 +63,13 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       // Try team_data first (shared across team members)
       if (tid && tid !== "local-dev") {
         saved = await teamGet<KickoffStateData>(tid, "kickoff_data");
+        if (saved) loadedFromCloud = true;
       }
 
       // Fall back to user's own Supabase data
       if (!saved && userId && userId !== "local-dev") {
         saved = await cloudGet<KickoffStateData>(userId, getCloudKey("KICKOFF"));
+        if (saved) loadedFromCloud = true;
       }
 
       if (!saved) {
@@ -79,7 +82,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
         const migrated = { ...saved, stats };
         setState(migrated);
         localSet("KICKOFF", migrated);
-        if (tid && tid !== "local-dev") {
+        if (!loadedFromCloud && tid && tid !== "local-dev") {
           teamSet(tid, "kickoff_data", migrated);
         }
       }

@@ -65,6 +65,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       let saved: FGStateData | null = null;
+      let loadedFromCloud = false;
       // Wait briefly for team ID to be set by AppProviders after auth resolves
       let tid = getTeamId();
       for (let i = 0; i < 10 && !tid; i++) {
@@ -75,11 +76,13 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
       // Try team_data first (shared across team members)
       if (tid && tid !== "local-dev") {
         saved = await teamGet<FGStateData>(tid, "fg_data");
+        if (saved) loadedFromCloud = true;
       }
 
       // Fall back to user's own Supabase data
       if (!saved && userId && userId !== "local-dev") {
         saved = await cloudGet<FGStateData>(userId, getCloudKey("FG"));
+        if (saved) loadedFromCloud = true;
       }
 
       // Fall back to localStorage
@@ -98,9 +101,14 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         });
         const migrated = { ...saved, stats };
         setState(migrated);
-        // Ensure localStorage is in sync
+        // Sync localStorage with what we loaded
         localSet("FG", migrated);
-        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", migrated); }
+        // Only write back to cloud if data came from a LOCAL fallback
+        // (never overwrite cloud with potentially stale local data)
+        if (!loadedFromCloud) {
+          const _t = getTeamId();
+          if (_t && _t !== "local-dev") teamSet(_t, "fg_data", migrated);
+        }
       }
     }
 
