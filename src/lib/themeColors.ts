@@ -1,80 +1,90 @@
 /**
- * Theme color customization.
- * Stores user-chosen colors and applies them as CSS custom properties on :root.
+ * Theme color customization with 3 school colors.
+ *
+ * The user picks:
+ *   primary   → accent color (buttons, highlights, active states, make indicator)
+ *   secondary → page backgrounds (bg, surface, surface-2 derived as lighter shades)
+ *   tertiary  → borders, muted elements, secondary highlights
+ *
+ * These map to CSS custom properties on :root that Tailwind reads via var().
  */
 
 const STORAGE_KEY = "st_theme";
 
 export interface ThemeColors {
-  accent: string;   // primary accent (buttons, highlights, make)
-  bg: string;       // page background
-  surface: string;  // card / sidebar background
-  surface2: string; // secondary surface
-  border: string;   // borders
+  primary: string;    // accent — buttons, active states
+  secondary: string;  // background base
+  tertiary: string;   // border / highlight accent
 }
 
 export const DEFAULT_THEME: ThemeColors = {
-  accent: "#00d4a0",
-  bg: "#0a0f14",
-  surface: "#141c26",
-  surface2: "#1a2535",
-  border: "#1f2f42",
+  primary: "#00d4a0",
+  secondary: "#0a0f14",
+  tertiary: "#1f2f42",
 };
 
-// Preset palettes
 export const PRESETS: { name: string; colors: ThemeColors }[] = [
-  {
-    name: "Default (Teal)",
-    colors: DEFAULT_THEME,
-  },
-  {
-    name: "Blue",
-    colors: { accent: "#3b82f6", bg: "#0a0f1a", surface: "#111827", surface2: "#1e293b", border: "#1e3a5f" },
-  },
-  {
-    name: "Purple",
-    colors: { accent: "#8b5cf6", bg: "#0f0a1a", surface: "#1a1127", surface2: "#251a3b", border: "#2e1f5f" },
-  },
-  {
-    name: "Red",
-    colors: { accent: "#ef4444", bg: "#140a0a", surface: "#1c1111", surface2: "#2a1a1a", border: "#3f1f1f" },
-  },
-  {
-    name: "Gold",
-    colors: { accent: "#f59e0b", bg: "#0f0d0a", surface: "#1a1711", surface2: "#2a2418", border: "#3f3520" },
-  },
-  {
-    name: "Emerald",
-    colors: { accent: "#10b981", bg: "#0a1410", surface: "#111c16", surface2: "#1a2b22", border: "#1f3f2f" },
-  },
-  {
-    name: "Pink",
-    colors: { accent: "#ec4899", bg: "#140a10", surface: "#1c1118", surface2: "#2a1a25", border: "#3f1f35" },
-  },
-  {
-    name: "Orange",
-    colors: { accent: "#f97316", bg: "#140e0a", surface: "#1c1511", surface2: "#2a2018", border: "#3f2f1f" },
-  },
+  { name: "Default", colors: DEFAULT_THEME },
+  { name: "Blue & Navy", colors: { primary: "#3b82f6", secondary: "#0a0f1a", tertiary: "#1e3a5f" } },
+  { name: "Purple & Black", colors: { primary: "#8b5cf6", secondary: "#0f0a1a", tertiary: "#2e1f5f" } },
+  { name: "Red & Black", colors: { primary: "#ef4444", secondary: "#0e0808", tertiary: "#3f1f1f" } },
+  { name: "Gold & Black", colors: { primary: "#f59e0b", secondary: "#0e0c08", tertiary: "#3f3520" } },
+  { name: "Maroon & Black", colors: { primary: "#7c2d3c", secondary: "#0e0808", tertiary: "#3d1820" } },
+  { name: "Orange & Navy", colors: { primary: "#f97316", secondary: "#0a0d14", tertiary: "#2a1f1f" } },
+  { name: "Crimson & Cream", colors: { primary: "#dc2626", secondary: "#1a1614", tertiary: "#3a2820" } },
+  { name: "Green & Gold", colors: { primary: "#16a34a", secondary: "#0a100c", tertiary: "#2a3520" } },
+  { name: "Royal & White", colors: { primary: "#2563eb", secondary: "#0c1020", tertiary: "#1e2d5f" } },
+  { name: "Scarlet & Gray", colors: { primary: "#cc0000", secondary: "#121212", tertiary: "#333333" } },
+  { name: "Black & Gold", colors: { primary: "#eab308", secondary: "#0a0a0a", tertiary: "#2a2510" } },
 ];
 
+function parseHex(hex: string): [number, number, number] {
+  const h = hex.startsWith("#") ? hex.slice(1) : hex;
+  return [
+    parseInt(h.slice(0, 2), 16) || 0,
+    parseInt(h.slice(2, 4), 16) || 0,
+    parseInt(h.slice(4, 6), 16) || 0,
+  ];
+}
+
+function lighten(hex: string, amount: number): string {
+  const [r, g, b] = parseHex(hex);
+  const lr = Math.min(255, r + Math.round((255 - r) * amount));
+  const lg = Math.min(255, g + Math.round((255 - g) * amount));
+  const lb = Math.min(255, b + Math.round((255 - b) * amount));
+  return `#${lr.toString(16).padStart(2, "0")}${lg.toString(16).padStart(2, "0")}${lb.toString(16).padStart(2, "0")}`;
+}
+
 function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
+  const [r, g, b] = parseHex(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/** Apply theme colors to :root CSS variables */
+/** Derive all CSS variables from the 3 user-chosen colors */
 export function applyTheme(colors: ThemeColors): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.style.setProperty("--accent", colors.accent);
-  root.style.setProperty("--accent-dim", hexToRgba(colors.accent, 0.15));
-  root.style.setProperty("--make", colors.accent);
-  root.style.setProperty("--bg", colors.bg);
-  root.style.setProperty("--surface", colors.surface);
-  root.style.setProperty("--surface-2", colors.surface2);
-  root.style.setProperty("--border", colors.border);
+
+  // Primary → accent, make
+  root.style.setProperty("--accent", colors.primary);
+  root.style.setProperty("--accent-dim", hexToRgba(colors.primary, 0.15));
+  root.style.setProperty("--make", colors.primary);
+
+  // Secondary → bg, surface, surface-2
+  root.style.setProperty("--bg", colors.secondary);
+  root.style.setProperty("--surface", lighten(colors.secondary, 0.06));
+  root.style.setProperty("--surface-2", lighten(colors.secondary, 0.10));
+
+  // Tertiary → border
+  root.style.setProperty("--border", colors.tertiary);
+
+  // Muted text — derived to be readable on the background
+  root.style.setProperty("--muted", lighten(colors.secondary, 0.35));
+
+  // Keep miss and warn fixed
+  root.style.setProperty("--miss", "#ef4444");
+  root.style.setProperty("--warn", "#f59e0b");
+  root.style.setProperty("--text", "#f1f5f9");
 }
 
 /** Load saved theme from localStorage, apply it, and return it */
@@ -84,12 +94,14 @@ export function loadAndApplyTheme(): ThemeColors {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as ThemeColors;
-      if (parsed.accent && parsed.bg) {
+      if (parsed.primary && parsed.secondary) {
         applyTheme(parsed);
         return parsed;
       }
     }
   } catch {}
+  // Apply defaults explicitly so CSS vars are always set
+  applyTheme(DEFAULT_THEME);
   return DEFAULT_THEME;
 }
 

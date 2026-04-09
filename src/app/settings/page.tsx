@@ -76,29 +76,16 @@ function SettingsContent() {
   const [theme, setTheme] = useState<ThemeColors>(() =>
     typeof window !== "undefined" ? loadAndApplyTheme() : DEFAULT_THEME
   );
-  const [customAccent, setCustomAccent] = useState(theme.accent);
 
   const handlePreset = (colors: ThemeColors) => {
     setTheme(colors);
-    setCustomAccent(colors.accent);
     saveTheme(colors);
   };
 
-  const handleCustomAccent = (hex: string) => {
-    setCustomAccent(hex);
-    // Derive bg/surface/border from accent hue
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const custom: ThemeColors = {
-      accent: hex,
-      bg: `rgb(${Math.round(r * 0.04)}, ${Math.round(g * 0.06)}, ${Math.round(b * 0.08)})`,
-      surface: `rgb(${Math.round(r * 0.08)}, ${Math.round(g * 0.11)}, ${Math.round(b * 0.15)})`,
-      surface2: `rgb(${Math.round(r * 0.10)}, ${Math.round(g * 0.15)}, ${Math.round(b * 0.21)})`,
-      border: `rgb(${Math.round(r * 0.12)}, ${Math.round(g * 0.19)}, ${Math.round(b * 0.26)})`,
-    };
-    setTheme(custom);
-    saveTheme(custom);
+  const handleColorChange = (field: keyof ThemeColors, hex: string) => {
+    const next = { ...theme, [field]: hex };
+    setTheme(next);
+    saveTheme(next);
   };
 
   // Archive UI state
@@ -255,42 +242,84 @@ function SettingsContent() {
           {/* Theme / Colors */}
           <div className="card space-y-4">
             <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Theme Colors
+              School Colors
             </p>
-            <p className="text-xs text-muted">Pick a preset or choose a custom accent color. The whole site updates instantly.</p>
+            <p className="text-xs text-muted">Pick a preset or choose your school&apos;s colors below. Changes apply instantly.</p>
 
             {/* Preset grid */}
-            <div className="grid grid-cols-4 gap-2">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.name}
-                  onClick={() => handlePreset(p.colors)}
-                  className={clsx(
-                    "flex flex-col items-center gap-1.5 p-2.5 rounded-input border transition-all",
-                    theme.accent === p.colors.accent
-                      ? "border-accent/60 bg-accent/10"
-                      : "border-border hover:border-accent/40 hover:bg-surface-2"
-                  )}
-                >
-                  <div
-                    className="w-7 h-7 rounded-full border-2 border-white/20"
-                    style={{ backgroundColor: p.colors.accent }}
-                  />
-                  <span className="text-[10px] text-slate-300 font-medium leading-tight text-center">{p.name}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {PRESETS.map((p) => {
+                const isActive = theme.primary === p.colors.primary && theme.secondary === p.colors.secondary;
+                return (
+                  <button
+                    key={p.name}
+                    onClick={() => handlePreset(p.colors)}
+                    className={clsx(
+                      "flex flex-col items-center gap-1.5 p-2 rounded-input border transition-all",
+                      isActive
+                        ? "border-accent/60 bg-accent/10 ring-1 ring-accent/40"
+                        : "border-border hover:border-accent/40 hover:bg-surface-2"
+                    )}
+                  >
+                    <div className="flex gap-1">
+                      <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: p.colors.primary }} />
+                      <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: p.colors.secondary }} />
+                      <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: p.colors.tertiary }} />
+                    </div>
+                    <span className="text-[9px] text-slate-300 font-medium leading-tight text-center">{p.name}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Custom color picker */}
-            <div className="flex items-center gap-3">
-              <label className="text-xs text-muted whitespace-nowrap">Custom accent:</label>
-              <input
-                type="color"
-                value={customAccent}
-                onChange={(e) => handleCustomAccent(e.target.value)}
-                className="w-10 h-10 rounded-input border border-border cursor-pointer bg-transparent"
-              />
-              <span className="text-xs text-slate-300 font-mono">{customAccent}</span>
+            {/* Custom 3-color pickers */}
+            <div className="space-y-3 pt-2 border-t border-border">
+              <p className="text-[10px] font-semibold text-muted uppercase tracking-wider">Custom Colors</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col items-center gap-1.5">
+                  <input
+                    type="color"
+                    value={theme.primary}
+                    onChange={(e) => handleColorChange("primary", e.target.value)}
+                    className="w-12 h-12 rounded-input border-2 border-border cursor-pointer bg-transparent"
+                  />
+                  <span className="text-[10px] text-muted font-semibold">Primary</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{theme.primary}</span>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <input
+                    type="color"
+                    value={theme.secondary}
+                    onChange={(e) => handleColorChange("secondary", e.target.value)}
+                    className="w-12 h-12 rounded-input border-2 border-border cursor-pointer bg-transparent"
+                  />
+                  <span className="text-[10px] text-muted font-semibold">Background</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{theme.secondary}</span>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <input
+                    type="color"
+                    value={theme.tertiary}
+                    onChange={(e) => handleColorChange("tertiary", e.target.value)}
+                    className="w-12 h-12 rounded-input border-2 border-border cursor-pointer bg-transparent"
+                  />
+                  <span className="text-[10px] text-muted font-semibold">Borders</span>
+                  <span className="text-[9px] text-slate-400 font-mono">{theme.tertiary}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Live preview strip */}
+            <div className="rounded-input overflow-hidden border border-border">
+              <div className="h-2" style={{ backgroundColor: theme.primary }} />
+              <div className="flex h-8">
+                <div className="flex-1" style={{ backgroundColor: theme.secondary }} />
+                <div className="w-px" style={{ backgroundColor: theme.tertiary }} />
+                <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: theme.primary }}>
+                  <span className="text-[10px] font-bold" style={{ color: theme.secondary }}>Button</span>
+                </div>
+              </div>
+              <div className="h-1" style={{ backgroundColor: theme.tertiary }} />
             </div>
           </div>
 
