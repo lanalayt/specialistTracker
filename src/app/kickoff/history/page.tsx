@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useKickoff } from "@/lib/kickoffContext";
 import { useAuth } from "@/lib/auth";
 import { KickoffFieldView } from "@/components/ui/KickoffFieldView";
@@ -23,12 +24,22 @@ function formatLabel(dateStr: string): string {
 export default function KickoffHistoryPage() {
   const { history, updateSessionDate, updateSessionWeather, deleteSession } = useKickoff();
   const { isAthlete } = useAuth();
-  const [modeFilter, setModeFilter] = useState<"practice" | "game">("practice");
+  const searchParams = useSearchParams();
+  const sessionParam = searchParams.get("session");
+  const [modeFilter, setModeFilter] = useState<"practice" | "game">(() => {
+    if (sessionParam) {
+      const s = history.find((h) => h.id === sessionParam);
+      if (s?.mode === "game") return "game";
+    }
+    return "practice";
+  });
   const filteredHistory = history.filter((s) =>
     modeFilter === "game" ? s.mode === "game" : s.mode !== "game"
   );
   const [selectedId, setSelectedId] = useState<string | null>(
-    filteredHistory[filteredHistory.length - 1]?.id ?? null
+    sessionParam && filteredHistory.some((s) => s.id === sessionParam)
+      ? sessionParam
+      : filteredHistory[filteredHistory.length - 1]?.id ?? null
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);

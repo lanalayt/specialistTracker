@@ -112,11 +112,11 @@ function SnapHighlights() {
   );
 }
 
-const SPORT_LABELS: Record<string, { label: string; icon: string; href: string }> = {
-  KICKING: { label: "FG", icon: "🏈", href: "/kicking/history" },
-  PUNTING: { label: "Punt", icon: "👟", href: "/punting/history" },
-  KICKOFF: { label: "KO", icon: "🎯", href: "/kickoff/history" },
-  LONGSNAP: { label: "Snap", icon: "📏", href: "/longsnap/history" },
+const SPORT_LABELS: Record<string, { label: string; icon: string; basePath: string }> = {
+  KICKING: { label: "FG", icon: "🏈", basePath: "/kicking/history" },
+  PUNTING: { label: "Punt", icon: "👟", basePath: "/punting/history" },
+  KICKOFF: { label: "KO", icon: "🎯", basePath: "/kickoff/history" },
+  LONGSNAP: { label: "Snap", icon: "📏", basePath: "/longsnap/history" },
 };
 
 function DashboardContent() {
@@ -188,39 +188,51 @@ function DashboardContent() {
             </h2>
             <div className="card-2 divide-y divide-border/50">
               {allSessions.slice(0, 8).map((session) => {
-                const entries = (session.entries ?? []) as unknown as Record<string, unknown>[];
-                const count = entries.length;
-                const sportInfo = SPORT_LABELS[session.sport] ?? { label: session.sport, icon: "📋", href: "#" };
+                const sportInfo = SPORT_LABELS[session.sport] ?? { label: session.sport, icon: "📋", basePath: "#" };
                 const isGame = session.mode === "game";
+                const href = `${sportInfo.basePath}?session=${session.id}`;
 
-                // Sport-specific summary
-                let summary = `${count} entries`;
+                // Sport-specific recap
+                let recap = "";
                 let badge: React.ReactNode = null;
                 if (session.sport === "KICKING") {
-                  const kicks = entries as { result: string }[];
+                  const kicks = ((session.entries ?? []) as unknown as { result: string; isPAT?: boolean }[]).filter(k => !k.isPAT);
                   const makes = kicks.filter((k) => k.result?.startsWith("Y")).length;
-                  summary = `${count} kick${count !== 1 ? "s" : ""}`;
+                  const att = kicks.length;
+                  recap = `${makes}/${att} FG · ${makePct(att, makes)}`;
                   badge = (
-                    <span className={makes / Math.max(count, 1) >= 0.7 ? "badge-make" : "badge-warn"}>
-                      {makePct(count, makes)}
+                    <span className={makes / Math.max(att, 1) >= 0.7 ? "badge-make" : "badge-warn"}>
+                      {makePct(att, makes)}
                     </span>
                   );
                 } else if (session.sport === "PUNTING") {
-                  summary = `${count} punt${count !== 1 ? "s" : ""}`;
+                  const punts = (session.entries ?? []) as unknown as { yards: number; hangTime: number }[];
+                  const att = punts.length;
+                  const ydsEntries = punts.filter((p) => p.yards > 0);
+                  const avgDist = ydsEntries.length > 0 ? (ydsEntries.reduce((s, p) => s + p.yards, 0) / ydsEntries.length).toFixed(1) : "—";
+                  const htEntries = punts.filter((p) => p.hangTime > 0);
+                  const avgHang = htEntries.length > 0 ? (htEntries.reduce((s, p) => s + p.hangTime, 0) / htEntries.length).toFixed(2) : "—";
+                  recap = `${att} punt${att !== 1 ? "s" : ""} · ${avgDist} avg · ${avgHang}s hang`;
                 } else if (session.sport === "KICKOFF") {
-                  summary = `${count} kickoff${count !== 1 ? "s" : ""}`;
+                  const kicks = (session.entries ?? []) as unknown as { distance: number; hangTime: number }[];
+                  const att = kicks.length;
+                  const distEntries = kicks.filter((k) => k.distance > 0);
+                  const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : "—";
+                  const htEntries = kicks.filter((k) => k.hangTime > 0);
+                  const avgHang = htEntries.length > 0 ? (htEntries.reduce((s, k) => s + k.hangTime, 0) / htEntries.length).toFixed(2) : "—";
+                  recap = `${att} KO${att !== 1 ? "s" : ""} · ${avgDist} avg · ${avgHang}s hang`;
                 }
 
                 return (
                   <Link
                     key={session.id}
-                    href={sportInfo.href}
-                    className="flex items-center justify-between py-3 px-1 first:pt-0 last:pb-0 hover:bg-surface/30 transition-colors rounded"
+                    href={href}
+                    className="flex items-center justify-between py-3 px-1.5 first:pt-0 last:pb-0 hover:bg-surface/30 transition-colors rounded"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-lg leading-none">{sportInfo.icon}</span>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="text-sm font-semibold text-slate-200 truncate">{session.label}</p>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border text-muted font-semibold shrink-0">
                             {sportInfo.label}
@@ -231,7 +243,7 @@ function DashboardContent() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-muted">{summary}</p>
+                        <p className="text-xs text-muted mt-0.5">{recap}</p>
                       </div>
                     </div>
                     {badge}
