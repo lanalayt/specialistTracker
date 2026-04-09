@@ -6,9 +6,6 @@ import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { useAuth } from "@/lib/auth";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
-import { localGet, localSet, STORAGE_KEYS, setCloudUserId } from "@/lib/amplify";
-import { cloudSetImmediate, cloudGet } from "@/lib/supabaseData";
-import { getCloudKey } from "@/lib/amplify";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
@@ -17,10 +14,13 @@ import { teamGet, getTeamId } from "@/lib/teamData";
 import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, type ThemeColors } from "@/lib/themeColors";
 import clsx from "clsx";
 
-const SPORT_OPTIONS = [
-  { id: "KICKING", label: "FG Kicking", icon: "🏈" },
-  { id: "PUNTING", label: "Punting", icon: "👟" },
-  { id: "KICKOFF", label: "Kickoff", icon: "🎯" },
+import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import React from "react";
+
+const SPORT_OPTIONS: { id: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+  { id: "KICKING", label: "FG Kicking", iconEl: <GoalpostIcon size={20} /> },
+  { id: "PUNTING", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
+  { id: "KICKOFF", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
   { id: "LONGSNAP", label: "Long Snapping", icon: "📏" },
 ];
 
@@ -33,44 +33,6 @@ function SettingsContent() {
   const [school, setSchool] = useState("My School");
   const [enabledSports, setEnabledSports] = useState<string[]>(["KICKING", "PUNTING", "KICKOFF", "LONGSNAP"]);
   const [saved, setSaved] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncDone, setSyncDone] = useState(false);
-  const [pulling, setPulling] = useState(false);
-  const [pullDone, setPullDone] = useState<string | null>(null);
-
-  const handlePullFromCloud = async () => {
-    setPulling(true);
-    setPullDone(null);
-    try {
-      const tid = getTeamId();
-      if (!tid || tid === "local-dev") {
-        alert("No team ID — make sure you're signed in.");
-        setPulling(false);
-        return;
-      }
-      // Fetch each phase from team_data
-      const [fgData, puntData, kickoffData] = await Promise.all([
-        teamGet<{ athletes: string[]; stats: Record<string, unknown>; history: unknown[] }>(tid, "fg_data"),
-        teamGet<{ athletes: string[]; stats: Record<string, unknown>; history: unknown[] }>(tid, "punt_data"),
-        teamGet<{ athletes: string[]; stats: Record<string, unknown>; history: unknown[] }>(tid, "kickoff_data"),
-      ]);
-      // Write to localStorage so contexts pick them up on reload
-      if (fgData) localStorage.setItem("st_fg_v1", JSON.stringify(fgData));
-      if (puntData) localStorage.setItem("st_punt_v1", JSON.stringify(puntData));
-      if (kickoffData) localStorage.setItem("st_kickoff_v1", JSON.stringify(kickoffData));
-      const fgCount = (fgData?.history as unknown[] | undefined)?.length ?? 0;
-      const puntCount = (puntData?.history as unknown[] | undefined)?.length ?? 0;
-      const koCount = (kickoffData?.history as unknown[] | undefined)?.length ?? 0;
-      setPullDone(`FG: ${fgCount} · Punt: ${puntCount} · KO: ${koCount}`);
-      // Reload so every context reads fresh data from localStorage
-      setTimeout(() => window.location.reload(), 1000);
-    } catch (err) {
-      console.error(err);
-      alert("Pull failed. Check console.");
-    } finally {
-      setPulling(false);
-    }
-  };
 
   // Theme
   const [theme, setTheme] = useState<ThemeColors>(() =>
@@ -126,42 +88,6 @@ function SettingsContent() {
     }
   };
 
-  const handleSyncToCloud = async () => {
-    if (!user?.id || user.id === "local-dev") return;
-    setSyncing(true);
-    setCloudUserId(user.id);
-
-    try {
-      // Sync all sport data from localStorage to Supabase
-      const sportKeys: (keyof typeof STORAGE_KEYS)[] = ["FG", "PUNT", "KICKOFF", "LONGSNAP", "TEAM"];
-      for (const key of sportKeys) {
-        const local = localGet(key);
-        if (local) {
-          await cloudSetImmediate(user.id, getCloudKey(key), local);
-        }
-      }
-
-      // Sync settings
-      const settingsKeys = ["fgSettings", "puntSettings", "st_team_v1"];
-      for (const key of settingsKeys) {
-        try {
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            await cloudSetImmediate(user.id, `settings_${key}`, parsed);
-          }
-        } catch {}
-      }
-
-      setSyncDone(true);
-      setTimeout(() => setSyncDone(false), 3000);
-    } catch (err) {
-      alert("Sync failed. Check console for details.");
-      console.error(err);
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   useEffect(() => {
     try {
@@ -345,7 +271,7 @@ function SettingsContent() {
                     onChange={() => toggleSport(s.id)}
                     className="accent-accent"
                   />
-                  <span className="text-xl">{s.icon}</span>
+                  {s.iconEl ?? <span className="text-xl">{s.icon}</span>}
                   <span className="text-sm font-medium text-slate-200">{s.label}</span>
                   {enabledSports.includes(s.id) && (
                     <span className="badge-make ml-auto">Enabled</span>
@@ -455,47 +381,6 @@ function SettingsContent() {
                 <code className="text-accent text-[10px] truncate ml-2 max-w-[180px]">{getTeamId() ?? "not set"}</code>
               </div>
             </div>
-            <button
-              onClick={handlePullFromCloud}
-              disabled={pulling}
-              className={clsx(
-                "w-full py-3 rounded-input text-sm font-bold transition-all",
-                pullDone
-                  ? "bg-make text-slate-900"
-                  : pulling
-                    ? "bg-surface-2 text-muted border border-border cursor-wait"
-                    : "bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30"
-              )}
-            >
-              {pullDone ? `✓ Pulled! ${pullDone} — reloading…` : pulling ? "Pulling..." : "↓ Pull Latest from Cloud"}
-            </button>
-            <p className="text-[10px] text-muted">
-              Forces this device to re-download all FG, Punt, and Kickoff data from the cloud, then reloads.
-            </p>
-          </div>
-
-          {/* Cloud Sync */}
-          <div className="card space-y-3">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Push Local → Cloud
-            </p>
-            <p className="text-xs text-muted">
-              Push all local data (sessions, stats, settings) to the cloud. Use this if you have existing data in your browser that needs to be backed up.
-            </p>
-            <button
-              onClick={handleSyncToCloud}
-              disabled={syncing || !user?.id || user.id === "local-dev"}
-              className={clsx(
-                "w-full py-3 rounded-input text-sm font-bold transition-all",
-                syncDone
-                  ? "bg-make text-slate-900"
-                  : syncing
-                    ? "bg-surface-2 text-muted border border-border cursor-wait"
-                    : "bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30"
-              )}
-            >
-              {syncDone ? "✓ All Data Synced!" : syncing ? "Syncing..." : "↑ Push Local Data to Cloud"}
-            </button>
           </div>
 
           {/* Save */}

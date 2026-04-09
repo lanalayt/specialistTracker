@@ -193,7 +193,7 @@ export default function KickoffSessionPage() {
   );
   const [pendingKicks, setPendingKicks] = useState<KickoffEntry[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
-  const [sessionMode, setSessionMode] = useState<"practice" | "game">(draft.sessionMode ?? "practice");
+  const [sessionMode, setSessionMode] = useState<"practice" | "game">("practice");
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 

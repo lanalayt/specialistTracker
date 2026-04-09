@@ -3,17 +3,19 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { StatCard } from "@/components/ui/StatCard";
+import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider, useLongSnap } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
 import Link from "next/link";
+import React from "react";
 
-const SPORT_CARDS = [
-  { href: "/kicking", icon: "🏈", label: "FG Kicking" },
-  { href: "/punting", icon: "👟", label: "Punting" },
-  { href: "/kickoff", icon: "🎯", label: "Kickoff" },
+const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string }[] = [
+  { href: "/kicking", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
+  { href: "/punting", iconEl: <PuntFootIcon size={36} />, label: "Punting" },
+  { href: "/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
   { href: "/longsnap", icon: "📏", label: "Long Snapping" },
 ];
 
@@ -112,11 +114,11 @@ function SnapHighlights() {
   );
 }
 
-const SPORT_LABELS: Record<string, { label: string; icon: string; basePath: string }> = {
-  KICKING: { label: "FG", icon: "🏈", basePath: "/kicking/history" },
-  PUNTING: { label: "Punt", icon: "👟", basePath: "/punting/history" },
-  KICKOFF: { label: "KO", icon: "🎯", basePath: "/kickoff/history" },
-  LONGSNAP: { label: "Snap", icon: "📏", basePath: "/longsnap/history" },
+const SPORT_LABELS: Record<string, { label: string; iconEl: React.ReactNode; basePath: string }> = {
+  KICKING: { label: "FG", iconEl: <GoalpostIcon size={20} />, basePath: "/kicking/history" },
+  PUNTING: { label: "Punt", iconEl: <PuntFootIcon size={20} />, basePath: "/punting/history" },
+  KICKOFF: { label: "KO", iconEl: <KickoffTeeIcon size={20} />, basePath: "/kickoff/history" },
+  LONGSNAP: { label: "Snap", iconEl: <span className="text-lg leading-none">📏</span>, basePath: "/longsnap/history" },
 };
 
 function DashboardContent() {
@@ -158,7 +160,7 @@ function DashboardContent() {
                 href={card.href}
                 className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
               >
-                <div className="text-4xl mb-2">{card.icon}</div>
+                <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
                 <h3 className="text-xs font-bold text-slate-100 group-hover:text-accent transition-colors">
                   {card.label}
                 </h3>
@@ -188,7 +190,7 @@ function DashboardContent() {
             </h2>
             <div className="card-2 divide-y divide-border/50">
               {allSessions.slice(0, 8).map((session) => {
-                const sportInfo = SPORT_LABELS[session.sport] ?? { label: session.sport, icon: "📋", basePath: "#" };
+                const sportInfo = SPORT_LABELS[session.sport] ?? { label: session.sport, iconEl: <span>📋</span>, basePath: "#" };
                 const isGame = session.mode === "game";
                 const href = `${sportInfo.basePath}?session=${session.id}`;
 
@@ -230,7 +232,7 @@ function DashboardContent() {
                     className="flex items-center justify-between py-3 px-1.5 first:pt-0 last:pb-0 hover:bg-surface/30 transition-colors rounded"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-lg leading-none">{sportInfo.icon}</span>
+                      {sportInfo.iconEl}
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="text-sm font-semibold text-slate-200 truncate">{session.label}</p>

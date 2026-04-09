@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveSettingsToCloud } from "@/lib/settingsSync";
+import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import React from "react";
 
-const SPORT_OPTIONS = [
-  { id: "KICKING", label: "FG Kicking", icon: "🏈", desc: "Field goals & PATs" },
-  { id: "PUNTING", label: "Punting", icon: "👟", desc: "Punts with hang time & direction" },
-  { id: "KICKOFF", label: "Kickoff", icon: "🎯", desc: "Touchback rate & landing zones" },
+const SPORT_OPTIONS: { id: string; label: string; icon?: string; iconEl?: React.ReactNode; desc: string }[] = [
+  { id: "KICKING", label: "FG Kicking", iconEl: <GoalpostIcon size={28} />, desc: "Field goals & PATs" },
+  { id: "PUNTING", label: "Punting", iconEl: <PuntFootIcon size={28} />, desc: "Punts with hang time & direction" },
+  { id: "KICKOFF", label: "Kickoff", iconEl: <KickoffTeeIcon size={28} />, desc: "Touchback rate & landing zones" },
   { id: "LONGSNAP", label: "Long Snapping", icon: "📏", desc: "Snap time & accuracy" },
 ];
 
@@ -90,7 +92,7 @@ export default function OnboardPage() {
                     onChange={() => toggleSport(s.id)}
                     className="accent-accent"
                   />
-                  <span className="text-xl">{s.icon}</span>
+                  {s.iconEl ?? <span className="text-xl">{s.icon}</span>}
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-slate-100">
                       {s.label}

@@ -204,7 +204,7 @@ export default function PuntingSessionPage() {
   );
   const [pendingPunts, setPendingPunts] = useState<PuntEntry[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
-  const [sessionMode, setSessionMode] = useState<"practice" | "game">(draft.sessionMode ?? "practice");
+  const [sessionMode, setSessionMode] = useState<"practice" | "game">("practice");
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 

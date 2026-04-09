@@ -11,14 +11,16 @@ import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
 import type { FGKick, PuntEntry } from "@/types";
 import { DIST_RANGES, PUNT_LANDING_ZONES } from "@/types";
+import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
+import React from "react";
 
 type Tab = "kicking" | "punting" | "kickoff" | "longsnap";
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: "kicking", label: "FG Kicking", icon: "🏈" },
-  { id: "punting", label: "Punting", icon: "👟" },
-  { id: "kickoff", label: "Kickoff", icon: "🎯" },
+const TABS: { id: Tab; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+  { id: "kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={18} /> },
+  { id: "punting", label: "Punting", iconEl: <PuntFootIcon size={18} /> },
+  { id: "kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={18} /> },
   { id: "longsnap", label: "Long Snap", icon: "📏" },
 ];
 
@@ -319,7 +321,7 @@ function AnalyticsContent() {
                   : "text-muted hover:text-white"
               )}
             >
-              <span>{tab.icon}</span>
+              {tab.iconEl ?? <span>{tab.icon}</span>}
               {tab.label}
             </button>
           ))}

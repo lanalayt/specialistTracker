@@ -5,19 +5,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTeamLogo } from "@/lib/useTeamLogo";
+import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 
-const NAV_ITEMS = [
+const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "⚡" },
-  { href: "/kicking", label: "FG Kicking", icon: "🏈" },
-  { href: "/punting", label: "Punting", icon: "👟" },
-  { href: "/kickoff", label: "Kickoff", icon: "🎯" },
+  { href: "/kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
+  { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/longsnap", label: "Long Snap", icon: "📏" },
   { href: "/analytics", label: "Analytics", icon: "📊" },
   { href: "/archives", label: "Archived Stats", icon: "🗄" },
 ];
 
-const COACH_ITEMS = [
+const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/athletes", label: "Athletes", icon: "👥" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
@@ -86,7 +87,7 @@ export function Sidebar() {
               isActive(item.href) ? "nav-link-active" : "nav-link"
             )}
           >
-            <span className="text-base leading-none">{item.icon}</span>
+            {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
             {item.label}
           </Link>
         ))}
@@ -104,7 +105,7 @@ export function Sidebar() {
                   isActive(item.href) ? "nav-link-active" : "nav-link"
                 )}
               >
-                <span className="text-base leading-none">{item.icon}</span>
+                {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
                 {item.label}
               </Link>
             ))}

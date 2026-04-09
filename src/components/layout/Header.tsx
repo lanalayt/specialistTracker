@@ -5,19 +5,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTeamLogo } from "@/lib/useTeamLogo";
+import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 
-const NAV_ITEMS = [
+const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "⚡" },
-  { href: "/kicking", label: "Kicking", icon: "🏈" },
-  { href: "/punting", label: "Punting", icon: "👟" },
-  { href: "/kickoff", label: "Kickoff", icon: "🎯" },
+  { href: "/kicking", label: "Kicking", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
+  { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/longsnap", label: "Long Snap", icon: "📏" },
   { href: "/analytics", label: "Analytics", icon: "📊" },
   { href: "/archives", label: "Archived Stats", icon: "🗄" },
 ];
 
-const COACH_ITEMS = [
+const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/athletes", label: "Athletes", icon: "👥" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
@@ -133,7 +134,7 @@ export function Header({ title }: { title?: string }) {
                     isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
                   )}
                 >
-                  <span className="text-lg leading-none">{item.icon}</span>
+                  {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
                   {item.label}
                 </Link>
               ))}
@@ -150,7 +151,7 @@ export function Header({ title }: { title?: string }) {
                         isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
                       )}
                     >
-                      <span className="text-lg leading-none">{item.icon}</span>
+                      {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
                       {item.label}
                     </Link>
                   ))}
@@ -201,7 +202,7 @@ export function MobileNav() {
               isActive(item.href) ? "text-accent" : "text-muted"
             )}
           >
-            <span className="text-lg leading-none">{item.icon}</span>
+            {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
             <span className="text-[9px] font-medium leading-none">
               {item.label.split(" ")[0]}
             </span>
