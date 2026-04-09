@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFG } from "@/lib/fgContext";
 import { useAuth } from "@/lib/auth";
@@ -38,6 +38,10 @@ function formatLabel(dateStr: string): string {
 }
 
 export default function KickingHistoryPage() {
+  return <Suspense><KickingHistoryContent /></Suspense>;
+}
+
+function KickingHistoryContent() {
   const { history, updateSessionDate, updateSessionWeather, deleteSession } = useFG();
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() => {
     if (typeof window === "undefined") return "detailed";

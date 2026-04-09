@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +22,10 @@ function formatLabel(dateStr: string): string {
 }
 
 export default function PuntHistoryPage() {
+  return <Suspense><PuntHistoryContent /></Suspense>;
+}
+
+function PuntHistoryContent() {
   const { history, updateSessionDate, updateSessionWeather, deleteSession } = usePunt();
   const { isAthlete } = useAuth();
   const searchParams = useSearchParams();

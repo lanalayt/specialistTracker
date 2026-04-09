@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useKickoff } from "@/lib/kickoffContext";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +22,10 @@ function formatLabel(dateStr: string): string {
 }
 
 export default function KickoffHistoryPage() {
+  return <Suspense><KickoffHistoryContent /></Suspense>;
+}
+
+function KickoffHistoryContent() {
   const { history, updateSessionDate, updateSessionWeather, deleteSession } = useKickoff();
   const { isAthlete } = useAuth();
   const searchParams = useSearchParams();
