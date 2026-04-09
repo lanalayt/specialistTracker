@@ -20,6 +20,9 @@ const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.Re
 
 const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/athletes", label: "Athletes", icon: "👥" },
+];
+
+const ALWAYS_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
@@ -168,6 +171,22 @@ export function Header({ title }: { title?: string }) {
                   ))}
                 </>
               )}
+              {/* Settings — always visible */}
+              <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 pt-4 pb-1.5">Settings</p>
+              {ALWAYS_ITEMS.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={clsx(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium transition-colors",
+                    isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
+                  )}
+                >
+                  {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+                  {item.label}
+                </Link>
+              ))}
             </nav>
             <div className="border-t border-border p-3 flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent text-sm font-bold">
