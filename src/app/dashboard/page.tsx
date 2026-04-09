@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { StatCard } from "@/components/ui/StatCard";
@@ -92,6 +93,18 @@ function DashboardContent() {
   const punt = usePunt();
   const kickoff = useKickoff();
 
+  const [schoolName, setSchoolName] = useState("Special Teams");
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("st_team_v1");
+      if (raw) {
+        const t = JSON.parse(raw);
+        if (t.school) setSchoolName(t.school);
+        else if (t.name) setSchoolName(t.name);
+      }
+    } catch {}
+  }, []);
+
   // Merge all histories, tag with sport, sort by date descending
   const allSessions = [
     ...fg.history.map((s) => ({ ...s, sport: "KICKING" as const })),
@@ -107,10 +120,10 @@ function DashboardContent() {
         {/* Welcome */}
         <div>
           <h1 className="text-2xl font-extrabold text-slate-100">
-            Special Teams Dashboard
+            {schoolName}
           </h1>
           <p className="text-sm text-muted mt-1">
-            Track kicker, punter, and snapper performance across all sessions.
+            Special Teams Dashboard
           </p>
         </div>
 

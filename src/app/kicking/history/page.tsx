@@ -84,6 +84,18 @@ function KickingHistoryContent() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
 
+  // Re-select when history loads (context async) and a session param is present
+  useEffect(() => {
+    if (sessionParam && history.length > 0 && !filteredHistory.some((s) => s.id === selectedId)) {
+      const target = history.find((h) => h.id === sessionParam);
+      if (target) {
+        if (target.mode === "game" && modeFilter !== "game") setModeFilter("game");
+        else if (target.mode !== "game" && modeFilter !== "practice") setModeFilter("practice");
+        setSelectedId(sessionParam);
+      }
+    }
+  }, [history, sessionParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const selected = filteredHistory.find((s) => s.id === selectedId);
   const kicks = (selected?.entries ?? []) as FGKick[];
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;

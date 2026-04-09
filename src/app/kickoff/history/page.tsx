@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useKickoff } from "@/lib/kickoffContext";
 import { useAuth } from "@/lib/auth";
@@ -47,6 +47,17 @@ function KickoffHistoryContent() {
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (sessionParam && history.length > 0 && !filteredHistory.some((s) => s.id === selectedId)) {
+      const target = history.find((h) => h.id === sessionParam);
+      if (target) {
+        if (target.mode === "game" && modeFilter !== "game") setModeFilter("game");
+        else if (target.mode !== "game" && modeFilter !== "practice") setModeFilter("practice");
+        setSelectedId(sessionParam);
+      }
+    }
+  }, [history, sessionParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = filteredHistory.find((s) => s.id === selectedId);
   const entries = (selected?.entries ?? []) as KickoffEntry[];

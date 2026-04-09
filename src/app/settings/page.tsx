@@ -235,18 +235,6 @@ function SettingsContent() {
               </div>
             </div>
 
-            {/* Live preview strip */}
-            <div className="rounded-input overflow-hidden border border-border">
-              <div className="h-2" style={{ backgroundColor: theme.primary }} />
-              <div className="flex h-8">
-                <div className="flex-1" style={{ backgroundColor: theme.secondary }} />
-                <div className="w-px" style={{ backgroundColor: theme.tertiary }} />
-                <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: theme.primary }}>
-                  <span className="text-[10px] font-bold" style={{ color: theme.secondary }}>Button</span>
-                </div>
-              </div>
-              <div className="h-1" style={{ backgroundColor: theme.tertiary }} />
-            </div>
           </div>
 
           {/* Enabled sports */}
