@@ -35,7 +35,7 @@ export function Header({ title }: { title?: string }) {
 
   return (
     <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur border-b border-border">
-      <div className="flex items-center gap-4 px-4 h-14 lg:pl-60">
+      <div className="flex items-center gap-4 px-4 h-14 lg:pl-[15rem]">
         {/* Logo (mobile) */}
         <div className="flex items-center gap-2 lg:hidden">
           <input
@@ -63,13 +63,13 @@ export function Header({ title }: { title?: string }) {
               "ST"
             )}
           </button>
-          <span className="text-sm font-bold text-slate-100">
+          <span className="text-lg font-extrabold text-slate-100">
             {title ?? "Specialist Tracker"}
           </span>
         </div>
 
         {/* Page title (desktop) */}
-        <span className="hidden lg:block text-sm font-semibold text-slate-100">
+        <span className="hidden lg:block text-lg font-extrabold text-slate-100">
           {title}
         </span>
 
