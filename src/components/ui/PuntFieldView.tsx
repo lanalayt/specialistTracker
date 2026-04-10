@@ -162,16 +162,16 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
             return <line key={`h-${yd}-${lat}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(255,255,255,0.12)" strokeWidth={0.8} />;
           });
         })}
-        {/* Goalposts at back of each end zone */}
-        {[-7, 107].map((fx) => {
-          const pc = proj(fx, 26.5); const pl = proj(fx, 21); const pr = proj(fx, 32);
-          const cbY = pc.y; const utY = cbY - 18;
+        {/* Goalposts at very back of each end zone */}
+        {[-9, 109].map((fx) => {
+          const pc = proj(fx, 26.5); const pl = proj(fx, 15); const pr = proj(fx, 38);
+          const cbY = pc.y; const utY = cbY - 35;
           return (
             <g key={`post-${fx}`}>
-              <line x1={pl.x} y1={cbY} x2={pr.x} y2={cbY} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" opacity={0.7} />
-              <line x1={pl.x} y1={cbY} x2={pl.x} y2={utY} stroke="#fbbf24" strokeWidth={2} strokeLinecap="round" opacity={0.7} />
-              <line x1={pr.x} y1={cbY} x2={pr.x} y2={utY} stroke="#fbbf24" strokeWidth={2} strokeLinecap="round" opacity={0.7} />
-              <line x1={pc.x} y1={cbY} x2={pc.x} y2={cbY + 4} stroke="#fbbf24" strokeWidth={2} opacity={0.5} />
+              <line x1={pl.x} y1={cbY} x2={pr.x} y2={cbY} stroke="#fbbf24" strokeWidth={4} strokeLinecap="round" opacity={0.8} />
+              <line x1={pl.x} y1={cbY} x2={pl.x} y2={utY} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" opacity={0.8} />
+              <line x1={pr.x} y1={cbY} x2={pr.x} y2={utY} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" opacity={0.8} />
+              <line x1={pc.x} y1={cbY} x2={pc.x} y2={cbY + 5} stroke="#fbbf24" strokeWidth={3} opacity={0.6} />
             </g>
           );
         })}

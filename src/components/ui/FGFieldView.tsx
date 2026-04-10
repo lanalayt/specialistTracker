@@ -35,7 +35,7 @@ function posLat(pos: string | undefined): number { return POS_LAT[pos as FGPosit
 // Made kicks end between the uprights ABOVE the crossbar
 // Missed L/R end outside the uprights, XS ends short
 function resultEndLat(r: string): number {
-  switch (r) { case "YC": return 26.5; case "YL": return 23; case "YR": return 30; case "XL": return 16; case "XR": return 37; default: return 26.5; }
+  switch (r) { case "YC": return 26.5; case "YL": return 21; case "YR": return 32; case "XL": return 12; case "XR": return 41; default: return 26.5; }
 }
 // FG distance = 7yd snap + LOS-to-goal + 10yd end zone
 // So kicker's field position from back of EZ = EZ_DEPTH + (fgDist - 17)
@@ -43,12 +43,13 @@ function kickerDist(fgDist: number): number {
   return Math.max(EZ_DEPTH + 1, Math.min(EZ_DEPTH + (fgDist - 17), MAX_DIST - 2));
 }
 
-// Uprights screen position (at dist=0)
-const UPRIGHT_L = proj(0, 20);
-const UPRIGHT_R = proj(0, 33);
+// Uprights — wide lateral spread so they're visible even at far perspective
+// Position at dist=0 (very back of end zone)
+const UPRIGHT_L = proj(0, 15);
+const UPRIGHT_R = proj(0, 38);
 const POST_CENTER = proj(0, 26.5);
 const CROSSBAR_Y = POST_CENTER.y;
-const UPRIGHT_TOP_Y = CROSSBAR_Y - 90; // tall uprights
+const UPRIGHT_TOP_Y = CROSSBAR_Y - 110; // very tall uprights
 
 function renderKick(key: string | number, kick: { dist: number; pos?: string; result?: string }, opacity: number) {
   const distance = kick.dist || 0;
@@ -117,9 +118,8 @@ export function FGFieldView({ kicks, currentKick }: Props) {
     yardEls.push(<line key={`yl-${yd}`} x1={l.x} y1={l.y} x2={r.x} y2={r.y}
       stroke={isGL ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.2)"} strokeWidth={isGL ? 3 : is10 ? 1.5 : 0.7} />);
     if (is10 && yd > 0 && yd <= 50) {
-      // Numbers between hash and sideline on each side — big block style
-      const nL = proj(dist, 10); const nR = proj(dist, 43);
-      // Scale font with perspective (closer = bigger)
+      // Numbers splitting the hash — one on each hash mark, like a real field
+      const nL = proj(dist, HASH_L); const nR = proj(dist, HASH_R);
       const scale = 1 - (dist / MAX_DIST) * 0.5;
       const fs = Math.max(10, 18 * scale);
       [nL, nR].forEach((p, j) => {
@@ -128,11 +128,9 @@ export function FGFieldView({ kicks, currentKick }: Props) {
             fontWeight="900" fill="rgba(255,255,255,0.2)" fontFamily="'Arial Black', sans-serif"
             letterSpacing="2" stroke="rgba(255,255,255,0.06)" strokeWidth={0.5}>{yd}</text>
         );
-        // Directional arrow pointing toward goal line
         if (yd < 50) {
           const ay = p.y + fs * 0.15;
           const as = fs * 0.2;
-          // Arrow points "up" (toward goal line = lower dist = higher on screen)
           yardEls.push(
             <polygon key={`ya-${yd}-${j}`}
               points={`${p.x - as},${ay} ${p.x},${ay - as * 1.5} ${p.x + as},${ay}`}
