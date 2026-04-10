@@ -1555,45 +1555,76 @@ export default function PuntingSessionPage() {
             </button>
           </div>
 
-          {/* Per-athlete recap cards */}
+          {/* Overall game stats + per-athlete recap cards */}
           {(() => {
+            const all = committedPunts;
+            const ydsE = all.filter((p) => p.yards > 0);
+            const totalGross = ydsE.reduce((s, p) => s + p.yards, 0);
+            const totalRet = all.reduce((s, p) => s + (p.returnYards ?? 0), 0);
+            const avgGross = ydsE.length > 0 ? (totalGross / ydsE.length).toFixed(1) : "—";
+            const avgNet = ydsE.length > 0 ? ((totalGross - totalRet) / ydsE.length).toFixed(1) : "—";
+            const htE = all.filter((p) => p.hangTime > 0);
+            const avgHangAll = htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) : "—";
+            const fSpot = (p: PuntEntry) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
+            const i20 = all.filter((p) => p.landingYL != null && fSpot(p) >= 80).length;
+            const i10 = all.filter((p) => p.landingYL != null && fSpot(p) >= 90).length;
+
             const byAthlete: Record<string, PuntEntry[]> = {};
-            committedPunts.forEach((p) => {
-              if (!byAthlete[p.athlete]) byAthlete[p.athlete] = [];
-              byAthlete[p.athlete].push(p);
-            });
+            all.forEach((p) => { if (!byAthlete[p.athlete]) byAthlete[p.athlete] = []; byAthlete[p.athlete].push(p); });
             const athleteNames = Object.keys(byAthlete);
-            if (athleteNames.length === 0) return null;
+
             return (
-              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
-                {athleteNames.map((name) => {
-                  const ap = byAthlete[name];
-                  const att = ap.length;
-                  const yardsEntries = ap.filter((p) => p.yards > 0);
-                  const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
-                  const hangEntries = ap.filter((p) => p.hangTime > 0);
-                  const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
-                  const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
-                  const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
-                  const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
-                  const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
-                  const dirScore = daEntries.reduce((s, p) => s + p.directionalAccuracy, 0);
-                  const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
-                  return (
-                    <div key={name} className="card-2 p-3">
-                      <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
-                        <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
-                        <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
-                        <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
-                        <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
-                        {dirEnabled && <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>}
-                        {dirEnabled && <div><span className="text-muted">Dir</span> <span className="text-slate-200 font-medium ml-1">{dirScoreDisplay}</span></div>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <>
+                {/* Overall summary */}
+                {sessionMode === "game" && all.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-accent">{avgGross}</p><p className="text-[10px] text-muted uppercase">Avg Gross</p></div>
+                    <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{avgNet}</p><p className="text-[10px] text-muted uppercase">Avg Net</p></div>
+                    <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{avgHangAll}{avgHangAll !== "—" ? "s" : ""}</p><p className="text-[10px] text-muted uppercase">Avg Hang</p></div>
+                    <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{i20}</p><p className="text-[10px] text-muted uppercase">Inside 20</p></div>
+                    <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{i10}</p><p className="text-[10px] text-muted uppercase">Inside 10</p></div>
+                    <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{all.length}</p><p className="text-[10px] text-muted uppercase">Total Punts</p></div>
+                  </div>
+                )}
+
+                {/* Per-athlete cards */}
+                {athleteNames.length > 0 && (
+                  <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                    {athleteNames.map((name) => {
+                      const ap = byAthlete[name];
+                      const att = ap.length;
+                      const yardsEntries = ap.filter((p) => p.yards > 0);
+                      const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
+                      const retTotal = ap.reduce((s, p) => s + (p.returnYards ?? 0), 0);
+                      const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
+                      const netAvg = yardsEntries.length > 0 ? ((grossTotal - retTotal) / yardsEntries.length).toFixed(1) : "—";
+                      const hangEntries = ap.filter((p) => p.hangTime > 0);
+                      const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+                      const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
+                      const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
+                      const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
+                      const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
+                      const apI20 = ap.filter((p) => p.landingYL != null && fSpot(p) >= 80).length;
+                      const apI10 = ap.filter((p) => p.landingYL != null && fSpot(p) >= 90).length;
+                      return (
+                        <div key={name} className="card-2 p-3">
+                          <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                          <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                            <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
+                            <div><span className="text-muted">Gross</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                            <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{netAvg}</span></div>
+                            <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
+                            {sessionMode !== "game" && <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>}
+                            {dirEnabled && <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>}
+                            <div><span className="text-muted">I-20</span> <span className="text-slate-200 font-medium ml-1">{apI20}</span></div>
+                            <div><span className="text-muted">I-10</span> <span className="text-slate-200 font-medium ml-1">{apI10}</span></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             );
           })()}
 
