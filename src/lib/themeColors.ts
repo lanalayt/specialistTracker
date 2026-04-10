@@ -106,16 +106,23 @@ export function loadAndApplyTheme(): ThemeColors {
   } catch {}
   applyTheme(theme);
 
-  // Then try cloud (async) — if cloud has a newer theme, apply + update localStorage
-  const tid = getTeamId();
-  if (tid && tid !== "local-dev") {
-    teamGet<ThemeColors>(tid, TEAM_KEY).then((cloud) => {
+  // Then try cloud (async) — wait for teamId if needed, then fetch
+  (async () => {
+    let tid = getTeamId();
+    // Wait up to 1.5s for teamId to be set by auth
+    for (let i = 0; i < 15 && (!tid || tid === "local-dev"); i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      tid = getTeamId();
+    }
+    if (!tid || tid === "local-dev") return;
+    try {
+      const cloud = await teamGet<ThemeColors>(tid, TEAM_KEY);
       if (cloud && cloud.primary && cloud.secondary) {
         applyTheme(cloud);
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud)); } catch {}
       }
-    }).catch(() => {});
-  }
+    } catch {}
+  })();
 
   return theme;
 }

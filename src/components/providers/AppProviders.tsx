@@ -3,8 +3,9 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { AuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
-import { setTeamId } from "@/lib/teamData";
-import { loadAndApplyTheme } from "@/lib/themeColors";
+import { setTeamId, getTeamId } from "@/lib/teamData";
+import { loadAndApplyTheme, applyTheme, type ThemeColors } from "@/lib/themeColors";
+import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import type { AuthUser, UserRole } from "@/types";
 
 function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
@@ -23,10 +24,18 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClient();
 
-  // Apply saved theme colors on mount
+  // Apply saved theme colors — re-run whenever user (and thus teamId) resolves
   useEffect(() => {
     loadAndApplyTheme();
-  }, []);
+  }, [user?.id]);
+
+  // Live-sync theme across devices
+  useTeamDataSync<ThemeColors>("theme_colors", (remote) => {
+    if (remote && remote.primary && remote.secondary) {
+      applyTheme(remote);
+      try { localStorage.setItem("st_theme", JSON.stringify(remote)); } catch {}
+    }
+  }, !!user && user.id !== "local-dev");
 
   // Listen for auth state changes
   useEffect(() => {

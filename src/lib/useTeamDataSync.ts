@@ -6,7 +6,7 @@ import { teamGetWithTimestamp, getTeamId, getLastWriteTimestamp } from "@/lib/te
 
 // Ignore remote updates that arrive within this window of a local write,
 // so our own outgoing write doesn't bounce back over fresh local state.
-const LOCAL_WRITE_GRACE_MS = 2000;
+const LOCAL_WRITE_GRACE_MS = 5000;
 // Fallback polling interval — runs in parallel with the realtime subscription
 // in case the websocket drops (offline, mobile background, etc.).
 const FALLBACK_POLL_MS = 15000;

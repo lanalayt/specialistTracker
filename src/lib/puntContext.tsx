@@ -63,10 +63,9 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
 
     async function loadData() {
       let saved: PuntStateData | null = null;
-      let loadedFromCloud = false;
       // Wait briefly for team ID to be set by AppProviders after auth resolves
       let tid = getTeamId();
-      for (let i = 0; i < 10 && !tid; i++) {
+      for (let i = 0; i < 15 && !tid; i++) {
         await new Promise((r) => setTimeout(r, 100));
         tid = getTeamId();
       }
@@ -74,15 +73,14 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       // Try team_data first (shared across team members)
       if (tid && tid !== "local-dev") {
         saved = await teamGet<PuntStateData>(tid, "punt_data");
-        if (saved) loadedFromCloud = true;
       }
 
       // Fall back to user's own Supabase data
       if (!saved && userId && userId !== "local-dev") {
         saved = await cloudGet<PuntStateData>(userId, getCloudKey("PUNT"));
-        if (saved) loadedFromCloud = true;
       }
 
+      // Fall back to localStorage (read-only — never write local back to cloud)
       if (!saved) {
         saved = localGet<PuntStateData>("PUNT");
       }
@@ -104,9 +102,6 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
         const migrated = { ...saved, stats };
         setState(migrated);
         localSet("PUNT", migrated);
-        if (!loadedFromCloud && tid && tid !== "local-dev") {
-          teamSet(tid, "punt_data", migrated);
-        }
       }
     }
 
