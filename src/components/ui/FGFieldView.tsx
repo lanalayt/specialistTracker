@@ -35,13 +35,13 @@ function posLat(pos: string | undefined): number { return POS_LAT[pos as FGPosit
 // Made kicks end between the uprights ABOVE the crossbar
 // Missed L/R end outside the uprights, XS ends short
 function resultEndLat(r: string): number {
-  switch (r) { case "YC": return 26.5; case "YL": return 25.5; case "YR": return 27.5; case "XL": return 20; case "XR": return 33; default: return 26.5; }
+  switch (r) { case "YC": return 26.5; case "YL": return 23; case "YR": return 30; case "XL": return 16; case "XR": return 37; default: return 26.5; }
 }
 function kickerDist(d: number): number { return Math.max(8, Math.min(d, MAX_DIST - 2)); }
 
 // Uprights screen position (at dist=0)
-const UPRIGHT_L = proj(0, 24);
-const UPRIGHT_R = proj(0, 29);
+const UPRIGHT_L = proj(0, 20);
+const UPRIGHT_R = proj(0, 33);
 const POST_CENTER = proj(0, 26.5);
 const CROSSBAR_Y = POST_CENTER.y;
 const UPRIGHT_TOP_Y = CROSSBAR_Y - 90; // tall uprights
