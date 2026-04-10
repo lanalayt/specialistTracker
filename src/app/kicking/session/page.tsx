@@ -205,7 +205,13 @@ export default function KickingSessionPage() {
   const [starred, setStarred] = useState(draft.partialInputs?.[draft.currentKickIdx]?.starred ?? false);
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
-  const [sessionMode, setSessionMode] = useState<"practice" | "game">("practice");
+  const [sessionMode, setSessionMode] = useState<"practice" | "game">(() => {
+    // Preserve game mode if there's active data from a game session
+    if ((draft.sessionKicks?.length > 0 || draft.sessionActive || draft.committed) && draft.sessionMode === "game") {
+      return "game";
+    }
+    return "practice";
+  });
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
