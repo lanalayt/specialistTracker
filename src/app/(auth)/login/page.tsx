@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase";
 import Link from "next/link";
 
 export default function LoginPage() {
   const { signIn } = useAuth();
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +26,28 @@ export default function LoginPage() {
       const msg = err instanceof Error ? err.message : "Sign in failed";
       setError(msg);
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError("Enter your email address above, then click Forgot password.");
+      return;
+    }
+    setResetLoading(true);
+    setError("");
+    try {
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (resetError) throw new Error(resetError.message);
+      setResetSent(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send reset email";
+      setError(msg);
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -54,6 +77,12 @@ export default function LoginPage() {
             </div>
           )}
 
+          {resetSent && (
+            <div className="bg-make/10 border border-make/30 text-make text-sm rounded-input px-3 py-2 mb-4">
+              Password reset email sent! Check your inbox.
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="label">Email</label>
@@ -69,7 +98,17 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="label">Password</label>
+              <div className="flex items-center justify-between">
+                <label className="label">Password</label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
+                  className="text-xs text-accent hover:underline disabled:opacity-50"
+                >
+                  {resetLoading ? "Sending…" : "Forgot password?"}
+                </button>
+              </div>
               <input
                 className="input"
                 type="password"

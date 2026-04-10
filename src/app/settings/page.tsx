@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { useAuth } from "@/lib/auth";
+import { createClient } from "@/lib/supabase";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
@@ -48,6 +49,50 @@ function SettingsContent() {
     const next = { ...theme, [field]: hex };
     setTheme(next);
     saveTheme(next);
+  };
+
+  // Change password
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const handleChangePassword = async () => {
+    setPwMsg(null);
+    if (newPw.length < 6) {
+      setPwMsg({ type: "err", text: "New password must be at least 6 characters." });
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwMsg({ type: "err", text: "New passwords do not match." });
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const supabase = createClient();
+      // Verify current password by re-authenticating
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: user?.email ?? "",
+        password: currentPw,
+      });
+      if (signInErr) {
+        setPwMsg({ type: "err", text: "Current password is incorrect." });
+        setPwLoading(false);
+        return;
+      }
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPw });
+      if (updateErr) throw new Error(updateErr.message);
+      setPwMsg({ type: "ok", text: "Password updated successfully!" });
+      setCurrentPw("");
+      setNewPw("");
+      setConfirmPw("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update password";
+      setPwMsg({ type: "err", text: msg });
+    } finally {
+      setPwLoading(false);
+    }
   };
 
   // Archive UI state
@@ -292,6 +337,62 @@ function SettingsContent() {
               Data is synced to the cloud and persists across devices and deployments.
             </p>
           </div>
+
+          {/* Change Password */}
+          {user && user.id !== "local-dev" && (
+            <div className="card space-y-3">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider">
+                Change Password
+              </p>
+              {pwMsg && (
+                <div className={clsx(
+                  "text-sm rounded-input px-3 py-2",
+                  pwMsg.type === "ok" ? "bg-make/10 border border-make/30 text-make" : "bg-miss/10 border border-miss/30 text-miss"
+                )}>
+                  {pwMsg.text}
+                </div>
+              )}
+              <div className="space-y-3">
+                <div>
+                  <label className="label">Current Password</label>
+                  <input
+                    className="input"
+                    type="password"
+                    value={currentPw}
+                    onChange={(e) => setCurrentPw(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div>
+                  <label className="label">New Password</label>
+                  <input
+                    className="input"
+                    type="password"
+                    value={newPw}
+                    onChange={(e) => setNewPw(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div>
+                  <label className="label">Confirm New Password</label>
+                  <input
+                    className="input"
+                    type="password"
+                    value={confirmPw}
+                    onChange={(e) => setConfirmPw(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <button
+                  onClick={handleChangePassword}
+                  disabled={pwLoading || !currentPw || !newPw || !confirmPw}
+                  className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {pwLoading ? "Updating…" : "Update Password"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Team Code */}
           {isCoach && user?.id && user.id !== "local-dev" && (
