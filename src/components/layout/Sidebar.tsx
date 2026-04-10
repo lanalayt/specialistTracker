@@ -137,13 +137,6 @@ export function Sidebar() {
             </p>
             <p className="text-[10px] text-muted capitalize">{user?.role}</p>
           </div>
-          <button
-            onClick={signOut}
-            className="text-muted hover:text-white text-xs transition-colors"
-            title="Sign out"
-          >
-            ↩
-          </button>
         </div>
       </div>
     </aside>
