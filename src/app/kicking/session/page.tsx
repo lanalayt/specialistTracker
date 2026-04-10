@@ -693,9 +693,12 @@ export default function KickingSessionPage() {
     setPendingKicks(sessionKicks);
   };
 
+  const [committedKicks, setCommittedKicks] = useState<FGKick[]>([]);
+
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;
     commitPractice(pendingKicks, undefined, weather, sessionMode, opponent, gameTime);
+    setCommittedKicks(pendingKicks);
     setPendingKicks(null);
     setCommitted(true);
   };
@@ -706,6 +709,7 @@ export default function KickingSessionPage() {
 
   const handleNewSession = () => {
     setSessionKicks([]);
+    setCommittedKicks([]);
     setPlannedKicks([]);
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
@@ -1355,6 +1359,102 @@ export default function KickingSessionPage() {
   // ════════════════════════════════════════════════════════════
   //  PLANNING MODE — table view
   // ════════════════════════════════════════════════════════════
+
+  // ── Committed recap ──
+  if (committed && committedKicks.length > 0) {
+    return (
+      <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-4xl">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-make uppercase tracking-wider">
+                {sessionMode === "game" ? "Game Committed" : "Practice Committed"}
+              </p>
+              <p className="text-lg font-bold text-slate-100 mt-1">
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+              </p>
+              {weather && <p className="text-xs text-muted mt-0.5">{weather}</p>}
+            </div>
+            <button onClick={handleNewSession} className="text-xs px-3 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all">
+              ← Back to Log
+            </button>
+          </div>
+          {/* Per-athlete recap */}
+          {(() => {
+            const byAthlete: Record<string, FGKick[]> = {};
+            committedKicks.forEach((k) => { if (!byAthlete[k.athlete]) byAthlete[k.athlete] = []; byAthlete[k.athlete].push(k); });
+            return Object.entries(byAthlete).map(([name, ak]) => {
+              const fgKicks = ak.filter((k) => !k.isPAT);
+              const patKicks = ak.filter((k) => k.isPAT);
+              const fgAtt = fgKicks.length;
+              const fgMade = fgKicks.filter((k) => k.result.startsWith("Y")).length;
+              const fgPct = fgAtt > 0 ? `${Math.round((fgMade / fgAtt) * 100)}%` : "—";
+              const fgAvgSc = fgAtt > 0 ? (fgKicks.reduce((s, k) => s + k.score, 0) / fgAtt).toFixed(1) : "—";
+              const fgMadeKicks = fgKicks.filter((k) => k.result.startsWith("Y"));
+              const long = fgMadeKicks.length > 0 ? Math.max(...fgMadeKicks.map((k) => k.dist)) : 0;
+              const patAtt = patKicks.length;
+              const patMade = patKicks.filter((k) => k.result.startsWith("Y")).length;
+              return (
+                <div key={name} className="card-2 p-3">
+                  <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                  <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">FG</p>
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                    <div><span className="text-muted">Made</span> <span className="text-make font-medium ml-1">{fgMade}</span></div>
+                    <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{fgAtt}</span></div>
+                    <div><span className="text-muted">Pct</span> <span className="text-accent font-medium ml-1">{fgPct}</span></div>
+                    {scoreEnabled && <div><span className="text-muted">Score</span> <span className="text-slate-200 font-medium ml-1">{fgAvgSc}</span></div>}
+                    <div><span className="text-muted">Long</span> <span className="text-slate-200 font-medium ml-1">{long > 0 ? `${long}` : "—"}</span></div>
+                  </div>
+                  {patAtt > 0 && (
+                    <>
+                      <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mt-2.5 mb-1">PAT</p>
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                        <div><span className="text-muted">Made</span> <span className="text-make font-medium ml-1">{patMade}</span></div>
+                        <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{patAtt}</span></div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            });
+          })()}
+          {/* Full kick table */}
+          <div className="card-2 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="table-header text-left">#</th>
+                  <th className="table-header text-left">Athlete</th>
+                  <th className="table-header">Dist</th>
+                  <th className="table-header">Pos</th>
+                  <th className="table-header">Result</th>
+                  {scoreEnabled && <th className="table-header">Score</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {committedKicks.map((k, i) => (
+                  <tr key={i} className="hover:bg-surface/30 transition-colors">
+                    <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}{k.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
+                    <td className="table-name">{k.athlete}</td>
+                    <td className="table-cell">{k.isPAT ? "PAT" : `${k.dist} yd`}</td>
+                    <td className="table-cell text-muted">{k.isPAT ? "—" : k.pos}</td>
+                    <td className="table-cell">
+                      <span className={clsx("text-xs font-semibold", k.result.startsWith("Y") ? "text-make" : "text-miss")}>
+                        {k.result.startsWith("Y") ? "✓" : "✗"}
+                      </span>
+                    </td>
+                    {scoreEnabled && <td className="table-cell">{k.score}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button onClick={handleNewSession} className="btn-primary w-full py-3 text-sm font-bold">← Back to Log</button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <>
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">

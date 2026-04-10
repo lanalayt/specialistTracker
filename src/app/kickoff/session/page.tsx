@@ -659,9 +659,12 @@ export default function KickoffSessionPage() {
     setPendingKicks(sessionKicks);
   };
 
+  const [committedKicks, setCommittedKicks] = useState<KickoffEntry[]>([]);
+
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;
     commitPractice(pendingKicks, undefined, weather, sessionMode, opponent, gameTime);
+    setCommittedKicks(pendingKicks);
     setPendingKicks(null);
     setCommitted(true);
   };
@@ -672,6 +675,7 @@ export default function KickoffSessionPage() {
 
   const handleNewSession = () => {
     setSessionKicks([]);
+    setCommittedKicks([]);
     setPlannedKicks([]);
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
@@ -1157,6 +1161,81 @@ export default function KickoffSessionPage() {
   // ════════════════════════════════════════════════════════════
   //  PLANNING MODE — table view
   // ════════════════════════════════════════════════════════════
+
+  // ── Committed recap ──
+  if (committed && committedKicks.length > 0) {
+    return (
+      <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-4xl">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-make uppercase tracking-wider">
+                {sessionMode === "game" ? "Game Committed" : "Practice Committed"}
+              </p>
+              <p className="text-lg font-bold text-slate-100 mt-1">
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+              </p>
+              {weather && <p className="text-xs text-muted mt-0.5">{weather}</p>}
+            </div>
+            <button onClick={handleNewSession} className="text-xs px-3 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all">
+              ← Back to Log
+            </button>
+          </div>
+          {/* Per-athlete recap */}
+          {(() => {
+            const byAthlete: Record<string, KickoffEntry[]> = {};
+            committedKicks.forEach((k) => { if (!byAthlete[k.athlete]) byAthlete[k.athlete] = []; byAthlete[k.athlete].push(k); });
+            return Object.entries(byAthlete).map(([name, ak]) => {
+              const att = ak.length;
+              const distEntries = ak.filter((k) => k.distance > 0);
+              const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : "—";
+              const hangEntries = ak.filter((k) => k.hangTime > 0);
+              const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, k) => s + k.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+              return (
+                <div key={name} className="card-2 p-3">
+                  <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                    <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
+                    <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                    <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
+                  </div>
+                </div>
+              );
+            });
+          })()}
+          {/* Full kick table */}
+          <div className="card-2 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="table-header text-left">#</th>
+                  <th className="table-header text-left">Athlete</th>
+                  <th className="table-header">Type</th>
+                  <th className="table-header">Dist</th>
+                  <th className="table-header">Hang</th>
+                  <th className="table-header">Dir</th>
+                </tr>
+              </thead>
+              <tbody>
+                {committedKicks.map((k, i) => (
+                  <tr key={i} className="hover:bg-surface/30 transition-colors">
+                    <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}</td>
+                    <td className="table-name">{k.athlete}</td>
+                    <td className="table-cell text-muted">{koTypeLabels[k.type] ?? k.type}</td>
+                    <td className="table-cell">{k.distance > 0 ? `${k.distance} yd` : "—"}</td>
+                    <td className="table-cell text-muted">{k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s` : "—"}</td>
+                    <td className="table-cell text-muted">{koDirLabels[k.direction] ?? k.direction}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button onClick={handleNewSession} className="btn-primary w-full py-3 text-sm font-bold">← Back to Log</button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <>
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">

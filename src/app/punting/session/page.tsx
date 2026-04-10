@@ -799,9 +799,12 @@ export default function PuntingSessionPage() {
     setPendingPunts(sessionPunts);
   };
 
+  const [committedPunts, setCommittedPunts] = useState<PuntEntry[]>([]);
+
   const handleConfirmCommit = () => {
     if (!pendingPunts) return;
     commitPractice(pendingPunts, undefined, weather, sessionMode, opponent, gameTime);
+    setCommittedPunts(pendingPunts);
     setPendingPunts(null);
     setCommitted(true);
   };
@@ -812,6 +815,7 @@ export default function PuntingSessionPage() {
 
   const handleNewSession = () => {
     setSessionPunts([]);
+    setCommittedPunts([]);
     setPlannedPunts([]);
     setPlannedRowIndices([]);
     setCurrentPuntIdx(0);
@@ -1516,6 +1520,121 @@ export default function PuntingSessionPage() {
   // ════════════════════════════════════════════════════════════
   //  PLANNING MODE — table view
   // ════════════════════════════════════════════════════════════
+
+  // ── Committed recap (shown after submitting from any mode) ──
+  if (committed && committedPunts.length > 0) {
+    return (
+      <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-4xl">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-make uppercase tracking-wider">
+                {sessionMode === "game" ? "Game Committed" : "Practice Committed"}
+              </p>
+              {sessionMode === "game" && opponent && (
+                <p className="text-lg font-black text-red-400 mt-1">vs {opponent}</p>
+              )}
+              <p className="text-lg font-bold text-slate-100 mt-1">
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                {gameTime && <span className="text-muted text-sm font-normal"> · {gameTime}</span>}
+              </p>
+              {weather && <p className="text-xs text-muted mt-0.5">{weather}</p>}
+            </div>
+            <button
+              onClick={handleNewSession}
+              className="text-xs px-3 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+            >
+              ← Back to Log
+            </button>
+          </div>
+
+          {/* Per-athlete recap cards */}
+          {(() => {
+            const byAthlete: Record<string, PuntEntry[]> = {};
+            committedPunts.forEach((p) => {
+              if (!byAthlete[p.athlete]) byAthlete[p.athlete] = [];
+              byAthlete[p.athlete].push(p);
+            });
+            const athleteNames = Object.keys(byAthlete);
+            if (athleteNames.length === 0) return null;
+            return (
+              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                {athleteNames.map((name) => {
+                  const ap = byAthlete[name];
+                  const att = ap.length;
+                  const yardsEntries = ap.filter((p) => p.yards > 0);
+                  const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
+                  const hangEntries = ap.filter((p) => p.hangTime > 0);
+                  const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+                  const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
+                  const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
+                  const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
+                  const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
+                  const dirScore = daEntries.reduce((s, p) => s + p.directionalAccuracy, 0);
+                  const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
+                  return (
+                    <div key={name} className="card-2 p-3">
+                      <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                        <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
+                        <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                        <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
+                        <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
+                        {dirEnabled && <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>}
+                        {dirEnabled && <div><span className="text-muted">Dir</span> <span className="text-slate-200 font-medium ml-1">{dirScoreDisplay}</span></div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Full punt table */}
+          <div className="card-2 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="table-header text-left">#</th>
+                  <th className="table-header text-left">Athlete</th>
+                  <th className="table-header">Type</th>
+                  <th className="table-header">Yds</th>
+                  <th className="table-header">Hang</th>
+                  <th className="table-header">OT</th>
+                  {dirEnabled && <th className="table-header">Dir</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {committedPunts.map((p, i) => (
+                  <tr key={i} className="hover:bg-surface/30">
+                    <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
+                    <td className="table-name">{p.athlete}</td>
+                    <td className="table-cell text-muted">{typeLabels[p.type] ?? (p.type || "—")}</td>
+                    <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
+                    <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
+                    <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
+                    {dirEnabled && (
+                      <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>
+                        {p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <button
+            onClick={handleNewSession}
+            className="btn-primary w-full py-3 text-sm font-bold"
+          >
+            ← Back to Log
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <>
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
