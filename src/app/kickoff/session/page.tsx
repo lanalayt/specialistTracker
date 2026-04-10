@@ -212,6 +212,22 @@ export default function KickoffSessionPage() {
   const [direction, setDirection] = useState<KickoffDirection>("1");
   // score removed — not used for kickoff
 
+  // Auto-decimal: user types digits, we insert decimal 2 places from right
+  // e.g. "456" → "4.56", "12" → "0.12"
+  function formatAutoDecimal(raw: string): string {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    const padded = digits.padStart(3, "0");
+    const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
+    return `${whole}.${padded.slice(-2)}`;
+  }
+  function handleAutoDecimalChange(setter: (v: string) => void) {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      const digits = e.target.value.replace(/\D/g, "");
+      setter(digits ? formatAutoDecimal(digits) : "");
+    };
+  }
+
   // Guard: skip sync callbacks that arrive shortly after a local save
   const lastLocalSave = useRef(0);
 
@@ -969,10 +985,10 @@ export default function KickoffSessionPage() {
                         <input
                           className="input text-center text-lg font-bold"
                           type="text"
-                          inputMode="decimal"
+                          inputMode="numeric"
                           placeholder="sec"
                           value={hangTime}
-                          onChange={(e) => setHangTime(e.target.value)}
+                          onChange={handleAutoDecimalChange(setHangTime)}
                         />
                       </div>
                     </div>
@@ -1371,7 +1387,10 @@ export default function KickoffSessionPage() {
                               <input
                                 type="text" inputMode="decimal" placeholder="sec"
                                 value={row.hangTime}
-                                onChange={(e) => updateRow(idx, "hangTime", e.target.value)}
+                                onChange={(e) => {
+                                  const digits = e.target.value.replace(/\D/g, "");
+                                  updateRow(idx, "hangTime", digits ? formatAutoDecimal(digits) : "");
+                                }}
                                 readOnly={isAthlete || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
