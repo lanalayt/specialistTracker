@@ -1,8 +1,12 @@
 /**
  * Theme color customization with 3 school colors.
+ * Syncs to team_data so all devices on the same account share the same theme.
  */
 
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+
 const STORAGE_KEY = "st_theme";
+const TEAM_KEY = "theme_colors";
 
 export interface ThemeColors {
   primary: string;    // accent — buttons, active states
@@ -86,24 +90,44 @@ export function applyTheme(colors: ThemeColors): void {
   root.style.setProperty("--text", "#f1f5f9");
 }
 
+/** Load from localStorage immediately + apply. Also kicks off async cloud load. */
 export function loadAndApplyTheme(): ThemeColors {
   if (typeof window === "undefined") return DEFAULT_THEME;
+  // Apply from localStorage first (instant)
+  let theme = DEFAULT_THEME;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as ThemeColors;
       if (parsed.primary && parsed.secondary) {
-        applyTheme(parsed);
-        return parsed;
+        theme = parsed;
       }
     }
   } catch {}
-  applyTheme(DEFAULT_THEME);
-  return DEFAULT_THEME;
+  applyTheme(theme);
+
+  // Then try cloud (async) — if cloud has a newer theme, apply + update localStorage
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") {
+    teamGet<ThemeColors>(tid, TEAM_KEY).then((cloud) => {
+      if (cloud && cloud.primary && cloud.secondary) {
+        applyTheme(cloud);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud)); } catch {}
+      }
+    }).catch(() => {});
+  }
+
+  return theme;
 }
 
+/** Save theme to localStorage + cloud + apply immediately */
 export function saveTheme(colors: ThemeColors): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(colors));
   applyTheme(colors);
+  // Sync to cloud so other devices get it
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") {
+    teamSet(tid, TEAM_KEY, colors);
+  }
 }
