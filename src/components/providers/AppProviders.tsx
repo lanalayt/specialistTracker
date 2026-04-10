@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { AuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
-import { setTeamId, getTeamId } from "@/lib/teamData";
+import { setTeamId, getTeamId, teamGet, teamSet } from "@/lib/teamData";
 import { loadAndApplyTheme, applyTheme, type ThemeColors } from "@/lib/themeColors";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import type { AuthUser, UserRole } from "@/types";
@@ -36,6 +36,28 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       try { localStorage.setItem("st_theme", JSON.stringify(remote)); } catch {}
     }
   }, !!user && user.id !== "local-dev");
+
+  // Auto-register as team member so coaches can see who has access
+  useEffect(() => {
+    if (!user || user.id === "local-dev") return;
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        tid = getTeamId();
+      }
+      if (!tid || tid === "local-dev") return;
+      const members = await teamGet<{ id: string; email: string; name: string; role: string; lastSeen: string }[]>(tid, "team_members") ?? [];
+      const me = { id: user.id, email: user.email, name: user.name, role: user.role, lastSeen: new Date().toISOString() };
+      const idx = members.findIndex((m) => m.id === me.id);
+      if (idx >= 0) {
+        members[idx] = me;
+      } else {
+        members.push(me);
+      }
+      teamSet(tid, "team_members", members);
+    })();
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for auth state changes
   useEffect(() => {
