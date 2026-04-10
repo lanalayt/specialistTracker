@@ -701,6 +701,7 @@ export default function KickingSessionPage() {
     setCommittedKicks(pendingKicks);
     setPendingKicks(null);
     setCommitted(true);
+    setSessionActive(false);
   };
 
   const handleBackToLog = () => {

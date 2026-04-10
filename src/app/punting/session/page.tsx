@@ -807,6 +807,7 @@ export default function PuntingSessionPage() {
     setCommittedPunts(pendingPunts);
     setPendingPunts(null);
     setCommitted(true);
+    setSessionActive(false);
   };
 
   const handleBackToLog = () => {
