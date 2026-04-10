@@ -37,7 +37,11 @@ function posLat(pos: string | undefined): number { return POS_LAT[pos as FGPosit
 function resultEndLat(r: string): number {
   switch (r) { case "YC": return 26.5; case "YL": return 23; case "YR": return 30; case "XL": return 16; case "XR": return 37; default: return 26.5; }
 }
-function kickerDist(d: number): number { return Math.max(8, Math.min(d, MAX_DIST - 2)); }
+// FG distance = 7yd snap + LOS-to-goal + 10yd end zone
+// So kicker's field position from back of EZ = EZ_DEPTH + (fgDist - 17)
+function kickerDist(fgDist: number): number {
+  return Math.max(EZ_DEPTH + 1, Math.min(EZ_DEPTH + (fgDist - 17), MAX_DIST - 2));
+}
 
 // Uprights screen position (at dist=0)
 const UPRIGHT_L = proj(0, 20);
