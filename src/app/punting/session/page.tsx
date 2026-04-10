@@ -1469,7 +1469,7 @@ export default function PuntingSessionPage() {
                         <StatCard label="Avg Hang" value={avgHang !== "—" ? `${avgHang}s` : "—"} />
                         <StatCard label="Dir %" value={dirPct} />
                         <StatCard label="Inside 20" value={inside20} />
-                        <StatCard label="Pin < 5" value={pin5} />
+                        <StatCard label="Inside 10" value={inside10} />
                       </div>
                     </>
                   );
@@ -2240,8 +2240,9 @@ export default function PuntingSessionPage() {
                 const avgNet = ydsCount > 0 ? ((totalGross - totalRet) / ydsCount).toFixed(1) : "—";
                 const htCount = punts.filter((p) => p.hangTime > 0).length;
                 const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
-                const inside20 = punts.filter((p) => (p.landingYL ?? 0) >= 80).length;
-                const pin5 = punts.filter((p) => (p.landingYL ?? 0) >= 95).length;
+                const finalSpot2 = (p: { landingYL?: number; returnYards?: number }) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
+                const inside20 = punts.filter((p) => finalSpot2(p) >= 80).length;
+                const inside10 = punts.filter((p) => finalSpot2(p) >= 90).length;
                 const daCount = punts.filter((p) => p.directionalAccuracy != null).length;
                 const daSum = punts.reduce((s, p) => s + (p.directionalAccuracy ?? 0), 0);
                 const dirPct = daCount > 0 ? `${Math.round((daSum / daCount) * 100)}%` : "—";

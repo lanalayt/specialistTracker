@@ -118,13 +118,18 @@ export function FGFieldView({ kicks, currentKick }: Props) {
     yardEls.push(<line key={`yl-${yd}`} x1={l.x} y1={l.y} x2={r.x} y2={r.y}
       stroke={isGL ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.2)"} strokeWidth={isGL ? 3 : is10 ? 1.5 : 0.7} />);
     if (is10 && yd > 0 && yd <= 50) {
-      // Numbers splitting the hash — one on each hash mark, like a real field
-      const nL = proj(dist, HASH_L); const nR = proj(dist, HASH_R);
+      // Numbers between sideline and hash — straddling the yard line, facing sideline
+      const nL = proj(dist, 9); const nR = proj(dist, 44);
       const scale = 1 - (dist / MAX_DIST) * 0.5;
-      const fs = Math.max(10, 18 * scale);
-      [nL, nR].forEach((p, j) => {
+      const fs = Math.max(8, 16 * scale);
+      // Numbers sit ON the yard line (half above, half below)
+      // Left number at dist-0.3 and dist+0.3 to straddle
+      const above = proj(dist - 0.8, 9); const below = proj(dist + 0.8, 9);
+      const aboveR = proj(dist - 0.8, 44); const belowR = proj(dist + 0.8, 44);
+      // Top digit above the line, bottom digit below — simplified: just center on line
+      [{ p: nL, k: "l" }, { p: nR, k: "r" }].forEach(({ p, k }) => {
         yardEls.push(
-          <text key={`yn-${yd}-${j}`} x={p.x} y={p.y + fs * 0.35} textAnchor="middle" fontSize={fs}
+          <text key={`yn-${yd}-${k}`} x={p.x} y={p.y + fs * 0.35} textAnchor="middle" fontSize={fs}
             fontWeight="900" fill="rgba(255,255,255,0.2)" fontFamily="'Arial Black', sans-serif"
             letterSpacing="2" stroke="rgba(255,255,255,0.06)" strokeWidth={0.5}>{yd}</text>
         );
@@ -132,7 +137,7 @@ export function FGFieldView({ kicks, currentKick }: Props) {
           const ay = p.y + fs * 0.15;
           const as = fs * 0.2;
           yardEls.push(
-            <polygon key={`ya-${yd}-${j}`}
+            <polygon key={`ya-${yd}-${k}`}
               points={`${p.x - as},${ay} ${p.x},${ay - as * 1.5} ${p.x + as},${ay}`}
               fill="rgba(255,255,255,0.12)" />
           );
