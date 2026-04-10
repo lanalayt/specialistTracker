@@ -5,10 +5,19 @@ import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
 import Link from "next/link";
 
+const REMEMBER_KEY = "st_remember_email";
+
 export default function LoginPage() {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try { return localStorage.getItem(REMEMBER_KEY) ?? ""; } catch { return ""; }
+  });
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { return !!localStorage.getItem(REMEMBER_KEY); } catch { return false; }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resetSent, setResetSent] = useState(false);
@@ -19,6 +28,11 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_KEY, email);
+      } else {
+        localStorage.removeItem(REMEMBER_KEY);
+      }
       await signIn(email, password);
       window.location.href = "/dashboard";
     } catch (err: unknown) {
@@ -119,6 +133,16 @@ export default function LoginPage() {
                 autoComplete="current-password"
               />
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 accent-accent rounded"
+              />
+              <span className="text-xs text-slate-300">Remember me</span>
+            </label>
 
             <button
               type="submit"
