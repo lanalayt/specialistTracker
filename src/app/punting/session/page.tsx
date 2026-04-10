@@ -222,6 +222,7 @@ export default function PuntingSessionPage() {
   );
   const [pendingPunts, setPendingPunts] = useState<PuntEntry[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
+  const [committedPunts, setCommittedPunts] = useState<PuntEntry[]>(draft.committedPunts ?? []);
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(() => {
     if ((draft.sessionPunts?.length > 0 || draft.sessionActive || draft.committed) && draft.sessionMode === "game") {
       return "game";
@@ -806,8 +807,6 @@ export default function PuntingSessionPage() {
     if (sessionPunts.length === 0) return;
     setPendingPunts(sessionPunts);
   };
-
-  const [committedPunts, setCommittedPunts] = useState<PuntEntry[]>(draft.committedPunts ?? []);
 
   const handleConfirmCommit = () => {
     if (!pendingPunts) return;
