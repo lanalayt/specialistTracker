@@ -23,6 +23,8 @@ export function PuntSessionSummary({
   const totalHang = htEntries.reduce((s, p) => s + p.hangTime, 0);
   const avgYds = ydsEntries.length > 0 ? (totalYards / ydsEntries.length).toFixed(1) : "—";
   const avgHT = htEntries.length > 0 ? (totalHang / htEntries.length).toFixed(2) : "—";
+  const touchbacks = punts.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
+  const fairCatches = punts.filter((p) => p.fairCatch || p.landingZones?.includes("fairCatch")).length;
   const athletes = [...new Set(punts.map((p) => p.athlete))];
 
   const byAthlete = athletes.map((a) => {
@@ -62,6 +64,22 @@ export function PuntSessionSummary({
               <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Avg HT</p>
             </div>
           </div>
+          {(touchbacks > 0 || fairCatches > 0) && (
+            <div className="flex gap-3">
+              {touchbacks > 0 && (
+                <div className="card-2 text-center flex-1">
+                  <p className="text-xl font-extrabold text-miss">{touchbacks}</p>
+                  <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Touchbacks</p>
+                </div>
+              )}
+              {fairCatches > 0 && (
+                <div className="card-2 text-center flex-1">
+                  <p className="text-xl font-extrabold text-slate-300">{fairCatches}</p>
+                  <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Fair Catches</p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card-2 space-y-1.5">
             <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">

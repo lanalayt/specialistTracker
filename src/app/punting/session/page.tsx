@@ -7,7 +7,7 @@ import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
 import { PuntSessionSummary } from "@/components/ui/PuntSessionSummary";
 import { PuntFieldStrip } from "@/components/ui/PuntFieldStrip";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
-import type { PuntEntry, PuntType, PuntHash } from "@/types";
+import type { PuntEntry, PuntType, PuntHash, PuntLandingZone } from "@/types";
 import { PUNT_HASHES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
@@ -75,6 +75,7 @@ interface LogRow {
   landingYL?: string;
   returnYards?: string;
   fairCatch?: boolean;
+  touchback?: boolean;
 }
 
 interface PartialPuntInput {
@@ -538,9 +539,15 @@ export default function PuntingSessionPage() {
     const htVal = parseFloat(r.hangTime) || 0;
     const retVal = r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined;
     const daVal = r.directionalAccuracy !== "" && r.directionalAccuracy != null ? (parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1) : 1;
+    // Auto-detect touchback: landing YL of 0 = into the end zone = touchback
+    const isTouchback = r.touchback || landingYLVal >= 100;
     // Filled index (position among filled rows)
     const filledIdx = filledIndices.indexOf(rowIdx);
     const kickNum = filledIdx >= 0 ? filledIdx + 1 : sessionPunts.length + 1;
+    // Build landing zones
+    const zones: PuntLandingZone[] = [];
+    if (isTouchback) zones.push("TB");
+    else if (r.fairCatch) zones.push("fairCatch");
     const punt: PuntEntry = {
       athleteId: r.athlete,
       athlete: r.athlete,
@@ -549,13 +556,14 @@ export default function PuntingSessionPage() {
       yards: gross,
       hangTime: htVal,
       opTime: 0,
-      landingZones: r.fairCatch ? ["fairCatch"] : [],
+      landingZones: zones,
       directionalAccuracy: daVal,
       kickNum,
       los: losVal,
       landingYL: landingYLVal,
-      returnYards: r.fairCatch ? 0 : retVal,
+      returnYards: isTouchback ? 0 : (r.fairCatch ? 0 : retVal),
       fairCatch: r.fairCatch || undefined,
+      touchback: isTouchback || undefined,
     };
     setSessionPunts((prev) => {
       // Replace if already saved for this kickNum, else append
@@ -673,6 +681,10 @@ export default function PuntingSessionPage() {
       poochYLVal = poochYL !== "" ? parseInt(poochYL) || 0 : undefined;
       ydsVal = 0; // pooch punts do not contribute to distance averages
     }
+    // Auto-detect touchback: landing at opponent's end zone (field pos >= 100)
+    const isTouchback = landingYLVal != null && landingYLVal >= 100;
+    const liveZones: PuntLandingZone[] = [];
+    if (isTouchback) liveZones.push("TB");
     const punt: PuntEntry = {
       athleteId: plan.athlete,
       athlete: plan.athlete,
@@ -681,14 +693,15 @@ export default function PuntingSessionPage() {
       yards: ydsVal,
       hangTime: htVal,
       opTime: otVal,
-      landingZones: [],
+      landingZones: liveZones,
       directionalAccuracy,
       starred: starred || undefined,
       kickNum: currentPuntIdx + 1,
       los: losVal,
       landingYL: landingYLVal,
-      returnYards: retVal,
+      returnYards: isTouchback ? 0 : retVal,
       poochLandingYardLine: poochYLVal,
+      touchback: isTouchback || undefined,
     };
 
     // Outlier check
@@ -1570,6 +1583,8 @@ export default function PuntingSessionPage() {
             const fSpot = (p: PuntEntry) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
             const i20 = all.filter((p) => p.landingYL != null && fSpot(p) >= 80).length;
             const i10 = all.filter((p) => p.landingYL != null && fSpot(p) >= 90).length;
+            const tbCount = all.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
+            const fcCount = all.filter((p) => p.fairCatch || p.landingZones?.includes("fairCatch")).length;
 
             const byAthlete: Record<string, PuntEntry[]> = {};
             all.forEach((p) => { if (!byAthlete[p.athlete]) byAthlete[p.athlete] = []; byAthlete[p.athlete].push(p); });
@@ -1585,6 +1600,8 @@ export default function PuntingSessionPage() {
                     <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{avgHangAll}{avgHangAll !== "—" ? "s" : ""}</p><p className="text-[10px] text-muted uppercase">Avg Hang</p></div>
                     <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{i20}</p><p className="text-[10px] text-muted uppercase">Inside 20</p></div>
                     <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{i10}</p><p className="text-[10px] text-muted uppercase">Inside 10</p></div>
+                    <div className="card-2 p-2 text-center"><p className={`text-lg font-bold ${tbCount > 0 ? "text-miss" : "text-slate-100"}`}>{tbCount}</p><p className="text-[10px] text-muted uppercase">Touchbacks</p></div>
+                    <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{fcCount}</p><p className="text-[10px] text-muted uppercase">Fair Catches</p></div>
                     <div className="card-2 p-2 text-center"><p className="text-lg font-bold text-slate-100">{all.length}</p><p className="text-[10px] text-muted uppercase">Total Punts</p></div>
                   </div>
                 )}
@@ -1608,6 +1625,7 @@ export default function PuntingSessionPage() {
                       const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
                       const apI20 = ap.filter((p) => p.landingYL != null && fSpot(p) >= 80).length;
                       const apI10 = ap.filter((p) => p.landingYL != null && fSpot(p) >= 90).length;
+                      const apTB = ap.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
                       return (
                         <div key={name} className="card-2 p-3">
                           <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
@@ -1620,6 +1638,7 @@ export default function PuntingSessionPage() {
                             {dirEnabled && <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>}
                             <div><span className="text-muted">I-20</span> <span className="text-slate-200 font-medium ml-1">{apI20}</span></div>
                             <div><span className="text-muted">I-10</span> <span className="text-slate-200 font-medium ml-1">{apI10}</span></div>
+                            <div><span className="text-muted">TB</span> <span className={`font-medium ml-1 ${apTB > 0 ? "text-miss" : "text-slate-200"}`}>{apTB}</span></div>
                           </div>
                         </div>
                       );
@@ -1833,6 +1852,7 @@ export default function PuntingSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]" title="Landing yard line. Use -X for own side, +X for opponent side">Land YL ±</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Hang Time</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Touchback">TB</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Fair Catch">FC</th>
                       {dirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
@@ -1960,7 +1980,19 @@ export default function PuntingSessionPage() {
                               <input
                                 type="text" inputMode="text" placeholder="25"
                                 value={row.landingYL ?? ""}
-                                onChange={(e) => updateRow(idx, "landingYL", e.target.value)}
+                                onChange={(e) => {
+                                  updateRow(idx, "landingYL", e.target.value);
+                                  // Auto-detect touchback: "0" on opponent side = end zone
+                                  const val = e.target.value.trim();
+                                  const parsed = parseYardLine(val, "+");
+                                  if (!isNaN(parsed) && parsed >= 100) {
+                                    updateRow(idx, "touchback", true);
+                                    updateRow(idx, "returnYards", "");
+                                    updateRow(idx, "fairCatch", false);
+                                  } else if (row.touchback) {
+                                    updateRow(idx, "touchback", false);
+                                  }
+                                }}
                                 readOnly={isAthlete || isSaved}
                                 title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
@@ -1983,15 +2015,31 @@ export default function PuntingSessionPage() {
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
                                 value={row.returnYards ?? ""}
                                 onChange={(e) => updateRow(idx, "returnYards", e.target.value)}
-                                readOnly={isAthlete || isSaved || !!row.fairCatch}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : row.fairCatch ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                readOnly={isAthlete || isSaved || !!row.fairCatch || !!row.touchback}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : (row.fairCatch || row.touchback) ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1 text-center">
+                              <input
+                                type="checkbox"
+                                checked={!!row.touchback}
+                                disabled={isAthlete || isSaved}
+                                onChange={(e) => {
+                                  updateRow(idx, "touchback", e.target.checked);
+                                  if (e.target.checked) {
+                                    updateRow(idx, "returnYards", "");
+                                    updateRow(idx, "fairCatch", false);
+                                  }
+                                }}
+                                title="Touchback"
+                                className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="py-1 px-1 text-center">
                               <input
                                 type="checkbox"
                                 checked={!!row.fairCatch}
-                                disabled={isAthlete || isSaved}
+                                disabled={isAthlete || isSaved || !!row.touchback}
                                 onChange={(e) => updateRow(idx, "fairCatch", e.target.checked)}
                                 title="Fair Catch"
                                 className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"

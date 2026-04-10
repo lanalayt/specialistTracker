@@ -103,6 +103,7 @@ export interface PuntEntry {
   los?: number;
   landingYL?: number;
   fairCatch?: boolean;
+  touchback?: boolean;
 }
 
 // ─── Punt stats ─────────────────────────────────────────────────────────────
