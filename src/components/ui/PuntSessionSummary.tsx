@@ -16,19 +16,26 @@ export function PuntSessionSummary({
   onConfirm,
   onCancel,
 }: PuntSessionSummaryProps) {
-  const totalYards = punts.reduce((s, p) => s + p.yards, 0);
-  const totalHang = punts.reduce((s, p) => s + p.hangTime, 0);
-  const avgYds = punts.length > 0 ? (totalYards / punts.length).toFixed(1) : "—";
-  const avgHT = punts.length > 0 ? (totalHang / punts.length).toFixed(2) : "—";
+  // Only count punts with actual yardage for distance averages
+  const ydsEntries = punts.filter((p) => p.yards > 0);
+  const htEntries = punts.filter((p) => p.hangTime > 0);
+  const totalYards = ydsEntries.reduce((s, p) => s + p.yards, 0);
+  const totalHang = htEntries.reduce((s, p) => s + p.hangTime, 0);
+  const avgYds = ydsEntries.length > 0 ? (totalYards / ydsEntries.length).toFixed(1) : "—";
+  const avgHT = htEntries.length > 0 ? (totalHang / htEntries.length).toFixed(2) : "—";
   const athletes = [...new Set(punts.map((p) => p.athlete))];
 
   const byAthlete = athletes.map((a) => {
     const ap = punts.filter((p) => p.athlete === a);
-    const aYds = ap.reduce((s, p) => s + p.yards, 0);
+    const apYds = ap.filter((p) => p.yards > 0);
+    const apHt = ap.filter((p) => p.hangTime > 0);
+    const aYds = apYds.reduce((s, p) => s + p.yards, 0);
+    const aHt = apHt.reduce((s, p) => s + p.hangTime, 0);
     return {
       name: a,
       count: ap.length,
-      avgYds: (aYds / ap.length).toFixed(1),
+      avgYds: apYds.length > 0 ? (aYds / apYds.length).toFixed(1) : "—",
+      avgHT: apHt.length > 0 ? (aHt / apHt.length).toFixed(2) : "—",
     };
   });
 
@@ -64,8 +71,9 @@ export function PuntSessionSummary({
               <div key={a.name} className="flex items-center justify-between text-sm">
                 <span className="font-medium text-slate-200">{a.name}</span>
                 <span className="text-muted">
-                  {a.count} punts{" "}
-                  <span className="text-accent font-semibold">({a.avgYds} avg)</span>
+                  {a.count} punts ·{" "}
+                  <span className="text-accent font-semibold">{a.avgYds} avg</span>
+                  {a.avgHT !== "—" && <span className="text-slate-300"> · {a.avgHT}s</span>}
                 </span>
               </div>
             ))}

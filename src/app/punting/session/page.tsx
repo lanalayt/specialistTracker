@@ -2138,15 +2138,19 @@ export default function PuntingSessionPage() {
             return athleteNames.map((name) => {
               const ap = todayPunts.filter((p) => p.athlete === name);
               const count = ap.length;
-              const totalYds = ap.reduce((s, p) => s + p.yards, 0);
-              const totalHT = ap.reduce((s, p) => s + p.hangTime, 0);
-              const totalOT = ap.reduce((s, p) => s + p.opTime, 0);
-              const totalDA = ap.reduce((s, p) => s + p.directionalAccuracy, 0);
-              const longPunt = Math.max(...ap.map((p) => p.yards));
-              const aYds = count > 0 ? (totalYds / count).toFixed(1) : "—";
-              const aHT = count > 0 ? (totalHT / count).toFixed(2) : "—";
-              const aOT = count > 0 ? (totalOT / count).toFixed(2) : "—";
-              const aDA = count > 0 ? `${Math.round((totalDA / count) * 100)}%` : "—";
+              const ydsEntries = ap.filter((p) => p.yards > 0);
+              const htEntries = ap.filter((p) => p.hangTime > 0);
+              const otEntries = ap.filter((p) => p.opTime > 0);
+              const daEntries = ap.filter((p) => p.directionalAccuracy != null);
+              const totalYds = ydsEntries.reduce((s, p) => s + p.yards, 0);
+              const totalHT = htEntries.reduce((s, p) => s + p.hangTime, 0);
+              const totalOT = otEntries.reduce((s, p) => s + p.opTime, 0);
+              const totalDA = daEntries.reduce((s, p) => s + p.directionalAccuracy, 0);
+              const longPunt = ydsEntries.length > 0 ? Math.max(...ydsEntries.map((p) => p.yards)) : 0;
+              const aYds = ydsEntries.length > 0 ? (totalYds / ydsEntries.length).toFixed(1) : "—";
+              const aHT = htEntries.length > 0 ? (totalHT / htEntries.length).toFixed(2) : "—";
+              const aOT = otEntries.length > 0 ? (totalOT / otEntries.length).toFixed(2) : "—";
+              const aDA = daEntries.length > 0 ? `${Math.round((totalDA / daEntries.length) * 100)}%` : "—";
 
               return (
                 <div key={name} className="card space-y-2">
