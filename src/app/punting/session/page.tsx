@@ -165,11 +165,27 @@ const POS_LABELS: Record<PuntHash, string> = {
   RH: "RH",
 };
 
-const DA_OPTIONS = [
+const DEFAULT_DA_OPTIONS = [
   { value: "1", label: "1.0 ✓" },
   { value: "0.5", label: "0.5" },
   { value: "0", label: "0 ★" },
 ];
+
+function loadDirectionSettings(): { enabled: boolean; options: { value: string; label: string }[] } {
+  if (typeof window === "undefined") return { enabled: true, options: DEFAULT_DA_OPTIONS };
+  try {
+    const raw = localStorage.getItem("puntSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const enabled = parsed.directionEnabled !== false;
+      const options = parsed.directionOptions?.length > 0
+        ? parsed.directionOptions.map((d: { id: string; label: string }) => ({ value: d.id, label: d.label }))
+        : DEFAULT_DA_OPTIONS;
+      return { enabled, options };
+    }
+  } catch {}
+  return { enabled: true, options: DEFAULT_DA_OPTIONS };
+}
 
 export default function PuntingSessionPage() {
   const { athletes, stats, canUndo, undoLastCommit, commitPractice, resetAll } =
@@ -214,6 +230,9 @@ export default function PuntingSessionPage() {
   }, [sessionMode, manualEntry]);
   const [showReset, setShowReset] = useState(false);
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
+  const [dirSettings] = useState(() => loadDirectionSettings());
+  const dirEnabled = dirSettings.enabled;
+  const DA_OPTIONS = dirSettings.options;
   const typeLabels: Record<string, string> = {};
   puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
   const drag = useDragReorder(rows, setRows);
@@ -1269,44 +1288,33 @@ export default function PuntingSessionPage() {
                     )}
 
                     {/* Directional Accuracy */}
+                    {dirEnabled && (
                     <div>
-                      <p className="label">Directional Accuracy</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() => setDirectionalAccuracy(1)}
-                          className={clsx(
-                            "py-3 rounded-input text-xs font-bold border transition-all",
-                            directionalAccuracy === 1
-                              ? "bg-make/20 text-make border-make/50"
-                              : "bg-surface-2 text-muted border-border hover:text-white"
-                          )}
-                        >
-                          1.0 ✓
-                        </button>
-                        <button
-                          onClick={() => setDirectionalAccuracy(0.5)}
-                          className={clsx(
-                            "py-3 rounded-input text-xs font-bold border transition-all",
-                            directionalAccuracy === 0.5
-                              ? "bg-warn/20 text-warn border-warn/50"
-                              : "bg-surface-2 text-muted border-border hover:text-white"
-                          )}
-                        >
-                          0.5
-                        </button>
-                        <button
-                          onClick={() => setDirectionalAccuracy(0)}
-                          className={clsx(
-                            "py-3 rounded-input text-xs font-bold border transition-all",
-                            directionalAccuracy === 0
-                              ? "bg-miss/20 text-miss border-miss/50"
-                              : "bg-surface-2 text-muted border-border hover:text-white"
-                          )}
-                        >
-                          0 ★
-                        </button>
+                      <p className="label">Direction Score</p>
+                      <div className="flex flex-wrap gap-2">
+                        {DA_OPTIONS.map((opt) => {
+                          const numVal = parseFloat(opt.value);
+                          const isActive = directionalAccuracy === numVal;
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => setDirectionalAccuracy(numVal as 0 | 0.5 | 1)}
+                              className={clsx(
+                                "px-3 py-3 rounded-input text-xs font-bold border transition-all",
+                                isActive
+                                  ? numVal === 1 ? "bg-make/20 text-make border-make/50"
+                                    : numVal === 0 ? "bg-miss/20 text-miss border-miss/50"
+                                    : "bg-warn/20 text-warn border-warn/50"
+                                  : "bg-surface-2 text-muted border-border hover:text-white"
+                              )}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
+                    )}
 
                     {/* Star + Log button + Remove */}
                     <div className="flex gap-2">
@@ -1644,7 +1652,7 @@ export default function PuntingSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Hang Time</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Fair Catch">FC</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>
+                      {dirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
                     </>
                   )}
@@ -1659,9 +1667,11 @@ export default function PuntingSessionPage() {
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
                         Punter Opp
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
-                        Dir. Score
-                      </th>
+                      {dirEnabled && (
+                        <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
+                          Dir. Score
+                        </th>
+                      )}
                     </>
                   )}
                   {sessionMode !== "game" && (
@@ -1805,19 +1815,21 @@ export default function PuntingSessionPage() {
                                 className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
-                            <td className="py-1 px-1">
-                              <select
-                                value={row.directionalAccuracy}
-                                onChange={(e) => updateRow(idx, "directionalAccuracy", e.target.value)}
-                                disabled={isAthlete || isSaved}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
-                              >
-                                <option value="">—</option>
-                                {DA_OPTIONS.map((o) => (
-                                  <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                              </select>
-                            </td>
+                            {dirEnabled && (
+                              <td className="py-1 px-1">
+                                <select
+                                  value={row.directionalAccuracy}
+                                  onChange={(e) => updateRow(idx, "directionalAccuracy", e.target.value)}
+                                  disabled={isAthlete || isSaved}
+                                  className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                >
+                                  <option value="">—</option>
+                                  {DA_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                  ))}
+                                </select>
+                              </td>
+                            )}
                             <td className="py-1 px-1 text-center">
                               {isSaved ? (
                                 <button
@@ -1887,19 +1899,21 @@ export default function PuntingSessionPage() {
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
-                          <td className="py-1 px-1">
-                            <select
-                              value={row.directionalAccuracy}
-                              onChange={(e) => updateRow(idx, "directionalAccuracy", e.target.value)}
-                              disabled={isAthlete}
-                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
-                            >
-                              <option value="">—</option>
-                              {DA_OPTIONS.map((o) => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
-                              ))}
-                            </select>
-                          </td>
+                          {dirEnabled && (
+                            <td className="py-1 px-1">
+                              <select
+                                value={row.directionalAccuracy}
+                                onChange={(e) => updateRow(idx, "directionalAccuracy", e.target.value)}
+                                disabled={isAthlete}
+                                className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
+                              >
+                                <option value="">—</option>
+                                {DA_OPTIONS.map((o) => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                            </td>
+                          )}
                         </>
                       )}
                       {sessionMode !== "game" && (
