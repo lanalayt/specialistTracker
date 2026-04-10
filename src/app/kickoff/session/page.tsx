@@ -194,6 +194,7 @@ export default function KickoffSessionPage() {
   );
   const [pendingKicks, setPendingKicks] = useState<KickoffEntry[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
+  const [committedKicks, setCommittedKicks] = useState<KickoffEntry[]>(draft.committedKicks ?? []);
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(() => {
     if ((draft.sessionKicks?.length > 0 || draft.sessionActive || draft.committed) && draft.sessionMode === "game") {
       return "game";
@@ -665,8 +666,6 @@ export default function KickoffSessionPage() {
     if (sessionKicks.length === 0) return;
     setPendingKicks(sessionKicks);
   };
-
-  const [committedKicks, setCommittedKicks] = useState<KickoffEntry[]>(draft.committedKicks ?? []);
 
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;
