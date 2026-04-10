@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import type { KickoffEntry } from "@/types";
 
 interface Props {
@@ -10,23 +10,23 @@ interface Props {
 
 const W = 780;
 const H = 380;
-const PAD_X = 30;
+const PAD_X = 20;
 const TOP_Y = 100;
 const BOTTOM_Y = 340;
+const FIELD_MIN = -10;
+const FIELD_MAX = 110;
+const FIELD_RANGE = FIELD_MAX - FIELD_MIN;
 
 function proj(fieldX: number, fieldY: number): { x: number; y: number } {
   const yT = Math.max(0, Math.min(1, fieldY / 53));
   const y = TOP_Y + yT * (BOTTOM_Y - TOP_Y);
   const scale = 0.88 + yT * 0.12;
   const halfWidth = (W - 2 * PAD_X) / 2 * scale;
-  const xT = (fieldX - 50) / 50;
+  const xT = ((fieldX - (FIELD_MIN + FIELD_MAX) / 2) / (FIELD_RANGE / 2));
   return { x: W / 2 + xT * halfWidth, y };
 }
 
-function hangLift(ht: number | undefined): number {
-  const h = Math.max(0.5, Math.min(ht ?? 3, 6));
-  return 20 + (h / 6) * 100;
-}
+function hangLift(ht: number | undefined): number { const h = Math.max(0.5, Math.min(ht ?? 3, 6)); return 20 + (h / 6) * 100; }
 
 function renderArc(key: string | number, los: number, landing: number, ht: number | undefined, retYds: number | undefined, opacity: number, color = "#f59e0b", sw = 2.5) {
   if (landing <= los) return null;
@@ -52,12 +52,27 @@ function renderArc(key: string | number, los: number, landing: number, ht: numbe
 }
 
 export function KickoffFieldView({ kicks, currentKick }: Props) {
-  const turfStripes: React.ReactNode[] = [];
+  const [ezColor, setEzColor] = useState("#991b1b");
+  useEffect(() => {
+    try { const r = localStorage.getItem("st_theme"); if (r) { const t = JSON.parse(r); if (t.primary) setEzColor(t.primary); } } catch {}
+  }, []);
+
+  const stripes: React.ReactNode[] = [];
   for (let fx = 0; fx < 100; fx += 5) {
     const isDark = Math.floor(fx / 5) % 2 === 0;
     const tl = proj(fx, 0); const tr = proj(fx + 5, 0); const bl = proj(fx, 53); const br = proj(fx + 5, 53);
-    turfStripes.push(<polygon key={`ts-${fx}`} points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill={isDark ? "#14532d" : "#166534"} />);
+    stripes.push(<polygon key={`s-${fx}`} points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill={isDark ? "#14532d" : "#166534"} />);
   }
+
+  const leftEZ = (() => {
+    const tl = proj(-10, 0); const tr = proj(0, 0); const br = proj(0, 53); const bl = proj(-10, 53);
+    return <polygon points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill={ezColor} opacity={0.3} />;
+  })();
+  const rightEZ = (() => {
+    const tl = proj(100, 0); const tr = proj(110, 0); const br = proj(110, 53); const bl = proj(100, 53);
+    return <polygon points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill={ezColor} opacity={0.3} />;
+  })();
+
   const yardLines: React.ReactNode[] = [];
   for (let fx = 0; fx <= 100; fx += 10) {
     const far = proj(fx, 0); const near = proj(fx, 53);
@@ -86,25 +101,24 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full rounded-lg overflow-hidden" style={{ maxHeight: 380 }}>
         <defs>
           <linearGradient id="ko-sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#020617" />
-            <stop offset="40%" stopColor="#0f172a" />
-            <stop offset="100%" stopColor="#1e293b" />
+            <stop offset="0%" stopColor="#020617" /><stop offset="40%" stopColor="#0f172a" /><stop offset="100%" stopColor="#1e293b" />
           </linearGradient>
           <filter id="koBlur"><feGaussianBlur stdDeviation="3" /></filter>
         </defs>
         <rect x={0} y={0} width={W} height={TOP_Y} fill="url(#ko-sky)" />
         <circle cx={W * 0.2} cy={10} r={60} fill="rgba(255,255,255,0.02)" />
         <circle cx={W * 0.8} cy={10} r={60} fill="rgba(255,255,255,0.02)" />
-        {turfStripes}
-        {(() => {
-          const tl = proj(0, 0); const tr = proj(100, 0); const bl = proj(0, 53); const br = proj(100, 53);
+        {(() => { const tl = proj(-10, 0); const tr = proj(110, 0); const br = proj(110, 53); const bl = proj(-10, 53);
+          return <polygon points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill="#14532d" />; })()}
+        {leftEZ}{rightEZ}
+        {stripes}
+        {(() => { const tl = proj(-10, 0); const tr = proj(110, 0); const bl = proj(-10, 53); const br = proj(110, 53);
           return (<>
             <line x1={tl.x} y1={tl.y} x2={tr.x} y2={tr.y} stroke="white" strokeWidth={3} />
             <line x1={bl.x} y1={bl.y} x2={br.x} y2={br.y} stroke="white" strokeWidth={3} />
-            <line x1={tl.x} y1={tl.y} x2={bl.x} y2={bl.y} stroke="white" strokeWidth={3} />
-            <line x1={tr.x} y1={tr.y} x2={br.x} y2={br.y} stroke="white" strokeWidth={3} />
-          </>);
-        })()}
+            <line x1={tl.x} y1={tl.y} x2={bl.x} y2={bl.y} stroke="white" strokeWidth={2} />
+            <line x1={tr.x} y1={tr.y} x2={br.x} y2={br.y} stroke="white" strokeWidth={2} />
+          </>); })()}
         {yardLines}
         {kicks.map((k, i) => {
           const los = k.los ?? 35; const landing = k.landingYL ?? (los + (k.distance || 0));
