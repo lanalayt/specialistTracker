@@ -49,6 +49,7 @@ interface SessionDraft {
   sessionKicks: KickoffEntry[];
   committed?: boolean;
   committedWeather?: string;
+  committedKicks?: KickoffEntry[];
   sessionMode?: "practice" | "game";
   opponent?: string;
   gameTime?: string;
@@ -265,11 +266,12 @@ export default function KickoffSessionPage() {
       sessionKicks,
       committed,
       committedWeather: committed ? weather : undefined,
+      committedKicks: committed ? committedKicks : undefined,
       sessionMode,
       opponent,
       gameTime,
     });
-  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, committed, weather, sessionMode, opponent, gameTime]);
+  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, committed, committedKicks, weather, sessionMode, opponent, gameTime]);
 
   // Load draft from cloud if local is empty
   useEffect(() => {
@@ -664,7 +666,7 @@ export default function KickoffSessionPage() {
     setPendingKicks(sessionKicks);
   };
 
-  const [committedKicks, setCommittedKicks] = useState<KickoffEntry[]>([]);
+  const [committedKicks, setCommittedKicks] = useState<KickoffEntry[]>(draft.committedKicks ?? []);
 
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;

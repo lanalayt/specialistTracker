@@ -97,6 +97,7 @@ interface SessionDraft {
   partialInputs?: Record<number, PartialPuntInput>;
   committed?: boolean;
   committedWeather?: string;
+  committedPunts?: PuntEntry[];
   sessionMode?: "practice" | "game";
   opponent?: string;
   gameTime?: string;
@@ -351,11 +352,12 @@ export default function PuntingSessionPage() {
       partialInputs: mergedPartials,
       committed,
       committedWeather: committed ? weather : undefined,
+      committedPunts: committed ? committedPunts : undefined,
       sessionMode,
       opponent,
       gameTime,
     });
-  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, weather, sessionMode, opponent, gameTime]);
+  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, committedPunts, weather, sessionMode, opponent, gameTime]);
 
   // ── Kick numbering helpers (track by planned position) ──────
   const loggedKickNums = new Set(sessionPunts.map(p => p.kickNum));
@@ -805,7 +807,7 @@ export default function PuntingSessionPage() {
     setPendingPunts(sessionPunts);
   };
 
-  const [committedPunts, setCommittedPunts] = useState<PuntEntry[]>([]);
+  const [committedPunts, setCommittedPunts] = useState<PuntEntry[]>(draft.committedPunts ?? []);
 
   const handleConfirmCommit = () => {
     if (!pendingPunts) return;

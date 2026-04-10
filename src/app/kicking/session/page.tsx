@@ -55,6 +55,7 @@ interface SessionDraft {
   partialInputs?: Record<number, PartialKickInput>;
   committed?: boolean;
   committedWeather?: string;
+  committedKicks?: FGKick[];
   sessionMode?: "practice" | "game";
   opponent?: string;
   gameTime?: string;
@@ -303,11 +304,12 @@ export default function KickingSessionPage() {
       partialInputs: mergedPartials,
       committed,
       committedWeather: committed ? weather : undefined,
+      committedKicks: committed ? committedKicks : undefined,
       sessionMode,
       opponent,
       gameTime,
     });
-  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, partialInputs, result, score, starred, committed, weather, sessionMode, opponent, gameTime]);
+  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, partialInputs, result, score, starred, committed, committedKicks, weather, sessionMode, opponent, gameTime]);
 
   // ── Kick numbering helpers (track by planned position) ──────
   const loggedKickNums = new Set(sessionKicks.map(k => k.kickNum));
@@ -702,7 +704,7 @@ export default function KickingSessionPage() {
     setPendingKicks(sessionKicks);
   };
 
-  const [committedKicks, setCommittedKicks] = useState<FGKick[]>([]);
+  const [committedKicks, setCommittedKicks] = useState<FGKick[]>(draft.committedKicks ?? []);
 
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;
