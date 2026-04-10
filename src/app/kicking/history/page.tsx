@@ -242,11 +242,29 @@ function KickingHistoryContent() {
                         onClick={() => {
                           const fgK = kicks.filter((k) => !k.isPAT);
                           const m = fgK.filter((k) => k.result.startsWith("Y")).length;
+                          const athleteNames = [...new Set(kicks.map((k) => k.athlete))];
+                          const athleteBreakdowns = athleteNames.map((name) => {
+                            const ak = kicks.filter((k) => k.athlete === name);
+                            const fg = ak.filter((k) => !k.isPAT);
+                            const made = fg.filter((k) => k.result.startsWith("Y")).length;
+                            const madeK = fg.filter((k) => k.result.startsWith("Y"));
+                            const long = madeK.length > 0 ? Math.max(...madeK.map((k) => k.dist)) : 0;
+                            const pats = ak.filter((k) => k.isPAT);
+                            const patMade = pats.filter((k) => k.result.startsWith("Y")).length;
+                            const stats: Record<string, string> = {
+                              "FG": `${made}/${fg.length}`,
+                              "%": fg.length > 0 ? `${Math.round((made / fg.length) * 100)}%` : "—",
+                              "Long": long > 0 ? `${long}` : "—",
+                            };
+                            if (pats.length > 0) stats["PAT"] = `${patMade}/${pats.length}`;
+                            return { name, stats };
+                          });
                           exportSessionPDF(
                             `FG Session — ${selected.label}`,
                             ["#", "Athlete", "Dist", "Pos", "Result", "Score"],
                             kicks.map((k, i) => [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result, String(k.score)]),
-                            { Made: `${m}/${fgK.length}`, Pct: fgK.length > 0 ? `${Math.round((m / fgK.length) * 100)}%` : "—" }
+                            { Made: `${m}/${fgK.length}`, Pct: fgK.length > 0 ? `${Math.round((m / fgK.length) * 100)}%` : "—" },
+                            athleteBreakdowns
                           );
                         }}
                         className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"

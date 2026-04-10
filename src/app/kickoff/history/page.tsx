@@ -200,11 +200,26 @@ function KickoffHistoryContent() {
                         onClick={() => {
                           const dE = entries.filter((k) => k.distance > 0);
                           const hE = entries.filter((k) => k.hangTime > 0);
+                          const athleteNames = [...new Set(entries.map((k) => k.athlete))];
+                          const athleteBreakdowns = athleteNames.map((name) => {
+                            const ak = entries.filter((k) => k.athlete === name);
+                            const aD = ak.filter((k) => k.distance > 0);
+                            const aH = ak.filter((k) => k.hangTime > 0);
+                            return {
+                              name,
+                              stats: {
+                                KOs: String(ak.length),
+                                "Avg Dist": aD.length > 0 ? (aD.reduce((s, k) => s + k.distance, 0) / aD.length).toFixed(1) : "—",
+                                "Avg Hang": aH.length > 0 ? (aH.reduce((s, k) => s + k.hangTime, 0) / aH.length).toFixed(2) + "s" : "—",
+                              },
+                            };
+                          });
                           exportSessionPDF(
                             `Kickoff Session — ${selected.label}`,
                             ["#", "Athlete", "Type", "Dist", "Hang", "Dir"],
                             entries.map((k, i) => [String(k.kickNum ?? i + 1), k.athlete, k.type, k.distance > 0 ? `${k.distance}` : "—", k.hangTime > 0 ? k.hangTime.toFixed(2) : "—", k.direction || "—"]),
-                            { Kickoffs: String(entries.length), "Avg Dist": dE.length > 0 ? (dE.reduce((s, k) => s + k.distance, 0) / dE.length).toFixed(1) : "—", "Avg Hang": hE.length > 0 ? (hE.reduce((s, k) => s + k.hangTime, 0) / hE.length).toFixed(2) + "s" : "—" }
+                            { Kickoffs: String(entries.length), "Avg Dist": dE.length > 0 ? (dE.reduce((s, k) => s + k.distance, 0) / dE.length).toFixed(1) : "—", "Avg Hang": hE.length > 0 ? (hE.reduce((s, k) => s + k.hangTime, 0) / hE.length).toFixed(2) + "s" : "—" },
+                            athleteBreakdowns
                           );
                         }}
                         className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"

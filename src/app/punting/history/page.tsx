@@ -219,23 +219,54 @@ function PuntHistoryContent() {
                         onClick={() => {
                           const ydsE = punts.filter((p) => p.yards > 0);
                           const htE = punts.filter((p) => p.hangTime > 0);
+                          const hasYL = punts.some((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+                          const hdrs = ["#", "Athlete", "Type", "Yards"];
+                          if (hasYL) hdrs.push("YL");
+                          hdrs.push("Hang", "OT", "Dir");
+                          const athleteNames = [...new Set(punts.map((p) => p.athlete))];
+                          const athleteBreakdowns = athleteNames.map((name) => {
+                            const ap = punts.filter((p) => p.athlete === name);
+                            const aYds = ap.filter((p) => p.yards > 0);
+                            const aHt = ap.filter((p) => p.hangTime > 0);
+                            const aOt = ap.filter((p) => (p.opTime || 0) > 0);
+                            const aDa = ap.filter((p) => p.directionalAccuracy != null);
+                            const stats: Record<string, string> = {
+                              Punts: String(ap.length),
+                              "Avg Dist": aYds.length > 0 ? (aYds.reduce((s, p) => s + p.yards, 0) / aYds.length).toFixed(1) : "—",
+                              "Avg Hang": aHt.length > 0 ? (aHt.reduce((s, p) => s + p.hangTime, 0) / aHt.length).toFixed(2) + "s" : "—",
+                              "Avg OT": aOt.length > 0 ? (aOt.reduce((s, p) => s + (p.opTime || 0), 0) / aOt.length).toFixed(2) + "s" : "—",
+                              "Dir %": aDa.length > 0 ? Math.round((aDa.reduce((s, p) => s + p.directionalAccuracy, 0) / aDa.length) * 100) + "%" : "—",
+                            };
+                            const poochYL = ap.filter((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+                            if (poochYL.length > 0) {
+                              stats["Pooch Avg YL"] = (poochYL.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / poochYL.length).toFixed(1);
+                            }
+                            return { name, stats };
+                          });
                           exportSessionPDF(
                             `Punt Session — ${selected.label}`,
-                            ["#", "Athlete", "Type", "Yards", "Hang", "OT", "Dir"],
-                            punts.map((p, i) => [
-                              String(p.kickNum ?? i + 1),
-                              p.athlete,
-                              p.type || "—",
-                              p.yards > 0 ? `${p.yards}` : "—",
-                              p.hangTime > 0 ? p.hangTime.toFixed(2) : "—",
-                              (p.opTime || 0) > 0 ? p.opTime.toFixed(2) : "—",
-                              String(p.directionalAccuracy ?? "—"),
-                            ]),
+                            hdrs,
+                            punts.map((p, i) => {
+                              const row = [
+                                String(p.kickNum ?? i + 1),
+                                p.athlete,
+                                p.type || "—",
+                                p.yards > 0 ? `${p.yards}` : "—",
+                              ];
+                              if (hasYL) row.push(p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? String(p.poochLandingYardLine) : "—");
+                              row.push(
+                                p.hangTime > 0 ? p.hangTime.toFixed(2) : "—",
+                                (p.opTime || 0) > 0 ? p.opTime.toFixed(2) : "—",
+                                String(p.directionalAccuracy ?? "—"),
+                              );
+                              return row;
+                            }),
                             {
                               Punts: String(punts.length),
                               "Avg Dist": ydsE.length > 0 ? (ydsE.reduce((s, p) => s + p.yards, 0) / ydsE.length).toFixed(1) : "—",
                               "Avg Hang": htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) + "s" : "—",
-                            }
+                            },
+                            athleteBreakdowns
                           );
                         }}
                         className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
@@ -345,51 +376,60 @@ function PuntHistoryContent() {
                 </div>
               );
             })()}
-            <div className="card-2 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="table-header text-left">#</th>
-                    <th className="table-header text-left">Athlete</th>
-                    <th className="table-header">Type</th>
-                    <th className="table-header">Yds</th>
-                    <th className="table-header">Hang</th>
-                    <th className="table-header">OT</th>
-                    <th className="table-header">Dir</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(editing ? editEntries : punts).map((p, i) => (
-                    <tr key={i} className="hover:bg-surface/30">
-                      <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
-                      <td className="table-name">{p.athlete}</td>
-                      <td className="table-cell text-muted">{p.type || "—"}</td>
-                      {editing ? (
-                        <>
-                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
-                          <td className="table-cell p-1"><input type="text" inputMode="decimal" value={p.hangTime || ""} onChange={(e) => updateEntry(i, "hangTime", parseFloat(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
-                          <td className="table-cell p-1"><input type="text" inputMode="decimal" value={p.opTime || ""} onChange={(e) => updateEntry(i, "opTime", parseFloat(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
-                          <td className="table-cell p-1">
-                            <select value={String(p.directionalAccuracy ?? "")} onChange={(e) => updateEntry(i, "directionalAccuracy", parseFloat(e.target.value))} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
-                              <option value="1">1</option>
-                              <option value="0.5">0.5</option>
-                              <option value="0">0</option>
-                            </select>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
-                          <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
-                          <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
-                          <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const displayPunts = editing ? editEntries : punts;
+              const hasPooch = displayPunts.some((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+              return (
+                <div className="card-2 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className="table-header text-left">#</th>
+                        <th className="table-header text-left">Athlete</th>
+                        <th className="table-header">Type</th>
+                        <th className="table-header">Yds</th>
+                        {hasPooch && <th className="table-header text-accent">YL</th>}
+                        <th className="table-header">Hang</th>
+                        <th className="table-header">OT</th>
+                        <th className="table-header">Dir</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayPunts.map((p, i) => (
+                        <tr key={i} className="hover:bg-surface/30">
+                          <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
+                          <td className="table-name">{p.athlete}</td>
+                          <td className="table-cell text-muted">{p.type || "—"}</td>
+                          {editing ? (
+                            <>
+                              <td className="table-cell p-1"><input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                              {hasPooch && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={p.poochLandingYardLine || ""} onChange={(e) => updateEntry(i, "poochLandingYardLine", parseInt(e.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-accent" /></td>}
+                              <td className="table-cell p-1"><input type="text" inputMode="decimal" value={p.hangTime || ""} onChange={(e) => updateEntry(i, "hangTime", parseFloat(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                              <td className="table-cell p-1"><input type="text" inputMode="decimal" value={p.opTime || ""} onChange={(e) => updateEntry(i, "opTime", parseFloat(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                              <td className="table-cell p-1">
+                                <select value={String(p.directionalAccuracy ?? "")} onChange={(e) => updateEntry(i, "directionalAccuracy", parseFloat(e.target.value))} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
+                                  <option value="1">1</option>
+                                  <option value="0.5">0.5</option>
+                                  <option value="0">0</option>
+                                </select>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
+                              {hasPooch && <td className="table-cell text-accent font-semibold">{p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? p.poochLandingYardLine : "—"}</td>}
+                              <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
+                              <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
+                              <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
