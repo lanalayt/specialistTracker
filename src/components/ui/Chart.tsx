@@ -345,14 +345,15 @@ export function MultiLineTrendChart({ data, dataKeys, title, unit = "", domain, 
 
 interface PositionMakeChartProps {
   data: { pos: string; pct: number; att: number }[];
+  title?: string;
   className?: string;
 }
 
-export function PositionMakeChart({ data, className }: PositionMakeChartProps) {
+export function PositionMakeChart({ data, title, className }: PositionMakeChartProps) {
   return (
     <div className={clsx("card", className)}>
       <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">
-        Make % by Field Position
+        {title ?? "Make % by Field Position"}
       </p>
       {data.every((d) => d.att === 0) ? (
         <div className="h-40 flex items-center justify-center text-muted text-xs">

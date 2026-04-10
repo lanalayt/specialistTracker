@@ -50,6 +50,21 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
     return { range: dr, Made: inRange.filter((k) => k.result.startsWith("Y")).length, Missed: inRange.filter((k) => !k.result.startsWith("Y")).length };
   });
 
+  // Make% by distance range
+  const DIST_BUCKETS = [
+    { label: "PAT", filter: (k: FGKick) => !!k.isPAT },
+    { label: "20-29", filter: (k: FGKick) => !k.isPAT && k.dist >= 20 && k.dist <= 29 },
+    { label: "30-39", filter: (k: FGKick) => !k.isPAT && k.dist >= 30 && k.dist <= 39 },
+    { label: "40-49", filter: (k: FGKick) => !k.isPAT && k.dist >= 40 && k.dist <= 49 },
+    { label: "50-59", filter: (k: FGKick) => !k.isPAT && k.dist >= 50 && k.dist <= 59 },
+    { label: "60+", filter: (k: FGKick) => !k.isPAT && k.dist >= 60 },
+  ];
+  const distMakeData = DIST_BUCKETS.map(({ label, filter }) => {
+    const kicks = allFilteredKicks.filter(filter);
+    const made = kicks.filter((k) => k.result.startsWith("Y")).length;
+    return { pos: label, pct: kicks.length > 0 ? Math.round((made / kicks.length) * 100) : 0, att: kicks.length };
+  });
+
   // Make% by field position
   const FG_POSITIONS = ["LH", "LM", "M", "RM", "RH"];
   const posData = FG_POSITIONS.map((pos) => {
@@ -78,6 +93,7 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <PositionMakeChart data={distMakeData} title="Make % by Distance" />
         <PositionMakeChart data={posData} />
       </div>
 
