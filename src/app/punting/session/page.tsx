@@ -1453,9 +1453,10 @@ export default function PuntingSessionPage() {
                   const htCount = punts.filter((p) => p.hangTime > 0).length;
                   const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
                   // Inside-20 = landing YL >= 80 (opponent 20 or closer to end zone)
-                  const inside20 = punts.filter((p) => (p.landingYL ?? 0) >= 80).length;
-                  // Pin inside 5 = landing YL >= 95
-                  const pin5 = punts.filter((p) => (p.landingYL ?? 0) >= 95).length;
+                  // Final spot = landing YL minus return yards (where the play ends)
+                  const finalSpot = (p: { landingYL?: number; returnYards?: number }) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
+                  const inside20 = punts.filter((p) => finalSpot(p) >= 80).length;
+                  const inside10 = punts.filter((p) => finalSpot(p) >= 90).length;
                   const daCount = punts.filter((p) => p.directionalAccuracy != null).length;
                   const daSum = punts.reduce((s, p) => s + (p.directionalAccuracy ?? 0), 0);
                   const dirPct = daCount > 0 ? `${Math.round((daSum / daCount) * 100)}%` : "—";
@@ -2254,7 +2255,7 @@ export default function PuntingSessionPage() {
                     <StatCard label="Avg Hang" value={avgHang !== "—" ? `${avgHang}s` : "—"} />
                     <StatCard label="Dir %" value={dirPct} />
                     <StatCard label="Inside 20" value={inside20} />
-                    <StatCard label="Pin < 5" value={pin5} />
+                    <StatCard label="Inside 10" value={inside10} />
                   </div>
                 );
               })()}
