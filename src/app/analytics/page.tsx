@@ -128,9 +128,9 @@ function PuntingAnalytics() {
     );
   }
 
-  // Avg distance per session trend
+  // Avg distance per session trend (only count punts with yards > 0)
   const distTrend = history.map((s) => {
-    const punts = (s.entries ?? []) as PuntEntry[];
+    const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.yards > 0);
     const totalYds = punts.reduce((sum, p) => sum + p.yards, 0);
     return {
       label: s.label,
@@ -138,9 +138,9 @@ function PuntingAnalytics() {
     };
   });
 
-  // Avg hang time per session trend
+  // Avg hang time per session trend (only count punts with hangTime > 0)
   const htTrend = history.map((s) => {
-    const punts = (s.entries ?? []) as PuntEntry[];
+    const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.hangTime > 0);
     const totalHT = punts.reduce((sum, p) => sum + p.hangTime, 0);
     return {
       label: s.label,
@@ -148,9 +148,9 @@ function PuntingAnalytics() {
     };
   });
 
-  // Directional accuracy % per session
+  // Directional accuracy % per session (only count punts with DA defined)
   const daTrend = history.map((s) => {
-    const punts = (s.entries ?? []) as PuntEntry[];
+    const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.directionalAccuracy != null);
     const totalDA = punts.reduce((sum, p) => sum + p.directionalAccuracy, 0);
     return {
       label: s.label,
@@ -158,9 +158,9 @@ function PuntingAnalytics() {
     };
   });
 
-  // Op time trend
+  // Op time trend (only count punts with opTime > 0)
   const otTrend = history.map((s) => {
-    const punts = (s.entries ?? []) as PuntEntry[];
+    const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.opTime > 0);
     const totalOT = punts.reduce((sum, p) => sum + p.opTime, 0);
     return {
       label: s.label,

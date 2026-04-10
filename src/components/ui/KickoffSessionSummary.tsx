@@ -16,19 +16,25 @@ export function KickoffSessionSummary({
   onConfirm,
   onCancel,
 }: KickoffSessionSummaryProps) {
-  const totalDist = kicks.reduce((s, k) => s + k.distance, 0);
-  const totalHang = kicks.reduce((s, k) => s + k.hangTime, 0);
-  const avgDist = kicks.length > 0 ? (totalDist / kicks.length).toFixed(1) : "—";
-  const avgHT = kicks.length > 0 ? (totalHang / kicks.length).toFixed(2) : "—";
+  const distEntries = kicks.filter((k) => k.distance > 0);
+  const htEntries = kicks.filter((k) => k.hangTime > 0);
+  const totalDist = distEntries.reduce((s, k) => s + k.distance, 0);
+  const totalHang = htEntries.reduce((s, k) => s + k.hangTime, 0);
+  const avgDist = distEntries.length > 0 ? (totalDist / distEntries.length).toFixed(1) : "—";
+  const avgHT = htEntries.length > 0 ? (totalHang / htEntries.length).toFixed(2) : "—";
   const athletes = [...new Set(kicks.map((k) => k.athlete))];
 
   const byAthlete = athletes.map((a) => {
     const ak = kicks.filter((k) => k.athlete === a);
-    const aDist = ak.reduce((s, k) => s + k.distance, 0);
+    const akDist = ak.filter((k) => k.distance > 0);
+    const akHt = ak.filter((k) => k.hangTime > 0);
+    const aDist = akDist.reduce((s, k) => s + k.distance, 0);
+    const aHt = akHt.reduce((s, k) => s + k.hangTime, 0);
     return {
       name: a,
       count: ak.length,
-      avgDist: (aDist / ak.length).toFixed(1),
+      avgDist: akDist.length > 0 ? (aDist / akDist.length).toFixed(1) : "—",
+      avgHT: akHt.length > 0 ? (aHt / akHt.length).toFixed(2) : "—",
     };
   });
 
@@ -64,8 +70,9 @@ export function KickoffSessionSummary({
               <div key={a.name} className="flex items-center justify-between text-sm">
                 <span className="font-medium text-slate-200">{a.name}</span>
                 <span className="text-muted">
-                  {a.count} kicks{" "}
-                  <span className="text-accent font-semibold">({a.avgDist} avg)</span>
+                  {a.count} kicks ·{" "}
+                  <span className="text-accent font-semibold">{a.avgDist} avg</span>
+                  {a.avgHT !== "—" && <span className="text-slate-300"> · {a.avgHT}s</span>}
                 </span>
               </div>
             ))}
