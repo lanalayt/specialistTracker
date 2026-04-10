@@ -33,8 +33,8 @@ export default function LongSnapHistoryPage() {
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
-      {/* Session list */}
-      <div className="lg:w-64 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto shrink-0">
+      {/* Session list — hidden on mobile when a session is selected */}
+      <div className={clsx("lg:w-64 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto shrink-0", selectedId && "hidden lg:block")}>
         <div className="p-4 border-b border-border">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">
             Sessions ({history.length})
@@ -66,14 +66,21 @@ export default function LongSnapHistoryPage() {
         )}
       </div>
 
-      {/* Session detail */}
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* Session detail — hidden on mobile when no session selected */}
+      <div className={clsx("flex-1 overflow-y-auto p-4", !selectedId && "hidden lg:block")}>
         {!selected ? (
           <div className="flex items-center justify-center h-40 text-muted text-sm">
             Select a session to view snaps
           </div>
         ) : (
           <>
+            {/* Mobile back button */}
+            <button
+              onClick={() => setSelectedId(null)}
+              className="lg:hidden flex items-center gap-1 text-xs text-accent font-semibold mb-3 hover:underline"
+            >
+              ← All Sessions
+            </button>
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
                 <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
