@@ -1999,7 +1999,6 @@ export default function KickingSessionPage() {
                 const att = kicks.length;
                 const made = kicks.filter((k) => k.result.startsWith("Y")).length;
                 const longFG = kicks.reduce((m, k) => k.result.startsWith("Y") ? Math.max(m, k.dist) : m, 0);
-                const avgSc = att > 0 ? (kicks.reduce((s, k) => s + k.score, 0) / att).toFixed(1) : "—";
                 if (sessionKicks.length === 0) {
                   return <p className="text-xs text-muted">Save a kick to see it on the field.</p>;
                 }
@@ -2008,7 +2007,6 @@ export default function KickingSessionPage() {
                     <StatCard label="Made" value={`${made}/${att}`} accent glow />
                     <StatCard label="%" value={makePct(att, made)} />
                     <StatCard label="Long" value={longFG > 0 ? `${longFG}` : "—"} />
-                    <StatCard label="Avg Score" value={avgSc} />
                   </div>
                 );
               })()}
