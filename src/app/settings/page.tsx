@@ -5,12 +5,11 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { useAuth } from "@/lib/auth";
-import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { createArchive } from "@/lib/archiveManager";
-import { teamGet, getTeamId } from "@/lib/teamData";
+import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
 import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, type ThemeColors } from "@/lib/themeColors";
 import clsx from "clsx";
 
@@ -90,6 +89,7 @@ function SettingsContent() {
 
 
   useEffect(() => {
+    // Load from localStorage first (instant)
     try {
       const raw = localStorage.getItem("st_team_v1");
       if (raw) {
@@ -100,14 +100,23 @@ function SettingsContent() {
       }
     } catch {}
 
-    // Try loading from Supabase
-    loadSettingsFromCloud<{ name: string; school: string; config: { enabledSports: string[] } }>("st_team_v1").then((cloud) => {
+    // Then load from team_data (shared cloud, source of truth)
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        tid = getTeamId();
+      }
+      if (!tid || tid === "local-dev") return;
+      const cloud = await teamGet<{ name: string; school: string; config: { enabledSports: string[] } }>(tid, "settings_team");
       if (cloud) {
         if (cloud.name) setTeamName(cloud.name);
         if (cloud.school) setSchool(cloud.school);
         if (cloud.config?.enabledSports) setEnabledSports(cloud.config.enabledSports);
+        // Update localStorage cache
+        try { localStorage.setItem("st_team_v1", JSON.stringify(cloud)); } catch {}
       }
-    });
+    })();
   }, []);
 
   const toggleSport = (id: string) =>
@@ -117,12 +126,17 @@ function SettingsContent() {
 
   const handleSave = () => {
     const team = {
-      id: "demo-team-1",
       name: teamName,
       school,
       config: { enabledSports },
     };
-    saveSettingsToCloud("st_team_v1", team);
+    // Save to localStorage
+    localStorage.setItem("st_team_v1", JSON.stringify(team));
+    // Save to shared team_data (source of truth)
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamSet(tid, "settings_team", team);
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

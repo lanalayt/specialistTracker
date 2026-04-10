@@ -10,7 +10,6 @@ import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
-import { saveSettingsToCloud } from "@/lib/settingsSync";
 import Link from "next/link";
 import React from "react";
 
@@ -109,15 +108,22 @@ function DashboardContent() {
         if (t.dashTitle) setDashTitle(t.dashTitle);
       }
     } catch {}
-    // Also load from cloud
-    import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
-      loadSettingsFromCloud<{ school?: string; name?: string; dashTitle?: string }>("st_team_v1").then((cloud) => {
+    // Load from shared team_data (source of truth)
+    import("@/lib/teamData").then(({ teamGet, getTeamId }) => {
+      (async () => {
+        let tid = getTeamId();
+        for (let i = 0; i < 15 && !tid; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+          tid = getTeamId();
+        }
+        if (!tid || tid === "local-dev") return;
+        const cloud = await teamGet<{ school?: string; name?: string; dashTitle?: string }>(tid, "settings_team");
         if (cloud) {
           if (cloud.school) setSchoolName(cloud.school);
           else if (cloud.name) setSchoolName(cloud.name);
           if (cloud.dashTitle) setDashTitle(cloud.dashTitle);
         }
-      });
+      })();
     });
   }, []);
 
@@ -128,7 +134,7 @@ function DashboardContent() {
     }
   }, [editingTitle]);
 
-  const saveDashTitle = (val: string) => {
+  const saveDashTitle = async (val: string) => {
     const title = val.trim() || "Special Teams Dashboard";
     setDashTitle(title);
     setEditingTitle(false);
@@ -137,7 +143,10 @@ function DashboardContent() {
       const team = raw ? JSON.parse(raw) : {};
       team.dashTitle = title;
       localStorage.setItem("st_team_v1", JSON.stringify(team));
-      saveSettingsToCloud("st_team_v1", team);
+      // Save to shared team_data
+      const { teamSet, getTeamId } = await import("@/lib/teamData");
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSet(tid, "settings_team", team);
     } catch {}
   };
 
