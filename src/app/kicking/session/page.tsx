@@ -752,7 +752,10 @@ export default function KickingSessionPage() {
     setShowReset(false);
   };
 
+  const [clearUndoData, setClearUndoData] = useState<{ rows: typeof rows; sessionKicks: typeof sessionKicks; plannedKicks: typeof plannedKicks; plannedRowIndices: number[]; partialInputs: typeof partialInputs } | null>(null);
+
   const clearLog = () => {
+    setClearUndoData({ rows, sessionKicks, plannedKicks, plannedRowIndices, partialInputs });
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setErrorRows(new Set());
     setSessionKicks([]);
@@ -760,6 +763,16 @@ export default function KickingSessionPage() {
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
     setPartialInputs({});
+  };
+
+  const undoClear = () => {
+    if (!clearUndoData) return;
+    setRows(clearUndoData.rows);
+    setSessionKicks(clearUndoData.sessionKicks);
+    setPlannedKicks(clearUndoData.plannedKicks);
+    setPlannedRowIndices(clearUndoData.plannedRowIndices);
+    setPartialInputs(clearUndoData.partialInputs);
+    setClearUndoData(null);
   };
 
   // ════════════════════════════════════════════════════════════
@@ -1965,6 +1978,14 @@ export default function KickingSessionPage() {
                   >
                     Clear Log
                   </button>
+                  {clearUndoData && (
+                    <button
+                      onClick={undoClear}
+                      className="text-xs py-1.5 px-3 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                    >
+                      Undo Clear
+                    </button>
+                  )}
                 </div>
                 {sessionMode === "game" ? (
                   <button

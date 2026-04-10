@@ -868,7 +868,10 @@ export default function PuntingSessionPage() {
     setShowReset(false);
   };
 
+  const [clearUndoData, setClearUndoData] = useState<{ rows: typeof rows; sessionPunts: typeof sessionPunts; plannedPunts: typeof plannedPunts; plannedRowIndices: number[]; partialInputs: typeof partialInputs } | null>(null);
+
   const clearLog = () => {
+    setClearUndoData({ rows, sessionPunts, plannedPunts, plannedRowIndices, partialInputs });
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setErrorRows(new Set());
     setSessionPunts([]);
@@ -876,6 +879,16 @@ export default function PuntingSessionPage() {
     setPlannedRowIndices([]);
     setCurrentPuntIdx(0);
     setPartialInputs({});
+  };
+
+  const undoClear = () => {
+    if (!clearUndoData) return;
+    setRows(clearUndoData.rows);
+    setSessionPunts(clearUndoData.sessionPunts);
+    setPlannedPunts(clearUndoData.plannedPunts);
+    setPlannedRowIndices(clearUndoData.plannedRowIndices);
+    setPartialInputs(clearUndoData.partialInputs);
+    setClearUndoData(null);
   };
 
   // ════════════════════════════════════════════════════════════
@@ -2282,6 +2295,14 @@ export default function PuntingSessionPage() {
                 >
                   Clear Log
                 </button>
+                {clearUndoData && (
+                  <button
+                    onClick={undoClear}
+                    className="text-xs py-1.5 px-3 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                  >
+                    Undo Clear
+                  </button>
+                )}
               </div>
               {sessionMode === "game" ? (
                 <button

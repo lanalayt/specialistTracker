@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import type { FGKick, FGPosition } from "@/types";
 
 interface Props {
@@ -95,10 +95,16 @@ function renderKick(key: string | number, kick: { dist: number; pos?: string; re
   );
 }
 
+const RESULT_LABELS: Record<string, string> = { YC: "Made (C)", YL: "Made (L)", YR: "Made (R)", XL: "Miss L", XR: "Miss R", XS: "Short" };
+
 export function FGFieldView({ kicks, currentKick }: Props) {
   const [ezColor, setEzColor] = useState("#991b1b");
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   useEffect(() => {
     try { const r = localStorage.getItem("st_theme"); if (r) { const t = JSON.parse(r); if (t.primary) setEzColor(t.primary); } } catch {}
+  }, []);
+  const handleKickTap = useCallback((idx: number) => {
+    setSelectedIdx((prev) => (prev === idx ? null : idx));
   }, []);
 
   // Turf stripes
@@ -218,10 +224,49 @@ export function FGFieldView({ kicks, currentKick }: Props) {
         })}
 
         {/* Kicks rendered AFTER uprights so arcs draw on top */}
-        {fgKicks.map((k, i) => renderKick(i, { dist: k.dist, pos: k.pos, result: k.result }, 0.75))}
+        {fgKicks.map((k, i) => {
+          const isSelected = selectedIdx === i;
+          const arc = renderKick(i, { dist: k.dist, pos: k.pos, result: k.result }, isSelected ? 1 : 0.75);
+          if (!arc) return null;
+          // Hit area
+          const startDist = kickerDist(k.dist);
+          const startLat = posLat(k.pos);
+          const start = proj(startDist, startLat);
+          const endLat = resultEndLat(k.result || "");
+          const isShort = k.result === "XS";
+          const isMake = typeof k.result === "string" && k.result.startsWith("Y");
+          let end = isShort ? proj((startDist + GOAL_LINE_DIST) / 2, endLat) : proj(0, endLat);
+          if (isMake && !isShort) end = { ...end, y: CROSSBAR_Y - 25 };
+          const midDist = isShort ? (startDist + (startDist + GOAL_LINE_DIST) / 2) / 2 : startDist / 2;
+          const mid = proj(midDist, (startLat + endLat) / 2);
+          mid.y -= 30 + (k.dist / 60) * 50;
+          const hitD = `M ${start.x} ${start.y} Q ${mid.x} ${mid.y} ${end.x} ${end.y}`;
+          return (
+            <g key={`tap-${i}`} onClick={() => handleKickTap(i)} style={{ cursor: "pointer" }}>
+              <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
+              {arc}
+            </g>
+          );
+        })}
         {currentKick && currentKick.dist > 0 && renderKick("preview", currentKick, 1)}
+        {/* Tooltip for selected kick */}
+        {selectedIdx != null && fgKicks[selectedIdx] && (() => {
+          const k = fgKicks[selectedIdx];
+          const startDist = kickerDist(k.dist);
+          const mid = proj(startDist / 2, posLat(k.pos));
+          mid.y -= 30 + (k.dist / 60) * 50;
+          const tx = Math.max(80, Math.min(W - 80, mid.x)); const ty = Math.max(30, mid.y - 10);
+          const isMake = typeof k.result === "string" && k.result.startsWith("Y");
+          return (
+            <g>
+              <rect x={tx - 65} y={ty - 28} width={130} height={36} rx={6} fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+              <text x={tx} y={ty - 12} textAnchor="middle" fontSize={10} fontWeight="bold" fill={isMake ? "#22c55e" : "#ef4444"}>{k.athlete} · {k.dist}yd · {RESULT_LABELS[k.result] ?? k.result}</text>
+              <text x={tx} y={ty + 1} textAnchor="middle" fontSize={9} fill="#94a3b8">Pos: {k.pos ?? "M"}{k.score != null ? ` · Score: ${k.score}` : ""}</text>
+            </g>
+          );
+        })()}
       </svg>
-      {fgKicks.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{fgKicks.length} kick{fgKicks.length !== 1 ? "s" : ""}</p>}
+      {fgKicks.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{fgKicks.length} kick{fgKicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}</p>}
     </div>
   );
 }

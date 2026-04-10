@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import type { PuntEntry } from "@/types";
 
 interface Props {
@@ -58,8 +58,12 @@ function renderArc(key: string | number, los: number, landing: number, ht: numbe
 
 export function PuntFieldView({ punts, currentPunt }: Props) {
   const [ezColor, setEzColor] = useState("#991b1b");
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   useEffect(() => {
     try { const r = localStorage.getItem("st_theme"); if (r) { const t = JSON.parse(r); if (t.primary) setEzColor(t.primary); } } catch {}
+  }, []);
+  const handleArcTap = useCallback((idx: number) => {
+    setSelectedIdx((prev) => (prev === idx ? null : idx));
   }, []);
 
   // Turf stripes (playing field only: 0-100)
@@ -175,10 +179,47 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
             </g>
           );
         })}
-        {punts.map((p, i) => { if (p.los == null || p.landingYL == null) return null; return renderArc(i, p.los, p.landingYL, p.hangTime, p.returnYards, !!p.fairCatch, p.hash, 0.7); })}
+        {punts.map((p, i) => {
+          if (p.los == null || p.landingYL == null) return null;
+          const isSelected = selectedIdx === i;
+          const arc = renderArc(i, p.los, p.landingYL, p.hangTime, p.returnYards, !!p.fairCatch, p.hash, isSelected ? 1 : 0.7, isSelected ? "#22d3ee" : "#06b6d4", isSelected ? 3.5 : 2.5);
+          if (!arc) return null;
+          // Invisible wider hit area for tap
+          const fy = hashToFieldY(p.hash);
+          const s = proj(p.los, fy); const e = proj(p.landingYL, fy); const m = proj((p.los + p.landingYL) / 2, fy);
+          const cpY = ((s.y + e.y) / 2) - 2 * hangLift(p.hangTime);
+          const hitD = `M ${s.x} ${s.y} Q ${m.x} ${cpY} ${e.x} ${e.y}`;
+          return (
+            <g key={`tap-${i}`} onClick={() => handleArcTap(i)} style={{ cursor: "pointer" }}>
+              <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
+              {arc}
+            </g>
+          );
+        })}
         {currentPunt && currentPunt.landingYL > currentPunt.los && renderArc("preview", currentPunt.los, currentPunt.landingYL, currentPunt.hangTime, 0, false, currentPunt.hash, 1, "#22d3ee", 3.5)}
+        {/* Tooltip for selected punt */}
+        {selectedIdx != null && punts[selectedIdx] && (() => {
+          const p = punts[selectedIdx];
+          if (p.los == null || p.landingYL == null) return null;
+          const fy = hashToFieldY(p.hash);
+          const mid = proj((p.los + p.landingYL) / 2, fy);
+          const cpY = ((proj(p.los, fy).y + proj(p.landingYL, fy).y) / 2) - 2 * hangLift(p.hangTime);
+          const tx = mid.x; const ty = Math.max(20, cpY - 10);
+          return (
+            <g>
+              <rect x={tx - 70} y={ty - 38} width={140} height={48} rx={6} fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+              <text x={tx} y={ty - 22} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#e2e8f0">{p.athlete} · #{p.kickNum ?? selectedIdx + 1}</text>
+              <text x={tx} y={ty - 8} textAnchor="middle" fontSize={9} fill="#94a3b8">
+                {p.yards > 0 ? `${p.yards}yd` : "—"} · {p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s HT` : "—"}{p.opTime > 0 ? ` · ${p.opTime.toFixed(2)}s OT` : ""}
+              </text>
+              <text x={tx} y={ty + 5} textAnchor="middle" fontSize={9} fill="#94a3b8">
+                {p.touchback ? "Touchback" : p.fairCatch ? "Fair Catch" : p.returnYards ? `${p.returnYards}yd return` : ""}{p.directionalAccuracy != null ? ` · Dir: ${p.directionalAccuracy}` : ""}
+              </text>
+            </g>
+          );
+        })()}
       </svg>
-      {punts.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{punts.length} punt{punts.length !== 1 ? "s" : ""}</p>}
+      {punts.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{punts.length} punt{punts.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}</p>}
     </div>
   );
 }

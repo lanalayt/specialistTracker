@@ -249,17 +249,17 @@ export default function KickingStatisticsPage() {
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
   const dateFilter = useDateRangeFilter();
 
-  const [includeLiveReps, setIncludeLiveReps] = useState(() => {
-    if (typeof window === "undefined") return true;
+  const [excludeLiveReps, setExcludeLiveReps] = useState(() => {
+    if (typeof window === "undefined") return false;
     try {
-      const v = localStorage.getItem("fg_include_live_reps");
-      return v === null ? true : v === "true";
-    } catch { return true; }
+      const v = localStorage.getItem("fg_exclude_live_reps");
+      return v === "true";
+    } catch { return false; }
   });
 
-  const toggleIncludeLiveReps = (val: boolean) => {
-    setIncludeLiveReps(val);
-    try { localStorage.setItem("fg_include_live_reps", String(val)); } catch {}
+  const toggleExcludeLiveReps = (val: boolean) => {
+    setExcludeLiveReps(val);
+    try { localStorage.setItem("fg_exclude_live_reps", String(val)); } catch {}
   };
 
   const modeHistory = useMemo(() => {
@@ -283,9 +283,9 @@ export default function KickingStatisticsPage() {
   }, [gameMode, dateFilter.mode, filteredHistory, stats, athletes]);
 
   const displayStats = useMemo(() => {
-    if (!hasStarred || includeLiveReps) return baseStats;
+    if (!hasStarred || !excludeLiveReps) return baseStats;
     return computeFilteredStats(athletes, filteredHistory, (k) => !k.starred);
-  }, [baseStats, hasStarred, includeLiveReps, athletes, filteredHistory]);
+  }, [baseStats, hasStarred, excludeLiveReps, athletes, filteredHistory]);
 
   const starredStats = useMemo(() => {
     if (!hasStarred) return null;
@@ -367,20 +367,20 @@ export default function KickingStatisticsPage() {
           {tab === "all" && (
             <div className="flex items-center gap-2">
               <button
-                onClick={() => toggleIncludeLiveReps(!includeLiveReps)}
+                onClick={() => toggleExcludeLiveReps(!excludeLiveReps)}
                 className={clsx(
                   "relative w-9 h-5 rounded-full transition-colors",
-                  includeLiveReps ? "bg-accent" : "bg-border"
+                  excludeLiveReps ? "bg-accent" : "bg-border"
                 )}
               >
                 <span
                   className={clsx(
                     "absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform",
-                    includeLiveReps ? "left-[18px]" : "left-0.5"
+                    excludeLiveReps ? "left-[18px]" : "left-0.5"
                   )}
                 />
               </button>
-              <span className="text-xs text-slate-300">Include live reps</span>
+              <span className="text-xs text-slate-300">Exclude live reps</span>
             </div>
           )}
         </div>

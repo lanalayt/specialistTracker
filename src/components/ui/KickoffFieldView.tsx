@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import type { KickoffEntry } from "@/types";
 
 interface Props {
@@ -53,8 +53,12 @@ function renderArc(key: string | number, los: number, landing: number, ht: numbe
 
 export function KickoffFieldView({ kicks, currentKick }: Props) {
   const [ezColor, setEzColor] = useState("#991b1b");
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   useEffect(() => {
     try { const r = localStorage.getItem("st_theme"); if (r) { const t = JSON.parse(r); if (t.primary) setEzColor(t.primary); } } catch {}
+  }, []);
+  const handleArcTap = useCallback((idx: number) => {
+    setSelectedIdx((prev) => (prev === idx ? null : idx));
   }, []);
 
   const stripes: React.ReactNode[] = [];
@@ -164,15 +168,47 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
         {kicks.map((k, i) => {
           const los = k.los ?? 35; const landing = k.landingYL ?? (los + (k.distance || 0));
           if (landing <= los) return null;
-          return renderArc(i, los, landing, k.hangTime, k.returnYards, 0.7);
+          const isSelected = selectedIdx === i;
+          const arc = renderArc(i, los, landing, k.hangTime, k.returnYards, isSelected ? 1 : 0.7, isSelected ? "#fbbf24" : "#f59e0b", isSelected ? 3.5 : 2.5);
+          if (!arc) return null;
+          const fy = 26.5;
+          const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
+          const cpY = ((s.y + e.y) / 2) - 2 * hangLift(k.hangTime);
+          const hitD = `M ${s.x} ${s.y} Q ${m.x} ${cpY} ${e.x} ${e.y}`;
+          return (
+            <g key={`tap-${i}`} onClick={() => handleArcTap(i)} style={{ cursor: "pointer" }}>
+              <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
+              {arc}
+            </g>
+          );
         })}
         {currentKick && (() => {
           const los = currentKick.los ?? 35; const landing = currentKick.landingYL ?? (los + (currentKick.distance ?? 0));
           if (landing <= los) return null;
           return renderArc("preview", los, landing, currentKick.hangTime, 0, 1, "#fbbf24", 3.5);
         })()}
+        {/* Tooltip for selected kickoff */}
+        {selectedIdx != null && kicks[selectedIdx] && (() => {
+          const k = kicks[selectedIdx];
+          const los = k.los ?? 35; const landing = k.landingYL ?? (los + (k.distance || 0));
+          if (landing <= los) return null;
+          const fy = 26.5;
+          const mid = proj((los + landing) / 2, fy);
+          const cpY = ((proj(los, fy).y + proj(landing, fy).y) / 2) - 2 * hangLift(k.hangTime);
+          const tx = mid.x; const ty = Math.max(20, cpY - 10);
+          const dist = k.distance || (landing - los);
+          return (
+            <g>
+              <rect x={tx - 70} y={ty - 28} width={140} height={36} rx={6} fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+              <text x={tx} y={ty - 12} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#e2e8f0">{k.athlete} · #{k.kickNum ?? selectedIdx + 1}</text>
+              <text x={tx} y={ty + 1} textAnchor="middle" fontSize={9} fill="#94a3b8">
+                {dist > 0 ? `${dist}yd` : "—"} · {k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s HT` : "—"}{k.returnYards ? ` · ${k.returnYards}yd ret` : ""}
+              </text>
+            </g>
+          );
+        })()}
       </svg>
-      {kicks.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{kicks.length} kickoff{kicks.length !== 1 ? "s" : ""}</p>}
+      {kicks.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}</p>}
     </div>
   );
 }
