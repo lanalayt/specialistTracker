@@ -278,7 +278,7 @@ function KickingHistoryContent() {
                       >PDF</button>
                       <button
                         onClick={() => {
-                          if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
+                          if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
                             deleteSession(selected.id);
                             setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
                           }
