@@ -85,9 +85,12 @@ export function Header({ title }: { title?: string }) {
           <span className="text-xs text-muted hidden sm:block capitalize">
             {user?.role}
           </span>
-          <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent text-sm font-bold">
+          <Link
+            href="/profile"
+            className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent text-sm font-bold hover:bg-accent/30 transition-colors"
+          >
             {user?.name?.[0]?.toUpperCase() ?? "?"}
-          </div>
+          </Link>
           <button
             onClick={signOut}
             className="text-muted hover:text-white text-xs transition-colors hidden sm:block"
