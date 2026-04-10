@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
 import { useAuth } from "@/lib/auth";
+import { exportPuntSession, exportSessionPDF } from "@/lib/exportStats";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, Session } from "@/types";
 import clsx from "clsx";
@@ -207,6 +208,39 @@ function PuntHistoryContent() {
                     <>
                       <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">
                         Edit
+                      </button>
+                      <button
+                        onClick={() => exportPuntSession(selected.label, punts)}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
+                      >
+                        Excel
+                      </button>
+                      <button
+                        onClick={() => {
+                          const ydsE = punts.filter((p) => p.yards > 0);
+                          const htE = punts.filter((p) => p.hangTime > 0);
+                          exportSessionPDF(
+                            `Punt Session — ${selected.label}`,
+                            ["#", "Athlete", "Type", "Yards", "Hang", "OT", "Dir"],
+                            punts.map((p, i) => [
+                              String(p.kickNum ?? i + 1),
+                              p.athlete,
+                              p.type || "—",
+                              p.yards > 0 ? `${p.yards}` : "—",
+                              p.hangTime > 0 ? p.hangTime.toFixed(2) : "—",
+                              (p.opTime || 0) > 0 ? p.opTime.toFixed(2) : "—",
+                              String(p.directionalAccuracy ?? "—"),
+                            ]),
+                            {
+                              Punts: String(punts.length),
+                              "Avg Dist": ydsE.length > 0 ? (ydsE.reduce((s, p) => s + p.yards, 0) / ydsE.length).toFixed(1) : "—",
+                              "Avg Hang": htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) + "s" : "—",
+                            }
+                          );
+                        }}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
+                      >
+                        PDF
                       </button>
                       <button
                         onClick={() => {

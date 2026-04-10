@@ -462,3 +462,113 @@ export function exportLongSnapStats(
 
   XLSX.writeFile(wb, "Long_Snap_Stats.xlsx");
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Individual Session Exports (Excel + PDF)
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Export a single FG session to Excel */
+export function exportFGSession(label: string, kicks: FGKick[]): void {
+  const rows: Row[] = [
+    ["FG Session — " + label],
+    [],
+    ["#", "Athlete", "Distance", "Position", "Result", "Score"],
+    ...kicks.map((k, i) => [
+      k.kickNum ?? i + 1,
+      k.athlete,
+      k.isPAT ? "PAT" : k.dist,
+      k.isPAT ? "—" : k.pos,
+      k.result,
+      k.score,
+    ]),
+  ];
+  // Summary
+  const fgKicks = kicks.filter((k) => !k.isPAT);
+  const makes = fgKicks.filter((k) => k.result.startsWith("Y")).length;
+  rows.push([], ["Summary"], ["Made", makes], ["Attempted", fgKicks.length], ["Pct", fgKicks.length > 0 ? `${Math.round((makes / fgKicks.length) * 100)}%` : "—"]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, aoaToSheet(rows), "Session");
+  XLSX.writeFile(wb, `FG_${label.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`);
+}
+
+/** Export a single punt session to Excel */
+export function exportPuntSession(label: string, punts: PuntEntry[]): void {
+  const rows: Row[] = [
+    ["Punt Session — " + label],
+    [],
+    ["#", "Athlete", "Type", "Yards", "Hang Time", "Op Time", "Dir Accuracy"],
+    ...punts.map((p, i) => [
+      p.kickNum ?? i + 1,
+      p.athlete,
+      p.type || "—",
+      p.yards,
+      p.hangTime,
+      p.opTime || 0,
+      p.directionalAccuracy ?? "—",
+    ]),
+  ];
+  const ydsE = punts.filter((p) => p.yards > 0);
+  const htE = punts.filter((p) => p.hangTime > 0);
+  const avgYds = ydsE.length > 0 ? (ydsE.reduce((s, p) => s + p.yards, 0) / ydsE.length).toFixed(1) : "—";
+  const avgHT = htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) : "—";
+  rows.push([], ["Summary"], ["Punts", punts.length], ["Avg Distance", avgYds], ["Avg Hang Time", avgHT]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, aoaToSheet(rows), "Session");
+  XLSX.writeFile(wb, `Punt_${label.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`);
+}
+
+/** Export a single kickoff session to Excel */
+export function exportKOSession(label: string, kicks: KickoffEntry[]): void {
+  const rows: Row[] = [
+    ["Kickoff Session — " + label],
+    [],
+    ["#", "Athlete", "Type", "Distance", "Hang Time", "Direction"],
+    ...kicks.map((k, i) => [
+      k.kickNum ?? i + 1,
+      k.athlete,
+      k.type || "—",
+      k.distance,
+      k.hangTime,
+      k.direction || "—",
+    ]),
+  ];
+  const distE = kicks.filter((k) => k.distance > 0);
+  const htE = kicks.filter((k) => k.hangTime > 0);
+  const avgDist = distE.length > 0 ? (distE.reduce((s, k) => s + k.distance, 0) / distE.length).toFixed(1) : "—";
+  const avgHT = htE.length > 0 ? (htE.reduce((s, k) => s + k.hangTime, 0) / htE.length).toFixed(2) : "—";
+  rows.push([], ["Summary"], ["Kickoffs", kicks.length], ["Avg Distance", avgDist], ["Avg Hang Time", avgHT]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, aoaToSheet(rows), "Session");
+  XLSX.writeFile(wb, `KO_${label.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`);
+}
+
+/** Export a single session to a printable PDF (opens browser print dialog) */
+export function exportSessionPDF(title: string, headers: string[], rows: string[][], summary: Record<string, string>): void {
+  const style = `
+    body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
+    h1 { font-size: 18px; margin-bottom: 4px; }
+    h2 { font-size: 14px; color: #666; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th { background: #1a1a2e; color: white; text-align: left; padding: 8px 10px; font-size: 12px; }
+    td { padding: 6px 10px; border-bottom: 1px solid #ddd; font-size: 12px; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    .summary { margin-top: 16px; }
+    .summary dt { font-weight: bold; display: inline; }
+    .summary dd { display: inline; margin-left: 4px; margin-right: 16px; }
+  `;
+  const summaryHTML = Object.entries(summary).map(([k, v]) => `<dt>${k}:</dt><dd>${v}</dd>`).join("");
+  const html = `<!DOCTYPE html><html><head><title>${title}</title><style>${style}</style></head><body>
+    <h1>${title}</h1>
+    <table>
+      <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table>
+    <div class="summary"><h2>Summary</h2><dl>${summaryHTML}</dl></div>
+  </body></html>`;
+  const win = window.open("", "_blank");
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 300);
+  }
+}

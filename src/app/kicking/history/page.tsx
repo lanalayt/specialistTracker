@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useFG } from "@/lib/fgContext";
 import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
+import { exportFGSession, exportSessionPDF } from "@/lib/exportStats";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { FGFieldView } from "@/components/ui/FGFieldView";
 import type { FGKick, Session } from "@/types";
@@ -233,6 +234,23 @@ function KickingHistoryContent() {
                   ) : (
                     <>
                       <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>
+                      <button
+                        onClick={() => exportFGSession(selected.label, kicks)}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
+                      >Excel</button>
+                      <button
+                        onClick={() => {
+                          const fgK = kicks.filter((k) => !k.isPAT);
+                          const m = fgK.filter((k) => k.result.startsWith("Y")).length;
+                          exportSessionPDF(
+                            `FG Session — ${selected.label}`,
+                            ["#", "Athlete", "Dist", "Pos", "Result", "Score"],
+                            kicks.map((k, i) => [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result, String(k.score)]),
+                            { Made: `${m}/${fgK.length}`, Pct: fgK.length > 0 ? `${Math.round((m / fgK.length) * 100)}%` : "—" }
+                          );
+                        }}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
+                      >PDF</button>
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
