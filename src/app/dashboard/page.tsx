@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { StatCard } from "@/components/ui/StatCard";
@@ -10,6 +10,7 @@ import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
+import { saveSettingsToCloud } from "@/lib/settingsSync";
 import Link from "next/link";
 import React from "react";
 
@@ -94,6 +95,10 @@ function DashboardContent() {
   const kickoff = useKickoff();
 
   const [schoolName, setSchoolName] = useState("Special Teams");
+  const [dashTitle, setDashTitle] = useState("Special Teams Dashboard");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem("st_team_v1");
@@ -101,9 +106,40 @@ function DashboardContent() {
         const t = JSON.parse(raw);
         if (t.school) setSchoolName(t.school);
         else if (t.name) setSchoolName(t.name);
+        if (t.dashTitle) setDashTitle(t.dashTitle);
       }
     } catch {}
+    // Also load from cloud
+    import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
+      loadSettingsFromCloud<{ school?: string; name?: string; dashTitle?: string }>("st_team_v1").then((cloud) => {
+        if (cloud) {
+          if (cloud.school) setSchoolName(cloud.school);
+          else if (cloud.name) setSchoolName(cloud.name);
+          if (cloud.dashTitle) setDashTitle(cloud.dashTitle);
+        }
+      });
+    });
   }, []);
+
+  useEffect(() => {
+    if (editingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [editingTitle]);
+
+  const saveDashTitle = (val: string) => {
+    const title = val.trim() || "Special Teams Dashboard";
+    setDashTitle(title);
+    setEditingTitle(false);
+    try {
+      const raw = localStorage.getItem("st_team_v1");
+      const team = raw ? JSON.parse(raw) : {};
+      team.dashTitle = title;
+      localStorage.setItem("st_team_v1", JSON.stringify(team));
+      saveSettingsToCloud("st_team_v1", team);
+    } catch {}
+  };
 
   // Merge all histories, tag with sport, sort by date descending
   const allSessions = [
@@ -117,11 +153,28 @@ function DashboardContent() {
       <Header title={schoolName} />
 
       <main className="p-4 lg:p-6 space-y-6 max-w-6xl">
-        {/* Welcome */}
+        {/* Welcome — double-click to edit */}
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-100">
-            Special Teams Dashboard
-          </h1>
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              className="text-2xl font-extrabold text-slate-100 bg-transparent border-b-2 border-accent outline-none w-full"
+              defaultValue={dashTitle}
+              onBlur={(e) => saveDashTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveDashTitle((e.target as HTMLInputElement).value);
+                if (e.key === "Escape") setEditingTitle(false);
+              }}
+            />
+          ) : (
+            <h1
+              className="text-2xl font-extrabold text-slate-100 cursor-pointer"
+              onDoubleClick={() => setEditingTitle(true)}
+              title="Double-click to edit"
+            >
+              {dashTitle}
+            </h1>
+          )}
         </div>
 
         {/* Sport cards — icon only */}
@@ -237,6 +290,30 @@ function DashboardContent() {
             </div>
           </div>
         )}
+        {/* Quick links — Analytics, Archives, Athletes, Settings */}
+        <div>
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+            Quick Links
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Link href="/analytics" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+              <span className="text-xl">📊</span>
+              <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Analytics</span>
+            </Link>
+            <Link href="/archives" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+              <span className="text-xl">🗄</span>
+              <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Archived Stats</span>
+            </Link>
+            <Link href="/athletes" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+              <span className="text-xl">👥</span>
+              <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Athletes</span>
+            </Link>
+            <Link href="/settings" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+              <span className="text-xl">⚙️</span>
+              <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Settings</span>
+            </Link>
+          </div>
+        </div>
       </main>
     </div>
   );
