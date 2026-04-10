@@ -8,16 +8,15 @@ interface Props {
   currentKick?: { dist: number; pos?: string; result?: string } | null;
 }
 
-const W = 500;
-const H = 680;
-const BOTTOM_Y = H - 12;
-const TOP_Y = 20;
-// Wider near, much narrower far = lower camera angle
+const W = 520;
+const H = 480;
+const BOTTOM_Y = H - 14;
+const TOP_Y = 60;
 const NEAR_HALF_W = 240;
-const FAR_HALF_W = 50;
+const FAR_HALF_W = 55;
 const CENTER_X = W / 2;
-const MAX_DIST = 65; // show up to 55-yard line area
-const EZ_DEPTH = 10;
+const MAX_DIST = 60;
+const EZ_DEPTH = 4; // thin end zone in perspective (visually compressed)
 const GOAL_LINE_DIST = EZ_DEPTH;
 
 function proj(dist: number, lat: number): { x: number; y: number } {
@@ -32,10 +31,20 @@ const HASH_L = 18.5;
 const HASH_R = 34.5;
 const POS_LAT: Record<FGPosition, number> = { LH: HASH_L, LM: 22, M: 26.5, RM: 31, RH: HASH_R };
 function posLat(pos: string | undefined): number { return POS_LAT[pos as FGPosition] ?? 26.5; }
+
+// Made kicks end between the uprights ABOVE the crossbar
+// Missed L/R end outside the uprights, XS ends short
 function resultEndLat(r: string): number {
-  switch (r) { case "YC": return 26.5; case "YL": return 25; case "YR": return 28; case "XL": return 20; case "XR": return 33; default: return 26.5; }
+  switch (r) { case "YC": return 26.5; case "YL": return 25.5; case "YR": return 27.5; case "XL": return 20; case "XR": return 33; default: return 26.5; }
 }
-function kickerDist(d: number): number { return Math.max(12, Math.min(d, MAX_DIST - 2)); }
+function kickerDist(d: number): number { return Math.max(8, Math.min(d, MAX_DIST - 2)); }
+
+// Uprights screen position (at dist=0)
+const UPRIGHT_L = proj(0, 24);
+const UPRIGHT_R = proj(0, 29);
+const POST_CENTER = proj(0, 26.5);
+const CROSSBAR_Y = POST_CENTER.y;
+const UPRIGHT_TOP_Y = CROSSBAR_Y - 90; // tall uprights
 
 function renderKick(key: string | number, kick: { dist: number; pos?: string; result?: string }, opacity: number) {
   const distance = kick.dist || 0;
@@ -43,11 +52,29 @@ function renderKick(key: string | number, kick: { dist: number; pos?: string; re
   const isMake = typeof kick.result === "string" && kick.result.startsWith("Y");
   const isShort = kick.result === "XS";
   const startDist = kickerDist(distance);
-  const start = proj(startDist, posLat(kick.pos));
-  const endDist = isShort ? (startDist + GOAL_LINE_DIST) / 2 : 3;
-  const end = proj(endDist, resultEndLat(kick.result || ""));
-  const mid = proj((startDist + endDist) / 2, (posLat(kick.pos) + resultEndLat(kick.result || "")) / 2);
-  mid.y -= 35 + (distance / 60) * 55;
+  const startLat = posLat(kick.pos);
+  const start = proj(startDist, startLat);
+
+  // End point: makes go to the uprights (dist=0) and above crossbar
+  // Misses go to dist=0 but laterally outside the uprights (or short)
+  const endLat = resultEndLat(kick.result || "");
+  let end: { x: number; y: number };
+  if (isShort) {
+    end = proj((startDist + GOAL_LINE_DIST) / 2, endLat);
+  } else {
+    end = proj(0, endLat);
+    if (isMake) {
+      // Push the endpoint ABOVE the crossbar (between uprights)
+      end.y = CROSSBAR_Y - 25;
+    }
+  }
+
+  const midDist = isShort ? (startDist + (startDist + GOAL_LINE_DIST) / 2) / 2 : startDist / 2;
+  const midLat = (startLat + endLat) / 2;
+  const mid = proj(midDist, midLat);
+  const arcLift = 30 + (distance / 60) * 50;
+  mid.y -= arcLift;
+
   const color = isMake ? "#22c55e" : "#ef4444";
   const d = `M ${start.x} ${start.y} Q ${mid.x} ${mid.y} ${end.x} ${end.y}`;
   return (
@@ -87,7 +114,7 @@ export function FGFieldView({ kicks, currentKick }: Props) {
       stroke={isGL ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.2)"} strokeWidth={isGL ? 3 : is10 ? 1.5 : 0.7} />);
     if (is10 && yd > 0 && yd <= 50) {
       const nL = proj(dist, 14); const nR = proj(dist, 39);
-      const fs = Math.max(7, 13 - (dist / MAX_DIST) * 5);
+      const fs = Math.max(7, 12 - (dist / MAX_DIST) * 4);
       [nL, nR].forEach((p, j) => yardEls.push(
         <text key={`yn-${yd}-${j}`} x={p.x} y={p.y + 1} textAnchor="middle" fontSize={fs} fontWeight="900" fill="rgba(255,255,255,0.18)" letterSpacing="1">{yd}</text>
       ));
@@ -105,11 +132,6 @@ export function FGFieldView({ kicks, currentKick }: Props) {
     });
   }
 
-  // Goalpost at BACK of end zone (dist=0)
-  const pc = proj(0, 26.5); const pl = proj(0, 24); const pr = proj(0, 29);
-  const cbY = pc.y; const upTop = cbY - 50;
-
-  // Pylons
   const pylons = [proj(GOAL_LINE_DIST, 0), proj(GOAL_LINE_DIST, 53), proj(0, 0), proj(0, 53)];
   const fgKicks = kicks.filter((k) => !k.isPAT);
 
@@ -123,22 +145,22 @@ export function FGFieldView({ kicks, currentKick }: Props) {
           <span className="flex items-center gap-1"><span className="w-5 h-[3px] rounded bg-[#ef4444]" /> Miss</span>
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full mx-auto rounded-lg overflow-hidden" style={{ maxHeight: 680 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full mx-auto rounded-lg overflow-hidden" style={{ maxHeight: 500 }}>
         <defs>
           <linearGradient id="fg-sky" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#020617" /><stop offset="50%" stopColor="#0f172a" /><stop offset="100%" stopColor="#1e293b" />
           </linearGradient>
           <filter id="fgBlur"><feGaussianBlur stdDeviation="3" /></filter>
-          <filter id="pglow"><feGaussianBlur stdDeviation="2" /></filter>
+          <filter id="pglow"><feGaussianBlur stdDeviation="3" /></filter>
         </defs>
         {/* Sky */}
-        <rect x={0} y={0} width={W} height={upTop + 10} fill="url(#fg-sky)" />
-        <circle cx={W * 0.25} cy={12} r={45} fill="rgba(255,255,255,0.03)" />
-        <circle cx={W * 0.75} cy={12} r={45} fill="rgba(255,255,255,0.03)" />
+        <rect x={0} y={0} width={W} height={UPRIGHT_TOP_Y + 10} fill="url(#fg-sky)" />
+        <circle cx={W * 0.25} cy={12} r={40} fill="rgba(255,255,255,0.03)" />
+        <circle cx={W * 0.75} cy={12} r={40} fill="rgba(255,255,255,0.03)" />
         {/* Field base */}
         {(() => { const tl = proj(MAX_DIST, 0); const tr = proj(MAX_DIST, 53); const br = proj(0, 53); const bl = proj(0, 0);
           return <polygon points={`${bl.x},${bl.y} ${br.x},${br.y} ${tr.x},${tr.y} ${tl.x},${tl.y}`} fill="#14532d" />; })()}
-        {/* End zone fill */}
+        {/* End zone — thin rectangle */}
         {(() => { const gl = proj(GOAL_LINE_DIST, 0); const gr = proj(GOAL_LINE_DIST, 53); const br = proj(0, 53); const bl = proj(0, 0);
           return <polygon points={`${bl.x},${bl.y} ${br.x},${br.y} ${gr.x},${gr.y} ${gl.x},${gl.y}`} fill={ezColor} opacity={0.35} />; })()}
         {stripes}
@@ -149,20 +171,25 @@ export function FGFieldView({ kicks, currentKick }: Props) {
         {yardEls}
         {hashEls}
         {pylons.map((p, i) => <rect key={`py-${i}`} x={p.x - 3} y={p.y - 3} width={6} height={6} fill="#f97316" stroke="#ea580c" strokeWidth={1} rx={1.5} />)}
-        {/* Goalpost glow */}
-        <line x1={pl.x} y1={cbY} x2={pr.x} y2={cbY} stroke="#fbbf24" strokeWidth={10} opacity={0.12} filter="url(#pglow)" />
-        <line x1={pl.x} y1={cbY} x2={pl.x} y2={upTop} stroke="#fbbf24" strokeWidth={7} opacity={0.08} filter="url(#pglow)" />
-        <line x1={pr.x} y1={cbY} x2={pr.x} y2={upTop} stroke="#fbbf24" strokeWidth={7} opacity={0.08} filter="url(#pglow)" />
-        {/* Goalpost solid */}
-        <line x1={pc.x} y1={cbY} x2={pc.x} y2={cbY + 10} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" />
-        <line x1={pl.x} y1={cbY} x2={pr.x} y2={cbY} stroke="#fbbf24" strokeWidth={5} strokeLinecap="round" />
-        <line x1={pl.x} y1={cbY} x2={pl.x} y2={upTop} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" />
-        <line x1={pr.x} y1={cbY} x2={pr.x} y2={upTop} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" />
-        {/* Hash position labels */}
+
+        {/* GOALPOST — big and prominent at dist=0 */}
+        {/* Glow */}
+        <line x1={UPRIGHT_L.x} y1={CROSSBAR_Y} x2={UPRIGHT_R.x} y2={CROSSBAR_Y} stroke="#fbbf24" strokeWidth={14} opacity={0.1} filter="url(#pglow)" />
+        <line x1={UPRIGHT_L.x} y1={CROSSBAR_Y} x2={UPRIGHT_L.x} y2={UPRIGHT_TOP_Y} stroke="#fbbf24" strokeWidth={10} opacity={0.08} filter="url(#pglow)" />
+        <line x1={UPRIGHT_R.x} y1={CROSSBAR_Y} x2={UPRIGHT_R.x} y2={UPRIGHT_TOP_Y} stroke="#fbbf24" strokeWidth={10} opacity={0.08} filter="url(#pglow)" />
+        {/* Solid post */}
+        <line x1={POST_CENTER.x} y1={CROSSBAR_Y} x2={POST_CENTER.x} y2={CROSSBAR_Y + 12} stroke="#fbbf24" strokeWidth={4} strokeLinecap="round" />
+        <line x1={UPRIGHT_L.x} y1={CROSSBAR_Y} x2={UPRIGHT_R.x} y2={CROSSBAR_Y} stroke="#fbbf24" strokeWidth={6} strokeLinecap="round" />
+        <line x1={UPRIGHT_L.x} y1={CROSSBAR_Y} x2={UPRIGHT_L.x} y2={UPRIGHT_TOP_Y} stroke="#fbbf24" strokeWidth={4} strokeLinecap="round" />
+        <line x1={UPRIGHT_R.x} y1={CROSSBAR_Y} x2={UPRIGHT_R.x} y2={UPRIGHT_TOP_Y} stroke="#fbbf24" strokeWidth={4} strokeLinecap="round" />
+
+        {/* Hash labels at bottom */}
         {(["LH", "LM", "M", "RM", "RH"] as FGPosition[]).map((p) => {
           const pt = proj(MAX_DIST - 1, POS_LAT[p]);
           return <text key={`hl-${p}`} x={pt.x} y={pt.y + 3} textAnchor="middle" fontSize={7} fill="rgba(255,255,255,0.25)" fontWeight="bold">{p}</text>;
         })}
+
+        {/* Kicks rendered AFTER uprights so arcs draw on top */}
         {fgKicks.map((k, i) => renderKick(i, { dist: k.dist, pos: k.pos, result: k.result }, 0.75))}
         {currentKick && currentKick.dist > 0 && renderKick("preview", currentKick, 1)}
       </svg>
