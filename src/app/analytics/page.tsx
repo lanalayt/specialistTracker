@@ -6,7 +6,7 @@ import { Header, MobileNav } from "@/components/layout/Header";
 import { TrendChart, DistBarChart, LineTrendChart, MultiLineTrendChart, ZoneBarChart } from "@/components/ui/Chart";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
-import { KickoffProvider } from "@/lib/kickoffContext";
+import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
 import type { FGKick, PuntEntry } from "@/types";
@@ -32,11 +32,15 @@ const LANDING_LABELS: Record<string, string> = {
   fairCatch: "Fair Catch",
 };
 
-function KickingAnalytics() {
+function KickingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
   const { history, stats, athletes } = useFG();
+  const filteredAthletes = selectedAthlete ? [selectedAthlete] : athletes;
+  const filteredHistory = selectedAthlete
+    ? history.map((s) => ({ ...s, entries: ((s.entries ?? []) as FGKick[]).filter((k) => k.athlete === selectedAthlete) })).filter((s) => (s.entries as FGKick[]).length > 0)
+    : history;
 
   // Build trend data — make% per session
-  const trendData = history.map((s) => {
+  const trendData = filteredHistory.map((s) => {
     const kicks = (s.entries ?? []) as FGKick[];
     const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
     return {
@@ -48,7 +52,7 @@ function KickingAnalytics() {
   // Build distance bar chart
   const distData = DIST_RANGES.map((dr) => {
     let made = 0, missed = 0;
-    athletes.forEach((a) => {
+    filteredAthletes.forEach((a) => {
       const s = stats[a];
       if (!s) return;
       made += s.distance[dr].made;
@@ -58,7 +62,7 @@ function KickingAnalytics() {
   });
 
   // Per-athlete comparison
-  const athleteRows = athletes.map((a) => {
+  const athleteRows = filteredAthletes.map((a) => {
     const s = stats[a];
     if (!s) return { athlete: a, att: 0, made: 0, score: 0, longFG: 0 };
     return {
@@ -117,10 +121,14 @@ function KickingAnalytics() {
   );
 }
 
-function PuntingAnalytics() {
+function PuntingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
   const { history, stats, athletes } = usePunt();
+  const filteredAthletes = selectedAthlete ? [selectedAthlete] : athletes;
+  const filteredHistory = selectedAthlete
+    ? history.map((s) => ({ ...s, entries: ((s.entries ?? []) as PuntEntry[]).filter((p) => p.athlete === selectedAthlete) })).filter((s) => (s.entries as PuntEntry[]).length > 0)
+    : history;
 
-  if (history.length === 0) {
+  if (filteredHistory.length === 0) {
     return (
       <div className="card flex items-center justify-center h-48 text-muted text-sm">
         Punting analytics — commit some sessions to see charts
@@ -129,7 +137,7 @@ function PuntingAnalytics() {
   }
 
   // Avg distance per session trend (only count punts with yards > 0)
-  const distTrend = history.map((s) => {
+  const distTrend = filteredHistory.map((s) => {
     const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.yards > 0);
     const totalYds = punts.reduce((sum, p) => sum + p.yards, 0);
     return {
@@ -139,7 +147,7 @@ function PuntingAnalytics() {
   });
 
   // Avg hang time per session trend (only count punts with hangTime > 0)
-  const htTrend = history.map((s) => {
+  const htTrend = filteredHistory.map((s) => {
     const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.hangTime > 0);
     const totalHT = punts.reduce((sum, p) => sum + p.hangTime, 0);
     return {
@@ -149,7 +157,7 @@ function PuntingAnalytics() {
   });
 
   // Directional accuracy % per session (only count punts with DA defined)
-  const daTrend = history.map((s) => {
+  const daTrend = filteredHistory.map((s) => {
     const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.directionalAccuracy != null);
     const totalDA = punts.reduce((sum, p) => sum + p.directionalAccuracy, 0);
     return {
@@ -159,7 +167,7 @@ function PuntingAnalytics() {
   });
 
   // Op time trend (only count punts with opTime > 0)
-  const otTrend = history.map((s) => {
+  const otTrend = filteredHistory.map((s) => {
     const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.opTime > 0);
     const totalOT = punts.reduce((sum, p) => sum + p.opTime, 0);
     return {
@@ -171,7 +179,7 @@ function PuntingAnalytics() {
   // Landing zone distribution
   const landingData = PUNT_LANDING_ZONES.map((zone) => {
     let count = 0;
-    athletes.forEach((a) => {
+    filteredAthletes.forEach((a) => {
       const s = stats[a];
       if (!s) return;
       count += s.byLanding[zone] ?? 0;
@@ -180,7 +188,7 @@ function PuntingAnalytics() {
   });
 
   // Per-athlete comparison
-  const athleteRows = athletes.map((a) => {
+  const athleteRows = filteredAthletes.map((a) => {
     const s = stats[a];
     if (!s) return { athlete: a, att: 0, avgDist: "—", avgHT: "—", avgOT: "—", da: "—", long: 0, critDir: 0 };
     const o = s.overall;
@@ -295,6 +303,22 @@ function PlaceholderAnalytics({ sport }: { sport: string }) {
 
 function AnalyticsContent() {
   const [activeTab, setActiveTab] = useState<Tab>("kicking");
+  const [selectedAthlete, setSelectedAthlete] = useState("");
+  const fg = useFG();
+  const punt = usePunt();
+  const ko = useKickoff();
+
+  // Get athletes for the active tab
+  const currentAthletes = activeTab === "kicking" ? fg.athletes
+    : activeTab === "punting" ? punt.athletes
+    : activeTab === "kickoff" ? ko.athletes
+    : [];
+
+  // Reset athlete selection when switching tabs
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    setSelectedAthlete("");
+  };
 
   return (
     <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
@@ -313,7 +337,7 @@ function AnalyticsContent() {
           {TABS.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={clsx(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all",
                 activeTab === tab.id
@@ -327,9 +351,40 @@ function AnalyticsContent() {
           ))}
         </div>
 
+        {/* Athlete filter */}
+        {currentAthletes.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap">
+            <button
+              onClick={() => setSelectedAthlete("")}
+              className={clsx(
+                "px-3 py-1.5 rounded-input text-xs font-semibold transition-all border",
+                !selectedAthlete
+                  ? "bg-accent text-slate-900 border-accent"
+                  : "border-border text-muted hover:text-white hover:bg-surface-2"
+              )}
+            >
+              All
+            </button>
+            {currentAthletes.map((a) => (
+              <button
+                key={a}
+                onClick={() => setSelectedAthlete(a)}
+                className={clsx(
+                  "px-3 py-1.5 rounded-input text-xs font-semibold transition-all border",
+                  selectedAthlete === a
+                    ? "bg-accent text-slate-900 border-accent"
+                    : "border-border text-muted hover:text-white hover:bg-surface-2"
+                )}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Content */}
-        {activeTab === "kicking" && <KickingAnalytics />}
-        {activeTab === "punting" && <PuntingAnalytics />}
+        {activeTab === "kicking" && <KickingAnalytics selectedAthlete={selectedAthlete} />}
+        {activeTab === "punting" && <PuntingAnalytics selectedAthlete={selectedAthlete} />}
         {activeTab === "kickoff" && <PlaceholderAnalytics sport="Kickoff" />}
         {activeTab === "longsnap" && <PlaceholderAnalytics sport="Long Snap" />}
       </main>
