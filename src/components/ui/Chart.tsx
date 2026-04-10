@@ -350,6 +350,7 @@ interface PositionMakeChartProps {
 }
 
 export function PositionMakeChart({ data, title, className }: PositionMakeChartProps) {
+  const gradId = `grad_pos_${(title ?? "pos").replace(/\s/g, "_")}`;
   return (
     <div className={clsx("card", className)}>
       <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">
@@ -361,7 +362,13 @@ export function PositionMakeChart({ data, title, className }: PositionMakeChartP
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+          <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={ACCENT} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={ACCENT} stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2f42" vertical={false} />
             <XAxis
               dataKey="pos"
@@ -386,8 +393,16 @@ export function PositionMakeChart({ data, title, className }: PositionMakeChartP
                 ) : null
               }
             />
-            <Bar dataKey="pct" fill={ACCENT} radius={[4, 4, 0, 0]} />
-          </BarChart>
+            <Area
+              type="monotone"
+              dataKey="pct"
+              stroke={ACCENT}
+              strokeWidth={2.5}
+              fill={`url(#${gradId})`}
+              dot={{ fill: ACCENT, r: 4, strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: ACCENT, stroke: SURFACE2, strokeWidth: 2 }}
+            />
+          </AreaChart>
         </ResponsiveContainer>
       )}
     </div>
