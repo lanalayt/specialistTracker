@@ -46,13 +46,14 @@ function isPoochType(type: string | undefined | null): boolean {
 //   "0"    = own goal    → 0
 //
 // Returns NaN for invalid input (caller should handle).
-function parseYardLine(input: string | undefined | null): number {
+// defaultSide: "-" = own side (use for LOS), "+" = opponent side (use for landing YL)
+function parseYardLine(input: string | undefined | null, defaultSide: "-" | "+" = "-"): number {
   if (input == null) return NaN;
   const trimmed = String(input).trim();
   if (!trimmed) return NaN;
   const match = trimmed.match(/^([+-]?)(\d+)$/);
   if (!match) return NaN;
-  const sign = match[1] || "-"; // default to own side
+  const sign = match[1] || defaultSide;
   const n = parseInt(match[2], 10);
   if (isNaN(n) || n < 0 || n > 50) return NaN;
   return sign === "-" ? n : 100 - n;
@@ -523,10 +524,10 @@ export default function PuntingSessionPage() {
       setErrorRows((prev) => new Set([...prev, rowIdx]));
       return;
     }
-    const losVal = parseYardLine(r.los);
-    const landingYLVal = parseYardLine(r.landingYL);
+    const losVal = parseYardLine(r.los, "-");      // LOS defaults to own side
+    const landingYLVal = parseYardLine(r.landingYL, "+"); // Landing defaults to opponent side
     if (isNaN(losVal) || isNaN(landingYLVal)) {
-      alert("LOS and Landing YL must be yard lines 0–50. Use - for own side and + for opponent side (e.g. -20 or +25).");
+      alert("Yard lines must be 0–50.\nLOS: use - for own side (default), + for opponent.\nLanding: no sign or + for opponent side (default), - for own side.\nExamples: LOS=-20, Landing=25 or +25");
       setErrorRows((prev) => new Set([...prev, rowIdx]));
       return;
     }
@@ -1477,8 +1478,8 @@ export default function PuntingSessionPage() {
                 <PuntFieldView
                   punts={sessionPunts.filter((p) => p.los != null && p.landingYL != null)}
                   currentPunt={(() => {
-                    const l = parseYardLine(los);
-                    const ly = parseYardLine(landingYL);
+                    const l = parseYardLine(los, "-");
+                    const ly = parseYardLine(landingYL, "+");
                     if (isNaN(l) || isNaN(ly) || ly <= l) return null;
                     const hangVal = parseFloat(hangTime) || undefined;
                     return { los: l, landingYL: ly, hangTime: hangVal, direction: directionalAccuracy };
@@ -1933,7 +1934,7 @@ export default function PuntingSessionPage() {
                             </td>
                             <td className="py-1 px-1">
                               <input
-                                type="text" inputMode="text" placeholder="+25"
+                                type="text" inputMode="text" placeholder="25"
                                 value={row.landingYL ?? ""}
                                 onChange={(e) => updateRow(idx, "landingYL", e.target.value)}
                                 readOnly={isAthlete || isSaved}
