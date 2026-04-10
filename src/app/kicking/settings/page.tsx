@@ -7,11 +7,13 @@ import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 const SNAP_DISTANCES = ["6", "7", "8"];
 const STORAGE_KEY = "fgSettings";
 
+type ScoreMode = "on" | "practice" | "off";
+
 interface FGSettings {
   snapDistance: string;
   makeMode: "simple" | "detailed";
   missMode: "simple" | "detailed";
-  scoreEnabled: boolean;
+  scoreEnabled: ScoreMode;
   scoreOptions: string[];
 }
 
@@ -20,9 +22,16 @@ const DEFAULT_SETTINGS: FGSettings = {
   snapDistance: "7",
   makeMode: "detailed",
   missMode: "detailed",
-  scoreEnabled: true,
+  scoreEnabled: "on",
   scoreOptions: DEFAULT_SCORE_OPTIONS,
 };
+
+function parseScoreMode(val: unknown): ScoreMode {
+  if (val === "on" || val === "practice" || val === "off") return val;
+  if (val === true) return "on";
+  if (val === false) return "off";
+  return "on";
+}
 
 function loadSettingsLocal(): FGSettings {
   try {
@@ -33,7 +42,7 @@ function loadSettingsLocal(): FGSettings {
         snapDistance: parsed.snapDistance ?? "7",
         makeMode: parsed.makeMode ?? "detailed",
         missMode: parsed.missMode ?? "detailed",
-        scoreEnabled: parsed.scoreEnabled !== false, // default true
+        scoreEnabled: parseScoreMode(parsed.scoreEnabled),
         scoreOptions: Array.isArray(parsed.scoreOptions) && parsed.scoreOptions.length > 0
           ? parsed.scoreOptions
           : DEFAULT_SCORE_OPTIONS,
@@ -47,7 +56,7 @@ export default function FGSettingsPage() {
   const [snapDistance, setSnapDistance] = useState("7");
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">("detailed");
   const [missMode, setMissMode] = useState<"simple" | "detailed">("detailed");
-  const [scoreEnabled, setScoreEnabled] = useState(true);
+  const [scoreEnabled, setScoreEnabled] = useState<ScoreMode>("on");
   const [scoreOptions, setScoreOptions] = useState<string[]>(DEFAULT_SCORE_OPTIONS);
   const [newScore, setNewScore] = useState("");
   const [saved, setSaved] = useState(false);
@@ -74,13 +83,13 @@ export default function FGSettingsPage() {
         setSnapDistance(cloud.snapDistance ?? "7");
         setMakeMode(cloud.makeMode ?? "detailed");
         setMissMode(cloud.missMode ?? "detailed");
-        setScoreEnabled(cloud.scoreEnabled !== false);
+        setScoreEnabled(parseScoreMode(cloud.scoreEnabled));
         setScoreOptions(Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS);
         setSavedSettings({
           snapDistance: cloud.snapDistance ?? "7",
           makeMode: cloud.makeMode ?? "detailed",
           missMode: cloud.missMode ?? "detailed",
-          scoreEnabled: cloud.scoreEnabled !== false,
+          scoreEnabled: parseScoreMode(cloud.scoreEnabled),
           scoreOptions: Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS,
         });
       }
@@ -214,28 +223,27 @@ export default function FGSettingsPage() {
       </div>
 
       <div className="card space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="label mb-0">Kick Score</p>
-          <button
-            onClick={() => setScoreEnabled((v) => !v)}
-            className={clsx(
-              "relative w-11 h-6 rounded-full transition-colors",
-              scoreEnabled ? "bg-accent" : "bg-border"
-            )}
-            aria-label="Toggle score tracking"
-          >
-            <span
-              className={clsx(
-                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                scoreEnabled ? "left-[22px]" : "left-0.5"
-              )}
-            />
-          </button>
-        </div>
+        <p className="label">Kick Score</p>
         <p className="text-xs text-muted">
-          Enable to track a numeric kick score for each attempt. Disable to hide score everywhere.
+          Choose when to track kick score. &quot;Practice Only&quot; hides score in game mode but shows it in practice.
         </p>
-        {scoreEnabled && (
+        <div className="grid grid-cols-3 gap-2">
+          {(["on", "practice", "off"] as ScoreMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setScoreEnabled(mode)}
+              className={clsx(
+                "py-3 rounded-input text-xs font-bold border transition-all",
+                scoreEnabled === mode
+                  ? "bg-accent/20 text-accent border-accent/50"
+                  : "bg-surface-2 text-muted border-border hover:text-white"
+              )}
+            >
+              {mode === "on" ? "On" : mode === "practice" ? "Practice Only" : "Off"}
+            </button>
+          ))}
+        </div>
+        {scoreEnabled !== "off" && (
           <>
             <p className="label">Score Options</p>
             <div className="space-y-2">

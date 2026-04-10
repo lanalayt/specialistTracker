@@ -116,16 +116,18 @@ function loadMissMode(): "simple" | "detailed" {
   return "detailed";
 }
 
-function loadScoreEnabled(): boolean {
-  if (typeof window === "undefined") return true;
+function loadScoreMode(): "on" | "practice" | "off" {
+  if (typeof window === "undefined") return "on";
   try {
     const raw = localStorage.getItem("fgSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
-      return parsed.scoreEnabled !== false;
+      if (parsed.scoreEnabled === "on" || parsed.scoreEnabled === "practice" || parsed.scoreEnabled === "off") return parsed.scoreEnabled;
+      if (parsed.scoreEnabled === false) return "off";
+      return "on";
     }
   } catch {}
-  return true;
+  return "on";
 }
 
 function loadScoreOptions(): string[] {
@@ -216,7 +218,9 @@ export default function KickingSessionPage() {
   const drag = useDragReorder(rows, setRows);
   const [makeMode, setMakeMode] = useState(() => loadMakeMode());
   const [missMode, setMissMode] = useState(() => loadMissMode());
-  const [scoreEnabled, setScoreEnabled] = useState(() => loadScoreEnabled());
+  const [scoreMode] = useState(() => loadScoreMode());
+  // Score is visible when: "on" (always), "practice" (only in practice mode), "off" (never)
+  const scoreEnabled = scoreMode === "on" || (scoreMode === "practice" && sessionMode !== "game");
   const [scoreOptions, setScoreOptions] = useState<string[]>(() => loadScoreOptions());
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
@@ -248,7 +252,6 @@ export default function KickingSessionPage() {
         if (cloud.snapDistance) setSnapDistance(parseInt(cloud.snapDistance) || 7);
         if (cloud.makeMode === "simple" || cloud.makeMode === "detailed") setMakeMode(cloud.makeMode);
         if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
-        if (typeof cloud.scoreEnabled === "boolean") setScoreEnabled(cloud.scoreEnabled);
         if (Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0) setScoreOptions(cloud.scoreOptions);
       }
     });
