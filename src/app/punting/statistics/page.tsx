@@ -519,7 +519,7 @@ export default function PuntingStatisticsPage() {
                   )}
                 />
               </button>
-              <span className="text-xs text-slate-300">Exclude live reps</span>
+              <span className="text-xs text-slate-300">Include live reps</span>
             </div>
           )}
         </div>
