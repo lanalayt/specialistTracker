@@ -130,6 +130,26 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
             <line x1={tr.x} y1={tr.y} x2={br.x} y2={br.y} stroke="white" strokeWidth={2} />
           </>); })()}
         {yardLines}
+        {/* Hash marks */}
+        {Array.from({ length: 100 }, (_, yd) => yd + 1).map((yd) => {
+          return [18.5, 34.5].map((lat) => {
+            const a = proj(yd, lat - 0.3); const b = proj(yd, lat + 0.3);
+            return <line key={`h-${yd}-${lat}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(255,255,255,0.12)" strokeWidth={0.8} />;
+          });
+        })}
+        {/* Goalposts at back of each end zone */}
+        {[-7, 107].map((fx) => {
+          const pc = proj(fx, 26.5); const pl = proj(fx, 21); const pr = proj(fx, 32);
+          const cbY = pc.y; const utY = cbY - 18;
+          return (
+            <g key={`post-${fx}`}>
+              <line x1={pl.x} y1={cbY} x2={pr.x} y2={cbY} stroke="#fbbf24" strokeWidth={3} strokeLinecap="round" opacity={0.7} />
+              <line x1={pl.x} y1={cbY} x2={pl.x} y2={utY} stroke="#fbbf24" strokeWidth={2} strokeLinecap="round" opacity={0.7} />
+              <line x1={pr.x} y1={cbY} x2={pr.x} y2={utY} stroke="#fbbf24" strokeWidth={2} strokeLinecap="round" opacity={0.7} />
+              <line x1={pc.x} y1={cbY} x2={pc.x} y2={cbY + 4} stroke="#fbbf24" strokeWidth={2} opacity={0.5} />
+            </g>
+          );
+        })}
         {punts.map((p, i) => { if (p.los == null || p.landingYL == null) return null; return renderArc(i, p.los, p.landingYL, p.hangTime, p.returnYards, !!p.fairCatch, p.hash, 0.7); })}
         {currentPunt && currentPunt.landingYL > currentPunt.los && renderArc("preview", currentPunt.los, currentPunt.landingYL, currentPunt.hangTime, 0, false, currentPunt.hash, 1, "#22d3ee", 3.5)}
       </svg>

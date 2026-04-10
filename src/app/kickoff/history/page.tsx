@@ -27,6 +27,7 @@ export default function KickoffHistoryPage() {
 
 function KickoffHistoryContent() {
   const { history, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession } = useKickoff();
+
   const { isAthlete } = useAuth();
   const searchParams = useSearchParams();
   const sessionParam = searchParams.get("session");
