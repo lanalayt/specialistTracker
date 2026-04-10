@@ -62,7 +62,7 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
   const distMakeData = DIST_BUCKETS.map(({ label, filter }) => {
     const kicks = allFilteredKicks.filter(filter);
     const made = kicks.filter((k) => k.result.startsWith("Y")).length;
-    return { pos: label, pct: kicks.length > 0 ? Math.round((made / kicks.length) * 100) : 0, att: kicks.length };
+    return { pos: label, pct: kicks.length > 0 ? Math.round((made / kicks.length) * 100) : null, att: kicks.length };
   });
 
   // Make% by field position
@@ -70,7 +70,7 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
   const posData = FG_POSITIONS.map((pos) => {
     const kicks = allFilteredKicks.filter((k) => !k.isPAT && k.pos === pos);
     const made = kicks.filter((k) => k.result.startsWith("Y")).length;
-    return { pos, pct: kicks.length > 0 ? Math.round((made / kicks.length) * 100) : 0, att: kicks.length };
+    return { pos, pct: kicks.length > 0 ? Math.round((made / kicks.length) * 100) : null, att: kicks.length };
   });
 
   // Per-athlete comparison (from filtered history so mode filter works)

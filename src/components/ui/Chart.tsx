@@ -344,7 +344,7 @@ export function MultiLineTrendChart({ data, dataKeys, title, unit = "", domain, 
 // ─── Position Make% chart ────────────────────────────────────────────────────
 
 interface PositionMakeChartProps {
-  data: { pos: string; pct: number; att: number }[];
+  data: { pos: string; pct: number | null; att: number }[];
   title?: string;
   className?: string;
 }
@@ -356,7 +356,7 @@ export function PositionMakeChart({ data, title, className }: PositionMakeChartP
       <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">
         {title ?? "Make % by Field Position"}
       </p>
-      {data.every((d) => d.att === 0) ? (
+      {data.every((d) => d.pct === null) ? (
         <div className="h-40 flex items-center justify-center text-muted text-xs">
           No kicks recorded yet
         </div>
@@ -384,14 +384,16 @@ export function PositionMakeChart({ data, title, className }: PositionMakeChartP
               tickFormatter={(v) => `${v}%`}
             />
             <Tooltip
-              content={({ active, payload, label }) =>
-                active && payload?.[0] ? (
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.[0]) return null;
+                const att = (payload[0].payload as { att: number }).att;
+                return (
                   <div className="bg-surface border border-border rounded-card px-3 py-2 shadow-lg text-xs">
                     <p className="font-bold text-slate-100">{label}</p>
-                    <p className="text-accent">{payload[0].value}% ({(payload[0].payload as { att: number }).att} att)</p>
+                    <p className="text-accent">{att > 0 ? `${payload[0].value}% (${att} att)` : "No attempts"}</p>
                   </div>
-                ) : null
-              }
+                );
+              }}
             />
             <Area
               type="monotone"

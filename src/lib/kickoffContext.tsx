@@ -28,6 +28,7 @@ interface KickoffContextValue extends KickoffStateData {
   updateSessionWeather: (sessionId: string, weather: string) => void;
   updateSessionEntries: (sessionId: string, entries: KickoffEntry[]) => void;
   deleteSession: (sessionId: string) => void;
+  restoreSession: (session: Session) => void;
   canUndo: boolean;
 }
 
@@ -232,6 +233,10 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
 
   const deleteSession = useCallback((sessionId: string) => {
     setState((prev) => {
+      const deleted = prev.history.find((s) => s.id === sessionId);
+      if (deleted) {
+        import("@/lib/trashBin").then(({ trashSession }) => trashSession(deleted, "KICKOFF"));
+      }
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
       const newStats = recomputeKickoffStats(
         prev.athletes,
@@ -243,6 +248,22 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       localSet("KICKOFF", next);
       const tid = getTeamId();
       if (tid && tid !== "local-dev") { teamSet(tid, "kickoff_data", next); }
+      return next;
+    });
+  }, []);
+
+  const restoreSession = useCallback((session: Session) => {
+    setState((prev) => {
+      if (prev.history.some((s) => s.id === session.id)) return prev;
+      const newHistory = [...prev.history, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const newStats = recomputeKickoffStats(
+        prev.athletes,
+        newHistory.filter((s) => s.mode !== "game").map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("KICKOFF", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", next);
       return next;
     });
   }, []);
@@ -266,7 +287,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <KickoffContext.Provider value={{
-      ...state, addAthletes, removeAthlete, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession, resetStatsKeepAthletes, canUndo: state.snapshot !== null,
+      ...state, addAthletes, removeAthlete, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession, restoreSession, resetStatsKeepAthletes, canUndo: state.snapshot !== null,
     }}>
       {children}
     </KickoffContext.Provider>

@@ -39,6 +39,7 @@ interface PuntContextValue extends PuntStateData {
   updateSessionWeather: (sessionId: string, weather: string) => void;
   updateSessionEntries: (sessionId: string, entries: PuntEntry[]) => void;
   deleteSession: (sessionId: string) => void;
+  restoreSession: (session: Session) => void;
   canUndo: boolean;
 }
 
@@ -262,6 +263,10 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
 
   const deleteSession = useCallback((sessionId: string) => {
     setState((prev) => {
+      const deleted = prev.history.find((s) => s.id === sessionId);
+      if (deleted) {
+        import("@/lib/trashBin").then(({ trashSession }) => trashSession(deleted, "PUNTING"));
+      }
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
       const newStats = recomputePuntStats(
         prev.athletes,
@@ -273,6 +278,22 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       localSet("PUNT", next);
       const tid = getTeamId();
       if (tid && tid !== "local-dev") { teamSet(tid, "punt_data", next); }
+      return next;
+    });
+  }, []);
+
+  const restoreSession = useCallback((session: Session) => {
+    setState((prev) => {
+      if (prev.history.some((s) => s.id === session.id)) return prev;
+      const newHistory = [...prev.history, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const newStats = recomputePuntStats(
+        prev.athletes,
+        newHistory.filter((s) => s.mode !== "game").map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("PUNT", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSet(tid, "punt_data", next);
       return next;
     });
   }, []);
@@ -307,7 +328,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
   return (
     <PuntContext.Provider value={{
       ...state, addAthletes, removeAthlete, commitPractice, resetStatsKeepAthletes,
-      undoLastCommit, resetAll, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession, canUndo: state.snapshot !== null,
+      undoLastCommit, resetAll, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession, restoreSession, canUndo: state.snapshot !== null,
     }}>
       {children}
     </PuntContext.Provider>

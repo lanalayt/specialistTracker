@@ -21,6 +21,7 @@ const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.Re
 
 const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/athletes", label: "Athletes", icon: "👥" },
+  { href: "/trash", label: "Deleted Sessions", icon: "🗑" },
 ];
 
 const ALWAYS_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [

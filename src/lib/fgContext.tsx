@@ -39,6 +39,7 @@ interface FGContextValue extends FGStateData {
   updateSessionWeather: (sessionId: string, weather: string) => void;
   updateSessionEntries: (sessionId: string, entries: FGKick[]) => void;
   deleteSession: (sessionId: string) => void;
+  restoreSession: (session: Session) => void;
   canUndo: boolean;
 }
 
@@ -282,12 +283,32 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
 
   const deleteSession = useCallback((sessionId: string) => {
     setState((prev) => {
+      // Save to trash before deleting
+      const deleted = prev.history.find((s) => s.id === sessionId);
+      if (deleted) {
+        import("@/lib/trashBin").then(({ trashSession }) => trashSession(deleted, "KICKING"));
+      }
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
       const newStats = recomputeFGStats(
         prev.athletes,
         newHistory
           .filter((s) => s.mode !== "game")
           .map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("FG", next);
+      { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
+      return next;
+    });
+  }, []);
+
+  const restoreSession = useCallback((session: Session) => {
+    setState((prev) => {
+      if (prev.history.some((s) => s.id === session.id)) return prev;
+      const newHistory = [...prev.history, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const newStats = recomputeFGStats(
+        prev.athletes,
+        newHistory.filter((s) => s.mode !== "game").map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
       );
       const next = { ...prev, history: newHistory, stats: newStats };
       localSet("FG", next);
@@ -332,6 +353,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         updateSessionWeather,
         updateSessionEntries,
         deleteSession,
+        restoreSession,
         canUndo: state.snapshot !== null,
       }}
     >
