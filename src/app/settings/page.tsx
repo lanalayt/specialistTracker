@@ -125,17 +125,25 @@ function SettingsContent() {
     );
 
   const handleSave = () => {
+    // Preserve existing fields (like dashTitle) when saving
+    let existing: Record<string, unknown> = {};
+    try { const raw = localStorage.getItem("st_team_v1"); if (raw) existing = JSON.parse(raw); } catch {}
     const team = {
+      ...existing,
       name: teamName,
       school,
       config: { enabledSports },
     };
     // Save to localStorage
     localStorage.setItem("st_team_v1", JSON.stringify(team));
-    // Save to shared team_data (source of truth)
+    // Save to shared team_data (merge with existing to preserve dashTitle etc.)
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamSet(tid, "settings_team", team);
+      teamGet<Record<string, unknown>>(tid, "settings_team").then((cloudExisting) => {
+        teamSet(tid, "settings_team", { ...cloudExisting, ...team });
+      }).catch(() => {
+        teamSet(tid, "settings_team", team);
+      });
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
