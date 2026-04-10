@@ -37,10 +37,13 @@ function posLat(pos: string | undefined): number { return POS_LAT[pos as FGPosit
 function resultEndLat(r: string): number {
   switch (r) { case "YC": return 26.5; case "YL": return 21; case "YR": return 32; case "XL": return 12; case "XR": return 41; default: return 26.5; }
 }
-// FG distance = 7yd snap + LOS-to-goal + 10yd end zone
-// So kicker's field position from back of EZ = EZ_DEPTH + (fgDist - 17)
+// FG distance = LOS-to-goal + 10yd end zone + 7yd snap
+// The ball is KICKED from 7yd behind the LOS, so:
+//   kick spot = LOS + 7 = (fgDist - 10) yards from goal line
+//   field position from back of EZ = EZ_DEPTH + (fgDist - 10)
+// Example: 45yd FG → kicked from the 35 yard line
 function kickerDist(fgDist: number): number {
-  return Math.max(EZ_DEPTH + 1, Math.min(EZ_DEPTH + (fgDist - 17), MAX_DIST - 2));
+  return Math.max(EZ_DEPTH + 1, Math.min(EZ_DEPTH + (fgDist - 10), MAX_DIST - 2));
 }
 
 // Uprights — wide lateral spread so they're visible even at far perspective
