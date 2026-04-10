@@ -253,9 +253,10 @@ export function FGFieldView({ kicks, currentKick }: Props) {
         {selectedIdx != null && fgKicks[selectedIdx] && (() => {
           const k = fgKicks[selectedIdx];
           const startDist = kickerDist(k.dist);
-          const mid = proj(startDist / 2, posLat(k.pos));
-          mid.y -= 30 + (k.dist / 60) * 50;
-          const tx = Math.max(80, Math.min(W - 80, mid.x)); const ty = Math.max(30, mid.y - 10);
+          const start = proj(startDist, posLat(k.pos));
+          const end = proj(0, posLat(k.pos));
+          const tx = Math.max(80, Math.min(W - 80, (start.x + end.x) / 2));
+          const ty = Math.max(55, Math.min(H - 60, (start.y + end.y) / 2));
           const isMake = typeof k.result === "string" && k.result.startsWith("Y");
           return (
             <g>

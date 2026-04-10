@@ -193,13 +193,13 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           const los = k.los ?? 35; const landing = k.landingYL ?? (los + (k.distance || 0));
           if (landing <= los) return null;
           const fy = 26.5;
-          const mid = proj((los + landing) / 2, fy);
-          const cpY = ((proj(los, fy).y + proj(landing, fy).y) / 2) - 2 * hangLift(k.hangTime);
-          const tx = mid.x; const ty = Math.max(20, cpY - 10);
+          const sP = proj(los, fy); const eP = proj(landing, fy);
+          const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
+          const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
           const dist = k.distance || (landing - los);
           return (
             <g>
-              <rect x={tx - 70} y={ty - 28} width={140} height={36} rx={6} fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+              <rect x={tx - 75} y={ty - 28} width={150} height={36} rx={6} fill="rgba(0,0,0,0.9)" stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
               <text x={tx} y={ty - 12} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#e2e8f0">{k.athlete} · #{k.kickNum ?? selectedIdx + 1}</text>
               <text x={tx} y={ty + 1} textAnchor="middle" fontSize={9} fill="#94a3b8">
                 {dist > 0 ? `${dist}yd` : "—"} · {k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s HT` : "—"}{k.returnYards ? ` · ${k.returnYards}yd ret` : ""}

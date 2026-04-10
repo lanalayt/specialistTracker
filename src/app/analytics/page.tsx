@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
-import { TrendChart, DistBarChart, LineTrendChart, MultiLineTrendChart, ZoneBarChart } from "@/components/ui/Chart";
+import { TrendChart, DistBarChart, LineTrendChart } from "@/components/ui/Chart";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
 import type { FGKick, PuntEntry } from "@/types";
-import { DIST_RANGES, PUNT_LANDING_ZONES } from "@/types";
+import { DIST_RANGES } from "@/types";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 import React from "react";
@@ -23,14 +23,6 @@ const TABS: { id: Tab; label: string; icon?: string; iconEl?: React.ReactNode }[
   { id: "kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={18} /> },
   { id: "longsnap", label: "Long Snap", icon: "📏" },
 ];
-
-const LANDING_LABELS: Record<string, string> = {
-  TB: "Touchback",
-  inside10: "Inside 10",
-  inside20: "Inside 20",
-  returned: "Returned",
-  fairCatch: "Fair Catch",
-};
 
 function KickingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
   const { history, stats, athletes } = useFG();
@@ -176,16 +168,6 @@ function PuntingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
     };
   });
 
-  // Landing zone distribution
-  const landingData = PUNT_LANDING_ZONES.map((zone) => {
-    let count = 0;
-    filteredAthletes.forEach((a) => {
-      const s = stats[a];
-      if (!s) return;
-      count += s.byLanding[zone] ?? 0;
-    });
-    return { zone: LANDING_LABELS[zone] ?? zone, count };
-  });
 
   // Per-athlete comparison
   const athleteRows = filteredAthletes.map((a) => {
@@ -233,7 +215,6 @@ function PuntingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
           unit="%"
           domain={[0, 100]}
         />
-        <ZoneBarChart data={landingData} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

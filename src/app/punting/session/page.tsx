@@ -548,6 +548,10 @@ export default function PuntingSessionPage() {
     const zones: PuntLandingZone[] = [];
     if (isTouchback) zones.push("TB");
     else if (r.fairCatch) zones.push("fairCatch");
+    // Outlier check
+    const warnings = checkPuntOutliers(gross, htVal, 0);
+    if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
+
     const punt: PuntEntry = {
       athleteId: r.athlete,
       athlete: r.athlete,

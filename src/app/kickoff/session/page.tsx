@@ -469,6 +469,10 @@ export default function KickoffSessionPage() {
       return;
     }
     const htVal = parseFloat(r.hangTime) || 0;
+    // Outlier check
+    const warnings = checkKickoffOutliers(distance, htVal);
+    if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
+
     const retVal = r.touchback ? 0 : (r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined);
     const losVal = 35; // kickoff spot — own 35
     const landingYLVal = Math.min(100, losVal + distance);

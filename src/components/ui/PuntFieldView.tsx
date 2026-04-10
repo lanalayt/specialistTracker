@@ -202,17 +202,17 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
           const p = punts[selectedIdx];
           if (p.los == null || p.landingYL == null) return null;
           const fy = hashToFieldY(p.hash);
-          const mid = proj((p.los + p.landingYL) / 2, fy);
-          const cpY = ((proj(p.los, fy).y + proj(p.landingYL, fy).y) / 2) - 2 * hangLift(p.hangTime);
-          const tx = mid.x; const ty = Math.max(20, cpY - 10);
+          const sP = proj(p.los, fy); const eP = proj(p.landingYL, fy);
+          const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
+          const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
           return (
             <g>
-              <rect x={tx - 70} y={ty - 38} width={140} height={48} rx={6} fill="rgba(0,0,0,0.85)" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
-              <text x={tx} y={ty - 22} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#e2e8f0">{p.athlete} · #{p.kickNum ?? selectedIdx + 1}</text>
-              <text x={tx} y={ty - 8} textAnchor="middle" fontSize={9} fill="#94a3b8">
+              <rect x={tx - 75} y={ty - 28} width={150} height={48} rx={6} fill="rgba(0,0,0,0.9)" stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
+              <text x={tx} y={ty - 12} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#e2e8f0">{p.athlete} · #{p.kickNum ?? selectedIdx + 1}</text>
+              <text x={tx} y={ty + 1} textAnchor="middle" fontSize={9} fill="#94a3b8">
                 {p.yards > 0 ? `${p.yards}yd` : "—"} · {p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s HT` : "—"}{p.opTime > 0 ? ` · ${p.opTime.toFixed(2)}s OT` : ""}
               </text>
-              <text x={tx} y={ty + 5} textAnchor="middle" fontSize={9} fill="#94a3b8">
+              <text x={tx} y={ty + 14} textAnchor="middle" fontSize={9} fill="#94a3b8">
                 {p.touchback ? "Touchback" : p.fairCatch ? "Fair Catch" : p.returnYards ? `${p.returnYards}yd return` : ""}{p.directionalAccuracy != null ? ` · Dir: ${p.directionalAccuracy}` : ""}
               </text>
             </g>

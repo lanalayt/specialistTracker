@@ -474,6 +474,11 @@ export default function KickingSessionPage() {
     const filledIdx = filledIndices.indexOf(rowIdx);
     const kickNum = filledIdx >= 0 ? filledIdx + 1 : sessionKicks.length + 1;
     const isPAT = r.pos === "PAT";
+    // Outlier check (skip for PATs)
+    if (!isPAT) {
+      const warnings = checkFGOutliers(parseInt(r.dist) || 0);
+      if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
+    }
     const kick: FGKick = {
       athleteId: r.athlete,
       athlete: r.athlete,
