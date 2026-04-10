@@ -283,18 +283,58 @@ function PuntStatsView({
         </section>
       )}
 
-      {/* By Type (excludes pooch — those have their own section above) */}
+      {/* By Type */}
       <CollapsibleSection title="By Type">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {puntTypes
-            .filter(({ id }) => !id.toUpperCase().includes("POOCH"))
             .filter(({ id: type }) => athletes.some((a) => statsMap[a]?.byType[type]?.att > 0))
-            .map(({ id: type }) => (
-              <div key={type} className="card-2">
-                <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
-                <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
-              </div>
-            ))}
+            .map(({ id: type }) => {
+              const isPooch = type.toUpperCase().includes("POOCH");
+              if (isPooch) {
+                // Pooch types: show Avg YL instead of Dist
+                return (
+                  <div key={type} className="card-2">
+                    <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr>
+                          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
+                          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
+                          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>
+                          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
+                          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {athletes.map((a) => {
+                          const b = statsMap[a]?.byType[type];
+                          if (!b || b.att === 0) return null;
+                          const ylData = poochYLStats[a];
+                          const avgYL = ylData && ylData.att > 0 ? (ylData.total / ylData.att).toFixed(1) : "—";
+                          const ht = (b.hangAtt ?? 0) > 0 ? ((b.totalHang / (b.hangAtt ?? b.att)).toFixed(2)) : "—";
+                          const da = (b.daAtt ?? 0) > 0 ? `${Math.round((b.totalDirectionalAccuracy / (b.daAtt ?? b.att)) * 100)}%` : "—";
+                          return (
+                            <tr key={a} className="hover:bg-surface/30 transition-colors">
+                              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a}</td>
+                              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{b.att}</td>
+                              <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{avgYL}</td>
+                              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{ht}</td>
+                              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{da}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              }
+              return (
+                <div key={type} className="card-2">
+                  <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
+                  <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
+                </div>
+              );
+            })}
         </div>
       </CollapsibleSection>
 
@@ -310,8 +350,8 @@ function PuntStatsView({
         </div>
       </CollapsibleSection>
 
-      {/* Per-Type Position Breakdown (excludes pooch) */}
-      {puntTypes.filter(({ id }) => !id.toUpperCase().includes("POOCH")).filter(({ id: type }) => athletes.some((a) => statsMap[a]?.byType[type]?.att > 0)).map(({ id: type }) => (
+      {/* Per-Type Position Breakdown */}
+      {puntTypes.filter(({ id: type }) => athletes.some((a) => statsMap[a]?.byType[type]?.att > 0)).map(({ id: type }) => (
         <CollapsibleSection key={type} title={`${typeLabels[type] ?? type} — By Position`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {PUNT_HASHES.map((hash) => {
