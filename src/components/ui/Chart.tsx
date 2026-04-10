@@ -341,6 +341,60 @@ export function MultiLineTrendChart({ data, dataKeys, title, unit = "", domain, 
   );
 }
 
+// ─── Position Make% chart ────────────────────────────────────────────────────
+
+interface PositionMakeChartProps {
+  data: { pos: string; pct: number; att: number }[];
+  className?: string;
+}
+
+export function PositionMakeChart({ data, className }: PositionMakeChartProps) {
+  return (
+    <div className={clsx("card", className)}>
+      <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">
+        Make % by Field Position
+      </p>
+      {data.every((d) => d.att === 0) ? (
+        <div className="h-40 flex items-center justify-center text-muted text-xs">
+          No kicks recorded yet
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1f2f42" vertical={false} />
+            <XAxis
+              dataKey="pos"
+              tick={{ fill: MUTED, fontSize: 11, fontWeight: 600 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: MUTED, fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              domain={[0, 100]}
+              tickFormatter={(v) => `${v}%`}
+            />
+            <Tooltip
+              content={({ active, payload, label }) =>
+                active && payload?.[0] ? (
+                  <div className="bg-surface border border-border rounded-card px-3 py-2 shadow-lg text-xs">
+                    <p className="font-bold text-slate-100">{label}</p>
+                    <p className="text-accent">{payload[0].value}% ({(payload[0].payload as { att: number }).att} att)</p>
+                  </div>
+                ) : null
+              }
+            />
+            <Bar dataKey="pct" fill={ACCENT} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+// ─── Zone bar chart ─────────────────────────────────────────────────────────
+
 export function ZoneBarChart({ data, className }: ZoneBarChartProps) {
   const colors = [ACCENT, "#3b82f6", "#8b5cf6", "#f59e0b", MISS, "#06b6d4", "#84cc16"];
 

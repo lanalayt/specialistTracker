@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
-import { TrendChart, DistBarChart, LineTrendChart } from "@/components/ui/Chart";
+import { TrendChart, DistBarChart, LineTrendChart, PositionMakeChart } from "@/components/ui/Chart";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
@@ -50,6 +50,14 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
     return { range: dr, Made: inRange.filter((k) => k.result.startsWith("Y")).length, Missed: inRange.filter((k) => !k.result.startsWith("Y")).length };
   });
 
+  // Make% by field position
+  const FG_POSITIONS = ["LH", "LM", "M", "RM", "RH"];
+  const posData = FG_POSITIONS.map((pos) => {
+    const kicks = allFilteredKicks.filter((k) => !k.isPAT && k.pos === pos);
+    const made = kicks.filter((k) => k.result.startsWith("Y")).length;
+    return { pos, pct: kicks.length > 0 ? Math.round((made / kicks.length) * 100) : 0, att: kicks.length };
+  });
+
   // Per-athlete comparison (from filtered history so mode filter works)
   const athleteRows = filteredAthletes.map((a) => {
     const ak = allFilteredKicks.filter((k) => k.athlete === a && !k.isPAT);
@@ -67,6 +75,10 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TrendChart data={trendData} />
         <DistBarChart data={distData} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <PositionMakeChart data={posData} />
       </div>
 
       {/* Comparison table */}
