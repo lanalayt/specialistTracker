@@ -1284,16 +1284,18 @@ export default function KickoffSessionPage() {
               </div>
             )}
           </div>
-          {/* Practice / Game mode toggle */}
+          {/* Practice / Game mode toggle + Live / Manual toggle */}
           {!isAthlete && !isContinuing && (
-            <div className="px-4 py-2 border-b border-border shrink-0 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Mode</span>
+            <div className={clsx(
+              "px-4 py-2 border-b shrink-0 space-y-2 transition-colors",
+              sessionMode === "game" ? "bg-red-500/10 border-red-500/40" : "border-border"
+            )}>
+              <div className="flex items-center gap-3">
                 <div className="flex rounded-input border border-border overflow-hidden">
                   <button
                     onClick={() => setSessionMode("practice")}
                     className={clsx(
-                      "px-3 py-1 text-xs font-semibold transition-colors",
+                      "px-3 py-1.5 text-xs font-semibold transition-colors",
                       sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
                     )}
                   >
@@ -1302,11 +1304,32 @@ export default function KickoffSessionPage() {
                   <button
                     onClick={() => setSessionMode("game")}
                     className={clsx(
-                      "px-3 py-1 text-xs font-semibold transition-colors border-l border-border",
+                      "px-3 py-1.5 text-xs font-semibold transition-colors border-l border-border",
                       sessionMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
                     )}
                   >
                     GAME
+                  </button>
+                </div>
+                <div className="flex rounded-input border border-border overflow-hidden">
+                  <button
+                    onClick={() => { if (sessionMode !== "game") setManualEntry(false); }}
+                    className={clsx(
+                      "px-3 py-1.5 text-xs font-semibold transition-colors",
+                      !manualEntry ? "bg-accent text-slate-900" : "text-muted hover:text-white",
+                      sessionMode === "game" && "opacity-40 cursor-not-allowed"
+                    )}
+                  >
+                    Live Mode
+                  </button>
+                  <button
+                    onClick={() => setManualEntry(true)}
+                    className={clsx(
+                      "px-3 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+                      manualEntry ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                    )}
+                  >
+                    Manual Entry
                   </button>
                 </div>
               </div>
@@ -1682,19 +1705,6 @@ export default function KickoffSessionPage() {
                   Clear Log
                 </button>
               </div>
-              {!isContinuing && sessionMode !== "game" && (
-                <button
-                  onClick={() => setManualEntry((v) => !v)}
-                  className={clsx(
-                    "text-xs py-2 px-5 rounded-input border font-semibold transition-all",
-                    manualEntry
-                      ? "bg-accent/20 text-accent border-accent/50"
-                      : "border-border text-muted hover:text-white hover:bg-surface-2"
-                  )}
-                >
-                  {manualEntry ? "Manual Entry ●" : "Manual Entry"}
-                </button>
-              )}
               {sessionMode === "game" ? (
                 <button
                   onClick={handleCommitReady}

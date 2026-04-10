@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -37,6 +38,7 @@ export function Header({ title }: { title?: string }) {
     pathname === href || pathname.startsWith(href + "/");
 
   return (
+    <>
     <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur border-b border-border">
       <div className="flex items-center gap-4 px-4 h-14 lg:pl-[15rem]">
         {/* Logo (mobile) */}
@@ -105,8 +107,10 @@ export function Header({ title }: { title?: string }) {
         </div>
       </div>
 
-      {/* Mobile drawer */}
-      {menuOpen && (
+      {/* Mobile bottom nav (rendered via CSS fixed positioning in MobileNav) */}
+    </header>
+    {/* Mobile drawer — portaled to body so backdrop-blur on header doesn't break fixed positioning */}
+    {menuOpen && typeof document !== "undefined" && createPortal(
         <div className="lg:hidden fixed inset-0 z-50">
           {/* Backdrop */}
           <div
@@ -204,11 +208,10 @@ export function Header({ title }: { title?: string }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-
-      {/* Mobile bottom nav (rendered via CSS fixed positioning in MobileNav) */}
-    </header>
+    </>
   );
 }
 
