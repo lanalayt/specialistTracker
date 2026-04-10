@@ -16,9 +16,16 @@ export function SportHub({ basePath, sportName }: { basePath: string; sportName:
 
   return (
     <main className="p-4 lg:p-8 max-w-2xl">
-      <div className="mb-8">
+      <div className="mb-8 flex items-center gap-3">
         <h1 className="text-2xl font-extrabold text-slate-100">{sportName}</h1>
-        <p className="text-sm text-muted mt-1">Select a section to get started.</p>
+        {!isAthlete && (
+          <Link
+            href={`${basePath}/settings`}
+            className="text-[10px] font-bold text-muted uppercase tracking-wider px-2.5 py-1 rounded-input border border-border hover:border-accent/40 hover:text-accent transition-all"
+          >
+            Settings
+          </Link>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-4">
         {visibleCards.map((card) => (
