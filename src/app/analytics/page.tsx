@@ -24,12 +24,13 @@ const TABS: { id: Tab; label: string; icon?: string; iconEl?: React.ReactNode }[
   { id: "longsnap", label: "Long Snap", icon: "📏" },
 ];
 
-function KickingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
+function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: string; modeFilter: "all" | "practice" | "game" }) {
   const { history, stats, athletes } = useFG();
   const filteredAthletes = selectedAthlete ? [selectedAthlete] : athletes;
+  const modeHistory = modeFilter === "all" ? history : history.filter((s) => modeFilter === "game" ? s.mode === "game" : s.mode !== "game");
   const filteredHistory = selectedAthlete
-    ? history.map((s) => ({ ...s, entries: ((s.entries ?? []) as FGKick[]).filter((k) => k.athlete === selectedAthlete) })).filter((s) => (s.entries as FGKick[]).length > 0)
-    : history;
+    ? modeHistory.map((s) => ({ ...s, entries: ((s.entries ?? []) as FGKick[]).filter((k) => k.athlete === selectedAthlete) })).filter((s) => (s.entries as FGKick[]).length > 0)
+    : modeHistory;
 
   // Build trend data — make% per session
   const trendData = filteredHistory.map((s) => {
@@ -41,28 +42,23 @@ function KickingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
     };
   });
 
-  // Build distance bar chart
+  // Build distance bar chart from filtered history
+  const allFilteredKicks = filteredHistory.flatMap((s) => (s.entries ?? []) as FGKick[]);
   const distData = DIST_RANGES.map((dr) => {
-    let made = 0, missed = 0;
-    filteredAthletes.forEach((a) => {
-      const s = stats[a];
-      if (!s) return;
-      made += s.distance[dr].made;
-      missed += s.distance[dr].att - s.distance[dr].made;
-    });
-    return { range: dr, Made: made, Missed: missed };
+    const [lo, hi] = dr.split("-").map(Number);
+    const inRange = allFilteredKicks.filter((k) => !k.isPAT && k.dist >= lo && k.dist <= (hi || 999));
+    return { range: dr, Made: inRange.filter((k) => k.result.startsWith("Y")).length, Missed: inRange.filter((k) => !k.result.startsWith("Y")).length };
   });
 
-  // Per-athlete comparison
+  // Per-athlete comparison (from filtered history so mode filter works)
   const athleteRows = filteredAthletes.map((a) => {
-    const s = stats[a];
-    if (!s) return { athlete: a, att: 0, made: 0, score: 0, longFG: 0 };
+    const ak = allFilteredKicks.filter((k) => k.athlete === a && !k.isPAT);
     return {
       athlete: a,
-      att: s.overall.att,
-      made: s.overall.made,
-      score: s.overall.score,
-      longFG: s.overall.longFG,
+      att: ak.length,
+      made: ak.filter((k) => k.result.startsWith("Y")).length,
+      score: ak.reduce((s, k) => s + (k.score || 0), 0),
+      longFG: ak.length > 0 ? Math.max(...ak.filter((k) => k.result.startsWith("Y")).map((k) => k.dist), 0) : 0,
     };
   });
 
@@ -113,12 +109,13 @@ function KickingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
   );
 }
 
-function PuntingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
+function PuntingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: string; modeFilter: "all" | "practice" | "game" }) {
   const { history, stats, athletes } = usePunt();
   const filteredAthletes = selectedAthlete ? [selectedAthlete] : athletes;
+  const modeHistory = modeFilter === "all" ? history : history.filter((s) => modeFilter === "game" ? s.mode === "game" : s.mode !== "game");
   const filteredHistory = selectedAthlete
-    ? history.map((s) => ({ ...s, entries: ((s.entries ?? []) as PuntEntry[]).filter((p) => p.athlete === selectedAthlete) })).filter((s) => (s.entries as PuntEntry[]).length > 0)
-    : history;
+    ? modeHistory.map((s) => ({ ...s, entries: ((s.entries ?? []) as PuntEntry[]).filter((p) => p.athlete === selectedAthlete) })).filter((s) => (s.entries as PuntEntry[]).length > 0)
+    : modeHistory;
 
   if (filteredHistory.length === 0) {
     return (
@@ -169,20 +166,24 @@ function PuntingAnalytics({ selectedAthlete }: { selectedAthlete: string }) {
   });
 
 
-  // Per-athlete comparison
+  // Per-athlete comparison (computed from filtered history so mode filter works)
+  const allFilteredPunts = filteredHistory.flatMap((s) => (s.entries ?? []) as PuntEntry[]);
   const athleteRows = filteredAthletes.map((a) => {
-    const s = stats[a];
-    if (!s) return { athlete: a, att: 0, avgDist: "—", avgHT: "—", avgOT: "—", da: "—", long: 0, critDir: 0 };
-    const o = s.overall;
+    const ap = allFilteredPunts.filter((p) => p.athlete === a);
+    if (ap.length === 0) return { athlete: a, att: 0, avgDist: "—", avgHT: "—", avgOT: "—", da: "—", long: 0, critDir: 0 };
+    const ydsE = ap.filter((p) => p.yards > 0);
+    const htE = ap.filter((p) => p.hangTime > 0);
+    const otE = ap.filter((p) => (p.opTime || 0) > 0);
+    const daE = ap.filter((p) => p.directionalAccuracy != null);
     return {
       athlete: a,
-      att: o.att,
-      avgDist: (o.yardsAtt ?? o.att) > 0 ? (o.totalYards / (o.yardsAtt ?? o.att)).toFixed(1) : "—",
-      avgHT: (o.hangAtt ?? o.att) > 0 ? (o.totalHang / (o.hangAtt ?? o.att)).toFixed(2) : "—",
-      avgOT: (o.opTimeAtt ?? o.att) > 0 ? (o.totalOpTime / (o.opTimeAtt ?? o.att)).toFixed(2) : "—",
-      da: (o.daAtt ?? o.att) > 0 ? `${Math.round((o.totalDirectionalAccuracy / (o.daAtt ?? o.att)) * 100)}%` : "—",
-      long: o.long,
-      critDir: o.criticalDirections,
+      att: ap.length,
+      avgDist: ydsE.length > 0 ? (ydsE.reduce((s, p) => s + p.yards, 0) / ydsE.length).toFixed(1) : "—",
+      avgHT: htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) : "—",
+      avgOT: otE.length > 0 ? (otE.reduce((s, p) => s + (p.opTime || 0), 0) / otE.length).toFixed(2) : "—",
+      da: daE.length > 0 ? `${Math.round((daE.reduce((s, p) => s + p.directionalAccuracy, 0) / daE.length) * 100)}%` : "—",
+      long: ydsE.length > 0 ? Math.max(...ydsE.map((p) => p.yards)) : 0,
+      critDir: daE.filter((p) => p.directionalAccuracy === 0).length,
     };
   });
 
@@ -284,6 +285,7 @@ function PlaceholderAnalytics({ sport }: { sport: string }) {
 
 function AnalyticsContent() {
   const [activeTab, setActiveTab] = useState<Tab>("kicking");
+  const [modeFilter, setModeFilter] = useState<"all" | "practice" | "game">("all");
   const [selectedAthlete, setSelectedAthlete] = useState("");
   const fg = useFG();
   const punt = usePunt();
@@ -299,6 +301,7 @@ function AnalyticsContent() {
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
     setSelectedAthlete("");
+    setModeFilter("all");
   };
 
   return (
@@ -328,6 +331,24 @@ function AnalyticsContent() {
             >
               {tab.iconEl ?? <span>{tab.icon}</span>}
               {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Practice / Game filter */}
+        <div className="flex gap-1 bg-surface-2 p-1 rounded-input w-fit">
+          {(["all", "practice", "game"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setModeFilter(m)}
+              className={clsx(
+                "px-3 py-1.5 rounded text-xs font-semibold transition-all",
+                modeFilter === m
+                  ? m === "game" ? "bg-red-500 text-white" : "bg-accent text-bg"
+                  : "text-muted hover:text-white"
+              )}
+            >
+              {m === "all" ? "All" : m === "practice" ? "Practice" : "Game"}
             </button>
           ))}
         </div>
@@ -364,8 +385,8 @@ function AnalyticsContent() {
         )}
 
         {/* Content */}
-        {activeTab === "kicking" && <KickingAnalytics selectedAthlete={selectedAthlete} />}
-        {activeTab === "punting" && <PuntingAnalytics selectedAthlete={selectedAthlete} />}
+        {activeTab === "kicking" && <KickingAnalytics selectedAthlete={selectedAthlete} modeFilter={modeFilter} />}
+        {activeTab === "punting" && <PuntingAnalytics selectedAthlete={selectedAthlete} modeFilter={modeFilter} />}
         {activeTab === "kickoff" && <PlaceholderAnalytics sport="Kickoff" />}
         {activeTab === "longsnap" && <PlaceholderAnalytics sport="Long Snap" />}
       </main>
