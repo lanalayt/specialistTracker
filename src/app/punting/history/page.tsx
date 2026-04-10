@@ -26,7 +26,7 @@ export default function PuntHistoryPage() {
 }
 
 function PuntHistoryContent() {
-  const { history, updateSessionDate, updateSessionWeather, deleteSession } = usePunt();
+  const { history, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession } = usePunt();
   const { isAthlete } = useAuth();
   const searchParams = useSearchParams();
   const sessionParam = searchParams.get("session");
@@ -61,6 +61,24 @@ function PuntHistoryContent() {
 
   const selected = filteredHistory.find((s) => s.id === selectedId);
   const punts = (selected?.entries ?? []) as PuntEntry[];
+  const [editing, setEditing] = useState(false);
+  const [editEntries, setEditEntries] = useState<PuntEntry[]>([]);
+
+  const startEditing = () => {
+    setEditEntries(punts.map((p) => ({ ...p })));
+    setEditing(true);
+  };
+  const cancelEditing = () => { setEditing(false); setEditEntries([]); };
+  const saveEditing = () => {
+    if (selected) {
+      updateSessionEntries(selected.id, editEntries);
+      setEditing(false);
+      setEditEntries([]);
+    }
+  };
+  const updateEntry = (idx: number, field: keyof PuntEntry, value: unknown) => {
+    setEditEntries((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
+  };
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
@@ -175,17 +193,35 @@ function PuntHistoryContent() {
               <p className="text-xs text-muted mt-0.5">{punts.length} punt{punts.length !== 1 ? "s" : ""}</p>
               </div>
               {!isAthlete && (
-                <button
-                  onClick={() => {
-                    if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
-                      deleteSession(selected.id);
-                      setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
-                    }
-                  }}
-                  className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all ml-3 shrink-0"
-                >
-                  Delete Session
-                </button>
+                <div className="flex gap-2 ml-3 shrink-0">
+                  {editing ? (
+                    <>
+                      <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">
+                        Save Changes
+                      </button>
+                      <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
+                            deleteSession(selected.id);
+                            setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
+                          }
+                        }}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
             {/* Weather display / edit */}
@@ -289,15 +325,32 @@ function PuntHistoryContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {punts.map((p, i) => (
+                  {(editing ? editEntries : punts).map((p, i) => (
                     <tr key={i} className="hover:bg-surface/30">
                       <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                       <td className="table-name">{p.athlete}</td>
                       <td className="table-cell text-muted">{p.type || "—"}</td>
-                      <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
-                      <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
-                      <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
-                      <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
+                      {editing ? (
+                        <>
+                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1"><input type="text" inputMode="decimal" value={p.hangTime || ""} onChange={(e) => updateEntry(i, "hangTime", parseFloat(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1"><input type="text" inputMode="decimal" value={p.opTime || ""} onChange={(e) => updateEntry(i, "opTime", parseFloat(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1">
+                            <select value={String(p.directionalAccuracy ?? "")} onChange={(e) => updateEntry(i, "directionalAccuracy", parseFloat(e.target.value))} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
+                              <option value="1">1</option>
+                              <option value="0.5">0.5</option>
+                              <option value="0">0</option>
+                            </select>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
+                          <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
+                          <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
+                          <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

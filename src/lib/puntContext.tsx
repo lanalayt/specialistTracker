@@ -37,6 +37,7 @@ interface PuntContextValue extends PuntStateData {
   resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  updateSessionEntries: (sessionId: string, entries: PuntEntry[]) => void;
   deleteSession: (sessionId: string) => void;
   canUndo: boolean;
 }
@@ -245,6 +246,25 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateSessionEntries = useCallback((sessionId: string, entries: PuntEntry[]) => {
+    setState((prev) => {
+      const newHistory = prev.history.map((s) =>
+        s.id === sessionId ? { ...s, entries } : s
+      );
+      const newStats = recomputePuntStats(
+        prev.athletes,
+        newHistory
+          .filter((s) => s.mode !== "game")
+          .map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("PUNT", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSet(tid, "punt_data", next);
+      return next;
+    });
+  }, []);
+
   const deleteSession = useCallback((sessionId: string) => {
     setState((prev) => {
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
@@ -292,7 +312,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
   return (
     <PuntContext.Provider value={{
       ...state, addAthletes, removeAthlete, commitPractice, resetStatsKeepAthletes,
-      undoLastCommit, resetAll, updateSessionDate, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
+      undoLastCommit, resetAll, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession, canUndo: state.snapshot !== null,
     }}>
       {children}
     </PuntContext.Provider>

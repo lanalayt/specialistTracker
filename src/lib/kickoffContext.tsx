@@ -26,6 +26,7 @@ interface KickoffContextValue extends KickoffStateData {
   resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  updateSessionEntries: (sessionId: string, entries: KickoffEntry[]) => void;
   deleteSession: (sessionId: string) => void;
   canUndo: boolean;
 }
@@ -217,6 +218,23 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateSessionEntries = useCallback((sessionId: string, entries: KickoffEntry[]) => {
+    setState((prev) => {
+      const newHistory = prev.history.map((s) =>
+        s.id === sessionId ? { ...s, entries } : s
+      );
+      const newStats = recomputeKickoffStats(
+        prev.athletes,
+        newHistory.filter((s) => s.mode !== "game").map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("KICKOFF", next);
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", next);
+      return next;
+    });
+  }, []);
+
   const deleteSession = useCallback((sessionId: string) => {
     setState((prev) => {
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
@@ -253,7 +271,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <KickoffContext.Provider value={{
-      ...state, addAthletes, removeAthlete, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, deleteSession, resetStatsKeepAthletes, canUndo: state.snapshot !== null,
+      ...state, addAthletes, removeAthlete, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession, resetStatsKeepAthletes, canUndo: state.snapshot !== null,
     }}>
       {children}
     </KickoffContext.Provider>

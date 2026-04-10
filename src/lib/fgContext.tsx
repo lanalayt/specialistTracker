@@ -37,6 +37,7 @@ interface FGContextValue extends FGStateData {
   resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  updateSessionEntries: (sessionId: string, entries: FGKick[]) => void;
   deleteSession: (sessionId: string) => void;
   canUndo: boolean;
 }
@@ -271,6 +272,23 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateSessionEntries = useCallback((sessionId: string, entries: FGKick[]) => {
+    setState((prev) => {
+      const newHistory = prev.history.map((s) =>
+        s.id === sessionId ? { ...s, entries } : s
+      );
+      const newStats = recomputeFGStats(
+        prev.athletes,
+        newHistory.filter((s) => s.mode !== "game").map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
+      );
+      const next = { ...prev, history: newHistory, stats: newStats };
+      localSet("FG", next);
+      const _t = getTeamId();
+      if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next);
+      return next;
+    });
+  }, []);
+
   const deleteSession = useCallback((sessionId: string) => {
     setState((prev) => {
       const newHistory = prev.history.filter((s) => s.id !== sessionId);
@@ -321,6 +339,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         resetAll,
         updateSessionDate,
         updateSessionWeather,
+        updateSessionEntries,
         deleteSession,
         canUndo: state.snapshot !== null,
       }}

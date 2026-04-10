@@ -42,7 +42,7 @@ export default function KickingHistoryPage() {
 }
 
 function KickingHistoryContent() {
-  const { history, updateSessionDate, updateSessionWeather, deleteSession } = useFG();
+  const { history, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession } = useFG();
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() => {
     if (typeof window === "undefined") return "detailed";
     try {
@@ -97,6 +97,12 @@ function KickingHistoryContent() {
   }, [history, sessionParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = filteredHistory.find((s) => s.id === selectedId);
+  const [editing, setEditing] = useState(false);
+  const [editEntries, setEditEntries] = useState<FGKick[]>([]);
+  const startEditing = () => { setEditEntries((selected?.entries ?? []) as FGKick[]); setEditing(true); };
+  const cancelEditing = () => { setEditing(false); setEditEntries([]); };
+  const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); } };
+  const updateEntry = (idx: number, field: keyof FGKick, value: unknown) => { setEditEntries((prev) => prev.map((k, i) => i === idx ? { ...k, [field]: value } : k)); };
   const kicks = (selected?.entries ?? []) as FGKick[];
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
 
@@ -218,17 +224,27 @@ function KickingHistoryContent() {
                 </p>
               </div>
               {!isAthlete && (
-                <button
-                  onClick={() => {
-                    if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
-                      deleteSession(selected.id);
-                      setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
-                    }
-                  }}
-                  className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all ml-3 shrink-0"
-                >
-                  Delete Session
-                </button>
+                <div className="flex gap-2 ml-3 shrink-0">
+                  {editing ? (
+                    <>
+                      <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">Save Changes</button>
+                      <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
+                            deleteSession(selected.id);
+                            setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
+                          }
+                        }}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
+                      >Delete</button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
             {/* Weather display / edit */}
@@ -337,18 +353,37 @@ function KickingHistoryContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {kicks.map((k, i) => (
+                  {(editing ? editEntries : kicks).map((k, i) => (
                     <tr key={i} className="hover:bg-surface/30 transition-colors">
                       <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}{k.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                       <td className="table-name">{k.athlete}</td>
-                      <td className="table-cell">{k.dist} yd</td>
-                      <td className="table-cell text-muted">{k.pos}</td>
-                      <td className="table-cell">
-                        <span className={clsx("text-xs font-semibold", k.result.startsWith("Y") ? "text-make" : "text-miss")}>
-                          {formatResult(k.result, makeMode)}
-                        </span>
-                      </td>
-                      <td className="table-cell">{k.score}</td>
+                      {editing ? (
+                        <>
+                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.dist || ""} onChange={(e) => updateEntry(i, "dist", parseInt(e.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1">
+                            <select value={k.pos} onChange={(e) => updateEntry(i, "pos", e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
+                              {["LH","LM","M","RM","RH","PAT"].map((p) => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                          </td>
+                          <td className="table-cell p-1">
+                            <select value={k.result} onChange={(e) => updateEntry(i, "result", e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
+                              {["YL","YC","YR","XL","XS","XR"].map((r) => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          </td>
+                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="table-cell">{k.dist} yd</td>
+                          <td className="table-cell text-muted">{k.pos}</td>
+                          <td className="table-cell">
+                            <span className={clsx("text-xs font-semibold", k.result.startsWith("Y") ? "text-make" : "text-miss")}>
+                              {formatResult(k.result, makeMode)}
+                            </span>
+                          </td>
+                          <td className="table-cell">{k.score}</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

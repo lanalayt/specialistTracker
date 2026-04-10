@@ -26,7 +26,7 @@ export default function KickoffHistoryPage() {
 }
 
 function KickoffHistoryContent() {
-  const { history, updateSessionDate, updateSessionWeather, deleteSession } = useKickoff();
+  const { history, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession } = useKickoff();
   const { isAthlete } = useAuth();
   const searchParams = useSearchParams();
   const sessionParam = searchParams.get("session");
@@ -61,6 +61,12 @@ function KickoffHistoryContent() {
 
   const selected = filteredHistory.find((s) => s.id === selectedId);
   const entries = (selected?.entries ?? []) as KickoffEntry[];
+  const [editing, setEditing] = useState(false);
+  const [editEntries, setEditEntries] = useState<KickoffEntry[]>([]);
+  const startEditing = () => { setEditEntries(entries.map((e) => ({ ...e }))); setEditing(true); };
+  const cancelEditing = () => { setEditing(false); setEditEntries([]); };
+  const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); } };
+  const updateEntry = (idx: number, field: keyof KickoffEntry, value: unknown) => { setEditEntries((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e)); };
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
@@ -175,17 +181,27 @@ function KickoffHistoryContent() {
               <p className="text-xs text-muted mt-0.5">{entries.length} kickoff{entries.length !== 1 ? "s" : ""}</p>
               </div>
               {!isAthlete && (
-                <button
-                  onClick={() => {
-                    if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
-                      deleteSession(selected.id);
-                      setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
-                    }
-                  }}
-                  className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all ml-3 shrink-0"
-                >
-                  Delete Session
-                </button>
+                <div className="flex gap-2 ml-3 shrink-0">
+                  {editing ? (
+                    <>
+                      <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">Save Changes</button>
+                      <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete session "${selected.label}"? This cannot be undone.`)) {
+                            deleteSession(selected.id);
+                            setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
+                          }
+                        }}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
+                      >Delete</button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
             {/* Weather display / edit */}
@@ -283,15 +299,31 @@ function KickoffHistoryContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map((e, i) => (
+                  {(editing ? editEntries : entries).map((e, i) => (
                     <tr key={i} className="hover:bg-surface/30">
                       <td className="table-cell text-left text-muted">{e.kickNum ?? i + 1}</td>
                       <td className="table-name">{e.athlete}</td>
-                      <td className="table-cell">{e.distance > 0 ? `${e.distance} yd` : "—"}</td>
-                      <td className="table-cell text-muted">{e.hangTime > 0 ? `${e.hangTime.toFixed(2)}s` : "—"}</td>
-                      <td className={clsx("table-cell font-bold",
-                        e.direction === "1" ? "text-make" : e.direction === "OB" ? "text-miss" : e.direction === "0.5" ? "text-amber-400" : "text-muted"
-                      )}>{e.direction || "—"}</td>
+                      {editing ? (
+                        <>
+                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={e.distance || ""} onChange={(ev) => updateEntry(i, "distance", parseInt(ev.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1"><input type="text" inputMode="decimal" value={e.hangTime || ""} onChange={(ev) => updateEntry(i, "hangTime", parseFloat(ev.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1">
+                            <select value={e.direction} onChange={(ev) => updateEntry(i, "direction", ev.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
+                              <option value="1">1</option>
+                              <option value="0.5">0.5</option>
+                              <option value="OB">OB</option>
+                            </select>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="table-cell">{e.distance > 0 ? `${e.distance} yd` : "—"}</td>
+                          <td className="table-cell text-muted">{e.hangTime > 0 ? `${e.hangTime.toFixed(2)}s` : "—"}</td>
+                          <td className={clsx("table-cell font-bold",
+                            e.direction === "1" ? "text-make" : e.direction === "OB" ? "text-miss" : e.direction === "0.5" ? "text-amber-400" : "text-muted"
+                          )}>{e.direction || "—"}</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
