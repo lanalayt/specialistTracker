@@ -103,7 +103,7 @@ export function FGFieldView({ kicks, currentKick }: Props) {
     stripes.push(<polygon key={`s-${yd}`} points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill={isDark ? "#15532d" : "#166534"} />);
   }
 
-  // Yard lines + numbers
+  // Yard lines + field numbers
   const yardEls: React.ReactNode[] = [];
   for (let yd = 0; yd <= 55; yd += 5) {
     const dist = GOAL_LINE_DIST + yd;
@@ -113,11 +113,29 @@ export function FGFieldView({ kicks, currentKick }: Props) {
     yardEls.push(<line key={`yl-${yd}`} x1={l.x} y1={l.y} x2={r.x} y2={r.y}
       stroke={isGL ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.2)"} strokeWidth={isGL ? 3 : is10 ? 1.5 : 0.7} />);
     if (is10 && yd > 0 && yd <= 50) {
-      const nL = proj(dist, 14); const nR = proj(dist, 39);
-      const fs = Math.max(7, 12 - (dist / MAX_DIST) * 4);
-      [nL, nR].forEach((p, j) => yardEls.push(
-        <text key={`yn-${yd}-${j}`} x={p.x} y={p.y + 1} textAnchor="middle" fontSize={fs} fontWeight="900" fill="rgba(255,255,255,0.18)" letterSpacing="1">{yd}</text>
-      ));
+      // Numbers between hash and sideline on each side — big block style
+      const nL = proj(dist, 10); const nR = proj(dist, 43);
+      // Scale font with perspective (closer = bigger)
+      const scale = 1 - (dist / MAX_DIST) * 0.5;
+      const fs = Math.max(10, 18 * scale);
+      [nL, nR].forEach((p, j) => {
+        yardEls.push(
+          <text key={`yn-${yd}-${j}`} x={p.x} y={p.y + fs * 0.35} textAnchor="middle" fontSize={fs}
+            fontWeight="900" fill="rgba(255,255,255,0.2)" fontFamily="'Arial Black', sans-serif"
+            letterSpacing="2" stroke="rgba(255,255,255,0.06)" strokeWidth={0.5}>{yd}</text>
+        );
+        // Directional arrow pointing toward goal line
+        if (yd < 50) {
+          const ay = p.y + fs * 0.15;
+          const as = fs * 0.2;
+          // Arrow points "up" (toward goal line = lower dist = higher on screen)
+          yardEls.push(
+            <polygon key={`ya-${yd}-${j}`}
+              points={`${p.x - as},${ay} ${p.x},${ay - as * 1.5} ${p.x + as},${ay}`}
+              fill="rgba(255,255,255,0.12)" />
+          );
+        }
+      });
     }
   }
 

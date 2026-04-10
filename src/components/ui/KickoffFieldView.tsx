@@ -82,8 +82,29 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
       strokeWidth={isGoal ? 2.5 : isMid ? 2 : 1} />);
     const display = fx <= 50 ? fx : 100 - fx;
     if (fx > 0 && fx < 100 && fx % 10 === 0) {
-      const p = proj(fx, 45);
-      yardLines.push(<text key={`yn-${fx}`} x={p.x} y={p.y + 2} textAnchor="middle" fontSize={11} fontWeight="800" fill="rgba(255,255,255,0.25)" letterSpacing="1">{display}</text>);
+      const topPos = proj(fx, 10);
+      const botPos = proj(fx, 43);
+      const fs = 14 + (botPos.y - TOP_Y) / (BOTTOM_Y - TOP_Y) * 4;
+      const fsTop = 10;
+      const arrowDir = fx <= 50 ? -1 : 1;
+      const arrowOffsetX = arrowDir * 12;
+      [{ p: botPos, size: fs, k: "b" }, { p: topPos, size: fsTop, k: "t" }].forEach(({ p, size, k }) => {
+        yardLines.push(
+          <text key={`yn-${fx}-${k}`} x={p.x} y={p.y + size * 0.35} textAnchor="middle" fontSize={size}
+            fontWeight="900" fill="rgba(255,255,255,0.2)" fontFamily="'Arial Black', sans-serif"
+            letterSpacing="2" stroke="rgba(255,255,255,0.06)" strokeWidth={0.5}>{display}</text>
+        );
+        if (display !== 50) {
+          const ax = p.x + arrowOffsetX * (size / 14);
+          const ay = p.y + size * 0.15;
+          const as = size * 0.25;
+          yardLines.push(
+            <polygon key={`ya-${fx}-${k}`}
+              points={`${ax - as},${ay - as} ${ax + as * arrowDir},${ay} ${ax - as},${ay + as}`}
+              fill="rgba(255,255,255,0.15)" />
+          );
+        }
+      });
     }
   }
 

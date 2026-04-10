@@ -80,7 +80,7 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
     return <polygon points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill={ezColor} opacity={0.3} />;
   })();
 
-  // Yard lines + numbers
+  // Yard lines + field numbers
   const yardLines: React.ReactNode[] = [];
   for (let fx = 0; fx <= 100; fx += 10) {
     const far = proj(fx, 0); const near = proj(fx, 53);
@@ -90,8 +90,33 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
       strokeWidth={isGoal ? 2.5 : isMid ? 2 : 1} />);
     const display = fx <= 50 ? fx : 100 - fx;
     if (fx > 0 && fx < 100 && fx % 10 === 0) {
-      const p = proj(fx, 45);
-      yardLines.push(<text key={`yn-${fx}`} x={p.x} y={p.y + 2} textAnchor="middle" fontSize={11} fontWeight="800" fill="rgba(255,255,255,0.25)" letterSpacing="1">{display}</text>);
+      // Top side numbers (between far sideline and far hash) — upside down on real field
+      const topPos = proj(fx, 10);
+      // Bottom side numbers (between near hash and near sideline)
+      const botPos = proj(fx, 43);
+      const fs = 14 + (botPos.y - TOP_Y) / (BOTTOM_Y - TOP_Y) * 4; // bigger near bottom
+      const fsTop = 10;
+      // Directional arrow: triangle pointing toward nearest end zone
+      const arrowDir = fx <= 50 ? -1 : 1; // -1 = left, 1 = right
+      const arrowOffsetX = arrowDir * 12;
+      [{ p: botPos, size: fs, k: "b" }, { p: topPos, size: fsTop, k: "t" }].forEach(({ p, size, k }) => {
+        yardLines.push(
+          <text key={`yn-${fx}-${k}`} x={p.x} y={p.y + size * 0.35} textAnchor="middle" fontSize={size}
+            fontWeight="900" fill="rgba(255,255,255,0.2)" fontFamily="'Arial Black', sans-serif"
+            letterSpacing="2" stroke="rgba(255,255,255,0.06)" strokeWidth={0.5}>{display}</text>
+        );
+        // Arrow
+        if (display !== 50) {
+          const ax = p.x + arrowOffsetX * (size / 14);
+          const ay = p.y + size * 0.15;
+          const as = size * 0.25;
+          yardLines.push(
+            <polygon key={`ya-${fx}-${k}`}
+              points={`${ax - as},${ay - as} ${ax + as * arrowDir},${ay} ${ax - as},${ay + as}`}
+              fill="rgba(255,255,255,0.15)" />
+          );
+        }
+      });
     }
   }
 
