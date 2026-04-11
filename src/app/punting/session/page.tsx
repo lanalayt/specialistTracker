@@ -35,6 +35,19 @@ function isPoochType(type: string | undefined | null): boolean {
   return type.toUpperCase().includes("POOCH");
 }
 
+// Touchback penalty: ball comes out to the 20, so net loses 20 yards vs gross
+// Also touchbacks do NOT count as inside-20 or inside-10
+function isTB(p: { touchback?: boolean; landingZones?: string[] }): boolean {
+  return !!(p.touchback || p.landingZones?.includes("TB"));
+}
+function puntNetPenalty(p: { touchback?: boolean; landingZones?: string[]; returnYards?: number }): number {
+  return isTB(p) ? 20 : (p.returnYards ?? 0);
+}
+function puntFinalSpot(p: { landingYL?: number; touchback?: boolean; landingZones?: string[]; returnYards?: number }): number {
+  if (isTB(p)) return 0; // touchback = not inside 20
+  return (p.landingYL ?? 0) - (p.returnYards ?? 0);
+}
+
 // Parse a yard-line input into an absolute field position 0..100
 // where 0 = own goal line and 100 = opponent goal line.
 //
@@ -1321,10 +1334,10 @@ export default function PuntingSessionPage() {
                           {(() => {
                             const l = parseInt(los) || 0;
                             const ly = parseInt(landingYL) || 0;
-                            const ret = parseInt(returnYardsInput) || 0;
                             const gross = Math.max(0, ly - l);
-                            const net = gross - ret;
-                            return gross > 0 ? `${net} yd` : "—";
+                            if (gross <= 0) return "—";
+                            const tbPenalty = ly >= 100 ? 20 : (parseInt(returnYardsInput) || 0);
+                            return `${gross - tbPenalty} yd`;
                           })()}
                         </span>
                       </div>
@@ -1480,16 +1493,13 @@ export default function PuntingSessionPage() {
                   const sAtt = punts.length;
                   const ydsCount = punts.filter((p) => p.yards > 0).length;
                   const totalGross = punts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
-                  const totalRet = punts.reduce((s, p) => s + (p.returnYards || 0), 0);
+                  const totalNetPenalty = punts.reduce((s, p) => s + puntNetPenalty(p), 0);
                   const avgGross = ydsCount > 0 ? (totalGross / ydsCount).toFixed(1) : "—";
-                  const avgNet = ydsCount > 0 ? ((totalGross - totalRet) / ydsCount).toFixed(1) : "—";
+                  const avgNet = ydsCount > 0 ? ((totalGross - totalNetPenalty) / ydsCount).toFixed(1) : "—";
                   const htCount = punts.filter((p) => p.hangTime > 0).length;
                   const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
-                  // Inside-20 = landing YL >= 80 (opponent 20 or closer to end zone)
-                  // Final spot = landing YL minus return yards (where the play ends)
-                  const finalSpot = (p: { landingYL?: number; returnYards?: number }) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
-                  const inside20 = punts.filter((p) => finalSpot(p) >= 80).length;
-                  const inside10 = punts.filter((p) => finalSpot(p) >= 90).length;
+                  const inside20 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
+                  const inside10 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
                   const daCount = punts.filter((p) => p.directionalAccuracy != null).length;
                   const daSum = punts.reduce((s, p) => s + (p.directionalAccuracy ?? 0), 0);
                   const dirPct = daCount > 0 ? `${Math.round((daSum / daCount) * 100)}%` : "—";
@@ -1593,14 +1603,13 @@ export default function PuntingSessionPage() {
             const all = committedPunts;
             const ydsE = all.filter((p) => p.yards > 0);
             const totalGross = ydsE.reduce((s, p) => s + p.yards, 0);
-            const totalRet = all.reduce((s, p) => s + (p.returnYards ?? 0), 0);
+            const totalNetPenalty = all.reduce((s, p) => s + puntNetPenalty(p), 0);
             const avgGross = ydsE.length > 0 ? (totalGross / ydsE.length).toFixed(1) : "—";
-            const avgNet = ydsE.length > 0 ? ((totalGross - totalRet) / ydsE.length).toFixed(1) : "—";
+            const avgNet = ydsE.length > 0 ? ((totalGross - totalNetPenalty) / ydsE.length).toFixed(1) : "—";
             const htE = all.filter((p) => p.hangTime > 0);
             const avgHangAll = htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) : "—";
-            const fSpot = (p: PuntEntry) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
-            const i20 = all.filter((p) => p.landingYL != null && fSpot(p) >= 80).length;
-            const i10 = all.filter((p) => p.landingYL != null && fSpot(p) >= 90).length;
+            const i20 = all.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
+            const i10 = all.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
             const tbCount = all.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
             const fcCount = all.filter((p) => p.fairCatch || p.landingZones?.includes("fairCatch")).length;
 
@@ -1632,17 +1641,17 @@ export default function PuntingSessionPage() {
                       const att = ap.length;
                       const yardsEntries = ap.filter((p) => p.yards > 0);
                       const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
-                      const retTotal = ap.reduce((s, p) => s + (p.returnYards ?? 0), 0);
+                      const netPenaltyTotal = ap.reduce((s, p) => s + puntNetPenalty(p), 0);
                       const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
-                      const netAvg = yardsEntries.length > 0 ? ((grossTotal - retTotal) / yardsEntries.length).toFixed(1) : "—";
+                      const netAvg = yardsEntries.length > 0 ? ((grossTotal - netPenaltyTotal) / yardsEntries.length).toFixed(1) : "—";
                       const hangEntries = ap.filter((p) => p.hangTime > 0);
                       const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                       const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
                       const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
                       const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
                       const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
-                      const apI20 = ap.filter((p) => p.landingYL != null && fSpot(p) >= 80).length;
-                      const apI10 = ap.filter((p) => p.landingYL != null && fSpot(p) >= 90).length;
+                      const apI20 = ap.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
+                      const apI10 = ap.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
                       const apTB = ap.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
                       return (
                         <div key={name} className="card-2 p-3">
