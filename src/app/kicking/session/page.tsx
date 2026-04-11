@@ -226,7 +226,7 @@ export default function KickingSessionPage() {
   const drag = useDragReorder(rows, setRows);
   const [makeMode, setMakeMode] = useState(() => loadMakeMode());
   const [missMode, setMissMode] = useState(() => loadMissMode());
-  const [scoreMode] = useState(() => loadScoreMode());
+  const [scoreMode, setScoreMode] = useState(() => loadScoreMode());
   // Score is visible when: "on" (always), "practice" (only in practice mode), "off" (never)
   const scoreEnabled = scoreMode === "on" || (scoreMode === "practice" && sessionMode !== "game");
   const [scoreOptions, setScoreOptions] = useState<string[]>(() => loadScoreOptions());
@@ -255,12 +255,16 @@ export default function KickingSessionPage() {
 
   // Load settings and draft from cloud on fresh device
   useEffect(() => {
-    loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string; scoreEnabled?: boolean; scoreOptions?: string[] }>("fgSettings").then((cloud) => {
+    loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string; scoreEnabled?: string | boolean; scoreOptions?: string[] }>("fgSettings").then((cloud) => {
       if (cloud) {
         if (cloud.snapDistance) setSnapDistance(parseInt(cloud.snapDistance) || 7);
         if (cloud.makeMode === "simple" || cloud.makeMode === "detailed") setMakeMode(cloud.makeMode);
         if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
         if (Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0) setScoreOptions(cloud.scoreOptions);
+        // Score mode
+        const se = cloud.scoreEnabled;
+        if (se === "on" || se === "practice" || se === "off") setScoreMode(se);
+        else if (se === false) setScoreMode("off");
       }
     });
     // Load draft from team data if local is empty
