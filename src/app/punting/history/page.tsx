@@ -356,6 +356,9 @@ function PuntHistoryContent() {
                     const att = ap.length;
                     const yardsEntries = ap.filter((p) => p.yards > 0);
                     const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
+                    const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
+                    const netPenalty = ap.reduce((s, p) => s + ((p.touchback || p.landingZones?.includes("TB")) ? 20 : (p.returnYards ?? 0)), 0);
+                    const avgNet = yardsEntries.length > 0 ? ((grossTotal - netPenalty) / yardsEntries.length).toFixed(1) : "—";
                     const hangEntries = ap.filter((p) => p.hangTime > 0);
                     const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                     const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
@@ -370,7 +373,8 @@ function PuntHistoryContent() {
                         <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
                         <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
                           <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
-                          <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                          <div><span className="text-muted">Gross</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                          <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{avgNet}</span></div>
                           <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                           <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
                           <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>
