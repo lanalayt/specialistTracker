@@ -63,21 +63,21 @@ interface SessionDraft {
 
 const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", result: "", score: "", starred: false });
 
-function loadDraft(): SessionDraft | null {
+function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    const raw = localStorage.getItem(`${SESSION_STORAGE_KEY}_${mode}`);
     if (raw) return JSON.parse(raw);
   } catch {}
   return null;
 }
 
-function saveDraft(draft: SessionDraft) {
+function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
   if (typeof window === "undefined") return;
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(draft));
+  localStorage.setItem(`${SESSION_STORAGE_KEY}_${mode}`, JSON.stringify(draft));
   const tid = getTeamId();
   if (tid && tid !== "local-dev") {
-    teamSet(tid, "fg_session_draft", draft);
+    teamSet(tid, `fg_session_draft_${mode}`, draft);
   }
 }
 
@@ -175,11 +175,19 @@ export default function KickingSessionPage() {
   const { isAthlete } = useAuth();
 
   // ── Initialize all state from localStorage ──────────────────
+  const [initialMode] = useState<"practice" | "game">(() => {
+    // Check if game mode has active data
+    const gameDraft = loadDraftForMode("game");
+    if ((gameDraft?.sessionKicks?.length ?? 0) > 0 || gameDraft?.sessionActive || gameDraft?.committed) {
+      return "game";
+    }
+    return "practice";
+  });
   const [draft] = useState<SessionDraft>(() => {
-    const saved = loadDraft();
+    const saved = loadDraftForMode(initialMode);
     return saved ?? {
       rows: Array.from({ length: INIT_ROWS }, emptyRow),
-      manualEntry: false,
+      manualEntry: initialMode === "game",
       sessionActive: false,
       plannedKicks: [],
       plannedRowIndices: [],
@@ -207,13 +215,7 @@ export default function KickingSessionPage() {
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedKicks, setCommittedKicks] = useState<FGKick[]>(draft.committedKicks ?? []);
-  const [sessionMode, setSessionMode] = useState<"practice" | "game">(() => {
-    // Preserve game mode if there's active data from a game session
-    if ((draft.sessionKicks?.length > 0 || draft.sessionActive || draft.committed) && draft.sessionMode === "game") {
-      return "game";
-    }
-    return "practice";
-  });
+  const [sessionMode, setSessionMode] = useState<"practice" | "game">(initialMode);
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
@@ -237,7 +239,7 @@ export default function KickingSessionPage() {
   const lastLocalSave = useRef(0);
 
   // Poll for draft changes from other devices
-  useTeamDraftSync<SessionDraft>("fg_session_draft", (cloudDraft) => {
+  useTeamDraftSync<SessionDraft>(`fg_session_draft_${sessionMode}`, (cloudDraft) => {
     if (Date.now() - lastLocalSave.current < 8000) return;
     if (cloudDraft && cloudDraft.rows) {
       setRows(cloudDraft.rows);
@@ -270,9 +272,9 @@ export default function KickingSessionPage() {
     // Load draft from team data if local is empty
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamGet<SessionDraft>(tid, "fg_session_draft").then((cloudDraft) => {
+      teamGet<SessionDraft>(tid, `fg_session_draft_${sessionMode}`).then((cloudDraft) => {
         if (cloudDraft && cloudDraft.rows) {
-          const localDraft = loadDraft();
+          const localDraft = loadDraftForMode(sessionMode);
           const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.dist || r.pos);
           // Use cloud draft if local is empty or cloud has active session
           if (!localHasData || cloudDraft.sessionActive) {
@@ -298,7 +300,7 @@ export default function KickingSessionPage() {
     const mergedPartials = sessionActive && !isPlannedLogged(currentKickIdx)
       ? { ...partialInputs, [currentKickIdx]: { result, score, starred } }
       : partialInputs;
-    saveDraft({
+    saveDraftForMode({
       rows,
       manualEntry,
       sessionActive,
@@ -313,8 +315,45 @@ export default function KickingSessionPage() {
       sessionMode,
       opponent,
       gameTime,
-    });
+    }, sessionMode);
   }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, partialInputs, result, score, starred, committed, committedKicks, weather, sessionMode, opponent, gameTime]);
+
+  // ── Switch between practice / game mode with independent drafts ──
+  const switchMode = (newMode: "practice" | "game") => {
+    if (newMode === sessionMode) return;
+    // Save current state to current mode's draft
+    const mergedPartials = sessionActive
+      ? { ...partialInputs, [currentKickIdx]: { result, score, starred } }
+      : partialInputs;
+    const currentDraft: SessionDraft = {
+      rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices,
+      currentKickIdx, sessionKicks, partialInputs: mergedPartials,
+      committed, committedWeather: committed ? weather : undefined,
+      committedKicks: committed ? committedKicks : undefined,
+      sessionMode, opponent, gameTime,
+    };
+    saveDraftForMode(currentDraft, sessionMode);
+    // Load new mode's draft
+    const nd = loadDraftForMode(newMode);
+    setRows(nd?.rows ?? Array.from({ length: INIT_ROWS }, emptyRow));
+    setManualEntry(nd?.manualEntry ?? (newMode === "game"));
+    setSessionActive(nd?.sessionActive ?? false);
+    setPlannedKicks(nd?.plannedKicks ?? []);
+    setPlannedRowIndices(nd?.plannedRowIndices ?? []);
+    setCurrentKickIdx(nd?.currentKickIdx ?? 0);
+    setSessionKicks(nd?.sessionKicks ?? []);
+    setPartialInputs(nd?.partialInputs ?? {});
+    setResult(nd?.partialInputs?.[nd?.currentKickIdx ?? 0]?.result ?? null);
+    setScore(nd?.partialInputs?.[nd?.currentKickIdx ?? 0]?.score ?? 0);
+    setStarred(nd?.partialInputs?.[nd?.currentKickIdx ?? 0]?.starred ?? false);
+    setPendingKicks(null);
+    setCommitted(nd?.committed ?? false);
+    setCommittedKicks(nd?.committedKicks ?? []);
+    setOpponent(nd?.opponent ?? "");
+    setGameTime(nd?.gameTime ?? "");
+    setWeather(nd?.committedWeather ?? "");
+    setSessionMode(newMode);
+  };
 
   // ── Kick numbering helpers (track by planned position) ──────
   const loggedKickNums = new Set(sessionKicks.map(k => k.kickNum));
@@ -1538,7 +1577,7 @@ export default function KickingSessionPage() {
               <div className="flex items-center gap-3">
                 <div className="flex rounded-input border border-border overflow-hidden">
                   <button
-                    onClick={() => setSessionMode("practice")}
+                    onClick={() => switchMode("practice")}
                     className={clsx(
                       "px-3 py-1.5 text-xs font-semibold transition-colors",
                       sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
@@ -1547,7 +1586,7 @@ export default function KickingSessionPage() {
                     Practice
                   </button>
                   <button
-                    onClick={() => setSessionMode("game")}
+                    onClick={() => switchMode("game")}
                     className={clsx(
                       "px-3 py-1.5 text-xs font-semibold transition-colors border-l border-border",
                       sessionMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
