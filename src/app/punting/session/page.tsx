@@ -1903,8 +1903,8 @@ export default function PuntingSessionPage() {
           </div>
 
           {/* Scrollable table */}
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <table className="w-full border-collapse text-xs">
+          <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0">
+            <table className="w-full border-collapse text-xs" style={{ minWidth: manualEntry && sessionMode === "game" ? 700 : undefined }}>
               <thead>
                 <tr className="sticky top-0 z-10">
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">
@@ -1921,30 +1921,30 @@ export default function PuntingSessionPage() {
                   </th>
                   {manualEntry && sessionMode === "game" && (
                     <>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]" title="LOS yard line. Use -X for own side, +X for opponent side">LOS ±</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]" title="Landing yard line. Use -X for own side, +X for opponent side">Land YL ±</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Hang Time</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Op Time</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Fair Catch">FC</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-16 border-b border-red-500/40 text-[11px]" title="LOS yard line">LOS</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-16 border-b border-red-500/40 text-[11px]" title="Landing yard line">Land</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-red-500/40 text-[11px]">HT</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-red-500/40 text-[11px]">OT</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-14 border-b border-red-500/40 text-[11px]">Ret</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-10 border-b border-red-500/40 text-[11px]" title="Fair Catch">FC</th>
                       {dirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
                     </>
                   )}
                   {manualEntry && sessionMode !== "game" && (
                     <>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1.5 text-center w-16 border-b border-border text-[11px]">
                         Yards
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
-                        Hang Time
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-border text-[11px]">
+                        HT
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
-                        Punter Opp
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-border text-[11px]">
+                        OT
                       </th>
                       {dirEnabled && (
-                        <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-[4.5rem] border-b border-border text-[10px]">
-                          Dir. Score
+                        <th className="bg-surface-2 text-muted font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-border text-[11px]">
+                          Dir
                         </th>
                       )}
                     </>
@@ -2095,7 +2095,7 @@ export default function PuntingSessionPage() {
                                   updateRow(idx, "hangTime", digits ? formatAutoDecimal(digits) : "");
                                 }}
                                 readOnly={isAthlete || isSaved}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                className={clsx("w-full bg-transparent border rounded px-1.5 py-2 text-sm text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
                             <td className="py-1 px-1">
@@ -2107,7 +2107,7 @@ export default function PuntingSessionPage() {
                                   updateRow(idx, "opTime", digits ? formatAutoDecimal(digits) : "");
                                 }}
                                 readOnly={isAthlete || isSaved}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                className={clsx("w-full bg-transparent border rounded px-1.5 py-2 text-sm text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
                             <td className="py-1 px-1">
@@ -2116,7 +2116,7 @@ export default function PuntingSessionPage() {
                                 value={row.returnYards ?? ""}
                                 onChange={(e) => updateRow(idx, "returnYards", e.target.value)}
                                 readOnly={isAthlete || isSaved || !!row.fairCatch || !!row.touchback}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : (row.fairCatch || row.touchback) ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                className={clsx("w-full bg-transparent border rounded px-1.5 py-2 text-sm text-center focus:outline-none", isSaved ? "border-make/30 text-make" : (row.fairCatch || row.touchback) ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
                             <td className="py-1 px-1 text-center">
