@@ -1984,38 +1984,53 @@ export default function PuntingSessionPage() {
                         const isSaved = sessionPunts.some((p) => p.kickNum === kickNum);
                         return (
                           <>
-                            <td className="py-1 px-1">
-                              <input
-                                type="text" inputMode="text" placeholder="-20"
-                                value={row.los ?? ""}
-                                onChange={(e) => updateRow(idx, "los", e.target.value)}
-                                readOnly={isAthlete || isSaved}
-                                title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
-                              />
-                            </td>
-                            <td className="py-1 px-1">
-                              <input
-                                type="text" inputMode="text" placeholder="25"
-                                value={row.landingYL ?? ""}
-                                onChange={(e) => {
-                                  updateRow(idx, "landingYL", e.target.value);
-                                  // Auto-detect touchback: "0" on opponent side = end zone
-                                  const val = e.target.value.trim();
-                                  const parsed = parseYardLine(val, "+");
-                                  if (!isNaN(parsed) && parsed >= 100) {
-                                    updateRow(idx, "touchback", true);
-                                    updateRow(idx, "returnYards", "");
-                                    updateRow(idx, "fairCatch", false);
-                                  } else if (row.touchback) {
-                                    updateRow(idx, "touchback", false);
-                                  }
-                                }}
-                                readOnly={isAthlete || isSaved}
-                                title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
-                              />
-                            </td>
+                            {isSaved ? (
+                              <td colSpan={2} className="py-1 px-1 relative">
+                                <div className="flex items-center justify-center relative">
+                                  <span className="text-[9px] text-make/30 absolute left-1">{row.los ?? ""}</span>
+                                  <span className="text-sm font-bold text-make">{(() => {
+                                    const l = parseYardLine(row.los, "-");
+                                    const ly = parseYardLine(row.landingYL, "+");
+                                    return !isNaN(l) && !isNaN(ly) ? `${Math.max(0, ly - l)} yd` : "—";
+                                  })()}</span>
+                                  <span className="text-[9px] text-make/30 absolute right-1">{row.landingYL ?? ""}</span>
+                                </div>
+                              </td>
+                            ) : (
+                              <>
+                                <td className="py-1 px-1">
+                                  <input
+                                    type="text" inputMode="text" placeholder="-20"
+                                    value={row.los ?? ""}
+                                    onChange={(e) => updateRow(idx, "los", e.target.value)}
+                                    readOnly={isAthlete}
+                                    title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
+                                    className="w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60"
+                                  />
+                                </td>
+                                <td className="py-1 px-1">
+                                  <input
+                                    type="text" inputMode="text" placeholder="25"
+                                    value={row.landingYL ?? ""}
+                                    onChange={(e) => {
+                                      updateRow(idx, "landingYL", e.target.value);
+                                      const val = e.target.value.trim();
+                                      const parsed = parseYardLine(val, "+");
+                                      if (!isNaN(parsed) && parsed >= 100) {
+                                        updateRow(idx, "touchback", true);
+                                        updateRow(idx, "returnYards", "");
+                                        updateRow(idx, "fairCatch", false);
+                                      } else if (row.touchback) {
+                                        updateRow(idx, "touchback", false);
+                                      }
+                                    }}
+                                    readOnly={isAthlete}
+                                    title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
+                                    className="w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60"
+                                  />
+                                </td>
+                              </>
+                            )}
                             <td className="py-1 px-1">
                               <input
                                 type="text" inputMode="numeric" placeholder="sec"
@@ -2078,10 +2093,10 @@ export default function PuntingSessionPage() {
                               {isSaved ? (
                                 <button
                                   onClick={() => handleUnsaveGameRow(idx)}
-                                  className="text-[10px] px-1 text-make/60 hover:text-miss transition-colors"
-                                  title="Unsave this punt"
+                                  className="text-[10px] px-2 py-1 rounded border border-make/40 text-make/70 hover:text-accent hover:border-accent/50 transition-colors font-semibold"
+                                  title="Edit this punt"
                                 >
-                                  ✓ Saved
+                                  Edit
                                 </button>
                               ) : (
                                 <button
