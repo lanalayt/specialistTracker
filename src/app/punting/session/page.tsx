@@ -537,10 +537,11 @@ export default function PuntingSessionPage() {
     }
     const gross = Math.max(0, landingYLVal - losVal);
     const htVal = parseFloat(r.hangTime) || 0;
+    const otVal = parseFloat(r.opTime) || 0;
     const retVal = r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined;
     const daVal = r.directionalAccuracy !== "" && r.directionalAccuracy != null ? (parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1) : 1;
     // Auto-detect touchback: landing YL of 0 = into the end zone = touchback
-    const isTouchback = r.touchback || landingYLVal >= 100;
+    const isTouchback = landingYLVal >= 100;
     // Filled index (position among filled rows)
     const filledIdx = filledIndices.indexOf(rowIdx);
     const kickNum = filledIdx >= 0 ? filledIdx + 1 : sessionPunts.length + 1;
@@ -549,7 +550,7 @@ export default function PuntingSessionPage() {
     if (isTouchback) zones.push("TB");
     else if (r.fairCatch) zones.push("fairCatch");
     // Outlier check
-    const warnings = checkPuntOutliers(gross, htVal, 0);
+    const warnings = checkPuntOutliers(gross, htVal, otVal);
     if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
 
     const punt: PuntEntry = {
@@ -559,7 +560,7 @@ export default function PuntingSessionPage() {
       hash: r.hash as PuntHash,
       yards: gross,
       hangTime: htVal,
-      opTime: 0,
+      opTime: otVal,
       landingZones: zones,
       directionalAccuracy: daVal,
       kickNum,
@@ -1868,8 +1869,8 @@ export default function PuntingSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]" title="LOS yard line. Use -X for own side, +X for opponent side">LOS ±</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]" title="Landing yard line. Use -X for own side, +X for opponent side">Land YL ±</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Hang Time</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Op Time</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Touchback">TB</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Fair Catch">FC</th>
                       {dirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
@@ -2029,27 +2030,23 @@ export default function PuntingSessionPage() {
                             </td>
                             <td className="py-1 px-1">
                               <input
+                                type="text" inputMode="decimal" placeholder="sec"
+                                value={row.opTime}
+                                onChange={(e) => {
+                                  const digits = e.target.value.replace(/\D/g, "");
+                                  updateRow(idx, "opTime", digits ? formatAutoDecimal(digits) : "");
+                                }}
+                                readOnly={isAthlete || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <input
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
                                 value={row.returnYards ?? ""}
                                 onChange={(e) => updateRow(idx, "returnYards", e.target.value)}
                                 readOnly={isAthlete || isSaved || !!row.fairCatch || !!row.touchback}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : (row.fairCatch || row.touchback) ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
-                              />
-                            </td>
-                            <td className="py-1 px-1 text-center">
-                              <input
-                                type="checkbox"
-                                checked={!!row.touchback}
-                                disabled={isAthlete || isSaved}
-                                onChange={(e) => {
-                                  updateRow(idx, "touchback", e.target.checked);
-                                  if (e.target.checked) {
-                                    updateRow(idx, "returnYards", "");
-                                    updateRow(idx, "fairCatch", false);
-                                  }
-                                }}
-                                title="Touchback"
-                                className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="py-1 px-1 text-center">
