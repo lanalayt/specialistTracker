@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase";
 import { setTeamId, getTeamId, teamGet, teamSet } from "@/lib/teamData";
 import { loadAndApplyTheme, applyTheme, type ThemeColors } from "@/lib/themeColors";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
+import { TutorialProvider } from "@/components/ui/Tutorial";
 import type { AuthUser, UserRole } from "@/types";
 
 function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
@@ -144,7 +145,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         setDemoRole,
       }}
     >
-      {children}
+      <TutorialProvider>
+        {children}
+      </TutorialProvider>
     </AuthContext.Provider>
   );
 }

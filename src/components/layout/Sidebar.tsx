@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTeamLogo } from "@/lib/useTeamLogo";
+import { useTutorial } from "@/components/ui/Tutorial";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 
@@ -28,6 +29,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, isCoach, signOut, setDemoRole } = useAuth();
   const { logo, uploadLogo } = useTeamLogo();
+  const { show: showTutorial } = useTutorial();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isActive = (href: string) =>
@@ -125,9 +127,19 @@ export function Sidebar() {
         )}
       </nav>
 
+      {/* Tutorial */}
+      <div className="px-3 pb-1">
+        <button
+          onClick={showTutorial}
+          className="nav-link w-full text-left"
+        >
+          <span className="text-base leading-none">&#x1F393;</span>
+          Tutorial
+        </button>
+      </div>
+
       {/* User info */}
       <div className="p-3 border-t border-border space-y-2">
-        {/* User info */}
         <div className="flex items-center gap-2 px-1">
           <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent text-xs font-bold flex-shrink-0">
             {user?.name?.[0]?.toUpperCase() ?? "?"}

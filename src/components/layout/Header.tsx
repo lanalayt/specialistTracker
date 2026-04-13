@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTeamLogo } from "@/lib/useTeamLogo";
+import { useTutorial } from "@/components/ui/Tutorial";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 
@@ -32,6 +33,7 @@ export function Header({ title }: { title?: string }) {
   const pathname = usePathname();
   const { user, isCoach, signOut } = useAuth();
   const { logo, uploadLogo } = useTeamLogo();
+  const { show: showTutorial } = useTutorial();
   const fileRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -195,6 +197,13 @@ export function Header({ title }: { title?: string }) {
                   {item.label}
                 </Link>
               ))}
+              <button
+                onClick={() => { setMenuOpen(false); showTutorial(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium text-slate-200 hover:bg-surface-2 transition-colors w-full text-left"
+              >
+                <span className="text-lg leading-none">&#x1F393;</span>
+                Tutorial
+              </button>
             </nav>
             <div className="border-t border-border p-3 flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent text-sm font-bold">
