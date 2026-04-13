@@ -9,13 +9,13 @@ import { useTutorial } from "@/components/ui/Tutorial";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 
-const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode; disabled?: boolean }[] = [
+const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode; disabled?: boolean; tutorialId?: string }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "⚡" },
-  { href: "/kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={20} /> },
-  { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
-  { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
+  { href: "/kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={20} />, tutorialId: "nav-kicking" },
+  { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} />, tutorialId: "nav-punting" },
+  { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} />, tutorialId: "nav-kickoff" },
   { href: "#", label: "Long Snap", icon: "📏", disabled: true },
-  { href: "/analytics", label: "Analytics", icon: "📊" },
+  { href: "/analytics", label: "Analytics", icon: "📊", tutorialId: "nav-analytics" },
   { href: "/archives", label: "Archived Stats", icon: "🗄" },
 ];
 
@@ -99,6 +99,7 @@ export function Sidebar() {
               className={clsx(
                 isActive(item.href) ? "nav-link-active" : "nav-link"
               )}
+              {...(item.tutorialId ? { "data-tutorial": item.tutorialId } : {})}
             >
               {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
               {item.label}

@@ -1575,7 +1575,7 @@ export default function KickingSessionPage() {
               sessionMode === "game" ? "bg-red-500/10 border-red-500/40" : "border-border"
             )}>
               <div className="flex items-center gap-3">
-                <div className="flex rounded-input border border-border overflow-hidden">
+                <div className="flex rounded-input border border-border overflow-hidden" data-tutorial="mode-toggle">
                   <button
                     onClick={() => switchMode("practice")}
                     className={clsx(
@@ -1595,7 +1595,7 @@ export default function KickingSessionPage() {
                     GAME
                   </button>
                 </div>
-                <div className="flex rounded-input border border-border overflow-hidden">
+                <div className="flex rounded-input border border-border overflow-hidden" data-tutorial="entry-mode-toggle">
                   <button
                     onClick={() => { if (sessionMode !== "game") setManualEntry(false); }}
                     className={clsx(
@@ -1663,7 +1663,7 @@ export default function KickingSessionPage() {
           </div>
 
           {/* Scrollable table */}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 overflow-y-auto min-h-0" data-tutorial="session-table">
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="sticky top-0 z-10">
@@ -1997,7 +1997,7 @@ export default function KickingSessionPage() {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-border p-3 flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="border-t border-border p-3 flex items-center gap-2 shrink-0 flex-wrap" data-tutorial="start-session">
             <span className="text-xs text-muted flex-1">
               {filledCount === 0
                 ? "0 kicks entered"

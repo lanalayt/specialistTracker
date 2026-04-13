@@ -26,7 +26,7 @@ export function SportSubNav({ basePath, extraTabs }: SportSubNavProps) {
   const pathname = usePathname();
 
   return (
-    <div className="sticky top-14 z-20 bg-surface border-b border-border overflow-x-auto shrink-0">
+    <div className="sticky top-14 z-20 bg-surface border-b border-border overflow-x-auto shrink-0" data-tutorial="sport-subnav">
       <div className="flex">
         {visibleTabs.map((tab) => {
           const href = `${basePath}/${tab.slug}`;
@@ -35,6 +35,7 @@ export function SportSubNav({ basePath, extraTabs }: SportSubNavProps) {
             <Link
               key={tab.slug}
               href={href}
+              data-tutorial={`subnav-${tab.slug}`}
               className={clsx(
                 "px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px",
                 isActive
