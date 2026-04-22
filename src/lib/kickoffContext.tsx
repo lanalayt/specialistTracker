@@ -10,6 +10,7 @@ import { cloudGet } from "@/lib/supabaseData";
 import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import { mergeHistory } from "@/lib/mergeHistory";
+import { verifyCloudWrite } from "@/lib/integritySync";
 import { useAuth } from "@/lib/auth";
 
 interface KickoffStateData {
@@ -112,7 +113,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
         if (!stats[a]) stats[a] = emptyKickoffStats();
       });
       const merged = { ...remote, athletes, stats, history: mergedHistory, snapshot: prev.snapshot };
-      localSet("KICKOFF", merged);
+      localSet("KICKOFF", merged, true); // skipCloud — don't write remote data back to user_data
       return merged;
     });
   });
@@ -165,6 +166,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       if (tid && tid !== "local-dev") {
         // Critical: committed session must reach cloud immediately, not debounced
         teamSetImmediate(tid, "kickoff_data", next);
+        verifyCloudWrite("kickoff_data", session.id, next);
       }
       return next;
     });

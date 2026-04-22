@@ -7,6 +7,7 @@ import { setTeamId, getTeamId, teamGet, teamSet } from "@/lib/teamData";
 import { loadAndApplyTheme, applyTheme, type ThemeColors } from "@/lib/themeColors";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import { TutorialProvider } from "@/components/ui/Tutorial";
+import { runIntegritySync } from "@/lib/integritySync";
 import type { AuthUser, UserRole } from "@/types";
 
 function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
@@ -30,6 +31,30 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadAndApplyTheme();
   }, [user?.id]);
+
+  // Integrity sync: ensure localStorage sessions reach Supabase.
+  // Runs on load (after a delay for team ID to settle) and every 60s.
+  useEffect(() => {
+    if (!user || user.id === "local-dev") return;
+    const initialTimeout = setTimeout(() => {
+      runIntegritySync();
+    }, 5000); // Wait 5s for everything to settle
+    const interval = setInterval(() => {
+      runIntegritySync();
+    }, 60000); // Every 60s
+    // Also run when tab becomes visible (returning from background)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        setTimeout(runIntegritySync, 2000);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live-sync theme across devices
   useTeamDataSync<ThemeColors>("theme_colors", (remote) => {

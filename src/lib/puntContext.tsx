@@ -20,6 +20,7 @@ import { cloudGet } from "@/lib/supabaseData";
 import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import { mergeHistory } from "@/lib/mergeHistory";
+import { verifyCloudWrite } from "@/lib/integritySync";
 import { useAuth } from "@/lib/auth";
 
 interface PuntStateData {
@@ -141,7 +142,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
         }
       });
       const merged = { ...remote, athletes, stats, history: mergedHistory, snapshot: prev.snapshot };
-      localSet("PUNT", merged);
+      localSet("PUNT", merged, true); // skipCloud — don't write remote data back to user_data
       return merged;
     });
   });
@@ -202,6 +203,8 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
       if (tid && tid !== "local-dev") {
         // Critical: committed session must reach cloud immediately, not debounced
         teamSetImmediate(tid, "punt_data", next);
+        // Safety net: verify the write made it to the cloud
+        verifyCloudWrite("punt_data", session.id, next);
       }
       return next;
     });

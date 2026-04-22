@@ -42,7 +42,12 @@ export function localGet<T>(key: keyof typeof STORAGE_KEYS): T | null {
   }
 }
 
-export function localSet<T>(key: keyof typeof STORAGE_KEYS, data: T): void {
+/**
+ * Write to localStorage. Also syncs to user_data (Supabase) unless
+ * `skipCloud` is true. Pass skipCloud=true when the write originates
+ * from a remote sync to avoid writing stale data back to the cloud.
+ */
+export function localSet<T>(key: keyof typeof STORAGE_KEYS, data: T, skipCloud = false): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEYS[key], JSON.stringify(data));
@@ -50,8 +55,9 @@ export function localSet<T>(key: keyof typeof STORAGE_KEYS, data: T): void {
     console.warn("[Storage] Could not write to localStorage");
   }
 
-  // Also sync to Supabase in the background (debounced)
-  if (_currentUserId && _currentUserId !== "local-dev") {
+  // Also sync to Supabase user_data in the background (debounced)
+  // Skip when data comes FROM a remote sync to avoid writing stale data back
+  if (!skipCloud && _currentUserId && _currentUserId !== "local-dev") {
     cloudSet(_currentUserId, CLOUD_KEYS[key], data);
   }
 }

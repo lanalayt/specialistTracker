@@ -10,6 +10,7 @@ import { cloudGet } from "@/lib/supabaseData";
 import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import { mergeHistory } from "@/lib/mergeHistory";
+import { verifyCloudWrite } from "@/lib/integritySync";
 import { useAuth } from "@/lib/auth";
 
 interface LongSnapStateData {
@@ -106,7 +107,7 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
         else if (stats[a].overall.excellent === undefined) stats[a] = emptyLongSnapStats();
       });
       const merged = { ...remote, athletes, stats, history: mergedHistory, snapshot: prev.snapshot };
-      localSet("LONGSNAP", merged);
+      localSet("LONGSNAP", merged, true); // skipCloud — don't write remote data back to user_data
       return merged;
     });
   });
@@ -123,7 +124,11 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
       entries.forEach((e) => { newStats = processLongSnap(e, newStats); });
       const next = { ...prev, stats: newStats, history: [...prev.history, session], snapshot };
       localSet("LONGSNAP", next);
-      const _tid = getTeamId(); if (_tid && _tid !== "local-dev") teamSet(_tid, "longsnap_data", next);
+      const _tid = getTeamId();
+      if (_tid && _tid !== "local-dev") {
+        teamSet(_tid, "longsnap_data", next);
+        verifyCloudWrite("longsnap_data", session.id, next);
+      }
       return next;
     });
     return session;
