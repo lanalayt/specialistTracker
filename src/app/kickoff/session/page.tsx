@@ -1671,9 +1671,12 @@ export default function KickoffSessionPage() {
                           </td>
                           <td className="py-1 px-1">
                             <input
-                              type="text" inputMode="decimal" placeholder="sec"
+                              type="text" inputMode="numeric" placeholder="sec"
                               value={row.hangTime}
-                              onChange={(e) => updateRow(idx, "hangTime", e.target.value)}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, "");
+                                updateRow(idx, "hangTime", digits ? formatAutoDecimal(digits) : "");
+                              }}
                               readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
