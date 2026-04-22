@@ -141,7 +141,7 @@ export function Sidebar() {
 
       {/* User info */}
       <div className="p-3 border-t border-border space-y-2">
-        <div className="flex items-center gap-2 px-1">
+        <Link href="/profile" className="flex items-center gap-2 px-1 rounded-input hover:bg-surface-2 py-1 -my-1 transition-colors">
           <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent text-xs font-bold flex-shrink-0">
             {user?.name?.[0]?.toUpperCase() ?? "?"}
           </div>
@@ -151,7 +151,7 @@ export function Sidebar() {
             </p>
             <p className="text-[10px] text-muted capitalize">{user?.role}</p>
           </div>
-        </div>
+        </Link>
       </div>
     </aside>
   );
