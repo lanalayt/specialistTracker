@@ -101,6 +101,13 @@ const DEFAULT_KO_DIRS = [
   { id: "OB", label: "OB" },
 ];
 
+const FIELD_KO_DIRS = [
+  { id: "SL-NUM", label: "Sideline-Numbers" },
+  { id: "NUM-HASH", label: "Numbers-Hash" },
+  { id: "TO_FIELD", label: "To The Field" },
+  { id: "OB", label: "OB" },
+];
+
 // Parse a yard-line input ("-20", "+25", "50") into 0..100 field position
 function parseYardLine(input: string | undefined | null): number {
   if (input == null) return NaN;
@@ -114,19 +121,22 @@ function parseYardLine(input: string | undefined | null): number {
   return sign === "-" ? n : 100 - n;
 }
 
-function loadKickoffSettings(): { types: { id: string; label: string }[]; directions: { id: string; label: string }[] } {
-  if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS };
+function loadKickoffSettings(): { types: { id: string; label: string }[]; directions: { id: string; label: string }[]; directionMode: "numeric" | "field" } {
+  if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric" };
   try {
     const raw = localStorage.getItem("kickoffSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
+      const mode = parsed.directionMode === "field" ? "field" as const : "numeric" as const;
+      const defaultDirs = mode === "field" ? FIELD_KO_DIRS : DEFAULT_KO_DIRS;
       return {
         types: parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES,
-        directions: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : DEFAULT_KO_DIRS,
+        directions: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : defaultDirs,
+        directionMode: mode,
       };
     }
   } catch {}
-  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS };
+  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric" };
 }
 
 // Legacy labels for old data

@@ -23,16 +23,23 @@ const LEGACY_TYPE_LABELS: Record<string, string> = {
   FREE: "Free",
 };
 
-function loadKoTypes(): { id: string; label: string }[] {
-  if (typeof window === "undefined") return DEFAULT_KO_TYPES;
+type DirectionMode = "numeric" | "field";
+
+function loadKoSettings(): { types: { id: string; label: string }[]; dirMode: DirectionMode; directions: { id: string; label: string }[] } {
+  const defaults = { types: DEFAULT_KO_TYPES, dirMode: "numeric" as DirectionMode, directions: [{ id: "1", label: "1.0" }, { id: "0.5", label: "0.5" }, { id: "OB", label: "OB" }] };
+  if (typeof window === "undefined") return defaults;
   try {
     const raw = localStorage.getItem("kickoffSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.kickoffTypes?.length > 0) return parsed.kickoffTypes;
+      return {
+        types: parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : defaults.types,
+        dirMode: parsed.directionMode === "field" ? "field" : "numeric",
+        directions: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : defaults.directions,
+      };
     }
   } catch {}
-  return DEFAULT_KO_TYPES;
+  return defaults;
 }
 
 function dirToNum(d: string): number | null {
@@ -51,14 +58,20 @@ interface AthleteKOStats {
   dirSum: number;
   dirAtt: number;
   endzones: number;
+  /** Count per direction id (for field-based breakdown) */
+  dirCounts: Record<string, number>;
 }
 
 function emptyStats(): AthleteKOStats {
-  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0 };
+  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, dirCounts: {} };
 }
 
 function addEntry(s: AthleteKOStats, e: KickoffEntry): AthleteKOStats {
   const dir = dirToNum(e.direction);
+  const dirCounts = { ...s.dirCounts };
+  if (e.direction) {
+    dirCounts[e.direction] = (dirCounts[e.direction] || 0) + 1;
+  }
   return {
     att: s.att + 1,
     totalDist: s.totalDist + (e.distance > 0 ? e.distance : 0),
@@ -68,11 +81,8 @@ function addEntry(s: AthleteKOStats, e: KickoffEntry): AthleteKOStats {
     dirSum: s.dirSum + (dir != null ? dir : 0),
     dirAtt: s.dirAtt + (dir != null ? 1 : 0),
     endzones: s.endzones + (e.endzone ? 1 : 0),
+    dirCounts,
   };
-}
-
-function ezPct(s: AthleteKOStats): string {
-  return s.att > 0 ? `${Math.round((s.endzones / s.att) * 100)}%` : "—";
 }
 
 function avgDist(s: AthleteKOStats): string {
@@ -87,39 +97,68 @@ function dirPct(s: AthleteKOStats): string {
   return s.dirAtt > 0 ? `${Math.round((s.dirSum / s.dirAtt) * 100)}%` : "—";
 }
 
-function StatTable({ athletes, statsMap }: { athletes: string[]; statsMap: Record<string, AthleteKOStats> }) {
+function ezPct(s: AthleteKOStats): string {
+  return s.att > 0 ? `${Math.round((s.endzones / s.att) * 100)}%` : "—";
+}
+
+function StatTable({ athletes, statsMap, dirMode, dirOptions }: {
+  athletes: string[];
+  statsMap: Record<string, AthleteKOStats>;
+  dirMode: DirectionMode;
+  dirOptions: { id: string; label: string }[];
+}) {
   const visible = athletes.filter((a) => (statsMap[a]?.att ?? 0) > 0);
   if (visible.length === 0) {
     return <p className="text-xs text-muted p-2">No data.</p>;
   }
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr>
-          <th className="table-header text-left">Athlete</th>
-          <th className="table-header">KOs</th>
-          <th className="table-header">Dist</th>
-          <th className="table-header">Hang</th>
-          <th className="table-header">EZ %</th>
-          <th className="table-header">Dir %</th>
-        </tr>
-      </thead>
-      <tbody>
-        {visible.map((a) => {
-          const s = statsMap[a];
-          return (
-            <tr key={a} className="hover:bg-surface/30">
-              <td className="table-name">{a}</td>
-              <td className="table-cell">{s.att}</td>
-              <td className="table-cell">{avgDist(s)}</td>
-              <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>
-              <td className="table-cell text-make font-semibold">{ezPct(s)}</td>
-              <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr>
+            <th className="table-header text-left">Athlete</th>
+            <th className="table-header">KOs</th>
+            <th className="table-header">Dist</th>
+            <th className="table-header">Hang</th>
+            <th className="table-header">EZ %</th>
+            {dirMode === "numeric" ? (
+              <th className="table-header">Dir %</th>
+            ) : (
+              dirOptions.map((d) => (
+                <th key={d.id} className="table-header text-[10px]">{d.label}</th>
+              ))
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((a) => {
+            const s = statsMap[a];
+            return (
+              <tr key={a} className="hover:bg-surface/30">
+                <td className="table-name">{a}</td>
+                <td className="table-cell">{s.att}</td>
+                <td className="table-cell">{avgDist(s)}</td>
+                <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>
+                <td className="table-cell text-make font-semibold">{ezPct(s)}</td>
+                {dirMode === "numeric" ? (
+                  <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
+                ) : (
+                  dirOptions.map((d) => {
+                    const count = s.dirCounts[d.id] || 0;
+                    const pct = s.att > 0 ? Math.round((count / s.att) * 100) : 0;
+                    return (
+                      <td key={d.id} className="table-cell text-accent">
+                        {s.att > 0 ? `${pct}%` : "—"}
+                      </td>
+                    );
+                  })
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -154,16 +193,22 @@ function CollapsibleSection({
 export default function KickoffStatisticsPage() {
   const { athletes, history } = useKickoff();
   const dateFilter = useDateRangeFilter();
-  const [koTypes, setKoTypes] = useState(() => loadKoTypes());
+  const [koSettings, setKoSettings] = useState(() => loadKoSettings());
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
 
   useEffect(() => {
     import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
-      loadSettingsFromCloud<{ kickoffTypes?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
-        if (cloud?.kickoffTypes?.length) setKoTypes(cloud.kickoffTypes);
+      loadSettingsFromCloud<{ kickoffTypes?: { id: string; label: string }[]; directionMode?: string; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
+        if (cloud) {
+          setKoSettings({
+            types: cloud.kickoffTypes?.length ? cloud.kickoffTypes : koSettings.types,
+            dirMode: cloud.directionMode === "field" ? "field" : "numeric",
+            directions: cloud.directionMetrics?.length ? cloud.directionMetrics : koSettings.directions,
+          });
+        }
       });
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const modeHistory = useMemo(() => {
     return history.filter((s) => gameMode === "game" ? s.mode === "game" : s.mode !== "game");
@@ -205,7 +250,7 @@ export default function KickoffStatisticsPage() {
   }, [athletes, filteredHistory]);
 
   const typeLabel = (id: string): string => {
-    const custom = koTypes.find((t) => t.id === id);
+    const custom = koSettings.types.find((t) => t.id === id);
     if (custom) return custom.label;
     return LEGACY_TYPE_LABELS[id] ?? id;
   };
@@ -250,13 +295,23 @@ export default function KickoffStatisticsPage() {
   const totalDist = Object.values(overallStats).reduce((s, a) => s + a.totalDist, 0);
   const totalHangAtt = Object.values(overallStats).reduce((s, a) => s + a.hangAtt, 0);
   const totalHang = Object.values(overallStats).reduce((s, a) => s + a.totalHang, 0);
-  const totalDirAtt = Object.values(overallStats).reduce((s, a) => s + a.dirAtt, 0);
-  const totalDirSum = Object.values(overallStats).reduce((s, a) => s + a.dirSum, 0);
   const overallAvgDist = totalDistAtt > 0 ? (totalDist / totalDistAtt).toFixed(1) : "—";
   const overallAvgHang = totalHangAtt > 0 ? (totalHang / totalHangAtt).toFixed(2) : "—";
-  const overallDirPct = totalDirAtt > 0 ? `${Math.round((totalDirSum / totalDirAtt) * 100)}%` : "—";
   const totalEndzones = Object.values(overallStats).reduce((s, a) => s + a.endzones, 0);
   const overallEzPct = totalKOs > 0 ? `${Math.round((totalEndzones / totalKOs) * 100)}%` : "—";
+
+  // Direction summary for stat cards
+  const totalDirAtt = Object.values(overallStats).reduce((s, a) => s + a.dirAtt, 0);
+  const totalDirSum = Object.values(overallStats).reduce((s, a) => s + a.dirSum, 0);
+  const overallDirPct = totalDirAtt > 0 ? `${Math.round((totalDirSum / totalDirAtt) * 100)}%` : "—";
+
+  // Aggregate direction counts across all athletes for field-based breakdown
+  const totalDirCounts: Record<string, number> = {};
+  Object.values(overallStats).forEach((s) => {
+    Object.entries(s.dirCounts).forEach(([k, v]) => {
+      totalDirCounts[k] = (totalDirCounts[k] || 0) + v;
+    });
+  });
 
   return (
     <main className="p-4 lg:p-6 space-y-6 max-w-4xl overflow-y-auto">
@@ -275,13 +330,37 @@ export default function KickoffStatisticsPage() {
         <StatCard label="Avg Dist" value={overallAvgDist !== "—" ? `${overallAvgDist} yd` : "—"} accent glow />
         <StatCard label="Avg Hang" value={overallAvgHang !== "—" ? `${overallAvgHang}s` : "—"} />
         <StatCard label="Endzone %" value={overallEzPct} />
-        <StatCard label="Direction %" value={overallDirPct} />
+        {koSettings.dirMode === "numeric" ? (
+          <StatCard label="Direction %" value={overallDirPct} />
+        ) : (
+          <StatCard label="Kicks" value={String(totalKOs)} />
+        )}
       </div>
+
+      {/* Field-based direction breakdown */}
+      {koSettings.dirMode === "field" && totalKOs > 0 && (
+        <div className="card-2">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Direction Breakdown</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {koSettings.directions.map((d) => {
+              const count = totalDirCounts[d.id] || 0;
+              const pct = totalKOs > 0 ? Math.round((count / totalKOs) * 100) : 0;
+              return (
+                <div key={d.id} className="bg-surface-2/50 border border-border rounded-input p-3 text-center">
+                  <p className="text-lg font-extrabold text-accent">{pct}%</p>
+                  <p className="text-[10px] text-muted font-semibold uppercase tracking-wider mt-0.5">{d.label}</p>
+                  <p className="text-[10px] text-muted">{count} / {totalKOs}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* By Athlete */}
       <div className="card-2">
         <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">By Athlete</p>
-        <StatTable athletes={athletes} statsMap={overallStats} />
+        <StatTable athletes={athletes} statsMap={overallStats} dirMode={koSettings.dirMode} dirOptions={koSettings.directions} />
       </div>
 
       {/* By Kick Type */}
@@ -292,7 +371,7 @@ export default function KickoffStatisticsPage() {
         ) : (
           Object.entries(statsByType).map(([typeId, { total, map }]) => (
             <CollapsibleSection key={typeId} title={typeLabel(typeId)} count={total}>
-              <StatTable athletes={athletes} statsMap={map} />
+              <StatTable athletes={athletes} statsMap={map} dirMode={koSettings.dirMode} dirOptions={koSettings.directions} />
             </CollapsibleSection>
           ))
         )}

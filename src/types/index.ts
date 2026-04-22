@@ -28,7 +28,7 @@ export type KickoffLandingZone =
   | "4"
   | "5"
   | "OOB";
-export type KickoffDirection = "left" | "middle" | "right" | "OB" | "0.5" | "1";
+export type KickoffDirection = string;
 
 // Long Snap
 export type SnapType = "PUNT" | "FG" | "PAT";
