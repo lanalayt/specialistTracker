@@ -22,7 +22,8 @@ const BM_COLORS: Record<SnapBenchmark, string> = {
 
 export default function LongSnapHistoryPage() {
   const { history, updateSessionWeather, deleteSession } = useLongSnap();
-  const { isAthlete } = useAuth();
+  const { isAthlete, canEdit } = useAuth();
+  const viewOnly = isAthlete && !canEdit;
   const [selectedId, setSelectedId] = useState<string | null>(
     history[history.length - 1]?.id ?? null
   );
@@ -86,7 +87,7 @@ export default function LongSnapHistoryPage() {
                 <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
                 <p className="text-xs text-muted mt-0.5">{snaps.length} snap{snaps.length !== 1 ? "s" : ""}</p>
               </div>
-              {!isAthlete && (
+              {!viewOnly && (
                 <button
                   onClick={() => {
                     if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
@@ -102,7 +103,7 @@ export default function LongSnapHistoryPage() {
             </div>
             {/* Weather display / edit */}
             <div className="mb-4">
-              {!isAthlete && editingWeatherId === selected.id ? (
+              {!viewOnly && editingWeatherId === selected.id ? (
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
                   <input
@@ -122,7 +123,7 @@ export default function LongSnapHistoryPage() {
                   ) : (
                     <p className="text-xs text-muted italic">No weather set</p>
                   )}
-                  {!isAthlete && (
+                  {!viewOnly && (
                     <button
                       onClick={() => setEditingWeatherId(selected.id)}
                       className="text-muted hover:text-white transition-colors p-1"

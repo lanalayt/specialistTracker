@@ -29,7 +29,8 @@ export default function KickoffHistoryPage() {
 function KickoffHistoryContent() {
   const { history, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession } = useKickoff();
 
-  const { isAthlete } = useAuth();
+  const { isAthlete, canEdit } = useAuth();
+  const viewOnly = isAthlete && !canEdit;
   const searchParams = useSearchParams();
   const sessionParam = searchParams.get("session");
   const [modeFilter, setModeFilter] = useState<"practice" | "game">(() => {
@@ -142,7 +143,7 @@ function KickoffHistoryContent() {
             </button>
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
-              {!isAthlete && editingId === selected.id ? (
+              {!viewOnly && editingId === selected.id ? (
                 <div className="flex items-center gap-2">
                   <input
                     type="date"
@@ -176,7 +177,7 @@ function KickoffHistoryContent() {
                   {selected.mode === "game" && selected.gameTime && (
                     <span className="text-xs text-muted">· {selected.gameTime}</span>
                   )}
-                  {!isAthlete && (
+                  {!viewOnly && (
                     <button
                       onClick={() => setEditingId(selected.id)}
                       className="text-xs text-muted hover:text-accent transition-colors"
@@ -189,7 +190,7 @@ function KickoffHistoryContent() {
               )}
               <p className="text-xs text-muted mt-0.5">{entries.length} kickoff{entries.length !== 1 ? "s" : ""}</p>
               </div>
-              {!isAthlete && (
+              {!viewOnly && (
                 <div className="flex gap-2 ml-3 shrink-0">
                   {editing ? (
                     <>
@@ -247,7 +248,7 @@ function KickoffHistoryContent() {
             </div>
             {/* Weather display / edit */}
             <div className="mb-4">
-              {!isAthlete && editingWeatherId === selected.id ? (
+              {!viewOnly && editingWeatherId === selected.id ? (
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
                   <input
@@ -267,7 +268,7 @@ function KickoffHistoryContent() {
                   ) : (
                     <p className="text-xs text-muted italic">No weather set</p>
                   )}
-                  {!isAthlete && (
+                  {!viewOnly && (
                     <button
                       onClick={() => setEditingWeatherId(selected.id)}
                       className="text-muted hover:text-white transition-colors p-1"

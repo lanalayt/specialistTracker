@@ -23,6 +23,7 @@ function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?:
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [athleteAccess, setAthleteAccess] = useState<"view" | "edit">("view");
   const supabase = createClient();
 
   // Apply saved theme colors — re-run whenever user (and thus teamId) resolves
@@ -48,17 +49,30 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         tid = getTeamId();
       }
       if (!tid || tid === "local-dev") return;
-      const members = await teamGet<{ id: string; email: string; name: string; role: string; lastSeen: string }[]>(tid, "team_members") ?? [];
-      const me = { id: user.id, email: user.email, name: user.name, role: user.role, lastSeen: new Date().toISOString() };
-      const idx = members.findIndex((m) => m.id === me.id);
+      const members = await teamGet<{ id: string; email: string; name: string; role: string; lastSeen: string; access?: "view" | "edit" }[]>(tid, "team_members") ?? [];
+      const idx = members.findIndex((m) => m.id === user.id);
+      // Preserve existing access level if already set
+      const existingAccess = idx >= 0 ? members[idx].access : undefined;
+      const me = { id: user.id, email: user.email, name: user.name, role: user.role, lastSeen: new Date().toISOString(), access: existingAccess ?? (user.role === "coach" ? "edit" as const : "view" as const) };
       if (idx >= 0) {
         members[idx] = me;
       } else {
         members.push(me);
       }
       teamSet(tid, "team_members", members);
+      // Set athlete access for current user
+      if (user.role === "athlete") {
+        setAthleteAccess(me.access ?? "view");
+      }
     })();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Live-sync team_members to pick up access changes from coach
+  useTeamDataSync<{ id: string; access?: "view" | "edit" }[]>("team_members", (remote) => {
+    if (!remote || !user || user.role !== "athlete") return;
+    const me = remote.find((m) => m.id === user.id);
+    if (me) setAthleteAccess(me.access ?? "view");
+  }, !!user && user.id !== "local-dev" && user.role === "athlete");
 
   // Listen for auth state changes
   useEffect(() => {
@@ -139,6 +153,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         isLoading,
         isCoach: user?.role === "coach",
         isAthlete: user?.role === "athlete",
+        canEdit: user?.role === "coach" || athleteAccess === "edit",
         signIn,
         signUp,
         signOut,

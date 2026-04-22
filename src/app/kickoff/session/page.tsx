@@ -147,7 +147,8 @@ const DIR_LABELS: Record<string, string> = {
 export default function KickoffSessionPage() {
   const { athletes, stats, canUndo, undoLastCommit, commitPractice } =
     useKickoff();
-  const { isAthlete } = useAuth();
+  const { isAthlete, canEdit } = useAuth();
+  const viewOnly = isAthlete && !canEdit;
 
   // ── Custom kickoff types + directions from settings ──────────────────
   const [koTypes, setKoTypes] = useState(() => loadKickoffSettings().types);
@@ -1301,14 +1302,14 @@ export default function KickoffSessionPage() {
         <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
           {/* Weather input / display */}
           <div className="px-4 py-2 border-b border-border shrink-0">
-            {weatherLocked || isAthlete ? (
+            {weatherLocked || viewOnly ? (
               <div className="flex items-center gap-2">
                 <div className="flex-1">
                   <p className="text-[10px] text-muted">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
                   {weather && <p className="text-xs text-slate-300">{weather}</p>}
-                  {!weather && isAthlete && <p className="text-xs text-muted italic">No weather set</p>}
+                  {!weather && viewOnly && <p className="text-xs text-muted italic">No weather set</p>}
                 </div>
-                {!isAthlete && (
+                {!viewOnly && (
                   <button
                     onClick={() => setWeatherLocked(false)}
                     className="text-muted hover:text-white transition-colors p-1"
@@ -1336,7 +1337,7 @@ export default function KickoffSessionPage() {
             )}
           </div>
           {/* Practice / Game mode toggle + Live / Manual toggle */}
-          {!isAthlete && !isContinuing && (
+          {!viewOnly && !isContinuing && (
             <div className={clsx(
               "px-4 py-2 border-b shrink-0 space-y-2 transition-colors",
               sessionMode === "game" ? "bg-red-500/10 border-red-500/40" : "border-border"
@@ -1419,7 +1420,7 @@ export default function KickoffSessionPage() {
                 </span>
               )}
             </h2>
-            {!isAthlete && (
+            {!viewOnly && (
               <button
                 onClick={addRow}
                 className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
@@ -1503,7 +1504,7 @@ export default function KickoffSessionPage() {
                           <select
                             value={row.athlete}
                             onChange={(e) => updateRow(idx, "athlete", e.target.value)}
-                            disabled={isAthlete}
+                            disabled={viewOnly}
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
@@ -1520,7 +1521,7 @@ export default function KickoffSessionPage() {
                           <select
                             value={row.type}
                             onChange={(e) => updateRow(idx, "type", e.target.value)}
-                            disabled={isAthlete}
+                            disabled={viewOnly}
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
@@ -1539,7 +1540,7 @@ export default function KickoffSessionPage() {
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
                                 value={row.distance}
                                 onChange={(e) => updateRow(idx, "distance", e.target.value)}
-                                readOnly={isAthlete || isSaved}
+                                readOnly={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
@@ -1551,7 +1552,7 @@ export default function KickoffSessionPage() {
                                   const digits = e.target.value.replace(/\D/g, "");
                                   updateRow(idx, "hangTime", digits ? formatAutoDecimal(digits) : "");
                                 }}
-                                readOnly={isAthlete || isSaved}
+                                readOnly={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
@@ -1560,7 +1561,7 @@ export default function KickoffSessionPage() {
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
                                 value={row.returnYards ?? ""}
                                 onChange={(e) => updateRow(idx, "returnYards", e.target.value)}
-                                readOnly={isAthlete || isSaved || !!row.touchback}
+                                readOnly={viewOnly || isSaved || !!row.touchback}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : row.touchback ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
@@ -1568,7 +1569,7 @@ export default function KickoffSessionPage() {
                               <input
                                 type="checkbox"
                                 checked={!!row.touchback}
-                                disabled={isAthlete || isSaved}
+                                disabled={viewOnly || isSaved}
                                 onChange={(e) => updateRow(idx, "touchback", e.target.checked)}
                                 title="Touchback"
                                 className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
@@ -1578,7 +1579,7 @@ export default function KickoffSessionPage() {
                               <select
                                 value={row.direction}
                                 onChange={(e) => updateRow(idx, "direction", e.target.value)}
-                                disabled={isAthlete || isSaved}
+                                disabled={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               >
                                 <option value="">—</option>
@@ -1599,7 +1600,7 @@ export default function KickoffSessionPage() {
                               ) : (
                                 <button
                                   onClick={() => handleSaveGameRow(idx)}
-                                  disabled={isAthlete || !row.athlete}
+                                  disabled={viewOnly || !row.athlete}
                                   className="text-[10px] px-2 py-1 rounded bg-red-500 text-white font-bold hover:bg-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   Save
@@ -1616,7 +1617,7 @@ export default function KickoffSessionPage() {
                               type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
                               value={row.distance}
                               onChange={(e) => updateRow(idx, "distance", e.target.value)}
-                              readOnly={isAthlete}
+                              readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
@@ -1625,7 +1626,7 @@ export default function KickoffSessionPage() {
                               type="text" inputMode="decimal" placeholder="sec"
                               value={row.hangTime}
                               onChange={(e) => updateRow(idx, "hangTime", e.target.value)}
-                              readOnly={isAthlete}
+                              readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
@@ -1633,7 +1634,7 @@ export default function KickoffSessionPage() {
                             <select
                               value={row.direction}
                               onChange={(e) => updateRow(idx, "direction", e.target.value)}
-                              disabled={isAthlete}
+                              disabled={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                             >
                               <option value="">—</option>
@@ -1646,7 +1647,7 @@ export default function KickoffSessionPage() {
                       )}
                       <td className="py-1 px-1 text-center">
                         {isLocked ? (
-                          !isAthlete && (
+                          !viewOnly && (
                             <div className="flex items-center gap-0.5 justify-center">
                               {sessionMode === "game" ? (
                                 <button
@@ -1700,7 +1701,7 @@ export default function KickoffSessionPage() {
                             </div>
                           )
                         ) : (
-                          !isAthlete && (
+                          !viewOnly && (
                             <button
                               onClick={() => deleteRow(idx)}
                               className="text-border hover:text-miss transition-colors text-sm leading-none px-1"
@@ -1733,7 +1734,7 @@ export default function KickoffSessionPage() {
                 ? "0 kickoffs entered"
                 : `${filledCount} kickoff${filledCount !== 1 ? "s" : ""} entered`}
             </span>
-            {!isAthlete && (<>
+            {!viewOnly && (<>
               <div className="flex gap-2">
                 {(canUndo || deletedRowStack.length > 0) && (
                   <button

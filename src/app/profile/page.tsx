@@ -14,6 +14,7 @@ interface TeamMember {
   name: string;
   role: string;
   lastSeen: string;
+  access?: "view" | "edit";
 }
 
 function ProfileContent() {
@@ -116,6 +117,17 @@ function ProfileContent() {
     teamSet(tid, "team_members", updated);
   };
 
+  const handleToggleAccess = async (memberId: string) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    const updated = members.map((m) => {
+      if (m.id !== memberId) return m;
+      return { ...m, access: m.access === "edit" ? "view" as const : "edit" as const };
+    });
+    setMembers(updated);
+    teamSet(tid, "team_members", updated);
+  };
+
   return (
     <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
       <Header title="Profile" />
@@ -155,32 +167,50 @@ function ProfileContent() {
               <p className="text-sm text-muted py-4 text-center">No team members found. Share your team code in Settings so athletes can join.</p>
             ) : (
               <div className="space-y-2">
-                {members.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3 p-3 rounded-input border border-border bg-surface-2/50">
-                    <div className="w-9 h-9 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent text-sm font-bold shrink-0">
-                      {m.name?.[0]?.toUpperCase() ?? "?"}
+                {members.map((m) => {
+                  const access = m.access ?? (m.role === "coach" ? "edit" : "view");
+                  return (
+                    <div key={m.id} className="flex items-center gap-3 p-3 rounded-input border border-border bg-surface-2/50">
+                      <div className="w-9 h-9 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent text-sm font-bold shrink-0">
+                        {m.name?.[0]?.toUpperCase() ?? "?"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-200 truncate">{m.name}</p>
+                        <p className="text-xs text-muted truncate">{m.email}</p>
+                      </div>
+                      <span className={clsx(
+                        "text-[10px] px-2 py-0.5 rounded font-bold uppercase shrink-0",
+                        m.role === "coach" ? "bg-accent/20 text-accent" : "bg-surface border border-border text-muted"
+                      )}>
+                        {m.role}
+                      </span>
+                      {/* Access toggle for athletes — coaches always have edit */}
+                      {isCoach && m.role === "athlete" && (
+                        <button
+                          onClick={() => handleToggleAccess(m.id)}
+                          className={clsx(
+                            "text-[10px] px-2 py-0.5 rounded font-bold uppercase shrink-0 transition-colors",
+                            access === "edit"
+                              ? "bg-make/20 border border-make/40 text-make hover:bg-make/30"
+                              : "bg-surface border border-border text-muted hover:text-slate-200 hover:border-slate-500"
+                          )}
+                          title={access === "edit" ? "Click to revoke editing access" : "Click to grant editing access"}
+                        >
+                          {access === "edit" ? "Can Edit" : "View Only"}
+                        </button>
+                      )}
+                      {isCoach && m.id !== user?.id && (
+                        <button
+                          onClick={() => handleRemoveMember(m.id)}
+                          className="text-xs text-muted hover:text-miss transition-colors px-1 shrink-0"
+                          title="Remove member"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-200 truncate">{m.name}</p>
-                      <p className="text-xs text-muted truncate">{m.email}</p>
-                    </div>
-                    <span className={clsx(
-                      "text-[10px] px-2 py-0.5 rounded font-bold uppercase shrink-0",
-                      m.role === "coach" ? "bg-accent/20 text-accent" : "bg-surface border border-border text-muted"
-                    )}>
-                      {m.role}
-                    </span>
-                    {isCoach && m.id !== user?.id && (
-                      <button
-                        onClick={() => handleRemoveMember(m.id)}
-                        className="text-xs text-muted hover:text-miss transition-colors px-1 shrink-0"
-                        title="Remove member"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <p className="text-[10px] text-muted">

@@ -34,7 +34,8 @@ const ACC_LABEL: Record<string, string> = {
 
 export default function LongSnapSessionPage() {
   const { athletes, stats, canUndo, undoLastCommit, commitPractice } = useLongSnap();
-  const { isAthlete } = useAuth();
+  const { isAthlete, canEdit } = useAuth();
+  const viewOnly = isAthlete && !canEdit;
   const [sessionSnaps, setSessionSnaps] = useState<LongSnapEntry[]>([]);
   const [committed, setCommitted] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
@@ -131,7 +132,7 @@ export default function LongSnapSessionPage() {
               ? `${sessionSnaps.length} snap${sessionSnaps.length !== 1 ? "s" : ""} in progress.`
               : "Ready to start? Hit the button to begin logging snaps."}
           </p>
-          {!isAthlete ? (
+          {!viewOnly ? (
             <button
               onClick={() => setSessionStarted(true)}
               className="btn-primary py-3 px-8 text-sm w-full"
@@ -152,14 +153,14 @@ export default function LongSnapSessionPage() {
       <div className="lg:w-[55%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
         {/* Weather input / display */}
         <div className="px-4 py-2 border-b border-border shrink-0">
-          {weatherLocked || isAthlete ? (
+          {weatherLocked || viewOnly ? (
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <p className="text-[10px] text-muted">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
                 {weather && <p className="text-xs text-slate-300">{weather}</p>}
-                {!weather && isAthlete && <p className="text-xs text-muted italic">No weather set</p>}
+                {!weather && viewOnly && <p className="text-xs text-muted italic">No weather set</p>}
               </div>
-              {!isAthlete && (
+              {!viewOnly && (
                 <button
                   onClick={() => setWeatherLocked(false)}
                   className="text-muted hover:text-white transition-colors p-1"
@@ -187,7 +188,7 @@ export default function LongSnapSessionPage() {
           )}
         </div>
         <div className="overflow-y-auto border-b border-border">
-          <div className={isAthlete ? "pointer-events-none opacity-60" : ""}>
+          <div className={viewOnly ? "pointer-events-none opacity-60" : ""}>
             <SnapEntryCard
               athletes={athletes}
               snapCount={sessionSnaps.length}
@@ -240,7 +241,7 @@ export default function LongSnapSessionPage() {
                       {BM_LABELS[bm]}
                     </span>
                   )}
-                  {!isAthlete && (
+                  {!viewOnly && (
                     <button
                       onClick={() => handleDeleteSnap(idx)}
                       className="w-6 h-6 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm ml-2"
@@ -255,7 +256,7 @@ export default function LongSnapSessionPage() {
         </div>
 
         <div className="border-t border-border p-3 flex items-center gap-2 shrink-0">
-          {!isAthlete && (
+          {!viewOnly && (
             <>
               {canUndo && (
                 <button onClick={undoLastCommit} className="btn-ghost text-xs py-1.5 px-3">
@@ -265,7 +266,7 @@ export default function LongSnapSessionPage() {
             </>
           )}
           <div className="flex-1" />
-          {!isAthlete && (
+          {!viewOnly && (
             <button
               onClick={handleCommit}
               disabled={sessionSnaps.length === 0}

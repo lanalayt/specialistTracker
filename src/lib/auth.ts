@@ -10,6 +10,8 @@ interface AuthContextValue {
   isLoading: boolean;
   isCoach: boolean;
   isAthlete: boolean;
+  /** True for coaches and athletes with edit access */
+  canEdit: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, role?: UserRole, teamId?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -21,6 +23,7 @@ export const AuthContext = createContext<AuthContextValue>({
   isLoading: true,
   isCoach: false,
   isAthlete: false,
+  canEdit: false,
   signIn: async () => {},
   signUp: async () => {},
   signOut: async () => {},
