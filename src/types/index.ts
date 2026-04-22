@@ -144,6 +144,7 @@ export interface KickoffEntry {
   result?: "TB" | "RETURN" | "OOB";
   returnYards?: number;
   kickNum?: number;
+  endzone?: boolean;
   // Game mode only: absolute field positions 0..100
   los?: number;
   landingYL?: number;
@@ -161,6 +162,7 @@ export interface KickoffAthleteStats {
     totalHang: number;
     hangAtt?: number;
     totalReturn: number;
+    endzones: number;
   };
   byZone: Record<KickoffLandingZone, number>;
 }

@@ -50,10 +50,11 @@ interface AthleteKOStats {
   hangAtt: number;
   dirSum: number;
   dirAtt: number;
+  endzones: number;
 }
 
 function emptyStats(): AthleteKOStats {
-  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0 };
+  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0 };
 }
 
 function addEntry(s: AthleteKOStats, e: KickoffEntry): AthleteKOStats {
@@ -66,7 +67,12 @@ function addEntry(s: AthleteKOStats, e: KickoffEntry): AthleteKOStats {
     hangAtt: s.hangAtt + (e.hangTime > 0 ? 1 : 0),
     dirSum: s.dirSum + (dir != null ? dir : 0),
     dirAtt: s.dirAtt + (dir != null ? 1 : 0),
+    endzones: s.endzones + (e.endzone ? 1 : 0),
   };
+}
+
+function ezPct(s: AthleteKOStats): string {
+  return s.att > 0 ? `${Math.round((s.endzones / s.att) * 100)}%` : "—";
 }
 
 function avgDist(s: AthleteKOStats): string {
@@ -94,6 +100,7 @@ function StatTable({ athletes, statsMap }: { athletes: string[]; statsMap: Recor
           <th className="table-header">KOs</th>
           <th className="table-header">Dist</th>
           <th className="table-header">Hang</th>
+          <th className="table-header">EZ %</th>
           <th className="table-header">Dir %</th>
         </tr>
       </thead>
@@ -106,6 +113,7 @@ function StatTable({ athletes, statsMap }: { athletes: string[]; statsMap: Recor
               <td className="table-cell">{s.att}</td>
               <td className="table-cell">{avgDist(s)}</td>
               <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>
+              <td className="table-cell text-make font-semibold">{ezPct(s)}</td>
               <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
             </tr>
           );
@@ -247,6 +255,8 @@ export default function KickoffStatisticsPage() {
   const overallAvgDist = totalDistAtt > 0 ? (totalDist / totalDistAtt).toFixed(1) : "—";
   const overallAvgHang = totalHangAtt > 0 ? (totalHang / totalHangAtt).toFixed(2) : "—";
   const overallDirPct = totalDirAtt > 0 ? `${Math.round((totalDirSum / totalDirAtt) * 100)}%` : "—";
+  const totalEndzones = Object.values(overallStats).reduce((s, a) => s + a.endzones, 0);
+  const overallEzPct = totalKOs > 0 ? `${Math.round((totalEndzones / totalKOs) * 100)}%` : "—";
 
   return (
     <main className="p-4 lg:p-6 space-y-6 max-w-4xl overflow-y-auto">
@@ -261,9 +271,10 @@ export default function KickoffStatisticsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Avg Dist" value={overallAvgDist !== "—" ? `${overallAvgDist} yd` : "—"} accent glow />
         <StatCard label="Avg Hang" value={overallAvgHang !== "—" ? `${overallAvgHang}s` : "—"} />
+        <StatCard label="Endzone %" value={overallEzPct} />
         <StatCard label="Direction %" value={overallDirPct} />
       </div>
 

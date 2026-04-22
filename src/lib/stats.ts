@@ -356,6 +356,7 @@ export function emptyKickoffStats(): KickoffAthleteStats {
       totalDist: 0,
       totalHang: 0,
       totalReturn: 0,
+      endzones: 0,
     },
     byZone,
   };
@@ -365,7 +366,7 @@ export function processKickoff(
   entry: KickoffEntry,
   statsMap: Record<string, KickoffAthleteStats>
 ): Record<string, KickoffAthleteStats> {
-  const { athlete, distance, hangTime, landingZone, result, returnYards } =
+  const { athlete, distance, hangTime, landingZone, result, returnYards, endzone } =
     entry;
 
   const hasDist = distance > 0;
@@ -385,6 +386,7 @@ export function processKickoff(
     totalHang: s.overall.totalHang + (hasHang ? hangTime : 0),
     hangAtt: (s.overall.hangAtt || 0) + (hasHang ? 1 : 0),
     totalReturn: s.overall.totalReturn + (returnYards ?? 0),
+    endzones: (s.overall.endzones || 0) + (endzone ? 1 : 0),
   };
 
   if (landingZone) {

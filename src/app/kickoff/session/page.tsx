@@ -32,6 +32,7 @@ interface LogRow {
   distance: string;
   hangTime: string;
   direction: string;
+  endzone?: boolean;
   // Game mode only
   los?: string;
   landingYL?: string;
@@ -61,6 +62,7 @@ const emptyRow = (): LogRow => ({
   distance: "",
   hangTime: "",
   direction: "",
+  endzone: false,
   los: "",
   landingYL: "",
   returnYards: "",
@@ -220,6 +222,7 @@ export default function KickoffSessionPage() {
   const [distance, setDistance] = useState("");
   const [hangTime, setHangTime] = useState("");
   const [direction, setDirection] = useState<KickoffDirection>("1");
+  const [endzone, setEndzone] = useState(false);
   // score removed — not used for kickoff
 
   // Auto-decimal: user types digits, we insert decimal 2 places from right
@@ -527,6 +530,7 @@ export default function KickoffSessionPage() {
       landingYL: landingYLVal,
       returnYards: retVal,
       result: r.touchback ? "TB" : undefined,
+      endzone: r.endzone || undefined,
     };
     setSessionKicks((prev) => {
       const existing = prev.findIndex((k) => k.kickNum === kickNum);
@@ -579,6 +583,7 @@ export default function KickoffSessionPage() {
       hangTime: parseFloat(r.hangTime) || 0,
       direction: (r.direction || "1") as KickoffDirection,
       score: 0,
+      endzone: r.endzone || undefined,
     }));
 
     // Outlier check across all kickoffs
@@ -629,6 +634,7 @@ export default function KickoffSessionPage() {
       direction,
       score: 0,
       kickNum: currentKickIdx + 1,
+      endzone: endzone || undefined,
     };
 
     // Outlier check
@@ -659,6 +665,7 @@ export default function KickoffSessionPage() {
     setDistance("");
     setHangTime("");
     setDirection("1" as KickoffDirection);
+    setEndzone(false);
     setShowAthleteDropdown(false);
   };
 
@@ -1040,7 +1047,12 @@ export default function KickoffSessionPage() {
                           pattern="[0-9]*"
                           placeholder="yds"
                           value={distance}
-                          onChange={(e) => setDistance(e.target.value)}
+                          onChange={(e) => {
+                            setDistance(e.target.value);
+                            const dist = parseInt(e.target.value) || 0;
+                            if (dist >= 65) setEndzone(true);
+                            else if (dist > 0 && dist < 65) setEndzone(false);
+                          }}
                         />
                       </div>
                       <div>
@@ -1055,6 +1067,18 @@ export default function KickoffSessionPage() {
                         />
                       </div>
                     </div>
+
+                    {/* Endzone checkbox */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={endzone}
+                        onChange={(e) => setEndzone(e.target.checked)}
+                        className="w-5 h-5 accent-accent cursor-pointer"
+                      />
+                      <span className="text-sm font-semibold text-slate-200">Endzone</span>
+                      <span className="text-[10px] text-muted">(auto-checked at 65+ yds)</span>
+                    </label>
 
                     {/* Direction */}
                     <div>
@@ -1448,6 +1472,7 @@ export default function KickoffSessionPage() {
                     <>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dist</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">HT</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Endzone">EZ</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Touchback">TB</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dir</th>
@@ -1461,6 +1486,9 @@ export default function KickoffSessionPage() {
                       </th>
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                         HT
+                      </th>
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border" title="Endzone">
+                        EZ
                       </th>
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                         Dir
@@ -1539,7 +1567,12 @@ export default function KickoffSessionPage() {
                               <input
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
                                 value={row.distance}
-                                onChange={(e) => updateRow(idx, "distance", e.target.value)}
+                                onChange={(e) => {
+                                  updateRow(idx, "distance", e.target.value);
+                                  const dist = parseInt(e.target.value) || 0;
+                                  if (dist >= 65 && !row.endzone) updateRow(idx, "endzone", true);
+                                  else if (dist < 65 && dist > 0 && row.endzone) updateRow(idx, "endzone", false);
+                                }}
                                 readOnly={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
@@ -1554,6 +1587,16 @@ export default function KickoffSessionPage() {
                                 }}
                                 readOnly={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
+                            <td className="py-1 px-1 text-center">
+                              <input
+                                type="checkbox"
+                                checked={!!row.endzone}
+                                disabled={viewOnly || isSaved}
+                                onChange={(e) => updateRow(idx, "endzone", e.target.checked)}
+                                title="Endzone"
+                                className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
                             <td className="py-1 px-1">
@@ -1616,7 +1659,12 @@ export default function KickoffSessionPage() {
                             <input
                               type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
                               value={row.distance}
-                              onChange={(e) => updateRow(idx, "distance", e.target.value)}
+                              onChange={(e) => {
+                                updateRow(idx, "distance", e.target.value);
+                                const dist = parseInt(e.target.value) || 0;
+                                if (dist >= 65 && !row.endzone) updateRow(idx, "endzone", true);
+                                else if (dist < 65 && dist > 0 && row.endzone) updateRow(idx, "endzone", false);
+                              }}
                               readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
@@ -1628,6 +1676,16 @@ export default function KickoffSessionPage() {
                               onChange={(e) => updateRow(idx, "hangTime", e.target.value)}
                               readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
+                            />
+                          </td>
+                          <td className="py-1 px-1 text-center">
+                            <input
+                              type="checkbox"
+                              checked={!!row.endzone}
+                              disabled={viewOnly}
+                              onChange={(e) => updateRow(idx, "endzone", e.target.checked)}
+                              title="Endzone"
+                              className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
                             />
                           </td>
                           <td className="py-1 px-1">
