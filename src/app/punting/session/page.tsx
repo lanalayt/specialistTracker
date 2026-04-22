@@ -221,7 +221,7 @@ export default function PuntingSessionPage() {
     const saved = loadDraftForMode(initialMode);
     return saved ?? {
       rows: Array.from({ length: INIT_ROWS }, emptyRow),
-      manualEntry: initialMode === "game",
+      manualEntry: true,
       sessionActive: false,
       plannedPunts: [],
       plannedRowIndices: [],
