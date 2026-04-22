@@ -11,6 +11,7 @@ const PROTECTED_PREFIXES = [
   "/athletes",
   "/settings",
   "/profile",
+  "/recover",
 ];
 
 const AUTH_ROUTES = ["/login", "/signup", "/onboard"];
