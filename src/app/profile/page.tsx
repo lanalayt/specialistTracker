@@ -188,15 +188,26 @@ function ProfileContent() {
                       {isCoach && m.role === "athlete" && (
                         <button
                           onClick={() => handleToggleAccess(m.id)}
-                          className={clsx(
-                            "text-[10px] px-2 py-0.5 rounded font-bold uppercase shrink-0 transition-colors",
-                            access === "edit"
-                              ? "bg-make/20 border border-make/40 text-make hover:bg-make/30"
-                              : "bg-surface border border-border text-muted hover:text-slate-200 hover:border-slate-500"
-                          )}
+                          className="flex items-center gap-2 shrink-0 cursor-pointer group"
                           title={access === "edit" ? "Click to revoke editing access" : "Click to grant editing access"}
                         >
-                          {access === "edit" ? "Can Edit" : "View Only"}
+                          <span className={clsx(
+                            "text-[10px] font-semibold transition-colors",
+                            access === "edit" ? "text-make" : "text-muted group-hover:text-slate-300"
+                          )}>
+                            {access === "edit" ? "Can Edit" : "View Only"}
+                          </span>
+                          <div className={clsx(
+                            "relative w-9 h-5 rounded-full transition-colors",
+                            access === "edit" ? "bg-make/30" : "bg-surface-2 border border-border group-hover:border-slate-500"
+                          )}>
+                            <div className={clsx(
+                              "absolute top-0.5 w-4 h-4 rounded-full shadow transition-all",
+                              access === "edit"
+                                ? "left-[18px] bg-make"
+                                : "left-0.5 bg-muted group-hover:bg-slate-400"
+                            )} />
+                          </div>
                         </button>
                       )}
                       {isCoach && m.id !== user?.id && (
