@@ -9,6 +9,7 @@ import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
 import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
+import { mergeHistory } from "@/lib/mergeHistory";
 import { useAuth } from "@/lib/auth";
 
 interface KickoffStateData {
@@ -77,11 +78,21 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (saved) {
+        // Merge with localStorage to prevent losing sessions that only exist locally
+        const local = localGet<KickoffStateData>("KICKOFF");
+        const history = local?.history
+          ? mergeHistory(local.history, saved.history ?? [])
+          : (saved.history ?? []);
         const stats = { ...saved.stats };
         (saved.athletes || []).forEach((a) => { if (!stats[a]) stats[a] = emptyKickoffStats(); });
-        const migrated = { ...saved, stats };
+        const migrated = { ...saved, stats, history };
         setState(migrated);
         localSet("KICKOFF", migrated);
+        // If local had sessions the cloud didn't, push merged version to cloud
+        if (local?.history && history.length > (saved.history ?? []).length) {
+          const tid = getTeamId();
+          if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", migrated);
+        }
       }
     }
 
@@ -89,15 +100,21 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll team_data for remote updates (changes made on other devices)
+  // CRITICAL: merge histories instead of blind replacement to prevent data loss
   useTeamDataSync<KickoffStateData>("kickoff_data", (remote) => {
     if (!remote) return;
-    const stats = { ...remote.stats };
-    (remote.athletes || []).forEach((a) => {
-      if (!stats[a]) stats[a] = emptyKickoffStats();
+    setState((prev) => {
+      const mergedHistory = mergeHistory(prev.history, remote.history ?? []);
+      const athleteSet = new Set([...(prev.athletes || []), ...(remote.athletes || [])]);
+      const athletes = Array.from(athleteSet);
+      const stats = { ...remote.stats };
+      athletes.forEach((a) => {
+        if (!stats[a]) stats[a] = emptyKickoffStats();
+      });
+      const merged = { ...remote, athletes, stats, history: mergedHistory, snapshot: prev.snapshot };
+      localSet("KICKOFF", merged);
+      return merged;
     });
-    const migrated = { ...remote, stats };
-    setState(migrated);
-    localSet("KICKOFF", migrated);
   });
 
   const addAthletes = useCallback((names: string[]) => {

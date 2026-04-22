@@ -19,6 +19,7 @@ import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
 import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
+import { mergeHistory } from "@/lib/mergeHistory";
 import { useAuth } from "@/lib/auth";
 
 interface FGStateData {
@@ -90,6 +91,11 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (saved) {
+        // Merge with localStorage to prevent losing sessions that only exist locally
+        const local = localGet<FGStateData>("FG");
+        const history = local?.history
+          ? mergeHistory(local.history, saved.history ?? [])
+          : (saved.history ?? []);
         const stats = { ...saved.stats };
         (saved.athletes || []).forEach((a) => {
           if (!stats[a]) {
@@ -98,10 +104,14 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
             stats[a] = { ...stats[a], pat: { att: 0, made: 0, score: 0 } };
           }
         });
-        const migrated = { ...saved, stats };
+        const migrated = { ...saved, stats, history };
         setState(migrated);
-        // Sync localStorage with what we loaded
         localSet("FG", migrated);
+        // If local had sessions the cloud didn't, push merged version to cloud
+        if (local?.history && history.length > (saved.history ?? []).length) {
+          const tid = getTeamId();
+          if (tid && tid !== "local-dev") teamSet(tid, "fg_data", migrated);
+        }
       }
     }
 
@@ -109,19 +119,26 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll team_data for remote updates (changes made on other devices)
+  // CRITICAL: merge histories instead of blind replacement to prevent data loss
   useTeamDataSync<FGStateData>("fg_data", (remote) => {
     if (!remote) return;
-    const stats = { ...remote.stats };
-    (remote.athletes || []).forEach((a) => {
-      if (!stats[a]) {
-        stats[a] = emptyAthleteStats();
-      } else if (!stats[a].pat) {
-        stats[a] = { ...stats[a], pat: { att: 0, made: 0, score: 0 } };
-      }
+    setState((prev) => {
+      const mergedHistory = mergeHistory(prev.history, remote.history ?? []);
+      // Merge athlete lists (union)
+      const athleteSet = new Set([...(prev.athletes || []), ...(remote.athletes || [])]);
+      const athletes = Array.from(athleteSet);
+      const stats = { ...remote.stats };
+      athletes.forEach((a) => {
+        if (!stats[a]) {
+          stats[a] = emptyAthleteStats();
+        } else if (!stats[a].pat) {
+          stats[a] = { ...stats[a], pat: { att: 0, made: 0, score: 0 } };
+        }
+      });
+      const merged = { ...remote, athletes, stats, history: mergedHistory, snapshot: prev.snapshot };
+      localSet("FG", merged);
+      return merged;
     });
-    const migrated = { ...remote, stats };
-    setState(migrated);
-    localSet("FG", migrated);
   });
 
   const save = useCallback((next: FGStateData) => {
