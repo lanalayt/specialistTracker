@@ -89,15 +89,15 @@ function loadSnapDistance(): number {
 }
 
 function loadMakeMode(): "simple" | "detailed" {
-  if (typeof window === "undefined") return "detailed";
+  if (typeof window === "undefined") return "simple";
   try {
     const raw = localStorage.getItem("fgSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
-      return parsed.makeMode === "simple" ? "simple" : "detailed";
+      return parsed.makeMode === "detailed" ? "detailed" : "simple";
     }
   } catch {}
-  return "detailed";
+  return "simple";
 }
 
 function loadMissMode(): "simple" | "detailed" {
@@ -113,17 +113,17 @@ function loadMissMode(): "simple" | "detailed" {
 }
 
 function loadScoreMode(): "on" | "practice" | "off" {
-  if (typeof window === "undefined") return "on";
+  if (typeof window === "undefined") return "practice";
   try {
     const raw = localStorage.getItem("fgSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.scoreEnabled === "on" || parsed.scoreEnabled === "practice" || parsed.scoreEnabled === "off") return parsed.scoreEnabled;
       if (parsed.scoreEnabled === false) return "off";
-      return "on";
+      return "practice";
     }
   } catch {}
-  return "on";
+  return "practice";
 }
 
 function loadScoreOptions(): string[] {
