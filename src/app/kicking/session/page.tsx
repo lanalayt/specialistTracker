@@ -34,6 +34,7 @@ interface LogRow {
   pos: string;
   result: string;
   score: string;
+  opTime: string;
   starred?: boolean;
 }
 
@@ -61,7 +62,7 @@ interface SessionDraft {
   gameTime?: string;
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", result: "", score: "", starred: false });
+const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", result: "", score: "", opTime: "", starred: false });
 
 function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
   if (typeof window === "undefined") return null;
@@ -501,6 +502,7 @@ export default function KickingSessionPage() {
       const warnings = checkFGOutliers(parseInt(r.dist) || 0);
       if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
     }
+    const otVal = parseFloat(r.opTime) || 0;
     const kick: FGKick = {
       athleteId: r.athlete,
       athlete: r.athlete,
@@ -508,6 +510,7 @@ export default function KickingSessionPage() {
       pos: r.pos as FGPosition,
       result: r.result as FGResult,
       score: parseInt(r.score) || 0,
+      opTime: otVal > 0 ? otVal : undefined,
       isPAT: isPAT || undefined,
       starred: r.starred || undefined,
       kickNum,
@@ -1680,6 +1683,7 @@ export default function KickingSessionPage() {
                       {scoreEnabled && (
                         <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Score</th>
                       )}
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">OT</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
                     </>
                   )}
@@ -1693,6 +1697,9 @@ export default function KickingSessionPage() {
                           Score
                         </th>
                       )}
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
+                        OT
+                      </th>
                     </>
                   )}
                   {sessionMode !== "game" && (
@@ -1824,6 +1831,17 @@ export default function KickingSessionPage() {
                                 </select>
                               </td>
                             )}
+                            <td className="py-1 px-1">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="sec"
+                                value={row.opTime}
+                                onChange={(e) => updateRow(idx, "opTime", e.target.value)}
+                                readOnly={viewOnly || isSaved}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                              />
+                            </td>
                             <td className="py-1 px-1 text-center">
                               {isSaved ? (
                                 <button
@@ -1885,6 +1903,17 @@ export default function KickingSessionPage() {
                               </select>
                             </td>
                           )}
+                          <td className="py-1 px-1">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="sec"
+                              value={row.opTime}
+                              onChange={(e) => updateRow(idx, "opTime", e.target.value)}
+                              readOnly={viewOnly}
+                              className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
+                            />
+                          </td>
                         </>
                       )}
                       {sessionMode !== "game" && (
