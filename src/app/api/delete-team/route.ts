@@ -55,8 +55,8 @@ export async function POST() {
       .map((m) => m.id as string)
       .filter((id) => id !== teamId); // exclude admin — deleted last
 
-    // 3. Delete all team data from every table (order doesn't matter, no FK constraints)
-    await Promise.all([
+    // 3. Delete all team data from every table
+    const deletes = await Promise.all([
       admin.from("sessions").delete().eq("team_id", teamId),
       admin.from("athletes").delete().eq("team_id", teamId),
       admin.from("archives").delete().eq("team_id", teamId),
@@ -65,6 +65,10 @@ export async function POST() {
       admin.from("teams").delete().eq("id", teamId),
       admin.from("user_data").delete().eq("user_id", teamId),
     ]);
+    const tableNames = ["sessions", "athletes", "archives", "members", "team_data", "teams", "user_data"];
+    deletes.forEach((r, i) => {
+      if (r.error) console.error(`[delete-team] Failed to delete ${tableNames[i]}:`, r.error);
+    });
 
     // 4. Delete athlete/coach auth accounts
     for (const memberId of memberIds) {

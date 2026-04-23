@@ -132,7 +132,10 @@ function ProfileContent() {
         setDeleting(false);
         return;
       }
-      // Account deleted — redirect to login
+      // Sign out locally then redirect
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      localStorage.clear();
       window.location.href = "/login";
     } catch {
       setDeleteError("Failed to delete account. Please try again.");
