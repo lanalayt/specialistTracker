@@ -4,8 +4,8 @@ import React, { useState, useCallback, useEffect } from "react";
 import { AuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
 import { setTeamId, getTeamId } from "@/lib/teamData";
-import { loadAndApplyTheme, applyTheme, type ThemeColors } from "@/lib/themeColors";
-import { useTeamDataSync } from "@/lib/useTeamDataSync";
+import { loadAndApplyTheme, applyTheme } from "@/lib/themeColors";
+import { ensureTeamExists, useTeamSettingsSync, type TeamSettings } from "@/lib/teamSettingsStore";
 import { TutorialProvider } from "@/components/ui/Tutorial";
 import { upsertMember, loadMembers, useMemberSync } from "@/lib/memberStore";
 import { hardDeleteExpired } from "@/lib/sessionStore";
@@ -45,13 +45,29 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     return () => { clearTimeout(timeout); clearInterval(interval); };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live-sync theme across devices
-  useTeamDataSync<ThemeColors>("theme_colors", (remote) => {
-    if (remote && remote.primary && remote.secondary) {
-      applyTheme(remote);
-      try { localStorage.setItem("st_theme", JSON.stringify(remote)); } catch {}
-    }
-  }, !!user && user.id !== "local-dev");
+  // Ensure team row exists for coaches + live-sync settings across devices
+  useEffect(() => {
+    if (!user || user.id === "local-dev" || user.role === "athlete") return;
+    const tid = getTeamId();
+    if (!tid || tid === "local-dev") return;
+    ensureTeamExists(tid, { name: user.name }).then((settings) => {
+      if (settings) {
+        const colors = { primary: settings.colorPrimary, secondary: settings.colorSecondary, tertiary: settings.colorTertiary };
+        applyTheme(colors);
+        try { localStorage.setItem("st_theme", JSON.stringify(colors)); } catch {}
+      }
+    });
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useTeamSettingsSync(
+    user && user.id !== "local-dev" ? getTeamId() : null,
+    (settings: TeamSettings) => {
+      const colors = { primary: settings.colorPrimary, secondary: settings.colorSecondary, tertiary: settings.colorTertiary };
+      applyTheme(colors);
+      try { localStorage.setItem("st_theme", JSON.stringify(colors)); } catch {}
+    },
+    !!user && user.id !== "local-dev"
+  );
 
   // Auto-register as team member using members table
   useEffect(() => {
@@ -74,7 +90,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         email: user.email,
         name: user.name,
         role: user.role,
-        access: existingAccess ?? (user.role === "coach" ? "edit" : "view"),
+        access: existingAccess ?? (user.role === "coach" || user.role === "admin" ? "edit" : "view"),
         lastSeen: new Date().toISOString(),
       });
 
@@ -169,9 +185,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isLoading,
-        isCoach: user?.role === "coach",
+        isAdmin: user?.role === "admin",
+        isCoach: user?.role === "coach" || user?.role === "admin",
         isAthlete: user?.role === "athlete",
-        canEdit: user?.role === "coach" || athleteAccess === "edit",
+        canEdit: user?.role === "coach" || user?.role === "admin" || athleteAccess === "edit",
         signIn,
         signUp,
         signOut,

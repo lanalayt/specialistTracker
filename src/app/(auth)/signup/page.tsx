@@ -10,7 +10,7 @@ import clsx from "clsx";
 export default function SignupPage() {
   const { signUp } = useAuth();
   const router = useRouter();
-  const [role, setRole] = useState<UserRole>("coach");
+  const [roleChoice, setRoleChoice] = useState<"coach" | "athlete">("coach");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -36,15 +36,16 @@ export default function SignupPage() {
       setError("Password must be at least 6 characters");
       return;
     }
-    if (role === "athlete" && !teamCode.trim()) {
+    if (roleChoice === "athlete" && !teamCode.trim()) {
       setError("Athletes must enter a Team Code from their coach");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      await signUp(form.email, form.password, form.name, role, role === "athlete" ? teamCode.trim() : undefined);
-      router.push(role === "athlete" ? "/dashboard" : "/onboard");
+      const role: UserRole = roleChoice === "athlete" ? "athlete" : "admin";
+      await signUp(form.email, form.password, form.name, role, roleChoice === "athlete" ? teamCode.trim() : undefined);
+      router.push(roleChoice === "athlete" ? "/dashboard" : "/onboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Sign up failed");
     } finally {
@@ -79,10 +80,10 @@ export default function SignupPage() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setRole("coach")}
+                  onClick={() => setRoleChoice("coach")}
                   className={clsx(
                     "py-3 rounded-input text-sm font-bold border transition-all",
-                    role === "coach"
+                    roleChoice === "coach"
                       ? "bg-accent/20 text-accent border-accent/50"
                       : "bg-surface-2 text-muted border-border hover:text-white"
                   )}
@@ -91,10 +92,10 @@ export default function SignupPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRole("athlete")}
+                  onClick={() => setRoleChoice("athlete")}
                   className={clsx(
                     "py-3 rounded-input text-sm font-bold border transition-all",
-                    role === "athlete"
+                    roleChoice === "athlete"
                       ? "bg-accent/20 text-accent border-accent/50"
                       : "bg-surface-2 text-muted border-border hover:text-white"
                   )}
@@ -104,7 +105,7 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {role === "athlete" && (
+            {roleChoice === "athlete" && (
               <div>
                 <label className="label">Team Code</label>
                 <input

@@ -108,22 +108,23 @@ function DashboardContent() {
         if (t.dashTitle) setDashTitle(t.dashTitle);
       }
     } catch {}
-    // Load from shared team_data (source of truth)
-    import("@/lib/teamData").then(({ teamGet, getTeamId }) => {
-      (async () => {
-        let tid = getTeamId();
-        for (let i = 0; i < 15 && !tid; i++) {
-          await new Promise((r) => setTimeout(r, 100));
-          tid = getTeamId();
-        }
-        if (!tid || tid === "local-dev") return;
-        const cloud = await teamGet<{ school?: string; name?: string; dashTitle?: string }>(tid, "settings_team");
-        if (cloud) {
-          if (cloud.school) setSchoolName(cloud.school);
-          else if (cloud.name) setSchoolName(cloud.name);
-          if (cloud.dashTitle) setDashTitle(cloud.dashTitle);
-        }
-      })();
+    // Load from teams table (source of truth)
+    import("@/lib/teamData").then(({ getTeamId }) => {
+      import("@/lib/teamSettingsStore").then(({ getTeamSettings }) => {
+        (async () => {
+          let tid = getTeamId();
+          for (let i = 0; i < 15 && !tid; i++) {
+            await new Promise((r) => setTimeout(r, 100));
+            tid = getTeamId();
+          }
+          if (!tid || tid === "local-dev") return;
+          const settings = await getTeamSettings(tid);
+          if (settings) {
+            setSchoolName(settings.school || settings.name);
+            setDashTitle(settings.dashTitle);
+          }
+        })();
+      });
     });
   }, []);
 
@@ -143,10 +144,14 @@ function DashboardContent() {
       const team = raw ? JSON.parse(raw) : {};
       team.dashTitle = title;
       localStorage.setItem("st_team_v1", JSON.stringify(team));
-      // Save to shared team_data
-      const { teamSet, getTeamId } = await import("@/lib/teamData");
+      // Save to teams table
+      const { getTeamId } = await import("@/lib/teamData");
+      const { updateTeamSettings, stampTeamSettingsWrite } = await import("@/lib/teamSettingsStore");
       const tid = getTeamId();
-      if (tid && tid !== "local-dev") teamSet(tid, "settings_team", team);
+      if (tid && tid !== "local-dev") {
+        stampTeamSettingsWrite();
+        updateTeamSettings(tid, { dashTitle: title });
+      }
     } catch {}
   };
 

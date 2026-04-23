@@ -8,6 +8,7 @@ import type { AuthUser, UserRole } from "@/types";
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
+  isAdmin: boolean;
   isCoach: boolean;
   isAthlete: boolean;
   /** True for coaches and athletes with edit access */
@@ -21,6 +22,7 @@ interface AuthContextValue {
 export const AuthContext = createContext<AuthContextValue>({
   user: null,
   isLoading: true,
+  isAdmin: false,
   isCoach: false,
   isAthlete: false,
   canEdit: false,
@@ -41,5 +43,5 @@ export function useAuth() {
 }
 
 export function isCoachRole(role?: UserRole): boolean {
-  return role === "coach";
+  return role === "coach" || role === "admin";
 }

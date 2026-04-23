@@ -1,7 +1,7 @@
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 export type SportType = "KICKING" | "PUNTING" | "KICKOFF" | "LONGSNAP";
-export type UserRole = "coach" | "athlete";
+export type UserRole = "admin" | "coach" | "athlete";
 
 // FG Kicking
 export type FGPosition = "LH" | "RH" | "LM" | "RM" | "M";

@@ -3,10 +3,10 @@
  * Syncs to team_data so all devices on the same account share the same theme.
  */
 
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
+import { updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
 
 const STORAGE_KEY = "st_theme";
-const TEAM_KEY = "theme_colors";
 
 export interface ThemeColors {
   primary: string;    // accent — buttons, active states
@@ -90,10 +90,9 @@ export function applyTheme(colors: ThemeColors): void {
   root.style.setProperty("--text", "#f1f5f9");
 }
 
-/** Load from localStorage immediately + apply. Also kicks off async cloud load. */
+/** Load from localStorage immediately + apply. Cloud load is handled by AppProviders via useTeamSettingsSync. */
 export function loadAndApplyTheme(): ThemeColors {
   if (typeof window === "undefined") return DEFAULT_THEME;
-  // Apply from localStorage first (instant)
   let theme = DEFAULT_THEME;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -105,36 +104,21 @@ export function loadAndApplyTheme(): ThemeColors {
     }
   } catch {}
   applyTheme(theme);
-
-  // Then try cloud (async) — wait for teamId if needed, then fetch
-  (async () => {
-    let tid = getTeamId();
-    // Wait up to 1.5s for teamId to be set by auth
-    for (let i = 0; i < 15 && (!tid || tid === "local-dev"); i++) {
-      await new Promise((r) => setTimeout(r, 100));
-      tid = getTeamId();
-    }
-    if (!tid || tid === "local-dev") return;
-    try {
-      const cloud = await teamGet<ThemeColors>(tid, TEAM_KEY);
-      if (cloud && cloud.primary && cloud.secondary) {
-        applyTheme(cloud);
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cloud)); } catch {}
-      }
-    } catch {}
-  })();
-
   return theme;
 }
 
-/** Save theme to localStorage + cloud + apply immediately */
+/** Save theme to localStorage + teams table + apply immediately */
 export function saveTheme(colors: ThemeColors): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(colors));
   applyTheme(colors);
-  // Sync to cloud so other devices get it
   const tid = getTeamId();
   if (tid && tid !== "local-dev") {
-    teamSet(tid, TEAM_KEY, colors);
+    stampTeamSettingsWrite();
+    updateTeamSettings(tid, {
+      colorPrimary: colors.primary,
+      colorSecondary: colors.secondary,
+      colorTertiary: colors.tertiary,
+    });
   }
 }

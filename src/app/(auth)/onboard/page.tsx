@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { saveSettingsToCloud } from "@/lib/settingsSync";
+import { ensureTeamExists } from "@/lib/teamSettingsStore";
+import { createClient } from "@/lib/supabase";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import React from "react";
 
@@ -24,14 +25,23 @@ export default function OnboardPage() {
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
 
-  const handleFinish = () => {
-    const team = {
-      id: "demo-team-1",
+  const handleFinish = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
+    if (userId) {
+      await ensureTeamExists(userId, {
+        name: teamName || "My Team",
+        school: school || "My School",
+        enabledSports: sports,
+      });
+    }
+    // Also cache in localStorage for instant load
+    localStorage.setItem("st_team_v1", JSON.stringify({
       name: teamName || "My Team",
       school: school || "My School",
       config: { enabledSports: sports },
-    };
-    saveSettingsToCloud("st_team_v1", team);
+    }));
     router.push("/dashboard");
   };
 

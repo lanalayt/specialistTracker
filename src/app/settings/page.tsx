@@ -9,7 +9,8 @@ import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { createArchive } from "@/lib/archiveManager";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
+import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
 import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, type ThemeColors } from "@/lib/themeColors";
 import clsx from "clsx";
 
@@ -100,7 +101,7 @@ function SettingsContent() {
       }
     } catch {}
 
-    // Then load from team_data (shared cloud, source of truth)
+    // Then load from teams table (source of truth)
     (async () => {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) {
@@ -108,13 +109,20 @@ function SettingsContent() {
         tid = getTeamId();
       }
       if (!tid || tid === "local-dev") return;
-      const cloud = await teamGet<{ name: string; school: string; config: { enabledSports: string[] } }>(tid, "settings_team");
-      if (cloud) {
-        if (cloud.name) setTeamName(cloud.name);
-        if (cloud.school) setSchool(cloud.school);
-        if (cloud.config?.enabledSports) setEnabledSports(cloud.config.enabledSports);
+      const settings = await getTeamSettings(tid);
+      if (settings) {
+        setTeamName(settings.name);
+        setSchool(settings.school);
+        setEnabledSports(settings.enabledSports);
         // Update localStorage cache
-        try { localStorage.setItem("st_team_v1", JSON.stringify(cloud)); } catch {}
+        try {
+          localStorage.setItem("st_team_v1", JSON.stringify({
+            name: settings.name,
+            school: settings.school,
+            config: { enabledSports: settings.enabledSports },
+            dashTitle: settings.dashTitle,
+          }));
+        } catch {}
       }
     })();
   }, []);
@@ -125,7 +133,7 @@ function SettingsContent() {
     );
 
   const handleSave = () => {
-    // Preserve existing fields (like dashTitle) when saving
+    // Preserve existing fields (like dashTitle) when saving to localStorage cache
     let existing: Record<string, unknown> = {};
     try { const raw = localStorage.getItem("st_team_v1"); if (raw) existing = JSON.parse(raw); } catch {}
     const team = {
@@ -134,16 +142,12 @@ function SettingsContent() {
       school,
       config: { enabledSports },
     };
-    // Save to localStorage
     localStorage.setItem("st_team_v1", JSON.stringify(team));
-    // Save to shared team_data (merge with existing to preserve dashTitle etc.)
+    // Save to teams table
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamGet<Record<string, unknown>>(tid, "settings_team").then((cloudExisting) => {
-        teamSet(tid, "settings_team", { ...cloudExisting, ...team });
-      }).catch(() => {
-        teamSet(tid, "settings_team", team);
-      });
+      stampTeamSettingsWrite();
+      updateTeamSettings(tid, { name: teamName, school, enabledSports });
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getTeamId, teamGet, teamSet } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
+import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
 
 const STORAGE_KEY = "team_logo";
 
@@ -15,14 +16,14 @@ export function useTeamLogo() {
     }
   });
 
-  // Load from cloud on mount
+  // Load from teams table on mount
   useEffect(() => {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamGet<{ logo: string }>(tid, "team_logo").then((data) => {
-        if (data?.logo) {
-          setLogo(data.logo);
-          try { localStorage.setItem(STORAGE_KEY, data.logo); } catch {}
+      getTeamSettings(tid).then((settings) => {
+        if (settings?.logo) {
+          setLogo(settings.logo);
+          try { localStorage.setItem(STORAGE_KEY, settings.logo); } catch {}
         }
       });
     }
@@ -53,7 +54,8 @@ export function useTeamLogo() {
         try { localStorage.setItem(STORAGE_KEY, dataUrl); } catch {}
         const tid = getTeamId();
         if (tid && tid !== "local-dev") {
-          teamSet(tid, "team_logo", { logo: dataUrl });
+          stampTeamSettingsWrite();
+          updateTeamSettings(tid, { logo: dataUrl });
         }
       };
       img.src = reader.result as string;
@@ -66,7 +68,8 @@ export function useTeamLogo() {
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamSet(tid, "team_logo", { logo: "" });
+      stampTeamSettingsWrite();
+      updateTeamSettings(tid, { logo: null });
     }
   }, []);
 
