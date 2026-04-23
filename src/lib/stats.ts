@@ -48,7 +48,7 @@ export function emptyAthleteStats(): AthleteStats {
     overall: { att: 0, made: 0, score: 0, longFG: 0 },
     position,
     distance,
-    miss: { XL: 0, XR: 0, XS: 0 },
+    miss: { XL: 0, XR: 0, XS: 0, X: 0 },
     pat: { att: 0, made: 0, score: 0 },
   };
 }
@@ -125,7 +125,7 @@ export function processKick(
   }
 
   // Miss tracking
-  if (!isMake && (result === "XL" || result === "XR" || result === "XS")) {
+  if (!isMake && (result === "XL" || result === "XR" || result === "XS" || result === "X")) {
     s.miss = { ...s.miss, [result]: s.miss[result] + 1 };
   }
 

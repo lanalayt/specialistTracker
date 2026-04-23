@@ -61,7 +61,7 @@ export interface AthleteStats {
   overall: StatBucket & { longFG: number };
   position: Record<FGPosition, StatBucket>;
   distance: Record<DistRange, StatBucket>;
-  miss: { XL: number; XR: number; XS: number };
+  miss: { XL: number; XR: number; XS: number; X: number };
   pat: StatBucket;
 }
 

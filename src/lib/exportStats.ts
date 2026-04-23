@@ -124,7 +124,7 @@ function fgStatsToAOA(athletes: string[], statsMap: Record<string, AthleteStats>
   athletes.forEach((a) => {
     const s = statsMap[a];
     if (!s) return;
-    rows.push([a, s.miss.XL, s.miss.XR, s.miss.XS, s.miss.XL + s.miss.XR + s.miss.XS]);
+    rows.push([a, s.miss.XL, s.miss.XR, s.miss.XS, s.miss.XL + s.miss.XR + s.miss.XS + (s.miss.X || 0)]);
   });
 
   // ── By Hash / Position ──

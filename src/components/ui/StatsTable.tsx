@@ -165,12 +165,12 @@ export function MultiAthleteTable({
 // ─── Miss chart ───────────────────────────────────────────────────────────────
 
 interface MissChartProps {
-  miss: { XL: number; XR: number; XS: number };
+  miss: { XL: number; XR: number; XS: number; X: number };
   className?: string;
 }
 
 export function MissChart({ miss, className }: MissChartProps) {
-  const total = miss.XL + miss.XR + miss.XS;
+  const total = miss.XL + miss.XR + miss.XS + miss.X;
 
   const bars = [
     { label: "Miss Left (XL)", count: miss.XL, color: "#f59e0b" },

@@ -180,7 +180,7 @@ function FGStatsView({
               {athletes.map((a) => {
                 const s = statsMap[a.name];
                 if (!s) return null;
-                const total = s.miss.XL + s.miss.XR + s.miss.XS;
+                const total = s.miss.XL + s.miss.XR + s.miss.XS + s.miss.X;
                 return (
                   <tr key={a.id} className="hover:bg-surface/30 transition-colors">
                     <td className="table-name">{a.name}</td>
