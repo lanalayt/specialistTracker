@@ -10,7 +10,7 @@ const RESULT_LABELS: Record<string, string> = {
   YR: "✓ GOOD →",
   XL: "← MISS",
   XR: "MISS →",
-  XS: "↓ SHORT",
+  XS: "✗ MISS",
 };
 
 interface SessionLogProps {

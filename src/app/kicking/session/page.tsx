@@ -146,7 +146,7 @@ const RESULT_LABELS: Record<string, string> = {
   YC: "Make ✓",
   YR: "Make →",
   XL: "Miss ←",
-  XS: "Miss ↓",
+  XS: "Miss ✗",
   XR: "Miss →",
 };
 
