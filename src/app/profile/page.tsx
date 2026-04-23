@@ -5,23 +5,15 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
+import { upsertMember, loadMembers, updateMemberAccess, removeMember, type StoredMember } from "@/lib/memberStore";
 import clsx from "clsx";
-
-interface TeamMember {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  lastSeen: string;
-  access?: "view" | "edit";
-}
 
 function ProfileContent() {
   const { user, isCoach, signOut } = useAuth();
 
   // Team members
-  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [members, setMembers] = useState<StoredMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
 
   // Change password
@@ -31,14 +23,14 @@ function ProfileContent() {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  // Register self as team member + load team members list
+  // Load team members
   useEffect(() => {
     if (!user || user.id === "local-dev") {
       setMembersLoading(false);
       return;
     }
 
-    async function loadMembers() {
+    async function load() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) {
         await new Promise((r) => setTimeout(r, 100));
@@ -50,26 +42,21 @@ function ProfileContent() {
       }
 
       // Register self
-      const existing = await teamGet<TeamMember[]>(tid, "team_members") ?? [];
-      const me: TeamMember = {
+      await upsertMember(tid, {
         id: user!.id,
         email: user!.email,
         name: user!.name,
         role: user!.role,
+        access: user!.role === "coach" ? "edit" : "view",
         lastSeen: new Date().toISOString(),
-      };
-      const idx = existing.findIndex((m) => m.id === me.id);
-      if (idx >= 0) {
-        existing[idx] = me;
-      } else {
-        existing.push(me);
-      }
-      teamSet(tid, "team_members", existing);
-      setMembers(existing);
+      });
+
+      const list = await loadMembers(tid);
+      setMembers(list);
       setMembersLoading(false);
     }
 
-    loadMembers();
+    load();
   }, [user]);
 
   const handleChangePassword = async () => {
@@ -112,20 +99,20 @@ function ProfileContent() {
     if (!window.confirm("Remove this member from the team?")) return;
     const tid = getTeamId();
     if (!tid) return;
-    const updated = members.filter((m) => m.id !== memberId);
-    setMembers(updated);
-    teamSet(tid, "team_members", updated);
+    await removeMember(tid, memberId);
+    setMembers((prev) => prev.filter((m) => m.id !== memberId));
   };
 
   const handleToggleAccess = async (memberId: string) => {
     const tid = getTeamId();
     if (!tid) return;
-    const updated = members.map((m) => {
-      if (m.id !== memberId) return m;
-      return { ...m, access: m.access === "edit" ? "view" as const : "edit" as const };
-    });
-    setMembers(updated);
-    teamSet(tid, "team_members", updated);
+    const member = members.find((m) => m.id === memberId);
+    if (!member) return;
+    const newAccess = member.access === "edit" ? "view" as const : "edit" as const;
+    await updateMemberAccess(tid, memberId, newAccess);
+    setMembers((prev) => prev.map((m) =>
+      m.id === memberId ? { ...m, access: newAccess } : m
+    ));
   };
 
   return (

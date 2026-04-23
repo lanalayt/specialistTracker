@@ -3,12 +3,10 @@
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
-import { FGProvider, useFG } from "@/lib/fgContext";
-import { PuntProvider, usePunt } from "@/lib/puntContext";
-import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
-import { getTrash, removeFromTrash, clearTrash, type TrashedSession } from "@/lib/trashBin";
+import { loadDeletedSessions, restoreSession, hardDeleteSession, hardDeleteExpired } from "@/lib/sessionStore";
+import { getTeamId } from "@/lib/teamData";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
-import clsx from "clsx";
+import type { Session } from "@/types";
 import React from "react";
 
 const SPORT_INFO: Record<string, { label: string; iconEl: React.ReactNode }> = {
@@ -17,37 +15,56 @@ const SPORT_INFO: Record<string, { label: string; iconEl: React.ReactNode }> = {
   KICKOFF: { label: "KO", iconEl: <KickoffTeeIcon size={16} /> },
 };
 
+interface DeletedSession extends Session {
+  deletedAt: string;
+}
+
 function TrashContent() {
-  const fg = useFG();
-  const punt = usePunt();
-  const ko = useKickoff();
-  const [items, setItems] = useState<TrashedSession[]>([]);
+  const [items, setItems] = useState<DeletedSession[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      getTrash().then((t) => { setItems(t); setLoading(false); });
+    const timer = setTimeout(async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        tid = getTeamId();
+      }
+      if (!tid || tid === "local-dev") {
+        setLoading(false);
+        return;
+      }
+      // Purge expired sessions first
+      await hardDeleteExpired(tid);
+      const deleted = await loadDeletedSessions(tid);
+      setItems(deleted);
+      setLoading(false);
     }, 500);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleRestore = async (session: TrashedSession) => {
-    if (session.sport === "KICKING") fg.restoreSession(session);
-    else if (session.sport === "PUNTING") punt.restoreSession(session);
-    else if (session.sport === "KICKOFF") ko.restoreSession(session);
-    await removeFromTrash(session.id);
+  const handleRestore = async (session: DeletedSession) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    await restoreSession(tid, session.id);
     setItems((prev) => prev.filter((s) => s.id !== session.id));
   };
 
   const handlePermanentDelete = async (sessionId: string) => {
     if (!window.confirm("Permanently delete this session? This cannot be undone.")) return;
-    await removeFromTrash(sessionId);
+    const tid = getTeamId();
+    if (!tid) return;
+    await hardDeleteSession(tid, sessionId);
     setItems((prev) => prev.filter((s) => s.id !== sessionId));
   };
 
   const handleClearAll = async () => {
     if (!window.confirm("Permanently delete all trashed sessions? This cannot be undone.")) return;
-    await clearTrash();
+    const tid = getTeamId();
+    if (!tid) return;
+    for (const s of items) {
+      await hardDeleteSession(tid, s.id);
+    }
     setItems([]);
   };
 
@@ -133,16 +150,10 @@ function TrashContent() {
 
 export default function TrashPage() {
   return (
-    <FGProvider>
-      <PuntProvider>
-        <KickoffProvider>
-          <div className="flex overflow-x-hidden max-w-[100vw]">
-            <Sidebar />
-            <TrashContent />
-            <MobileNav />
-          </div>
-        </KickoffProvider>
-      </PuntProvider>
-    </FGProvider>
+    <div className="flex overflow-x-hidden max-w-[100vw]">
+      <Sidebar />
+      <TrashContent />
+      <MobileNav />
+    </div>
   );
 }

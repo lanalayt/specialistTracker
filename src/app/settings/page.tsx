@@ -68,9 +68,9 @@ function SettingsContent() {
     try {
       await createArchive(
         archiveName.trim(),
-        { athletes: fg.athletes, stats: fg.stats, history: fg.history },
-        { athletes: punt.athletes, stats: punt.stats, history: punt.history },
-        { athletes: kickoff.athletes, stats: kickoff.stats, history: kickoff.history }
+        { athletes: fg.athletes.map(a => a.name), stats: fg.stats, history: fg.history },
+        { athletes: punt.athletes.map(a => a.name), stats: punt.stats, history: punt.history },
+        { athletes: kickoff.athletes.map(a => a.name), stats: kickoff.stats, history: kickoff.history }
       );
       fg.resetStatsKeepAthletes();
       punt.resetStatsKeepAthletes();

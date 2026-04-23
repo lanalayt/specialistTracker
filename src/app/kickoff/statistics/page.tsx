@@ -102,12 +102,12 @@ function ezPct(s: AthleteKOStats): string {
 }
 
 function StatTable({ athletes, statsMap, dirMode, dirOptions }: {
-  athletes: string[];
+  athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteKOStats>;
   dirMode: DirectionMode;
   dirOptions: { id: string; label: string }[];
 }) {
-  const visible = athletes.filter((a) => (statsMap[a]?.att ?? 0) > 0);
+  const visible = athletes.filter((a) => (statsMap[a.name]?.att ?? 0) > 0);
   if (visible.length === 0) {
     return <p className="text-xs text-muted p-2">No data.</p>;
   }
@@ -132,10 +132,10 @@ function StatTable({ athletes, statsMap, dirMode, dirOptions }: {
         </thead>
         <tbody>
           {visible.map((a) => {
-            const s = statsMap[a];
+            const s = statsMap[a.name];
             return (
-              <tr key={a} className="hover:bg-surface/30">
-                <td className="table-name">{a}</td>
+              <tr key={a.id} className="hover:bg-surface/30">
+                <td className="table-name">{a.name}</td>
                 <td className="table-cell">{s.att}</td>
                 <td className="table-cell">{avgDist(s)}</td>
                 <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>
@@ -221,7 +221,7 @@ export default function KickoffStatisticsPage() {
   // Compute overall per-athlete stats
   const overallStats = useMemo(() => {
     const map: Record<string, AthleteKOStats> = {};
-    athletes.forEach((a) => { map[a] = emptyStats(); });
+    athletes.forEach((a) => { map[a.name] = emptyStats(); });
     filteredHistory.forEach((session) => {
       (session.entries ?? []).forEach((e) => {
         if (!map[e.athlete]) map[e.athlete] = emptyStats();
@@ -239,7 +239,7 @@ export default function KickoffStatisticsPage() {
         const type = e.type || "UNKNOWN";
         if (!result[type]) {
           result[type] = { total: 0, map: {} };
-          athletes.forEach((a) => { result[type].map[a] = emptyStats(); });
+          athletes.forEach((a) => { result[type].map[a.name] = emptyStats(); });
         }
         if (!result[type].map[e.athlete]) result[type].map[e.athlete] = emptyStats();
         result[type].map[e.athlete] = addEntry(result[type].map[e.athlete], e);
@@ -319,7 +319,7 @@ export default function KickoffStatisticsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
         <button
-          onClick={() => exportKickoffStats(athletes, history as { date?: string; entries?: KickoffEntry[] }[])}
+          onClick={() => exportKickoffStats(athletes.map((a) => a.name), history as { date?: string; entries?: KickoffEntry[] }[])}
           className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
         >
           Export

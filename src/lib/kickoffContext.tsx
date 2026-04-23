@@ -1,16 +1,15 @@
 "use client";
 
 import React, {
-  createContext, useContext, useState, useCallback, useEffect,
+  createContext, useContext, useState, useCallback, useEffect, useMemo,
 } from "react";
 import type { KickoffEntry, KickoffAthleteStats, Session, SessionMode } from "@/types";
-import { emptyKickoffStats, processKickoff, recomputeKickoffStats, genId, sessionLabel } from "@/lib/stats";
+import { emptyKickoffStats, recomputeKickoffStats, genId, sessionLabel } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
-import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
-import { useTeamDataSync } from "@/lib/useTeamDataSync";
-import { mergeHistory } from "@/lib/mergeHistory";
-import { verifyCloudWrite } from "@/lib/integritySync";
+import { teamGet, getTeamId } from "@/lib/teamData";
+import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
 
 interface KickoffStateData {
@@ -20,79 +19,101 @@ interface KickoffStateData {
   history: Session[];
 }
 
-interface KickoffContextValue extends KickoffStateData {
+interface KickoffContextValue {
+  athletes: StoredAthlete[];
+  stats: Record<string, KickoffAthleteStats>;
+  history: Session[];
   addAthletes: (names: string[]) => void;
-  removeAthlete: (name: string) => void;
+  removeAthlete: (athleteId: string) => void;
   commitPractice: (entries: KickoffEntry[], label?: string, weather?: string, mode?: SessionMode, opponent?: string, gameTime?: string) => Session;
-  undoLastCommit: () => boolean;
   resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   updateSessionEntries: (sessionId: string, entries: KickoffEntry[]) => void;
   deleteSession: (sessionId: string) => void;
   restoreSession: (session: Session) => void;
-  canUndo: boolean;
-}
-
-const DEFAULT_ATHLETES = ["Kyle", "LeSieur", "Eich"];
-
-function defaultState(): KickoffStateData {
-  const athletes = DEFAULT_ATHLETES;
-  const stats: Record<string, KickoffAthleteStats> = {};
-  athletes.forEach((a) => { stats[a] = emptyKickoffStats(); });
-  return { athletes, stats, snapshot: null, history: [] };
 }
 
 const KickoffContext = createContext<KickoffContextValue | null>(null);
 
 export function KickoffProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<KickoffStateData>(defaultState);
+  const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const { user } = useAuth();
+
+  const stats = useMemo(() => {
+    const names = athletes.map((a) => a.name);
+    return recomputeKickoffStats(
+      names,
+      sessions
+        .filter((s) => s.mode !== "game")
+        .map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
+    );
+  }, [athletes, sessions]);
+
+  const history = useMemo(
+    () => [...sessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [sessions]
+  );
 
   useEffect(() => {
     const userId = user?.id;
     if (userId) setCloudUserId(userId);
 
     async function loadData() {
-      let saved: KickoffStateData | null = null;
-
-      // Wait briefly for team ID to be set by AppProviders after auth resolves
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) {
         await new Promise((r) => setTimeout(r, 100));
         tid = getTeamId();
       }
 
-      // Try team_data first (shared across team members)
       if (tid && tid !== "local-dev") {
-        saved = await teamGet<KickoffStateData>(tid, "kickoff_data");
+        const dbAthletes = await loadAthletes(tid, "KICKOFF");
+        if (dbAthletes.length > 0) setAthletes(dbAthletes);
       }
 
-      // Fall back to user's own Supabase data
-      if (!saved && userId && userId !== "local-dev") {
-        saved = await cloudGet<KickoffStateData>(userId, getCloudKey("KICKOFF"));
+      if (tid && tid !== "local-dev") {
+        const dbSessions = await loadSessions(tid, "KICKOFF");
+        if (dbSessions.length > 0) { setSessions(dbSessions); return; }
       }
 
-      // Fall back to localStorage (read-only — never write local back to cloud)
-      if (!saved) {
-        saved = localGet<KickoffStateData>("KICKOFF");
-      }
+      // Migration
+      let blob: KickoffStateData | null = null;
+      if (tid && tid !== "local-dev") blob = await teamGet<KickoffStateData>(tid, "kickoff_data");
+      if (!blob && userId && userId !== "local-dev") blob = await cloudGet<KickoffStateData>(userId, getCloudKey("KICKOFF"));
+      if (!blob) blob = localGet<KickoffStateData>("KICKOFF");
+      const localBlob = localGet<KickoffStateData>("KICKOFF");
 
-      if (saved) {
-        // Merge with localStorage to prevent losing sessions that only exist locally
-        const local = localGet<KickoffStateData>("KICKOFF");
-        const history = local?.history
-          ? mergeHistory(local.history, saved.history ?? [])
-          : (saved.history ?? []);
-        const stats = { ...saved.stats };
-        (saved.athletes || []).forEach((a) => { if (!stats[a]) stats[a] = emptyKickoffStats(); });
-        const migrated = { ...saved, stats, history };
-        setState(migrated);
-        localSet("KICKOFF", migrated);
-        // If local had sessions the cloud didn't, push merged version to cloud
-        if (local?.history && history.length > (saved.history ?? []).length) {
-          const tid = getTeamId();
-          if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", migrated);
+      if (blob || localBlob) {
+        const source = blob ?? localBlob!;
+        const sessionMap = new Map<string, Session>();
+        for (const s of (localBlob?.history ?? [])) sessionMap.set(s.id, s);
+        for (const s of (blob?.history ?? [])) {
+          const ex = sessionMap.get(s.id);
+          if (!ex || (Array.isArray(s.entries) ? s.entries.length : 0) >= (Array.isArray(ex.entries) ? ex.entries.length : 0))
+            sessionMap.set(s.id, s);
+        }
+        const allSessions = Array.from(sessionMap.values()).sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+
+        const athleteNames = source.athletes ?? [];
+        if (tid && tid !== "local-dev" && athleteNames.length > 0) {
+          const existing = await loadAthletes(tid, "KICKOFF");
+          const existingNames = new Set(existing.map((a) => a.name));
+          const inserted: StoredAthlete[] = [...existing];
+          for (const name of athleteNames.filter((n) => !existingNames.has(n))) {
+            const result = await insertAthlete(tid, "KICKOFF", name);
+            if (result) inserted.push(result);
+          }
+          setAthletes(inserted);
+        }
+
+        if (tid && tid !== "local-dev" && allSessions.length > 0) {
+          for (const s of allSessions) await insertSession(tid, { ...s, sport: "KICKOFF", teamId: tid });
+          setSessions(await loadSessions(tid, "KICKOFF"));
+        } else {
+          setSessions(allSessions);
         }
       }
     }
@@ -100,213 +121,94 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     loadData();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll team_data for remote updates (changes made on other devices)
-  // CRITICAL: merge histories instead of blind replacement to prevent data loss
-  useTeamDataSync<KickoffStateData>("kickoff_data", (remote) => {
-    if (!remote) return;
-    setState((prev) => {
-      const mergedHistory = mergeHistory(prev.history, remote.history ?? []);
-      const athleteSet = new Set([...(prev.athletes || []), ...(remote.athletes || [])]);
-      const athletes = Array.from(athleteSet);
-      const stats = { ...remote.stats };
-      athletes.forEach((a) => {
-        if (!stats[a]) stats[a] = emptyKickoffStats();
-      });
-      const merged = { ...remote, athletes, stats, history: mergedHistory, snapshot: prev.snapshot };
-      localSet("KICKOFF", merged, true); // skipCloud — don't write remote data back to user_data
-      return merged;
-    });
+  const tid = getTeamId();
+  useSessionSync(tid, "KICKOFF", {
+    onInsert: (s) => setSessions((prev) => prev.some((x) => x.id === s.id) ? prev : [...prev, s].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())),
+    onUpdate: (s) => setSessions((prev) => prev.map((x) => x.id === s.id ? s : x)),
+    onDelete: (id) => setSessions((prev) => prev.filter((x) => x.id !== id)),
+    onRestore: (s) => setSessions((prev) => prev.some((x) => x.id === s.id) ? prev : [...prev, s].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())),
   });
 
-  const addAthletes = useCallback((names: string[]) => {
-    setState((prev) => {
-      const existing = new Set(prev.athletes);
-      const toAdd = names.filter((n) => n.trim() && !existing.has(n.trim()));
-      if (toAdd.length === 0) return prev;
-      const newAthletes = [...prev.athletes, ...toAdd.map((n) => n.trim())];
-      const newStats = { ...prev.stats };
-      toAdd.forEach((a) => {
-        if (!newStats[a.trim()]) newStats[a.trim()] = emptyKickoffStats();
-      });
-      const next = { ...prev, athletes: newAthletes, stats: newStats };
-      localSet("KICKOFF", next);
-      const tid = getTeamId();
-      if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", next);
-      return next;
-    });
-  }, []);
+  useAthleteSync(tid, "KICKOFF", (dbAthletes) => setAthletes(dbAthletes));
 
-  const removeAthlete = useCallback((name: string) => {
-    setState((prev) => {
-      const next = { ...prev, athletes: prev.athletes.filter((a) => a !== name) };
-      localSet("KICKOFF", next);
-      const tid = getTeamId();
-      if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", next);
-      return next;
-    });
+  const addAthletes = useCallback((names: string[]) => {
+    const tid = getTeamId();
+    const existing = new Set(athletes.map((a) => a.name));
+    const toAdd = names.filter((n) => n.trim() && !existing.has(n.trim()));
+    if (toAdd.length === 0) return;
+    if (tid && tid !== "local-dev") {
+      stampAthleteWrite(tid);
+      Promise.all(toAdd.map((n) => insertAthlete(tid, "KICKOFF", n))).then((results) => {
+        setAthletes((prev) => [...prev, ...results.filter(Boolean) as StoredAthlete[]]);
+      });
+    } else {
+      setAthletes((prev) => [...prev, ...toAdd.map((n) => ({ id: genId(), name: n.trim() }))]);
+    }
+  }, [athletes]);
+
+  const removeAthleteAction = useCallback((athleteId: string) => {
+    const tid = getTeamId();
+    setAthletes((prev) => prev.filter((a) => a.id !== athleteId));
+    if (tid && tid !== "local-dev") { stampAthleteWrite(tid); removeAthleteRow(tid, athleteId); }
   }, []);
 
   const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string, mode: SessionMode = "practice", opponent?: string, gameTime?: string): Session => {
+    const tid = getTeamId();
     const session: Session = {
-      id: genId(), teamId: "local", sport: "KICKOFF",
+      id: genId(), teamId: tid ?? "local", sport: "KICKOFF",
       label: label ?? sessionLabel(), date: new Date().toISOString(),
       weather: weather || undefined, mode,
-      opponent: opponent || undefined, gameTime: gameTime || undefined,
-      entries,
+      opponent: opponent || undefined, gameTime: gameTime || undefined, entries,
     };
-    setState((prev) => {
-      const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
-      let newStats = { ...prev.stats };
-      if (mode !== "game") {
-        entries.forEach((e) => { newStats = processKickoff(e, newStats); });
-      }
-      const next = { ...prev, stats: newStats, history: [...prev.history, session], snapshot };
-      localSet("KICKOFF", next);
-      const tid = getTeamId();
-      if (tid && tid !== "local-dev") {
-        // Critical: committed session must reach cloud immediately, not debounced
-        teamSetImmediate(tid, "kickoff_data", next);
-        verifyCloudWrite("kickoff_data", session.id, next);
-      }
-      return next;
-    });
+    setSessions((prev) => [...prev, session]);
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); insertSession(tid, session); }
     return session;
   }, []);
 
-  const undoLastCommit = useCallback((): boolean => {
-    let success = false;
-    setState((prev) => {
-      if (!prev.snapshot) return prev;
-      const newHistory = JSON.parse(JSON.stringify(prev.snapshot)) as Session[];
-      const newStats = defaultState().stats;
-      prev.athletes.forEach((a) => { newStats[a] = emptyKickoffStats(); });
-      newHistory.filter((s) => s.mode !== "game").forEach((s) => {
-        (s.entries as KickoffEntry[])?.forEach((e) => {
-          Object.assign(newStats, processKickoff(e, newStats));
-        });
-      });
-      const next = { ...prev, history: newHistory, snapshot: null, stats: newStats };
-      localSet("KICKOFF", next);
-      const tid = getTeamId();
-      if (tid && tid !== "local-dev") {
-        teamSet(tid, "kickoff_data", next);
-      }
-      success = true;
-      return next;
-    });
-    return success;
+  const updateSessionDate = useCallback((sessionId: string, date: string, label: string) => {
+    setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, date, label } : s));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); updateSessionRow(tid, sessionId, { date, label }); }
   }, []);
 
-  const updateSessionWeather = useCallback(
-    (sessionId: string, weather: string) => {
-      setState((prev) => {
-        const newHistory = prev.history.map((s) =>
-          s.id === sessionId ? { ...s, weather: weather || undefined } : s
-        );
-        const next = { ...prev, history: newHistory };
-        localSet("KICKOFF", next);
-        const tid = getTeamId();
-        if (tid && tid !== "local-dev") {
-          teamSet(tid, "kickoff_data", next);
-        }
-        return next;
-      });
-    },
-    []
-  );
-
-  const updateSessionDate = useCallback(
-    (sessionId: string, date: string, label: string) => {
-      setState((prev) => {
-        const newHistory = prev.history.map((s) =>
-          s.id === sessionId ? { ...s, date, label } : s
-        );
-        const next = { ...prev, history: newHistory };
-        localSet("KICKOFF", next);
-        const tid = getTeamId();
-        if (tid && tid !== "local-dev") {
-          teamSet(tid, "kickoff_data", next);
-        }
-        return next;
-      });
-    },
-    []
-  );
+  const updateSessionWeather = useCallback((sessionId: string, weather: string) => {
+    setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, weather: weather || undefined } : s));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); updateSessionRow(tid, sessionId, { weather: weather || undefined }); }
+  }, []);
 
   const updateSessionEntries = useCallback((sessionId: string, entries: KickoffEntry[]) => {
-    setState((prev) => {
-      const newHistory = prev.history.map((s) =>
-        s.id === sessionId ? { ...s, entries } : s
-      );
-      const newStats = recomputeKickoffStats(
-        prev.athletes,
-        newHistory.filter((s) => s.mode !== "game").map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
-      );
-      const next = { ...prev, history: newHistory, stats: newStats };
-      localSet("KICKOFF", next);
-      const tid = getTeamId();
-      if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", next);
-      return next;
-    });
+    setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, entries } : s));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); updateSessionRow(tid, sessionId, { entries }); }
   }, []);
 
   const deleteSession = useCallback((sessionId: string) => {
-    setState((prev) => {
-      const deleted = prev.history.find((s) => s.id === sessionId);
-      if (deleted) {
-        import("@/lib/trashBin").then(({ trashSession }) => trashSession(deleted, "KICKOFF"));
-      }
-      const newHistory = prev.history.filter((s) => s.id !== sessionId);
-      const newStats = recomputeKickoffStats(
-        prev.athletes,
-        newHistory
-          .filter((s) => s.mode !== "game")
-          .map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
-      );
-      const next = { ...prev, history: newHistory, stats: newStats };
-      localSet("KICKOFF", next);
-      const tid = getTeamId();
-      if (tid && tid !== "local-dev") { teamSet(tid, "kickoff_data", next); }
-      return next;
-    });
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); softDeleteSession(tid, sessionId); }
   }, []);
 
-  const restoreSession = useCallback((session: Session) => {
-    setState((prev) => {
-      if (prev.history.some((s) => s.id === session.id)) return prev;
-      const newHistory = [...prev.history, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const newStats = recomputeKickoffStats(
-        prev.athletes,
-        newHistory.filter((s) => s.mode !== "game").map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
-      );
-      const next = { ...prev, history: newHistory, stats: newStats };
-      localSet("KICKOFF", next);
-      const tid = getTeamId();
-      if (tid && tid !== "local-dev") teamSet(tid, "kickoff_data", next);
-      return next;
+  const restoreSessionAction = useCallback((session: Session) => {
+    setSessions((prev) => {
+      if (prev.some((s) => s.id === session.id)) return prev;
+      return [...prev, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     });
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); insertSession(tid, { ...session, sport: "KICKOFF", teamId: tid }); }
   }, []);
 
   const resetStatsKeepAthletes = useCallback(() => {
-    setState((prev) => {
-      const freshStats: Record<string, KickoffAthleteStats> = {};
-      prev.athletes.forEach((a) => { freshStats[a] = emptyKickoffStats(); });
-      const next: KickoffStateData = {
-        athletes: prev.athletes,
-        stats: freshStats,
-        snapshot: null,
-        history: [],
-      };
-      localSet("KICKOFF", next);
-      const tid = getTeamId();
-      if (tid && tid !== "local-dev") teamSetImmediate(tid, "kickoff_data", next);
-      return next;
-    });
-  }, []);
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); sessions.forEach((s) => softDeleteSession(tid, s.id)); }
+    setSessions([]);
+  }, [sessions]);
 
   return (
     <KickoffContext.Provider value={{
-      ...state, addAthletes, removeAthlete, commitPractice, undoLastCommit, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession, restoreSession, resetStatsKeepAthletes, canUndo: state.snapshot !== null,
+      athletes, stats, history, addAthletes, removeAthlete: removeAthleteAction,
+      commitPractice, resetStatsKeepAthletes, updateSessionDate, updateSessionWeather,
+      updateSessionEntries, deleteSession, restoreSession: restoreSessionAction,
     }}>
       {children}
     </KickoffContext.Provider>

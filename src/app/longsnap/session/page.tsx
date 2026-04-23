@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { StatCard } from "@/components/ui/StatCard";
 import { SnapEntryCard } from "@/components/ui/SnapEntryCard";
 import { SnapTimeBars } from "@/components/ui/SnapTimeBars";
@@ -9,8 +9,8 @@ import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import type { LongSnapEntry, SnapBenchmark } from "@/types";
 import clsx from "clsx";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
-import { useTeamDraftSync } from "@/lib/useTeamDraftSync";
+import { teamSet, getTeamId } from "@/lib/teamData";
+import type { StoredAthlete } from "@/lib/athleteStore";
 
 const BM_COLORS: Record<SnapBenchmark, string> = {
   excellent: "text-make",
@@ -33,7 +33,7 @@ const ACC_LABEL: Record<string, string> = {
 };
 
 export default function LongSnapSessionPage() {
-  const { athletes, stats, canUndo, undoLastCommit, commitPractice } = useLongSnap();
+  const { athletes, stats, commitPractice } = useLongSnap();
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
   const [sessionSnaps, setSessionSnaps] = useState<LongSnapEntry[]>([]);
@@ -42,9 +42,11 @@ export default function LongSnapSessionPage() {
   const [weather, setWeather] = useState("");
   const [weatherLocked, setWeatherLocked] = useState(false);
 
+  const athleteNames = athletes.map((a) => a.name);
+
   const totals = athletes.reduce(
     (acc, a) => {
-      const s = stats[a];
+      const s = stats[a.name];
       if (!s) return acc;
       return {
         att: acc.att + s.overall.att,
@@ -58,56 +60,47 @@ export default function LongSnapSessionPage() {
   const avgTime = totals.att > 0 ? (totals.totalTime / totals.att).toFixed(2) : "—";
   const onTargetPct = makePct(totals.att, totals.onTarget);
 
-  // Guard: skip sync callbacks that arrive shortly after a local save
-  const lastLocalSave = useRef(0);
-
-  // Poll for draft changes from other devices
-  useTeamDraftSync<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(
-    "longsnap_session_draft",
-    (cloud) => {
-      if (Date.now() - lastLocalSave.current < 8000) return;
-      if (cloud && cloud.sessionSnaps) {
-        setSessionSnaps(cloud.sessionSnaps);
-        setSessionStarted(cloud.sessionStarted ?? false);
-        if (cloud.weather !== undefined) setWeather(cloud.weather);
-      }
-    }
-  );
-
-  // Sync session snaps to team data
-  const saveSnapsToCloud = useCallback((snaps: LongSnapEntry[]) => {
-    lastLocalSave.current = Date.now();
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
-      teamSet(tid, "longsnap_session_draft", { sessionSnaps: snaps, sessionStarted: true, weather });
-    }
+  // Save draft to localStorage
+  const saveDraftLocal = useCallback((snaps: LongSnapEntry[]) => {
+    try {
+      localStorage.setItem("longsnap_session_draft", JSON.stringify({ sessionSnaps: snaps, sessionStarted: true, weather }));
+    } catch {}
   }, [weather]);
 
-  // Load session from team data on mount
+  // Load draft from localStorage on mount
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem("longsnap_session_draft");
+      if (raw) {
+        const draft = JSON.parse(raw) as { sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string };
+        if (draft.sessionSnaps && draft.sessionSnaps.length > 0) {
+          setSessionSnaps(draft.sessionSnaps);
+          setSessionStarted(draft.sessionStarted ?? false);
+          if (draft.weather) setWeather(draft.weather);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Save draft to cloud on demand
+  const saveDraftToCloud = useCallback(() => {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamGet<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(tid, "longsnap_session_draft").then((cloud) => {
-        if (cloud && cloud.sessionSnaps && cloud.sessionSnaps.length > 0) {
-          setSessionSnaps(cloud.sessionSnaps);
-          setSessionStarted(cloud.sessionStarted ?? false);
-          if (cloud.weather) setWeather(cloud.weather);
-        }
-      });
+      teamSet(tid, "longsnap_session_draft", { sessionSnaps, sessionStarted, weather });
     }
-  }, []);
+  }, [sessionSnaps, sessionStarted, weather]);
 
   const handleAddSnap = (snap: LongSnapEntry) => {
     setSessionSnaps((prev) => {
       const next = [...prev, snap];
-      saveSnapsToCloud(next);
+      saveDraftLocal(next);
       return next;
     });
   };
   const handleDeleteSnap = (idx: number) => {
     setSessionSnaps((prev) => {
       const next = prev.filter((_, i) => i !== idx);
-      saveSnapsToCloud(next);
+      saveDraftLocal(next);
       return next;
     });
   };
@@ -118,6 +111,7 @@ export default function LongSnapSessionPage() {
     setSessionSnaps([]);
     setCommitted(true);
     setWeather("");
+    try { localStorage.removeItem("longsnap_session_draft"); } catch {}
     setTimeout(() => setCommitted(false), 2000);
   };
 
@@ -190,7 +184,7 @@ export default function LongSnapSessionPage() {
         <div className="overflow-y-auto border-b border-border">
           <div className={viewOnly ? "pointer-events-none opacity-60" : ""}>
             <SnapEntryCard
-              athletes={athletes}
+              athletes={athleteNames}
               snapCount={sessionSnaps.length}
               onAdd={handleAddSnap}
             />
@@ -256,14 +250,13 @@ export default function LongSnapSessionPage() {
         </div>
 
         <div className="border-t border-border p-3 flex items-center gap-2 shrink-0">
-          {!viewOnly && (
-            <>
-              {canUndo && (
-                <button onClick={undoLastCommit} className="btn-ghost text-xs py-1.5 px-3">
-                  ↩ Undo
-                </button>
-              )}
-            </>
+          {!viewOnly && sessionSnaps.length > 0 && (
+            <button
+              onClick={saveDraftToCloud}
+              className="btn-ghost text-xs py-1.5 px-3"
+            >
+              Save Draft
+            </button>
           )}
           <div className="flex-1" />
           {!viewOnly && (
@@ -287,7 +280,7 @@ export default function LongSnapSessionPage() {
           <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
           <StatCard label="Total Snaps" value={totals.att || "—"} />
         </div>
-        <SnapTimeBars entries={sessionSnaps} athletes={athletes} />
+        <SnapTimeBars entries={sessionSnaps} athletes={athleteNames} />
       </div>
     </main>
   );

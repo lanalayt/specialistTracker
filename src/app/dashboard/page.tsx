@@ -28,7 +28,7 @@ function SeasonHighlights() {
   // FG
   const fgTotals = fgAthletes.reduce(
     (acc, a) => {
-      const s = fgStats[a];
+      const s = fgStats[a.name];
       if (!s) return acc;
       return { att: acc.att + s.overall.att, made: acc.made + s.overall.made, longFG: Math.max(acc.longFG, s.overall.longFG) };
     },
@@ -38,7 +38,7 @@ function SeasonHighlights() {
   // Punt
   const puntTotals = puntAthletes.reduce(
     (acc, a) => {
-      const s = puntStats[a];
+      const s = puntStats[a.name];
       if (!s) return acc;
       return {
         totalYards: acc.totalYards + s.overall.totalYards,
@@ -55,7 +55,7 @@ function SeasonHighlights() {
   // KO
   const koTotals = koAthletes.reduce(
     (acc, a) => {
-      const s = koStats[a];
+      const s = koStats[a.name];
       if (!s) return acc;
       return {
         totalDist: acc.totalDist + s.overall.totalDist,

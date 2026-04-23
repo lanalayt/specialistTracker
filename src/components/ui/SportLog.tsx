@@ -42,8 +42,8 @@ interface SportLogProps {
   athletes: string[];
   onCommit: (kicks: FGKick[]) => void;
   onClear?: () => void;
-  canUndo?: boolean;
-  onUndo?: () => void;
+  canUndo?: boolean; // deprecated — unused
+  onUndo?: () => void; // deprecated — unused
 }
 
 export function SportLog({

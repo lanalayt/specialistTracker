@@ -3,11 +3,12 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { AuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
-import { setTeamId, getTeamId, teamGet, teamSet } from "@/lib/teamData";
+import { setTeamId, getTeamId } from "@/lib/teamData";
 import { loadAndApplyTheme, applyTheme, type ThemeColors } from "@/lib/themeColors";
 import { useTeamDataSync } from "@/lib/useTeamDataSync";
 import { TutorialProvider } from "@/components/ui/Tutorial";
-import { runIntegritySync } from "@/lib/integritySync";
+import { upsertMember, loadMembers, useMemberSync } from "@/lib/memberStore";
+import { hardDeleteExpired } from "@/lib/sessionStore";
 import type { AuthUser, UserRole } from "@/types";
 
 function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
@@ -32,28 +33,16 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     loadAndApplyTheme();
   }, [user?.id]);
 
-  // Integrity sync: ensure localStorage sessions reach Supabase.
-  // Runs on load (after a delay for team ID to settle) and every 60s.
+  // Clean up expired deleted sessions periodically
   useEffect(() => {
     if (!user || user.id === "local-dev") return;
-    const initialTimeout = setTimeout(() => {
-      runIntegritySync();
-    }, 5000); // Wait 5s for everything to settle
-    const interval = setInterval(() => {
-      runIntegritySync();
-    }, 60000); // Every 60s
-    // Also run when tab becomes visible (returning from background)
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        setTimeout(runIntegritySync, 2000);
-      }
+    const cleanup = () => {
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") hardDeleteExpired(tid);
     };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      clearTimeout(initialTimeout);
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+    const timeout = setTimeout(cleanup, 10000);
+    const interval = setInterval(cleanup, 300000); // every 5 min
+    return () => { clearTimeout(timeout); clearInterval(interval); };
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live-sync theme across devices
@@ -64,7 +53,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     }
   }, !!user && user.id !== "local-dev");
 
-  // Auto-register as team member so coaches can see who has access
+  // Auto-register as team member using members table
   useEffect(() => {
     if (!user || user.id === "local-dev") return;
     (async () => {
@@ -74,30 +63,36 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         tid = getTeamId();
       }
       if (!tid || tid === "local-dev") return;
-      const members = await teamGet<{ id: string; email: string; name: string; role: string; lastSeen: string; access?: "view" | "edit" }[]>(tid, "team_members") ?? [];
-      const idx = members.findIndex((m) => m.id === user.id);
-      // Preserve existing access level if already set
-      const existingAccess = idx >= 0 ? members[idx].access : undefined;
-      const me = { id: user.id, email: user.email, name: user.name, role: user.role, lastSeen: new Date().toISOString(), access: existingAccess ?? (user.role === "coach" ? "edit" as const : "view" as const) };
-      if (idx >= 0) {
-        members[idx] = me;
-      } else {
-        members.push(me);
-      }
-      teamSet(tid, "team_members", members);
-      // Set athlete access for current user
+
+      // Check existing access level before upserting
+      const existing = await loadMembers(tid);
+      const me = existing.find((m) => m.id === user.id);
+      const existingAccess = me?.access;
+
+      await upsertMember(tid, {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        access: existingAccess ?? (user.role === "coach" ? "edit" : "view"),
+        lastSeen: new Date().toISOString(),
+      });
+
       if (user.role === "athlete") {
-        setAthleteAccess(me.access ?? "view");
+        setAthleteAccess(existingAccess ?? "view");
       }
     })();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live-sync team_members to pick up access changes from coach
-  useTeamDataSync<{ id: string; access?: "view" | "edit" }[]>("team_members", (remote) => {
-    if (!remote || !user || user.role !== "athlete") return;
-    const me = remote.find((m) => m.id === user.id);
-    if (me) setAthleteAccess(me.access ?? "view");
-  }, !!user && user.id !== "local-dev" && user.role === "athlete");
+  // Live-sync members to pick up access changes from coach
+  useMemberSync(
+    user && user.id !== "local-dev" && user.role === "athlete" ? getTeamId() : null,
+    (members) => {
+      if (!user) return;
+      const me = members.find((m) => m.id === user.id);
+      if (me) setAthleteAccess(me.access ?? "view");
+    }
+  );
 
   // Listen for auth state changes
   useEffect(() => {
@@ -109,10 +104,8 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         const u = mapSupabaseUser(session.user);
         setUser(u);
-        // Coach's team ID is their own user ID; athletes use their linked teamId
         setTeamId(u.role === "athlete" && u.teamId ? u.teamId : u.id);
       } else if (isLocal) {
-        // Localhost fallback — auto-login as coach for local dev
         setUser({
           id: "local-dev",
           email: "dev@localhost",

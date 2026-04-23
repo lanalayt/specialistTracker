@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { ZoneBarChart } from "@/components/ui/Chart";
@@ -12,8 +12,8 @@ import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
-import { useTeamDraftSync } from "@/lib/useTeamDraftSync";
+import { teamSet, getTeamId } from "@/lib/teamData";
+import type { StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
 
@@ -81,10 +81,6 @@ function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
 function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
   if (typeof window === "undefined") return;
   localStorage.setItem(`${SESSION_STORAGE_KEY}_${mode}`, JSON.stringify(draft));
-  const tid = getTeamId();
-  if (tid && tid !== "local-dev") {
-    teamSet(tid, `ko_session_draft_${mode}`, draft);
-  }
 }
 
 const DEFAULT_KO_TYPES = [
@@ -157,7 +153,7 @@ const DIR_LABELS: Record<string, string> = {
 };
 
 export default function KickoffSessionPage() {
-  const { athletes, stats, canUndo, undoLastCommit, commitPractice } =
+  const { athletes, stats, commitPractice } =
     useKickoff();
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
@@ -251,28 +247,8 @@ export default function KickoffSessionPage() {
     };
   }
 
-  // Guard: skip sync callbacks that arrive shortly after a local save
-  const lastLocalSave = useRef(0);
-
-  // Poll for draft changes from other devices
-  useTeamDraftSync<SessionDraft>(`ko_session_draft_${sessionMode}`, (cloudDraft) => {
-    if (Date.now() - lastLocalSave.current < 8000) return;
-    if (cloudDraft && cloudDraft.rows) {
-      setRows(cloudDraft.rows);
-      setManualEntry(cloudDraft.manualEntry);
-      setSessionActive(cloudDraft.sessionActive);
-      setPlannedKicks(cloudDraft.plannedKicks ?? []);
-      setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
-      setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
-      setSessionKicks(cloudDraft.sessionKicks ?? []);
-      setCommitted(cloudDraft.committed ?? false);
-      if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
-    }
-  });
-
   // Persist draft on every relevant state change
   useEffect(() => {
-    lastLocalSave.current = Date.now();
     saveDraftForMode({
       rows,
       manualEntry,
@@ -289,31 +265,6 @@ export default function KickoffSessionPage() {
       gameTime,
     }, sessionMode);
   }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, committed, committedKicks, weather, sessionMode, opponent, gameTime]);
-
-  // Load draft from cloud if local is empty
-  useEffect(() => {
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
-      teamGet<SessionDraft>(tid, `ko_session_draft_${sessionMode}`).then((cloudDraft) => {
-        if (cloudDraft && cloudDraft.rows) {
-          const localDraft = loadDraftForMode(sessionMode);
-          const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.type || r.distance);
-          if (!localHasData || cloudDraft.sessionActive) {
-            setRows(cloudDraft.rows);
-            setManualEntry(cloudDraft.manualEntry);
-            setSessionActive(cloudDraft.sessionActive);
-            setPlannedKicks(cloudDraft.plannedKicks ?? []);
-            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
-            setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
-            setSessionKicks(cloudDraft.sessionKicks ?? []);
-            setCommitted(cloudDraft.committed ?? false);
-            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
-          }
-        }
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ── Switch between practice / game mode with independent drafts ──
   const switchMode = (newMode: "practice" | "game") => {
@@ -362,7 +313,7 @@ export default function KickoffSessionPage() {
 
   const totals = athletes.reduce(
     (acc, a) => {
-      const s = stats[a];
+      const s = stats[a.name];
       if (!s) return acc;
       return {
         att: acc.att + s.overall.att,
@@ -381,7 +332,7 @@ export default function KickoffSessionPage() {
 
   const zoneData = KICKOFF_ZONES.map((z) => ({
     zone: z === "TB" ? "TB" : `Zone ${z}`,
-    count: athletes.reduce((acc, a) => acc + (stats[a]?.byZone[z] ?? 0), 0),
+    count: athletes.reduce((acc, a) => acc + (stats[a.name]?.byZone[z] ?? 0), 0),
   }));
 
   // ── Table helpers ────────────────────────────────────────────
@@ -751,9 +702,18 @@ export default function KickoffSessionPage() {
     setGameTime("");
   };
 
-  const handleUndo = () => {
-    const ok = undoLastCommit();
-    if (!ok) alert("Nothing to undo");
+  const handleSaveDraft = () => {
+    const draft: SessionDraft = {
+      rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices,
+      currentKickIdx, sessionKicks,
+      committed, committedWeather: committed ? weather : undefined,
+      committedKicks: committed ? committedKicks : undefined,
+      sessionMode, opponent, gameTime,
+    };
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamSet(tid, `kickoff_session_draft_${sessionMode}`, draft);
+    }
   };
 
   const [clearUndoData, setClearUndoData] = useState<{ rows: typeof rows; sessionKicks: typeof sessionKicks; plannedKicks: typeof plannedKicks; plannedRowIndices: number[] } | null>(null);
@@ -1007,17 +967,17 @@ export default function KickoffSessionPage() {
                           <div className="absolute top-full left-0 mt-1 z-20 bg-surface-2 border border-border rounded-input shadow-lg min-w-[120px]">
                             {athletes.map((a) => (
                               <button
-                                key={a}
+                                key={a.name}
                                 onClick={() => {
-                                  updateCurrentPlan("athlete", a);
+                                  updateCurrentPlan("athlete", a.name);
                                   setShowAthleteDropdown(false);
                                 }}
                                 className={clsx(
                                   "w-full text-left px-3 py-2 text-sm font-medium hover:bg-surface transition-colors",
-                                  a === currentPlan.athlete ? "text-accent" : "text-slate-300"
+                                  a.name === currentPlan.athlete ? "text-accent" : "text-slate-300"
                                 )}
                               >
-                                {a}
+                                {a.name}
                               </button>
                             ))}
                           </div>
@@ -1183,16 +1143,6 @@ export default function KickoffSessionPage() {
                 </button>
               ) : (
                 <>
-                  <div className="flex gap-2">
-                    {canUndo && (
-                      <button
-                        onClick={handleUndo}
-                        className="btn-ghost text-xs py-1.5 px-3"
-                      >
-                        ↩ Undo
-                      </button>
-                    )}
-                  </div>
                   <div className="flex-1" />
                   <button
                     onClick={handleCommitReady}
@@ -1547,7 +1497,7 @@ export default function KickoffSessionPage() {
                           >
                             <option value="">—</option>
                             {athletes.map((a) => (
-                              <option key={a} value={a}>{a}</option>
+                              <option key={a.name} value={a.name}>{a.name}</option>
                             ))}
                           </select>
                         )}
@@ -1807,15 +1757,9 @@ export default function KickoffSessionPage() {
             </span>
             {!viewOnly && (<>
               <div className="flex gap-2">
-                {(canUndo || deletedRowStack.length > 0) && (
+                {deletedRowStack.length > 0 && (
                   <button
-                    onClick={() => {
-                      if (deletedRowStack.length > 0) {
-                        undoDeleteRow();
-                      } else {
-                        handleUndo();
-                      }
-                    }}
+                    onClick={undoDeleteRow}
                     className="btn-ghost text-xs py-1.5 px-3"
                   >
                     ↩ Undo
@@ -1836,6 +1780,12 @@ export default function KickoffSessionPage() {
                   </button>
                 )}
               </div>
+              <button
+                onClick={handleSaveDraft}
+                className="text-xs py-1.5 px-3 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+              >
+                Save Draft
+              </button>
               {sessionMode === "game" ? (
                 <button
                   onClick={handleCommitReady}

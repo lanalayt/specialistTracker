@@ -1,16 +1,15 @@
 "use client";
 
 import React, {
-  createContext, useContext, useState, useCallback, useEffect,
+  createContext, useContext, useState, useCallback, useEffect, useMemo,
 } from "react";
 import type { LongSnapEntry, LongSnapAthleteStats, Session } from "@/types";
-import { emptyLongSnapStats, processLongSnap, recomputeLongSnapStats, genId, sessionLabel } from "@/lib/stats";
-import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
+import { emptyLongSnapStats, recomputeLongSnapStats, genId, sessionLabel } from "@/lib/stats";
+import { localGet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
-import { useTeamDataSync } from "@/lib/useTeamDataSync";
-import { mergeHistory } from "@/lib/mergeHistory";
-import { verifyCloudWrite } from "@/lib/integritySync";
+import { teamGet, getTeamId } from "@/lib/teamData";
+import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
 
 interface LongSnapStateData {
@@ -20,72 +19,93 @@ interface LongSnapStateData {
   history: Session[];
 }
 
-interface LongSnapContextValue extends LongSnapStateData {
+interface LongSnapContextValue {
+  athletes: StoredAthlete[];
+  stats: Record<string, LongSnapAthleteStats>;
+  history: Session[];
   commitPractice: (entries: LongSnapEntry[], label?: string, weather?: string) => Session;
-  undoLastCommit: () => boolean;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   deleteSession: (sessionId: string) => void;
-  canUndo: boolean;
-}
-
-const DEFAULT_ATHLETES = ["Snapper1", "Snapper2"];
-
-function defaultState(): LongSnapStateData {
-  const athletes = DEFAULT_ATHLETES;
-  const stats: Record<string, LongSnapAthleteStats> = {};
-  athletes.forEach((a) => { stats[a] = emptyLongSnapStats(); });
-  return { athletes, stats, snapshot: null, history: [] };
 }
 
 const LongSnapContext = createContext<LongSnapContextValue | null>(null);
 
 export function LongSnapProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<LongSnapStateData>(defaultState);
+  const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const { user } = useAuth();
+
+  const stats = useMemo(() => {
+    const names = athletes.map((a) => a.name);
+    return recomputeLongSnapStats(
+      names,
+      sessions.map((s) => ({ entries: (s.entries as LongSnapEntry[]) ?? [] }))
+    );
+  }, [athletes, sessions]);
+
+  const history = useMemo(
+    () => [...sessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [sessions]
+  );
 
   useEffect(() => {
     const userId = user?.id;
     if (userId) setCloudUserId(userId);
 
     async function loadData() {
-      let saved: LongSnapStateData | null = null;
-      const tid = getTeamId();
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        tid = getTeamId();
+      }
 
-      // Try team_data first (shared across team members)
       if (tid && tid !== "local-dev") {
-        saved = await teamGet<LongSnapStateData>(tid, "longsnap_data");
+        const dbAthletes = await loadAthletes(tid, "LONGSNAP");
+        if (dbAthletes.length > 0) setAthletes(dbAthletes);
       }
 
-      // Fall back to user's own Supabase data
-      if (!saved && userId && userId !== "local-dev") {
-        saved = await cloudGet<LongSnapStateData>(userId, getCloudKey("LONGSNAP"));
+      if (tid && tid !== "local-dev") {
+        const dbSessions = await loadSessions(tid, "LONGSNAP");
+        if (dbSessions.length > 0) { setSessions(dbSessions); return; }
       }
 
-      if (!saved) {
-        saved = localGet<LongSnapStateData>("LONGSNAP");
-      }
+      // Migration
+      let blob: LongSnapStateData | null = null;
+      if (tid && tid !== "local-dev") blob = await teamGet<LongSnapStateData>(tid, "longsnap_data");
+      if (!blob && userId && userId !== "local-dev") blob = await cloudGet<LongSnapStateData>(userId, getCloudKey("LONGSNAP"));
+      if (!blob) blob = localGet<LongSnapStateData>("LONGSNAP");
+      const localBlob = localGet<LongSnapStateData>("LONGSNAP");
 
-      if (saved) {
-        // Merge with localStorage to prevent losing sessions that only exist locally
-        const local = localGet<LongSnapStateData>("LONGSNAP");
-        const history = local?.history
-          ? mergeHistory(local.history, saved.history ?? [])
-          : (saved.history ?? []);
-        const stats = { ...saved.stats };
-        (saved.athletes || []).forEach((a) => {
-          if (!stats[a]) {
-            stats[a] = emptyLongSnapStats();
-          } else if (stats[a].overall.excellent === undefined) {
-            stats[a] = emptyLongSnapStats();
+      if (blob || localBlob) {
+        const source = blob ?? localBlob!;
+        const sessionMap = new Map<string, Session>();
+        for (const s of (localBlob?.history ?? [])) sessionMap.set(s.id, s);
+        for (const s of (blob?.history ?? [])) {
+          const ex = sessionMap.get(s.id);
+          if (!ex || (Array.isArray(s.entries) ? s.entries.length : 0) >= (Array.isArray(ex.entries) ? ex.entries.length : 0))
+            sessionMap.set(s.id, s);
+        }
+        const allSessions = Array.from(sessionMap.values()).sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+
+        const athleteNames = source.athletes ?? [];
+        if (tid && tid !== "local-dev" && athleteNames.length > 0) {
+          const existing = await loadAthletes(tid, "LONGSNAP");
+          const existingNames = new Set(existing.map((a) => a.name));
+          const inserted: StoredAthlete[] = [...existing];
+          for (const name of athleteNames.filter((n) => !existingNames.has(n))) {
+            const result = await insertAthlete(tid, "LONGSNAP", name);
+            if (result) inserted.push(result);
           }
-        });
-        const migrated = { ...saved, stats, history };
-        setState(migrated);
-        localSet("LONGSNAP", migrated);
-        // If local had sessions the cloud didn't, push merged version to cloud
-        if (local?.history && history.length > (saved.history ?? []).length) {
-          const tid = getTeamId();
-          if (tid && tid !== "local-dev") teamSet(tid, "longsnap_data", migrated);
+          setAthletes(inserted);
+        }
+
+        if (tid && tid !== "local-dev" && allSessions.length > 0) {
+          for (const s of allSessions) await insertSession(tid, { ...s, sport: "LONGSNAP", teamId: tid });
+          setSessions(await loadSessions(tid, "LONGSNAP"));
+        } else {
+          setSessions(allSessions);
         }
       }
     }
@@ -93,100 +113,43 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
     loadData();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll team_data for remote updates — was missing, causing stale data on multi-device
-  // CRITICAL: merge histories instead of blind replacement to prevent data loss
-  useTeamDataSync<LongSnapStateData>("longsnap_data", (remote) => {
-    if (!remote) return;
-    setState((prev) => {
-      const mergedHistory = mergeHistory(prev.history, remote.history ?? []);
-      const athleteSet = new Set([...(prev.athletes || []), ...(remote.athletes || [])]);
-      const athletes = Array.from(athleteSet);
-      const stats = { ...remote.stats };
-      athletes.forEach((a) => {
-        if (!stats[a]) stats[a] = emptyLongSnapStats();
-        else if (stats[a].overall.excellent === undefined) stats[a] = emptyLongSnapStats();
-      });
-      const merged = { ...remote, athletes, stats, history: mergedHistory, snapshot: prev.snapshot };
-      localSet("LONGSNAP", merged, true); // skipCloud — don't write remote data back to user_data
-      return merged;
-    });
+  const tid = getTeamId();
+  useSessionSync(tid, "LONGSNAP", {
+    onInsert: (s) => setSessions((prev) => prev.some((x) => x.id === s.id) ? prev : [...prev, s].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())),
+    onUpdate: (s) => setSessions((prev) => prev.map((x) => x.id === s.id ? s : x)),
+    onDelete: (id) => setSessions((prev) => prev.filter((x) => x.id !== id)),
+    onRestore: (s) => setSessions((prev) => prev.some((x) => x.id === s.id) ? prev : [...prev, s].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())),
   });
 
+  useAthleteSync(tid, "LONGSNAP", (dbAthletes) => setAthletes(dbAthletes));
+
   const commitPractice = useCallback((entries: LongSnapEntry[], label?: string, weather?: string): Session => {
+    const tid = getTeamId();
     const session: Session = {
-      id: genId(), teamId: "local", sport: "LONGSNAP",
+      id: genId(), teamId: tid ?? "local", sport: "LONGSNAP",
       label: label ?? sessionLabel(), date: new Date().toISOString(),
       weather: weather || undefined, entries,
     };
-    setState((prev) => {
-      const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
-      let newStats = { ...prev.stats };
-      entries.forEach((e) => { newStats = processLongSnap(e, newStats); });
-      const next = { ...prev, stats: newStats, history: [...prev.history, session], snapshot };
-      localSet("LONGSNAP", next);
-      const _tid = getTeamId();
-      if (_tid && _tid !== "local-dev") {
-        teamSet(_tid, "longsnap_data", next);
-        verifyCloudWrite("longsnap_data", session.id, next);
-      }
-      return next;
-    });
+    setSessions((prev) => [...prev, session]);
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); insertSession(tid, session); }
     return session;
   }, []);
 
-  const updateSessionWeather = useCallback(
-    (sessionId: string, weather: string) => {
-      setState((prev) => {
-        const newHistory = prev.history.map((s) =>
-          s.id === sessionId ? { ...s, weather: weather || undefined } : s
-        );
-        const next = { ...prev, history: newHistory };
-        localSet("LONGSNAP", next);
-      const _tid = getTeamId(); if (_tid && _tid !== "local-dev") teamSet(_tid, "longsnap_data", next);
-        return next;
-      });
-    },
-    []
-  );
-
-  const undoLastCommit = useCallback((): boolean => {
-    let success = false;
-    setState((prev) => {
-      if (!prev.snapshot) return prev;
-      const newHistory = JSON.parse(JSON.stringify(prev.snapshot)) as Session[];
-      const newStats: Record<string, LongSnapAthleteStats> = {};
-      prev.athletes.forEach((a) => { newStats[a] = emptyLongSnapStats(); });
-      newHistory.forEach((s) => {
-        (s.entries as LongSnapEntry[])?.forEach((e) => {
-          Object.assign(newStats, processLongSnap(e, newStats));
-        });
-      });
-      const next = { ...prev, history: newHistory, snapshot: null, stats: newStats };
-      localSet("LONGSNAP", next);
-      const _tid = getTeamId(); if (_tid && _tid !== "local-dev") teamSet(_tid, "longsnap_data", next);
-      success = true;
-      return next;
-    });
-    return success;
+  const updateSessionWeather = useCallback((sessionId: string, weather: string) => {
+    setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, weather: weather || undefined } : s));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); updateSessionRow(tid, sessionId, { weather: weather || undefined }); }
   }, []);
 
   const deleteSession = useCallback((sessionId: string) => {
-    setState((prev) => {
-      const newHistory = prev.history.filter((s) => s.id !== sessionId);
-      const newStats = recomputeLongSnapStats(
-        prev.athletes,
-        newHistory.map((s) => ({ entries: (s.entries as LongSnapEntry[]) ?? [] }))
-      );
-      const next = { ...prev, history: newHistory, stats: newStats };
-      localSet("LONGSNAP", next);
-      const _tid = getTeamId(); if (_tid && _tid !== "local-dev") teamSet(_tid, "longsnap_data", next);
-      return next;
-    });
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); softDeleteSession(tid, sessionId); }
   }, []);
 
   return (
     <LongSnapContext.Provider value={{
-      ...state, commitPractice, undoLastCommit, updateSessionWeather, deleteSession, canUndo: state.snapshot !== null,
+      athletes, stats, history, commitPractice, updateSessionWeather, deleteSession,
     }}>
       {children}
     </LongSnapContext.Provider>

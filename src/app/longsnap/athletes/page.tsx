@@ -18,8 +18,8 @@ export default function LongSnapAthletesPage() {
         {athletes.length === 0 ? (
           <p className="text-xs text-muted">No athletes configured.</p>
         ) : athletes.map((a) => (
-          <div key={a} className="card-2 flex items-center px-4 py-2.5">
-            <span className="text-sm font-medium text-slate-200">{a}</span>
+          <div key={a.id} className="card-2 flex items-center px-4 py-2.5">
+            <span className="text-sm font-medium text-slate-200">{a.name}</span>
           </div>
         ))}
       </div>

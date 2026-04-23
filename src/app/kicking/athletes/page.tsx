@@ -26,10 +26,10 @@ export default function KickingAthletesPage() {
           <p className="text-xs text-muted">No athletes added yet.</p>
         )}
         {athletes.map((a) => (
-          <div key={a} className="card-2 flex items-center justify-between px-4 py-2.5">
-            <span className="text-sm font-medium text-slate-200">{a}</span>
+          <div key={a.id} className="card-2 flex items-center justify-between px-4 py-2.5">
+            <span className="text-sm font-medium text-slate-200">{a.name}</span>
             <button
-              onClick={() => removeAthlete(a)}
+              onClick={() => removeAthlete(a.id)}
               className="text-xs text-muted hover:text-miss transition-colors px-2 py-1"
             >
               Remove

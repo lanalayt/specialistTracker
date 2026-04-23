@@ -26,7 +26,7 @@ const TABS: { id: Tab; label: string; icon?: string; iconEl?: React.ReactNode }[
 
 function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: string; modeFilter: "all" | "practice" | "game" }) {
   const { history, stats, athletes } = useFG();
-  const filteredAthletes = selectedAthlete ? [selectedAthlete] : athletes;
+  const filteredAthletes = selectedAthlete ? [selectedAthlete] : athletes.map(a => a.name);
   const modeHistory = modeFilter === "all" ? history : history.filter((s) => modeFilter === "game" ? s.mode === "game" : s.mode !== "game");
   const filteredHistory = selectedAthlete
     ? modeHistory.map((s) => ({ ...s, entries: ((s.entries ?? []) as FGKick[]).filter((k) => k.athlete === selectedAthlete) })).filter((s) => (s.entries as FGKick[]).length > 0)
@@ -139,7 +139,7 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
 
 function PuntingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: string; modeFilter: "all" | "practice" | "game" }) {
   const { history, stats, athletes } = usePunt();
-  const filteredAthletes = selectedAthlete ? [selectedAthlete] : athletes;
+  const filteredAthletes = selectedAthlete ? [selectedAthlete] : athletes.map(a => a.name);
   const modeHistory = modeFilter === "all" ? history : history.filter((s) => modeFilter === "game" ? s.mode === "game" : s.mode !== "game");
   const filteredHistory = selectedAthlete
     ? modeHistory.map((s) => ({ ...s, entries: ((s.entries ?? []) as PuntEntry[]).filter((p) => p.athlete === selectedAthlete) })).filter((s) => (s.entries as PuntEntry[]).length > 0)
@@ -397,16 +397,16 @@ function AnalyticsContent() {
             </button>
             {currentAthletes.map((a) => (
               <button
-                key={a}
-                onClick={() => setSelectedAthlete(a)}
+                key={a.name}
+                onClick={() => setSelectedAthlete(a.name)}
                 className={clsx(
                   "px-3 py-1.5 rounded-input text-xs font-semibold transition-all border",
-                  selectedAthlete === a
+                  selectedAthlete === a.name
                     ? "bg-accent text-slate-900 border-accent"
                     : "border-border text-muted hover:text-white hover:bg-surface-2"
                 )}
               >
-                {a}
+                {a.name}
               </button>
             ))}
           </div>

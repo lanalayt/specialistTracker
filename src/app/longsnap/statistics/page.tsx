@@ -10,11 +10,11 @@ import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFi
 import { exportLongSnapStats } from "@/lib/exportStats";
 
 function computeFilteredSnapStats(
-  athletes: string[],
+  athletes: { id: string; name: string }[],
   history: { entries?: LongSnapEntry[] }[]
 ): Record<string, LongSnapAthleteStats> {
   let statsMap: Record<string, LongSnapAthleteStats> = {};
-  athletes.forEach((a) => { statsMap[a] = emptyLongSnapStats(); });
+  athletes.forEach((a) => { statsMap[a.name] = emptyLongSnapStats(); });
   history.forEach((session) => {
     const snaps = (session.entries ?? []) as LongSnapEntry[];
     snaps.forEach((s) => {
@@ -39,7 +39,7 @@ export default function LongSnapStatisticsPage() {
 
   const totals = athletes.reduce(
     (acc, a) => {
-      const s = displayStats[a];
+      const s = displayStats[a.name];
       if (!s) return acc;
       return {
         att: acc.att + s.overall.att,
@@ -58,7 +58,7 @@ export default function LongSnapStatisticsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
         <button
-          onClick={() => exportLongSnapStats(athletes, history as { date?: string; entries?: LongSnapEntry[] }[])}
+          onClick={() => exportLongSnapStats(athletes.map((a) => a.name), history as { date?: string; entries?: LongSnapEntry[] }[])}
           className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
         >
           Export
@@ -86,7 +86,7 @@ export default function LongSnapStatisticsPage() {
             {SNAP_TYPES.map((t) => {
               let att = 0, onTarget = 0, totalTime = 0;
               athletes.forEach((a) => {
-                const s = displayStats[a]?.byType[t];
+                const s = displayStats[a.name]?.byType[t];
                 if (s) { att += s.att; onTarget += s.onTarget; totalTime += s.totalTime; }
               });
               return (
@@ -120,11 +120,11 @@ export default function LongSnapStatisticsPage() {
             </thead>
             <tbody>
               {athletes.map((a) => {
-                const s = displayStats[a];
+                const s = displayStats[a.name];
                 if (!s) return null;
                 return (
-                  <tr key={a} className="hover:bg-surface/30">
-                    <td className="table-name">{a}</td>
+                  <tr key={a.id} className="hover:bg-surface/30">
+                    <td className="table-name">{a.name}</td>
                     <td className="table-cell">{s.overall.att || "—"}</td>
                     <td className="table-cell make-pct">{makePct(s.overall.att, s.overall.onTarget)}</td>
                     <td className="table-cell text-muted">

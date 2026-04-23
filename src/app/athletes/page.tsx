@@ -16,9 +16,13 @@ function AthletesContent() {
   const [newName, setNewName] = useState("");
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
-  // Master list = union of all sports' athletes, preserving order
-  const allAthletes = Array.from(
-    new Set([...fg.athletes, ...punt.athletes, ...kickoff.athletes])
+  // Master list = union of all sports' athlete names, preserving order
+  const allNames = Array.from(
+    new Set([
+      ...fg.athletes.map((a) => a.name),
+      ...punt.athletes.map((a) => a.name),
+      ...kickoff.athletes.map((a) => a.name),
+    ])
   );
 
   const handleAdd = () => {
@@ -32,20 +36,28 @@ function AthletesContent() {
 
   const handleRemove = (name: string) => {
     if (confirmRemove === name) {
-      fg.removeAthlete(name);
-      punt.removeAthlete(name);
-      kickoff.removeAthlete(name);
+      // Find the athlete ID in each sport and remove by ID
+      const fgAthlete = fg.athletes.find((a) => a.name === name);
+      const puntAthlete = punt.athletes.find((a) => a.name === name);
+      const koAthlete = kickoff.athletes.find((a) => a.name === name);
+      if (fgAthlete) fg.removeAthlete(fgAthlete.id);
+      if (puntAthlete) punt.removeAthlete(puntAthlete.id);
+      if (koAthlete) kickoff.removeAthlete(koAthlete.id);
       setConfirmRemove(null);
     } else {
       setConfirmRemove(name);
     }
   };
 
+  const fgNames = new Set(fg.athletes.map((a) => a.name));
+  const puntNames = new Set(punt.athletes.map((a) => a.name));
+  const koNames = new Set(kickoff.athletes.map((a) => a.name));
+
   const inSports = (name: string): string[] => {
     const sports: string[] = [];
-    if (fg.athletes.includes(name)) sports.push("FG");
-    if (punt.athletes.includes(name)) sports.push("Punt");
-    if (kickoff.athletes.includes(name)) sports.push("KO");
+    if (fgNames.has(name)) sports.push("FG");
+    if (puntNames.has(name)) sports.push("Punt");
+    if (koNames.has(name)) sports.push("KO");
     return sports;
   };
 
@@ -87,23 +99,23 @@ function AthletesContent() {
         {/* Athlete list */}
         <div className="card space-y-1">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-            Athletes ({allAthletes.length})
+            Athletes ({allNames.length})
           </p>
-          {allAthletes.length === 0 ? (
+          {allNames.length === 0 ? (
             <p className="text-sm text-muted py-2">No athletes yet</p>
           ) : (
-            allAthletes.map((a) => {
-              const sports = inSports(a);
+            allNames.map((name) => {
+              const sports = inSports(name);
               return (
                 <div
-                  key={a}
+                  key={name}
                   className="flex items-center gap-3 px-3 py-3 rounded-input hover:bg-surface-2 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent font-bold text-sm flex-shrink-0">
-                    {a[0]?.toUpperCase()}
+                    {name[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-100">{a}</p>
+                    <p className="text-sm font-semibold text-slate-100">{name}</p>
                     <div className="flex gap-1 mt-1">
                       {sports.length === 0 ? (
                         <span className="text-[10px] text-muted italic">not on any roster</span>
@@ -116,16 +128,16 @@ function AthletesContent() {
                   </div>
                   <RoleGuard coachOnly>
                     <button
-                      onClick={() => handleRemove(a)}
-                      onBlur={() => confirmRemove === a && setTimeout(() => setConfirmRemove(null), 200)}
+                      onClick={() => handleRemove(name)}
+                      onBlur={() => confirmRemove === name && setTimeout(() => setConfirmRemove(null), 200)}
                       className={clsx(
                         "text-xs px-3 py-1 rounded-input border transition-all",
-                        confirmRemove === a
+                        confirmRemove === name
                           ? "bg-miss/20 border-miss/40 text-miss"
                           : "border-border text-muted hover:text-white hover:bg-surface-2"
                       )}
                     >
-                      {confirmRemove === a ? "Confirm Remove" : "Remove"}
+                      {confirmRemove === name ? "Confirm Remove" : "Remove"}
                     </button>
                   </RoleGuard>
                 </div>

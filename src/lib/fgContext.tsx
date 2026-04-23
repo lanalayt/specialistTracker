@@ -6,21 +6,20 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useMemo,
 } from "react";
 import type { FGKick, AthleteStats, Session, SessionMode } from "@/types";
 import {
   emptyAthleteStats,
-  processKick,
   recomputeFGStats,
   genId,
   sessionLabel,
 } from "@/lib/stats";
 import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
-import { teamGet, teamSet, teamSetImmediate, getTeamId } from "@/lib/teamData";
-import { useTeamDataSync } from "@/lib/useTeamDataSync";
-import { mergeHistory } from "@/lib/mergeHistory";
-import { verifyCloudWrite } from "@/lib/integritySync";
+import { teamGet, getTeamId } from "@/lib/teamData";
+import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
 
 interface FGStateData {
@@ -30,168 +29,212 @@ interface FGStateData {
   history: Session[];
 }
 
-interface FGContextValue extends FGStateData {
+interface FGContextValue {
+  athletes: StoredAthlete[];
+  stats: Record<string, AthleteStats>;
+  history: Session[];
   addAthletes: (names: string[]) => void;
-  removeAthlete: (name: string) => void;
+  removeAthlete: (athleteId: string) => void;
   commitPractice: (kicks: FGKick[], label?: string, weather?: string, mode?: SessionMode, opponent?: string, gameTime?: string) => Session;
-  undoLastCommit: () => boolean;
-  resetAll: () => void;
   resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   updateSessionEntries: (sessionId: string, entries: FGKick[]) => void;
   deleteSession: (sessionId: string) => void;
   restoreSession: (session: Session) => void;
-  canUndo: boolean;
-}
-
-const DEFAULT_ATHLETES = ["Kyle", "LeSieur", "Eich"];
-
-function defaultState(): FGStateData {
-  const athletes = DEFAULT_ATHLETES;
-  const stats: Record<string, AthleteStats> = {};
-  athletes.forEach((a) => {
-    stats[a] = emptyAthleteStats();
-  });
-  return { athletes, stats, snapshot: null, history: [] };
 }
 
 const FGContext = createContext<FGContextValue | null>(null);
 
 export function FGProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<FGStateData>(defaultState);
+  const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [migrated, setMigrated] = useState(false);
   const { user } = useAuth();
 
-  // Load from Supabase first, fall back to localStorage
+  // Stats computed on the fly from practice sessions
+  const stats = useMemo(() => {
+    const names = athletes.map((a) => a.name);
+    return recomputeFGStats(
+      names,
+      sessions
+        .filter((s) => s.mode !== "game")
+        .map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
+    );
+  }, [athletes, sessions]);
+
+  // History = sessions sorted by date
+  const history = useMemo(
+    () => [...sessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [sessions]
+  );
+
+  // ─── Load + migrate ──────────────────────────────────────────────
   useEffect(() => {
     const userId = user?.id;
     if (userId) setCloudUserId(userId);
 
     async function loadData() {
-      let saved: FGStateData | null = null;
-      // Wait briefly for team ID to be set by AppProviders after auth resolves
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) {
         await new Promise((r) => setTimeout(r, 100));
         tid = getTeamId();
       }
 
-      // Try team_data first (shared across team members)
+      // Load athletes from athletes table
       if (tid && tid !== "local-dev") {
-        saved = await teamGet<FGStateData>(tid, "fg_data");
-      }
-
-      // Fall back to user's own Supabase data
-      if (!saved && userId && userId !== "local-dev") {
-        saved = await cloudGet<FGStateData>(userId, getCloudKey("FG"));
-      }
-
-      // Fall back to localStorage (read-only — never write local back to cloud)
-      if (!saved) {
-        saved = localGet<FGStateData>("FG");
-      }
-
-      if (saved) {
-        // Merge with localStorage to prevent losing sessions that only exist locally
-        const local = localGet<FGStateData>("FG");
-        const history = local?.history
-          ? mergeHistory(local.history, saved.history ?? [])
-          : (saved.history ?? []);
-        const stats = { ...saved.stats };
-        (saved.athletes || []).forEach((a) => {
-          if (!stats[a]) {
-            stats[a] = emptyAthleteStats();
-          } else if (!stats[a].pat) {
-            stats[a] = { ...stats[a], pat: { att: 0, made: 0, score: 0 } };
-          }
-        });
-        const migrated = { ...saved, stats, history };
-        setState(migrated);
-        localSet("FG", migrated);
-        // If local had sessions the cloud didn't, push merged version to cloud
-        if (local?.history && history.length > (saved.history ?? []).length) {
-          const tid = getTeamId();
-          if (tid && tid !== "local-dev") teamSet(tid, "fg_data", migrated);
+        const dbAthletes = await loadAthletes(tid, "KICKING");
+        if (dbAthletes.length > 0) {
+          setAthletes(dbAthletes);
         }
+      }
+
+      // Load sessions from sessions table
+      if (tid && tid !== "local-dev") {
+        const dbSessions = await loadSessions(tid, "KICKING");
+        if (dbSessions.length > 0) {
+          setSessions(dbSessions);
+          setMigrated(true);
+          return;
+        }
+      }
+
+      // ─── Migration: blob → tables ──────────────────────────────
+      let blob: FGStateData | null = null;
+      if (tid && tid !== "local-dev") {
+        blob = await teamGet<FGStateData>(tid, "fg_data");
+      }
+      if (!blob && userId && userId !== "local-dev") {
+        blob = await cloudGet<FGStateData>(userId, getCloudKey("FG"));
+      }
+      if (!blob) {
+        blob = localGet<FGStateData>("FG");
+      }
+
+      // Also check localStorage for sessions that might only exist locally
+      const localBlob = localGet<FGStateData>("FG");
+
+      if (blob || localBlob) {
+        const source = blob ?? localBlob!;
+        const localHistory = localBlob?.history ?? [];
+        const blobHistory = blob?.history ?? [];
+
+        // Merge both histories by ID
+        const sessionMap = new Map<string, Session>();
+        for (const s of localHistory) sessionMap.set(s.id, s);
+        for (const s of blobHistory) {
+          const existing = sessionMap.get(s.id);
+          if (!existing || (Array.isArray(s.entries) ? s.entries.length : 0) >= (Array.isArray(existing.entries) ? existing.entries.length : 0)) {
+            sessionMap.set(s.id, s);
+          }
+        }
+        const allSessions = Array.from(sessionMap.values()).sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+
+        // Migrate athletes to athletes table
+        const athleteNames = source.athletes ?? [];
+        if (tid && tid !== "local-dev" && athleteNames.length > 0) {
+          const existing = await loadAthletes(tid, "KICKING");
+          const existingNames = new Set(existing.map((a) => a.name));
+          const toInsert = athleteNames.filter((n) => !existingNames.has(n));
+          const inserted: StoredAthlete[] = [...existing];
+          for (const name of toInsert) {
+            const result = await insertAthlete(tid, "KICKING", name);
+            if (result) inserted.push(result);
+          }
+          setAthletes(inserted);
+        }
+
+        // Migrate sessions to sessions table
+        if (tid && tid !== "local-dev" && allSessions.length > 0) {
+          for (const s of allSessions) {
+            await insertSession(tid, { ...s, sport: "KICKING", teamId: tid });
+          }
+          // Re-load from DB to get consistent data
+          const dbSessions = await loadSessions(tid, "KICKING");
+          setSessions(dbSessions);
+        } else {
+          setSessions(allSessions);
+        }
+
+        setMigrated(true);
       }
     }
 
     loadData();
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll team_data for remote updates (changes made on other devices)
-  // CRITICAL: merge histories instead of blind replacement to prevent data loss
-  useTeamDataSync<FGStateData>("fg_data", (remote) => {
-    if (!remote) return;
-    setState((prev) => {
-      const mergedHistory = mergeHistory(prev.history, remote.history ?? []);
-      // Merge athlete lists (union)
-      const athleteSet = new Set([...(prev.athletes || []), ...(remote.athletes || [])]);
-      const athletes = Array.from(athleteSet);
-      const stats = { ...remote.stats };
-      athletes.forEach((a) => {
-        if (!stats[a]) {
-          stats[a] = emptyAthleteStats();
-        } else if (!stats[a].pat) {
-          stats[a] = { ...stats[a], pat: { att: 0, made: 0, score: 0 } };
-        }
+  // ─── Realtime sync for sessions ─────────────────────────────────
+  const tid = getTeamId();
+  useSessionSync(tid, "KICKING", {
+    onInsert: (session) => {
+      setSessions((prev) => {
+        if (prev.some((s) => s.id === session.id)) return prev;
+        return [...prev, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       });
-      const merged = { ...remote, athletes, stats, history: mergedHistory, snapshot: prev.snapshot };
-      localSet("FG", merged, true); // skipCloud — don't write remote data back to user_data
-      return merged;
-    });
+    },
+    onUpdate: (session) => {
+      setSessions((prev) => prev.map((s) => (s.id === session.id ? session : s)));
+    },
+    onDelete: (sessionId) => {
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    },
+    onRestore: (session) => {
+      setSessions((prev) => {
+        if (prev.some((s) => s.id === session.id)) return prev;
+        return [...prev, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      });
+    },
   });
 
-  const save = useCallback((next: FGStateData) => {
-    setState(next);
-    localSet("FG", next);
-    // Also write to team_data for cross-account sharing
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
-      teamSet(tid, "fg_data", next);
-    }
-  }, []);
+  // ─── Realtime sync for athletes ─────────────────────────────────
+  useAthleteSync(tid, "KICKING", (dbAthletes) => {
+    setAthletes(dbAthletes);
+  });
+
+  // ─── Actions ────────────────────────────────────────────────────
 
   const addAthletes = useCallback(
     (names: string[]) => {
-      setState((prev) => {
-        const existing = new Set(prev.athletes);
-        const toAdd = names.filter((n) => n.trim() && !existing.has(n.trim()));
-        if (toAdd.length === 0) return prev;
-        const newAthletes = [...prev.athletes, ...toAdd.map((n) => n.trim())];
-        const newStats = { ...prev.stats };
-        toAdd.forEach((a) => {
-          if (!newStats[a.trim()]) newStats[a.trim()] = emptyAthleteStats();
+      const tid = getTeamId();
+      const existing = new Set(athletes.map((a) => a.name));
+      const toAdd = names.filter((n) => n.trim() && !existing.has(n.trim()));
+      if (toAdd.length === 0) return;
+
+      if (tid && tid !== "local-dev") {
+        stampAthleteWrite(tid);
+        Promise.all(toAdd.map((n) => insertAthlete(tid, "KICKING", n))).then((results) => {
+          const added = results.filter(Boolean) as StoredAthlete[];
+          setAthletes((prev) => [...prev, ...added]);
         });
-        const next = { ...prev, athletes: newAthletes, stats: newStats };
-        localSet("FG", next);
-        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
-        return next;
-      });
+      } else {
+        // Local fallback
+        const added = toAdd.map((n) => ({ id: genId(), name: n.trim() }));
+        setAthletes((prev) => [...prev, ...added]);
+      }
     },
-    []
+    [athletes]
   );
 
-  const removeAthlete = useCallback(
-    (name: string) => {
-      setState((prev) => {
-        const next = {
-          ...prev,
-          athletes: prev.athletes.filter((a) => a !== name),
-        };
-        localSet("FG", next);
-        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
-        return next;
-      });
+  const removeAthleteAction = useCallback(
+    (athleteId: string) => {
+      const tid = getTeamId();
+      setAthletes((prev) => prev.filter((a) => a.id !== athleteId));
+      if (tid && tid !== "local-dev") {
+        stampAthleteWrite(tid);
+        removeAthleteRow(tid, athleteId);
+      }
     },
     []
   );
 
   const commitPractice = useCallback(
     (kicks: FGKick[], label?: string, weather?: string, mode: SessionMode = "practice", opponent?: string, gameTime?: string): Session => {
+      const tid = getTeamId();
       const session: Session = {
         id: genId(),
-        teamId: "local",
+        teamId: tid ?? "local",
         sport: "KICKING",
         label: label ?? sessionLabel(),
         date: new Date().toISOString(),
@@ -202,180 +245,104 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         entries: kicks,
       };
 
-      setState((prev) => {
-        const snapshot = JSON.parse(JSON.stringify(prev.history)) as Session[];
-        const newHistory = [...prev.history, session];
-        // Cached stats represent PRACTICE only. Game sessions are stored in
-        // history but not added to cached stats.
-        let newStats = { ...prev.stats };
-        if (mode !== "game") {
-          kicks.forEach((k) => {
-            newStats = processKick(k, newStats);
-          });
-        }
-        const next = { ...prev, stats: newStats, history: newHistory, snapshot };
-        localSet("FG", next);
-        // Critical: committed session must reach cloud immediately, not debounced
-        const _t = getTeamId();
-        if (_t && _t !== "local-dev") {
-          teamSetImmediate(_t, "fg_data", next);
-          verifyCloudWrite("fg_data", session.id, next);
-        }
-        return next;
-      });
+      setSessions((prev) => [...prev, session]);
+
+      if (tid && tid !== "local-dev") {
+        stampSessionWrite(tid);
+        insertSession(tid, session);
+      }
 
       return session;
     },
     []
   );
 
-  const undoLastCommit = useCallback((): boolean => {
-    let success = false;
-    setState((prev) => {
-      if (!prev.snapshot) return prev;
-      const newHistory = JSON.parse(JSON.stringify(prev.snapshot)) as Session[];
-      // Cached stats = practice sessions only
-      const newStats = recomputeFGStats(
-        prev.athletes,
-        newHistory
-          .filter((s) => s.mode !== "game")
-          .map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
-      );
-      const next = {
-        ...prev,
-        history: newHistory,
-        snapshot: null,
-        stats: newStats,
-      };
-      localSet("FG", next);
-      { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
-      success = true;
-      return next;
-    });
-    return success;
-  }, []);
-
   const updateSessionDate = useCallback(
     (sessionId: string, date: string, label: string) => {
-      setState((prev) => {
-        const newHistory = prev.history.map((s) =>
-          s.id === sessionId ? { ...s, date, label } : s
-        );
-        const next = { ...prev, history: newHistory };
-        localSet("FG", next);
-        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
-        return next;
-      });
+      setSessions((prev) => prev.map((s) =>
+        s.id === sessionId ? { ...s, date, label } : s
+      ));
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        stampSessionWrite(tid);
+        updateSessionRow(tid, sessionId, { date, label });
+      }
     },
     []
   );
 
   const updateSessionWeather = useCallback(
     (sessionId: string, weather: string) => {
-      setState((prev) => {
-        const newHistory = prev.history.map((s) =>
-          s.id === sessionId ? { ...s, weather: weather || undefined } : s
-        );
-        const next = { ...prev, history: newHistory };
-        localSet("FG", next);
-        { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
-        return next;
-      });
+      setSessions((prev) => prev.map((s) =>
+        s.id === sessionId ? { ...s, weather: weather || undefined } : s
+      ));
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        stampSessionWrite(tid);
+        updateSessionRow(tid, sessionId, { weather: weather || undefined });
+      }
     },
     []
   );
 
   const updateSessionEntries = useCallback((sessionId: string, entries: FGKick[]) => {
-    setState((prev) => {
-      const newHistory = prev.history.map((s) =>
-        s.id === sessionId ? { ...s, entries } : s
-      );
-      const newStats = recomputeFGStats(
-        prev.athletes,
-        newHistory.filter((s) => s.mode !== "game").map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
-      );
-      const next = { ...prev, history: newHistory, stats: newStats };
-      localSet("FG", next);
-      const _t = getTeamId();
-      if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next);
-      return next;
-    });
+    setSessions((prev) => prev.map((s) =>
+      s.id === sessionId ? { ...s, entries } : s
+    ));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      stampSessionWrite(tid);
+      updateSessionRow(tid, sessionId, { entries });
+    }
   }, []);
 
   const deleteSession = useCallback((sessionId: string) => {
-    setState((prev) => {
-      // Save to trash before deleting
-      const deleted = prev.history.find((s) => s.id === sessionId);
-      if (deleted) {
-        import("@/lib/trashBin").then(({ trashSession }) => trashSession(deleted, "KICKING"));
-      }
-      const newHistory = prev.history.filter((s) => s.id !== sessionId);
-      const newStats = recomputeFGStats(
-        prev.athletes,
-        newHistory
-          .filter((s) => s.mode !== "game")
-          .map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
-      );
-      const next = { ...prev, history: newHistory, stats: newStats };
-      localSet("FG", next);
-      { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
-      return next;
-    });
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      stampSessionWrite(tid);
+      softDeleteSession(tid, sessionId);
+    }
   }, []);
 
-  const restoreSession = useCallback((session: Session) => {
-    setState((prev) => {
-      if (prev.history.some((s) => s.id === session.id)) return prev;
-      const newHistory = [...prev.history, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const newStats = recomputeFGStats(
-        prev.athletes,
-        newHistory.filter((s) => s.mode !== "game").map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
-      );
-      const next = { ...prev, history: newHistory, stats: newStats };
-      localSet("FG", next);
-      { const _t = getTeamId(); if (_t && _t !== "local-dev") teamSet(_t, "fg_data", next); }
-      return next;
+  const restoreSessionAction = useCallback((session: Session) => {
+    setSessions((prev) => {
+      if (prev.some((s) => s.id === session.id)) return prev;
+      return [...prev, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     });
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      stampSessionWrite(tid);
+      // Insert in case it was hard-deleted, otherwise the row already exists
+      insertSession(tid, { ...session, sport: "KICKING", teamId: tid });
+    }
   }, []);
-
-  const resetAll = useCallback(() => {
-    const next = defaultState();
-    save(next);
-  }, [save]);
 
   const resetStatsKeepAthletes = useCallback(() => {
-    setState((prev) => {
-      const freshStats: Record<string, AthleteStats> = {};
-      prev.athletes.forEach((a) => { freshStats[a] = emptyAthleteStats(); });
-      const next: FGStateData = {
-        athletes: prev.athletes,
-        stats: freshStats,
-        snapshot: null,
-        history: [],
-      };
-      localSet("FG", next);
-      const _t = getTeamId();
-      if (_t && _t !== "local-dev") teamSetImmediate(_t, "fg_data", next);
-      return next;
-    });
-  }, []);
+    // Soft-delete all sessions for this sport
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      stampSessionWrite(tid);
+      sessions.forEach((s) => softDeleteSession(tid, s.id));
+    }
+    setSessions([]);
+  }, [sessions]);
 
   return (
     <FGContext.Provider
       value={{
-        ...state,
+        athletes,
+        stats,
+        history,
         addAthletes,
-        removeAthlete,
+        removeAthlete: removeAthleteAction,
         commitPractice,
-        undoLastCommit,
         resetStatsKeepAthletes,
-        resetAll,
         updateSessionDate,
         updateSessionWeather,
         updateSessionEntries,
         deleteSession,
-        restoreSession,
-        canUndo: state.snapshot !== null,
+        restoreSession: restoreSessionAction,
       }}
     >
       {children}

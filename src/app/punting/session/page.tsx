@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { usePunt } from "@/lib/puntContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
@@ -13,8 +13,8 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
-import { useTeamDraftSync } from "@/lib/useTeamDraftSync";
+import { teamSet, getTeamId } from "@/lib/teamData";
+import type { StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
 const SESSION_STORAGE_KEY = "puntSessionDraft";
@@ -145,10 +145,6 @@ function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
 function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
   if (typeof window === "undefined") return;
   localStorage.setItem(`${SESSION_STORAGE_KEY}_${mode}`, JSON.stringify(draft));
-  const tid = getTeamId();
-  if (tid && tid !== "local-dev") {
-    teamSet(tid, `punt_session_draft_${mode}`, draft);
-  }
 }
 
 const DEFAULT_PUNT_TYPES = [
@@ -204,7 +200,7 @@ function loadDirectionSettings(): { enabled: boolean; options: { value: string; 
 }
 
 export default function PuntingSessionPage() {
-  const { athletes, stats, canUndo, undoLastCommit, commitPractice, resetAll } =
+  const { athletes, stats, commitPractice } =
     usePunt();
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
@@ -253,7 +249,6 @@ export default function PuntingSessionPage() {
   useEffect(() => {
     if (sessionMode === "game" && !manualEntry) setManualEntry(true);
   }, [sessionMode, manualEntry]);
-  const [showReset, setShowReset] = useState(false);
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
   const [dirSettings] = useState(() => loadDirectionSettings());
   const dirEnabled = dirSettings.enabled;
@@ -264,26 +259,6 @@ export default function PuntingSessionPage() {
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
 
-  // Guard: skip sync callbacks that arrive shortly after a local save
-  const lastLocalSave = useRef(0);
-
-  // Poll for draft changes from other devices
-  useTeamDraftSync<SessionDraft>(`punt_session_draft_${sessionMode}`, (cloudDraft) => {
-    if (Date.now() - lastLocalSave.current < 8000) return;
-    if (cloudDraft && cloudDraft.rows) {
-      setRows(cloudDraft.rows);
-      setManualEntry(cloudDraft.manualEntry);
-      setSessionActive(cloudDraft.sessionActive);
-      setPlannedPunts(cloudDraft.plannedPunts ?? []);
-      setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
-      setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
-      setSessionPunts(cloudDraft.sessionPunts ?? []);
-      if (cloudDraft.partialInputs) setPartialInputs(cloudDraft.partialInputs);
-      setCommitted(cloudDraft.committed ?? false);
-      if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
-    }
-  });
-
   // Load punt types from cloud on fresh device
   useEffect(() => {
     loadSettingsFromCloud<{ puntTypes?: { id: string; label: string }[] }>("puntSettings").then((cloud) => {
@@ -291,28 +266,6 @@ export default function PuntingSessionPage() {
         setPuntTypes(cloud.puntTypes);
       }
     });
-
-    // Load draft from cloud if local is empty
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
-      teamGet<SessionDraft>(tid, `punt_session_draft_${sessionMode}`).then((cloudDraft) => {
-        if (cloudDraft && cloudDraft.rows) {
-          const localDraft = loadDraftForMode(sessionMode);
-          const localHasData = localDraft?.rows?.some((r: LogRow) => r.athlete || r.type || r.hash);
-          if (!localHasData || cloudDraft.sessionActive) {
-            setRows(cloudDraft.rows);
-            setManualEntry(cloudDraft.manualEntry);
-            setSessionActive(cloudDraft.sessionActive);
-            setPlannedPunts(cloudDraft.plannedPunts ?? []);
-            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
-            setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
-            setSessionPunts(cloudDraft.sessionPunts ?? []);
-            setCommitted(cloudDraft.committed ?? false);
-            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
-          }
-        }
-      });
-    }
   }, []);
 
   // Auto-decimal: user types digits, we insert decimal 2 places from right
@@ -354,7 +307,6 @@ export default function PuntingSessionPage() {
 
   // Persist draft on every relevant state change
   useEffect(() => {
-    lastLocalSave.current = Date.now();
     // Merge current input fields into partialInputs for the active punt
     const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
       ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }
@@ -435,7 +387,7 @@ export default function PuntingSessionPage() {
 
   const totals = athletes.reduce(
     (acc, a) => {
-      const s = stats[a];
+      const s = stats[a.name];
       if (!s) return acc;
       return {
         att: acc.att + s.overall.att,
@@ -914,25 +866,6 @@ export default function PuntingSessionPage() {
     setGameTime("");
   };
 
-  const handleUndo = () => {
-    const ok = undoLastCommit();
-    if (!ok) alert("Nothing to undo");
-  };
-
-  const handleReset = () => {
-    if (!showReset) {
-      setShowReset(true);
-      return;
-    }
-    resetAll();
-    setSessionPunts([]);
-    setPlannedPunts([]);
-    setPlannedRowIndices([]);
-    setCurrentPuntIdx(0);
-    setPartialInputs({});
-    setShowReset(false);
-  };
-
   const [clearUndoData, setClearUndoData] = useState<{ rows: typeof rows; sessionPunts: typeof sessionPunts; plannedPunts: typeof plannedPunts; plannedRowIndices: number[]; partialInputs: typeof partialInputs } | null>(null);
 
   const clearLog = () => {
@@ -954,6 +887,24 @@ export default function PuntingSessionPage() {
     setPlannedRowIndices(clearUndoData.plannedRowIndices);
     setPartialInputs(clearUndoData.partialInputs);
     setClearUndoData(null);
+  };
+
+  // ── Save Draft to cloud ──────────────────────────────────────
+  const handleSaveDraft = () => {
+    const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }
+      : partialInputs;
+    const draft: SessionDraft = {
+      rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices,
+      currentPuntIdx, sessionPunts, partialInputs: mergedPartials,
+      committed, committedWeather: committed ? weather : undefined,
+      committedPunts: committed ? committedPunts : undefined,
+      sessionMode, opponent, gameTime,
+    };
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamSet(tid, `punt_session_draft_${sessionMode}`, draft);
+    }
   };
 
   // ════════════════════════════════════════════════════════════
@@ -1205,17 +1156,17 @@ export default function PuntingSessionPage() {
                           <div className="absolute top-full left-0 mt-1 z-20 bg-surface-2 border border-border rounded-input shadow-lg min-w-[120px]">
                             {athletes.map((a) => (
                               <button
-                                key={a}
+                                key={a.id}
                                 onClick={() => {
-                                  updateCurrentPlan("athlete", a);
+                                  updateCurrentPlan("athlete", a.name);
                                   setShowAthleteDropdown(false);
                                 }}
                                 className={clsx(
                                   "w-full text-left px-3 py-2 text-sm font-medium hover:bg-surface transition-colors",
-                                  a === currentPlan.athlete ? "text-accent" : "text-slate-300"
+                                  a.name === currentPlan.athlete ? "text-accent" : "text-slate-300"
                                 )}
                               >
-                                {a}
+                                {a.name}
                               </button>
                             ))}
                           </div>
@@ -1503,16 +1454,12 @@ export default function PuntingSessionPage() {
                 </button>
               ) : (
                 <>
-                  <div className="flex gap-2">
-                    {canUndo && (
-                      <button
-                        onClick={handleUndo}
-                        className="btn-ghost text-xs py-1.5 px-3"
-                      >
-                        ↩ Undo
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    onClick={handleSaveDraft}
+                    className="btn-ghost text-xs py-1.5 px-3"
+                  >
+                    Save Draft
+                  </button>
                   <div className="flex-1" />
                   <button
                     onClick={handleCommitReady}
@@ -1995,7 +1942,7 @@ export default function PuntingSessionPage() {
                           >
                             <option value="">—</option>
                             {athletes.map((a) => (
-                              <option key={a} value={a}>{a}</option>
+                              <option key={a.id} value={a.name}>{a.name}</option>
                             ))}
                           </select>
                         )}
@@ -2347,15 +2294,9 @@ export default function PuntingSessionPage() {
             </span>
             {!viewOnly && (<>
               <div className="flex gap-2">
-                {(canUndo || deletedRowStack.length > 0) && (
+                {deletedRowStack.length > 0 && (
                   <button
-                    onClick={() => {
-                      if (deletedRowStack.length > 0) {
-                        undoDeleteRow();
-                      } else {
-                        handleUndo();
-                      }
-                    }}
+                    onClick={undoDeleteRow}
                     className="btn-ghost text-xs py-1.5 px-3"
                   >
                     ↩ Undo
@@ -2375,6 +2316,12 @@ export default function PuntingSessionPage() {
                     Undo Clear
                   </button>
                 )}
+                <button
+                  onClick={handleSaveDraft}
+                  className="btn-ghost text-xs py-1.5 px-3"
+                >
+                  Save Draft
+                </button>
               </div>
               {sessionMode === "game" ? (
                 <button

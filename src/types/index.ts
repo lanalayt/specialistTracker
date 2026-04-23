@@ -221,28 +221,24 @@ export interface Session {
 export interface FGState {
   athletes: string[];
   stats: Record<string, AthleteStats>;
-  snapshot: Session[] | null;
   history: Session[];
 }
 
 export interface PuntState {
   athletes: string[];
   stats: Record<string, PuntAthleteStats>;
-  snapshot: Session[] | null;
   history: Session[];
 }
 
 export interface KickoffState {
   athletes: string[];
   stats: Record<string, KickoffAthleteStats>;
-  snapshot: Session[] | null;
   history: Session[];
 }
 
 export interface LongSnapState {
   athletes: string[];
   stats: Record<string, LongSnapAthleteStats>;
-  snapshot: Session[] | null;
   history: Session[];
 }
 

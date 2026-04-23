@@ -100,7 +100,7 @@ function PuntStatTable({
   statsMap,
   getBucket,
 }: {
-  athletes: string[];
+  athletes: { id: string; name: string }[];
   statsMap: Record<string, PuntAthleteStats>;
   getBucket: (s: PuntAthleteStats) => PuntStatBucket;
 }) {
@@ -119,12 +119,12 @@ function PuntStatTable({
       </thead>
       <tbody>
         {athletes.map((a) => {
-          const s = statsMap[a];
+          const s = statsMap[a.name];
           if (!s) return null;
           const b = getBucket(s);
           return (
-            <tr key={a} className="hover:bg-surface/30 transition-colors">
-              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a}</td>
+            <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{b.att || "—"}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgYds(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgHT(b)}</td>
@@ -142,12 +142,12 @@ function PuntStatTable({
 }
 
 function computeFilteredPuntStats(
-  athletes: string[],
+  athletes: { id: string; name: string }[],
   history: { entries?: PuntEntry[] }[],
   filter: (p: PuntEntry) => boolean
 ): Record<string, PuntAthleteStats> {
   let statsMap: Record<string, PuntAthleteStats> = {};
-  athletes.forEach((a) => { statsMap[a] = emptyPuntStats(); });
+  athletes.forEach((a) => { statsMap[a.name] = emptyPuntStats(); });
   history.forEach((session) => {
     const punts = (session.entries ?? []) as PuntEntry[];
     punts.filter(filter).forEach((p) => {
@@ -166,7 +166,7 @@ function PuntStatsView({
   history,
   puntFilter,
 }: {
-  athletes: string[];
+  athletes: { id: string; name: string }[];
   statsMap: Record<string, PuntAthleteStats>;
   puntTypes: { id: string; label: string }[];
   typeLabels: Record<string, string>;
@@ -178,7 +178,7 @@ function PuntStatsView({
   const typeStatsMaps = useMemo(() => {
     const result: Record<string, Record<string, PuntAthleteStats>> = {};
     puntTypes.forEach(({ id: type }) => {
-      if (!athletes.some((a) => statsMap[a]?.byType[type]?.att > 0)) return;
+      if (!athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0)) return;
       result[type] = computeFilteredPuntStats(
         athletes,
         history,
@@ -191,7 +191,7 @@ function PuntStatsView({
   // Compute per-athlete pooch landing YL from filtered history
   const poochYLStats = useMemo(() => {
     const result: Record<string, { att: number; total: number }> = {};
-    athletes.forEach((a) => { result[a] = { att: 0, total: 0 }; });
+    athletes.forEach((a) => { result[a.name] = { att: 0, total: 0 }; });
     history.forEach((session) => {
       (session.entries ?? []).forEach((p) => {
         if (puntFilter && !puntFilter(p)) return;
@@ -251,14 +251,14 @@ function PuntStatsView({
               </tr>
             </thead>
             <tbody>
-              {athletes.filter((a) => poochYLStats[a]?.att > 0).map((a) => {
-                const s = poochYLStats[a];
+              {athletes.filter((a) => poochYLStats[a.name]?.att > 0).map((a) => {
+                const s = poochYLStats[a.name];
                 const avgYL = s.att > 0 ? (s.total / s.att).toFixed(1) : "—";
                 // Get pooch-specific HT and DA from byType buckets
                 const poochTypes = puntTypes.filter(({ id }) => id.toUpperCase().includes("POOCH"));
                 let poochHangTotal = 0, poochHangAtt = 0, poochDATotal = 0, poochDAAtt = 0;
                 poochTypes.forEach(({ id }) => {
-                  const b = statsMap[a]?.byType[id];
+                  const b = statsMap[a.name]?.byType[id];
                   if (b) {
                     poochHangTotal += b.totalHang;
                     poochHangAtt += (b.hangAtt ?? 0);
@@ -269,8 +269,8 @@ function PuntStatsView({
                 const avgHT = poochHangAtt > 0 ? (poochHangTotal / poochHangAtt).toFixed(2) : "—";
                 const avgDA = poochDAAtt > 0 ? `${Math.round((poochDATotal / poochDAAtt) * 100)}%` : "—";
                 return (
-                  <tr key={a} className="hover:bg-surface/30 transition-colors">
-                    <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a}</td>
+                  <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                    <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
                     <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{s.att}</td>
                     <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{avgYL}</td>
                     <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgHT}</td>
@@ -287,7 +287,7 @@ function PuntStatsView({
       <CollapsibleSection title="By Type">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {puntTypes
-            .filter(({ id: type }) => athletes.some((a) => statsMap[a]?.byType[type]?.att > 0))
+            .filter(({ id: type }) => athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0))
             .map(({ id: type }) => {
               const isPooch = type.toUpperCase().includes("POOCH");
               if (isPooch) {
@@ -307,15 +307,15 @@ function PuntStatsView({
                       </thead>
                       <tbody>
                         {athletes.map((a) => {
-                          const b = statsMap[a]?.byType[type];
+                          const b = statsMap[a.name]?.byType[type];
                           if (!b || b.att === 0) return null;
-                          const ylData = poochYLStats[a];
+                          const ylData = poochYLStats[a.name];
                           const avgYL = ylData && ylData.att > 0 ? (ylData.total / ylData.att).toFixed(1) : "—";
                           const ht = (b.hangAtt ?? 0) > 0 ? ((b.totalHang / (b.hangAtt ?? b.att)).toFixed(2)) : "—";
                           const da = (b.daAtt ?? 0) > 0 ? `${Math.round((b.totalDirectionalAccuracy / (b.daAtt ?? b.att)) * 100)}%` : "—";
                           return (
-                            <tr key={a} className="hover:bg-surface/30 transition-colors">
-                              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a}</td>
+                            <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
                               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{b.att}</td>
                               <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{avgYL}</td>
                               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{ht}</td>
@@ -351,13 +351,13 @@ function PuntStatsView({
       </CollapsibleSection>
 
       {/* Per-Type Position Breakdown */}
-      {puntTypes.filter(({ id: type }) => athletes.some((a) => statsMap[a]?.byType[type]?.att > 0)).map(({ id: type }) => (
+      {puntTypes.filter(({ id: type }) => athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0)).map(({ id: type }) => (
         <CollapsibleSection key={type} title={`${typeLabels[type] ?? type} — By Position`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {PUNT_HASHES.map((hash) => {
               const typeStats = typeStatsMaps[type];
               if (!typeStats) return null;
-              const hasData = athletes.some((a) => typeStats[a]?.byHash[hash]?.att > 0);
+              const hasData = athletes.some((a) => typeStats[a.name]?.byHash[hash]?.att > 0);
               if (!hasData) return null;
               return (
                 <div key={hash} className="card-2">
@@ -469,7 +469,7 @@ export default function PuntingStatisticsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
         <button
-          onClick={() => exportPuntStats(athletes, history as { date?: string; entries?: PuntEntry[] }[], hasStarred)}
+          onClick={() => exportPuntStats(athletes.map((a) => a.name), history as { date?: string; entries?: PuntEntry[] }[], hasStarred)}
           className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
         >
           Export

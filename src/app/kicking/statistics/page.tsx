@@ -32,7 +32,7 @@ function StatTable({
   showScore = true,
   maxScore = 3,
 }: {
-  athletes: string[];
+  athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteStats>;
   getValue: (s: AthleteStats) => { att: number; made: number; score: number };
   showScore?: boolean;
@@ -51,12 +51,12 @@ function StatTable({
       </thead>
       <tbody>
         {athletes.map((a) => {
-          const s = statsMap[a];
+          const s = statsMap[a.name];
           if (!s) return null;
           const v = getValue(s);
           return (
-            <tr key={a} className="hover:bg-surface/30 transition-colors">
-              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a}</td>
+            <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{v.made || "—"}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{v.att || "—"}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50 make-pct">{makePct(v.att, v.made)}</td>
@@ -103,12 +103,12 @@ function CollapsibleSection({
 }
 
 function computeFilteredStats(
-  athletes: string[],
+  athletes: { id: string; name: string }[],
   history: { entries?: FGKick[] }[],
   filter: (k: FGKick) => boolean
 ): Record<string, AthleteStats> {
   let statsMap: Record<string, AthleteStats> = {};
-  athletes.forEach((a) => { statsMap[a] = emptyAthleteStats(); });
+  athletes.forEach((a) => { statsMap[a.name] = emptyAthleteStats(); });
   history.forEach((session) => {
     const kicks = (session.entries ?? []) as FGKick[];
     kicks.filter(filter).forEach((k) => {
@@ -123,7 +123,7 @@ function FGStatsView({
   statsMap,
   label,
 }: {
-  athletes: string[];
+  athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteStats>;
   label: string;
 }) {
@@ -145,12 +145,12 @@ function FGStatsView({
           </thead>
           <tbody>
             {athletes.map((a) => {
-              const s = statsMap[a];
+              const s = statsMap[a.name];
               if (!s) return null;
               const o = s.overall;
               return (
-                <tr key={a} className="hover:bg-surface/30 transition-colors">
-                  <td className="table-name">{a}</td>
+                <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                  <td className="table-name">{a.name}</td>
                   <td className="table-cell">{o.made || "—"}</td>
                   <td className="table-cell">{o.att || "—"}</td>
                   <td className="table-cell make-pct">{makePct(o.att, o.made)}</td>
@@ -178,12 +178,12 @@ function FGStatsView({
             </thead>
             <tbody>
               {athletes.map((a) => {
-                const s = statsMap[a];
+                const s = statsMap[a.name];
                 if (!s) return null;
                 const total = s.miss.XL + s.miss.XR + s.miss.XS;
                 return (
-                  <tr key={a} className="hover:bg-surface/30 transition-colors">
-                    <td className="table-name">{a}</td>
+                  <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                    <td className="table-name">{a.name}</td>
                     <td className="table-cell text-miss">{s.miss.XL || "—"}</td>
                     <td className="table-cell text-miss">{s.miss.XR || "—"}</td>
                     <td className="table-cell text-miss">{s.miss.XS || "—"}</td>
@@ -330,7 +330,7 @@ export default function KickingStatisticsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
         <button
-          onClick={() => exportFGStats(athletes, history as { date?: string; entries?: FGKick[] }[], hasStarred)}
+          onClick={() => exportFGStats(athletes.map((a) => a.name), history as { date?: string; entries?: FGKick[] }[], hasStarred)}
           className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
         >
           Export
