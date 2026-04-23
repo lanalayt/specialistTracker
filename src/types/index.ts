@@ -95,7 +95,7 @@ export interface PuntEntry {
   opTime: number; // punter operation time in seconds
   landingZones: PuntLandingZone[];
   returnYards?: number;
-  directionalAccuracy: 0 | 0.5 | 1;
+  directionalAccuracy: number | string;
   poochLandingYardLine?: number;
   starred?: boolean;
   kickNum?: number;

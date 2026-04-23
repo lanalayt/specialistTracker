@@ -175,8 +175,8 @@ function PuntingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
 
   // Directional accuracy % per session (only count punts with DA defined)
   const daTrend = filteredHistory.map((s) => {
-    const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => p.directionalAccuracy != null);
-    const totalDA = punts.reduce((sum, p) => sum + p.directionalAccuracy, 0);
+    const punts = ((s.entries ?? []) as PuntEntry[]).filter((p) => typeof p.directionalAccuracy === "number");
+    const totalDA = punts.reduce((sum, p) => sum + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);
     return {
       label: s.label,
       "DA%": punts.length > 0 ? Math.round((totalDA / punts.length) * 100) : 0,
@@ -202,14 +202,14 @@ function PuntingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
     const ydsE = ap.filter((p) => p.yards > 0);
     const htE = ap.filter((p) => p.hangTime > 0);
     const otE = ap.filter((p) => (p.opTime || 0) > 0);
-    const daE = ap.filter((p) => p.directionalAccuracy != null);
+    const daE = ap.filter((p) => typeof p.directionalAccuracy === "number");
     return {
       athlete: a,
       att: ap.length,
       avgDist: ydsE.length > 0 ? (ydsE.reduce((s, p) => s + p.yards, 0) / ydsE.length).toFixed(1) : "—",
       avgHT: htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) : "—",
       avgOT: otE.length > 0 ? (otE.reduce((s, p) => s + (p.opTime || 0), 0) / otE.length).toFixed(2) : "—",
-      da: daE.length > 0 ? `${Math.round((daE.reduce((s, p) => s + p.directionalAccuracy, 0) / daE.length) * 100)}%` : "—",
+      da: daE.length > 0 ? `${Math.round((daE.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / daE.length) * 100)}%` : "—",
       long: ydsE.length > 0 ? Math.max(...ydsE.map((p) => p.yards)) : 0,
       critDir: daE.filter((p) => p.directionalAccuracy === 0).length,
     };

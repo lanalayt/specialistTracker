@@ -95,7 +95,7 @@ interface PartialPuntInput {
   yards: string;
   hangTime: string;
   opTime: string;
-  directionalAccuracy: 0 | 0.5 | 1;
+  directionalAccuracy: number | string;
   starred: boolean;
   poochYL?: string;
 }
@@ -177,26 +177,40 @@ const POS_LABELS: Record<PuntHash, string> = {
   RH: "RH",
 };
 
+/** Safely extract numeric DA value — returns 0 for field-based string values */
+function numDA(val: number | string | undefined | null): number {
+  if (val == null) return 0;
+  return typeof val === "number" ? val : 0;
+}
+
 const DEFAULT_DA_OPTIONS = [
   { value: "1", label: "1.0 ✓" },
   { value: "0.5", label: "0.5" },
   { value: "0", label: "0 ★" },
 ];
 
-function loadDirectionSettings(): { enabled: boolean; options: { value: string; label: string }[] } {
-  if (typeof window === "undefined") return { enabled: true, options: DEFAULT_DA_OPTIONS };
+const FIELD_DA_OPTIONS = [
+  { value: "SL-NUM", label: "Sideline-Numbers" },
+  { value: "NUM-HASH", label: "Numbers-Hash" },
+  { value: "TO_FIELD", label: "To The Field" },
+];
+
+function loadDirectionSettings(): { enabled: boolean; mode: "numeric" | "field"; options: { value: string; label: string }[] } {
+  if (typeof window === "undefined") return { enabled: true, mode: "numeric", options: DEFAULT_DA_OPTIONS };
   try {
     const raw = localStorage.getItem("puntSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
       const enabled = parsed.directionEnabled !== false;
+      const mode: "numeric" | "field" = parsed.directionMode === "field" ? "field" : "numeric";
+      const defaultOpts = mode === "field" ? FIELD_DA_OPTIONS : DEFAULT_DA_OPTIONS;
       const options = parsed.directionOptions?.length > 0
         ? parsed.directionOptions.map((d: { id: string; label: string }) => ({ value: d.id, label: d.label }))
-        : DEFAULT_DA_OPTIONS;
-      return { enabled, options };
+        : defaultOpts;
+      return { enabled, mode, options };
     }
   } catch {}
-  return { enabled: true, options: DEFAULT_DA_OPTIONS };
+  return { enabled: true, mode: "numeric", options: DEFAULT_DA_OPTIONS };
 }
 
 export default function PuntingSessionPage() {
@@ -253,7 +267,9 @@ export default function PuntingSessionPage() {
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
   const [dirSettings] = useState(() => loadDirectionSettings());
   const dirEnabled = dirSettings.enabled;
+  const dirMode = dirSettings.mode;
   const DA_OPTIONS = dirSettings.options;
+  const defaultDA: number | string = dirMode === "field" ? (DA_OPTIONS[0]?.value ?? "SL-NUM") : 1;
   const typeLabels: Record<string, string> = {};
   puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
   const drag = useDragReorder(rows, setRows);
@@ -320,7 +336,9 @@ export default function PuntingSessionPage() {
   const [yards, setYards] = useState(initPartial?.yards ?? "");
   const [hangTime, setHangTime] = useState(initPartial?.hangTime ?? "");
   const [opTime, setOpTime] = useState(initPartial?.opTime ?? "");
-  const [directionalAccuracy, setDirectionalAccuracy] = useState<0 | 0.5 | 1>(initPartial?.directionalAccuracy ?? 1);
+  const [directionalAccuracy, setDirectionalAccuracy] = useState<number | string>(
+    initPartial?.directionalAccuracy ?? (dirMode === "field" ? DA_OPTIONS[0]?.value ?? "SL-NUM" : 1)
+  );
   const [starred, setStarred] = useState(initPartial?.starred ?? false);
   // Game-mode only: LOS and Landing yard line (absolute 0..100 field positions)
   const [los, setLos] = useState<string>("");
@@ -382,7 +400,7 @@ export default function PuntingSessionPage() {
     setYards(newPartial?.yards ?? "");
     setHangTime(newPartial?.hangTime ?? "");
     setOpTime(newPartial?.opTime ?? "");
-    setDirectionalAccuracy(newPartial?.directionalAccuracy ?? 1);
+    setDirectionalAccuracy(newPartial?.directionalAccuracy ?? defaultDA);
     setStarred(newPartial?.starred ?? false);
     setPoochYL(newPartial?.poochYL ?? "");
     setLos("");
@@ -546,7 +564,7 @@ export default function PuntingSessionPage() {
     setYards("");
     setHangTime("");
     setOpTime("");
-    setDirectionalAccuracy(1);
+    setDirectionalAccuracy(defaultDA);
     setStarred(!!planned[startIdx >= 0 ? startIdx : 0]?.starred);
     setSessionActive(true);
   };
@@ -575,7 +593,9 @@ export default function PuntingSessionPage() {
     const htVal = parseFloat(r.hangTime) || 0;
     const otVal = parseFloat(r.opTime) || 0;
     const retVal = r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined;
-    const daVal = r.directionalAccuracy !== "" && r.directionalAccuracy != null ? (parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1) : 1;
+      const daVal: number | string = r.directionalAccuracy !== "" && r.directionalAccuracy != null
+      ? (dirMode === "field" ? r.directionalAccuracy : (parseFloat(r.directionalAccuracy) || 0))
+      : (dirMode === "field" ? (DA_OPTIONS[0]?.value ?? "") : 1);
     // Auto-detect touchback: landing YL of 0 = into the end zone = touchback
     const isTouchback = landingYLVal >= 100;
     // Filled index (position among filled rows)
@@ -661,7 +681,7 @@ export default function PuntingSessionPage() {
         hangTime: parseFloat(r.hangTime) || 0,
         opTime: parseFloat(r.opTime) || 0,
         landingZones: [],
-        directionalAccuracy: parseFloat(r.directionalAccuracy) as 0 | 0.5 | 1,
+        directionalAccuracy: dirMode === "field" ? (r.directionalAccuracy || (DA_OPTIONS[0]?.value ?? "")) : (parseFloat(r.directionalAccuracy) || 0),
         starred: r.starred || undefined,
         poochLandingYardLine: isPooch && r.poochYL ? (parseInt(r.poochYL) || 0) : undefined,
       };
@@ -797,7 +817,7 @@ export default function PuntingSessionPage() {
       setYards("");
       setHangTime("");
       setOpTime("");
-      setDirectionalAccuracy(1);
+      setDirectionalAccuracy(defaultDA);
       setStarred(!!plannedPunts[advanceIdx]?.starred);
       setPoochYL("");
     }
@@ -854,7 +874,7 @@ export default function PuntingSessionPage() {
     setYards("");
     setHangTime("");
     setOpTime("");
-    setDirectionalAccuracy(1);
+    setDirectionalAccuracy(defaultDA);
   };
 
   const handleCommitReady = () => {
@@ -1013,10 +1033,10 @@ export default function PuntingSessionPage() {
                               const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                               const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
                               const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
-                              const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
-                              const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
-                              const dirScore = daEntries.reduce((s, p) => s + p.directionalAccuracy, 0);
-                              const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
+                              const numDaEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);
+                              const dirPct = numDaEntries.length > 0 ? `${Math.round((numDaEntries.reduce((s, p) => s + numDA(p.directionalAccuracy), 0) / numDaEntries.length) * 100)}%` : "—";
+                              const dirScore = numDaEntries.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);
+                              const dirScoreDisplay = numDaEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${numDaEntries.length}` : "—";
                               const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
                               return (
                                 <div key={name} className="card-2 p-3">
@@ -1135,7 +1155,7 @@ export default function PuntingSessionPage() {
                                   setYards("");
                                   setHangTime("");
                                   setOpTime("");
-                                  setDirectionalAccuracy(1);
+                                  setDirectionalAccuracy(defaultDA);
                                   setStarred(!!plannedPunts[i]?.starred);
                                 }
                                 setEditingPuntIdx(null);
@@ -1370,21 +1390,24 @@ export default function PuntingSessionPage() {
                     {/* Directional Accuracy */}
                     {dirEnabled && (
                     <div>
-                      <p className="label">Direction Score</p>
+                      <p className="label">Direction{dirMode === "numeric" ? " Score" : ""}</p>
                       <div className="flex flex-wrap gap-2">
                         {DA_OPTIONS.map((opt) => {
-                          const numVal = parseFloat(opt.value);
-                          const isActive = directionalAccuracy === numVal;
+                          const isNumeric = dirMode === "numeric";
+                          const val = isNumeric ? parseFloat(opt.value) : opt.value;
+                          const isActive = directionalAccuracy === val || String(directionalAccuracy) === opt.value;
                           return (
                             <button
                               key={opt.value}
-                              onClick={() => setDirectionalAccuracy(numVal as 0 | 0.5 | 1)}
+                              onClick={() => setDirectionalAccuracy(val)}
                               className={clsx(
                                 "px-3 py-3 rounded-input text-xs font-bold border transition-all",
                                 isActive
-                                  ? numVal === 1 ? "bg-make/20 text-make border-make/50"
-                                    : numVal === 0 ? "bg-miss/20 text-miss border-miss/50"
-                                    : "bg-warn/20 text-warn border-warn/50"
+                                  ? isNumeric
+                                    ? val === 1 ? "bg-make/20 text-make border-make/50"
+                                      : val === 0 ? "bg-miss/20 text-miss border-miss/50"
+                                      : "bg-warn/20 text-warn border-warn/50"
+                                    : "bg-accent/20 text-accent border-accent/50"
                                   : "bg-surface-2 text-muted border-border hover:text-white"
                               )}
                             >
@@ -1520,8 +1543,9 @@ export default function PuntingSessionPage() {
                   const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
                   const inside20 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
                   const inside10 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
-                  const daCount = punts.filter((p) => p.directionalAccuracy != null).length;
-                  const daSum = punts.reduce((s, p) => s + (p.directionalAccuracy ?? 0), 0);
+                  const numDAPunts = punts.filter((p) => typeof p.directionalAccuracy === "number");
+                  const daCount = numDAPunts.length;
+                  const daSum = numDAPunts.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);
                   const dirPct = daCount > 0 ? `${Math.round((daSum / daCount) * 100)}%` : "—";
                   return (
                     <>
@@ -1668,8 +1692,8 @@ export default function PuntingSessionPage() {
                       const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                       const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
                       const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
-                      const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
-                      const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
+                      const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);
+                      const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + numDA(p.directionalAccuracy), 0) / daEntries.length) * 100)}%` : "—";
                       const apI20 = ap.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
                       const apI10 = ap.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
                       const apTB = ap.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
@@ -2263,7 +2287,7 @@ export default function PuntingSessionPage() {
                                         setYards("");
                                         setHangTime("");
                                         setOpTime("");
-                                        setDirectionalAccuracy(1);
+                                        setDirectionalAccuracy(defaultDA);
                                         setStarred(false);
                                       }
                                       setSessionActive(true);
@@ -2400,8 +2424,9 @@ export default function PuntingSessionPage() {
                 const finalSpot2 = (p: { landingYL?: number; returnYards?: number }) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
                 const inside20 = punts.filter((p) => finalSpot2(p) >= 80).length;
                 const inside10 = punts.filter((p) => finalSpot2(p) >= 90).length;
-                const daCount = punts.filter((p) => p.directionalAccuracy != null).length;
-                const daSum = punts.reduce((s, p) => s + (p.directionalAccuracy ?? 0), 0);
+                const numDAPunts2 = punts.filter((p) => typeof p.directionalAccuracy === "number");
+                const daCount = numDAPunts2.length;
+                const daSum = numDAPunts2.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);
                 const dirPct = daCount > 0 ? `${Math.round((daSum / daCount) * 100)}%` : "—";
                 if (sAtt === 0) {
                   return <p className="text-xs text-muted">Save a punt to see it on the field and calculate stats.</p>;
@@ -2439,11 +2464,11 @@ export default function PuntingSessionPage() {
               const ydsEntries = ap.filter((p) => p.yards > 0);
               const htEntries = ap.filter((p) => p.hangTime > 0);
               const otEntries = ap.filter((p) => p.opTime > 0);
-              const daEntries = ap.filter((p) => p.directionalAccuracy != null);
+              const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number");
               const totalYds = ydsEntries.reduce((s, p) => s + p.yards, 0);
               const totalHT = htEntries.reduce((s, p) => s + p.hangTime, 0);
               const totalOT = otEntries.reduce((s, p) => s + p.opTime, 0);
-              const totalDA = daEntries.reduce((s, p) => s + p.directionalAccuracy, 0);
+              const totalDA = daEntries.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);
               const longPunt = ydsEntries.length > 0 ? Math.max(...ydsEntries.map((p) => p.yards)) : 0;
               const aYds = ydsEntries.length > 0 ? (totalYds / ydsEntries.length).toFixed(1) : "—";
               const aHT = htEntries.length > 0 ? (totalHT / htEntries.length).toFixed(2) : "—";

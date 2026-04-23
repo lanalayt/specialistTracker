@@ -237,13 +237,13 @@ function PuntHistoryContent() {
                             const aYds = ap.filter((p) => p.yards > 0);
                             const aHt = ap.filter((p) => p.hangTime > 0);
                             const aOt = ap.filter((p) => (p.opTime || 0) > 0);
-                            const aDa = ap.filter((p) => p.directionalAccuracy != null);
+                            const aDa = ap.filter((p) => typeof p.directionalAccuracy === "number");
                             const stats: Record<string, string> = {
                               Punts: String(ap.length),
                               "Avg Dist": aYds.length > 0 ? (aYds.reduce((s, p) => s + p.yards, 0) / aYds.length).toFixed(1) : "—",
                               "Avg Hang": aHt.length > 0 ? (aHt.reduce((s, p) => s + p.hangTime, 0) / aHt.length).toFixed(2) + "s" : "—",
                               "Avg OT": aOt.length > 0 ? (aOt.reduce((s, p) => s + (p.opTime || 0), 0) / aOt.length).toFixed(2) + "s" : "—",
-                              "Dir %": aDa.length > 0 ? Math.round((aDa.reduce((s, p) => s + p.directionalAccuracy, 0) / aDa.length) * 100) + "%" : "—",
+                              "Dir %": aDa.length > 0 ? Math.round((aDa.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / aDa.length) * 100) + "%" : "—",
                             };
                             const poochYL = ap.filter((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
                             if (poochYL.length > 0) {
@@ -364,10 +364,10 @@ function PuntHistoryContent() {
                     const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                     const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
                     const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
-                    const daEntries = ap.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
-                    const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + p.directionalAccuracy, 0) / daEntries.length) * 100)}%` : "—";
+                    const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);
+                    const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / daEntries.length) * 100)}%` : "—";
                     const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
-                    const dirScore = daEntries.reduce((s, p) => s + p.directionalAccuracy, 0);
+                    const dirScore = daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);
                     const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
                     return (
                       <div key={name} className="card-2 p-3">

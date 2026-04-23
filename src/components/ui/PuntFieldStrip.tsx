@@ -43,8 +43,8 @@ export function PuntFieldStrip({ punts }: PuntFieldStripProps) {
   const avgNet = puntsWithYards.length > 0 ? ((totalYards - totalReturn) / puntsWithYards.length).toFixed(1) : "—";
 
   // Directional accuracy stats
-  const puntsWithDA = punts.filter((p) => p.directionalAccuracy != null && p.directionalAccuracy >= 0);
-  const totalDA = puntsWithDA.reduce((acc, p) => acc + p.directionalAccuracy, 0);
+  const puntsWithDA = punts.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);
+  const totalDA = puntsWithDA.reduce((acc, p) => acc + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);
   const criticalCount = puntsWithDA.filter((p) => p.directionalAccuracy === 0).length;
   const avgDA = puntsWithDA.length > 0 ? (totalDA / puntsWithDA.length).toFixed(2) : "—";
 

@@ -6,9 +6,12 @@ import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 
 const STORAGE_KEY = "puntSettings";
 
+export type DirectionMode = "numeric" | "field";
+
 interface PuntSettings {
   puntTypes: { id: string; label: string }[];
   directionEnabled: boolean;
+  directionMode: DirectionMode;
   directionOptions: { id: string; label: string }[];
 }
 
@@ -20,10 +23,16 @@ const DEFAULT_TYPES = [
   { id: "BROWN", label: "Brown" },
 ];
 
-const DEFAULT_DIRECTION_OPTIONS = [
+const NUMERIC_DIRECTIONS = [
   { id: "1", label: "1.0 ✓" },
   { id: "0.5", label: "0.5" },
   { id: "0", label: "0 ★" },
+];
+
+const FIELD_DIRECTIONS = [
+  { id: "SL-NUM", label: "Sideline-Numbers" },
+  { id: "NUM-HASH", label: "Numbers-Hash" },
+  { id: "TO_FIELD", label: "To The Field" },
 ];
 
 function loadSettings(): PuntSettings {
@@ -31,21 +40,25 @@ function loadSettings(): PuntSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const mode: DirectionMode = parsed.directionMode === "field" ? "field" : "numeric";
+      const defaultDirs = mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS;
       return {
         puntTypes: parsed.puntTypes?.length > 0 ? parsed.puntTypes : DEFAULT_TYPES,
         directionEnabled: parsed.directionEnabled !== false,
-        directionOptions: parsed.directionOptions?.length > 0 ? parsed.directionOptions : DEFAULT_DIRECTION_OPTIONS,
+        directionMode: mode,
+        directionOptions: parsed.directionOptions?.length > 0 ? parsed.directionOptions : defaultDirs,
       };
     }
   } catch {}
-  return { puntTypes: DEFAULT_TYPES, directionEnabled: true, directionOptions: DEFAULT_DIRECTION_OPTIONS };
+  return { puntTypes: DEFAULT_TYPES, directionEnabled: true, directionMode: "numeric", directionOptions: NUMERIC_DIRECTIONS };
 }
 
 export default function PuntSettingsPage() {
   const [types, setTypes] = useState<{ id: string; label: string }[]>(DEFAULT_TYPES);
   const [newType, setNewType] = useState("");
   const [dirEnabled, setDirEnabled] = useState(true);
-  const [dirOptions, setDirOptions] = useState<{ id: string; label: string }[]>(DEFAULT_DIRECTION_OPTIONS);
+  const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
+  const [dirOptions, setDirOptions] = useState<{ id: string; label: string }[]>(NUMERIC_DIRECTIONS);
   const [newDir, setNewDir] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -53,13 +66,15 @@ export default function PuntSettingsPage() {
   const [savedSettings, setSavedSettings] = useState<PuntSettings>({
     puntTypes: DEFAULT_TYPES,
     directionEnabled: true,
-    directionOptions: DEFAULT_DIRECTION_OPTIONS,
+    directionMode: "numeric",
+    directionOptions: NUMERIC_DIRECTIONS,
   });
 
   useEffect(() => {
     const s = loadSettings();
     setTypes(s.puntTypes);
     setDirEnabled(s.directionEnabled);
+    setDirMode(s.directionMode);
     setDirOptions(s.directionOptions);
     setSavedSettings(s);
     setLoaded(true);
@@ -68,11 +83,13 @@ export default function PuntSettingsPage() {
       if (cloud) {
         if (cloud.puntTypes?.length > 0) setTypes(cloud.puntTypes);
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
+        if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionOptions?.length > 0) setDirOptions(cloud.directionOptions);
         setSavedSettings({
           puntTypes: cloud.puntTypes?.length > 0 ? cloud.puntTypes : DEFAULT_TYPES,
           directionEnabled: cloud.directionEnabled !== false,
-          directionOptions: cloud.directionOptions?.length > 0 ? cloud.directionOptions : DEFAULT_DIRECTION_OPTIONS,
+          directionMode: cloud.directionMode || "numeric",
+          directionOptions: cloud.directionOptions?.length > 0 ? cloud.directionOptions : NUMERIC_DIRECTIONS,
         });
       }
     });
@@ -83,10 +100,16 @@ export default function PuntSettingsPage() {
     const changed =
       JSON.stringify(types) !== JSON.stringify(savedSettings.puntTypes) ||
       dirEnabled !== savedSettings.directionEnabled ||
+      dirMode !== savedSettings.directionMode ||
       JSON.stringify(dirOptions) !== JSON.stringify(savedSettings.directionOptions);
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [types, dirEnabled, dirOptions, savedSettings, loaded]);
+  }, [types, dirEnabled, dirMode, dirOptions, savedSettings, loaded]);
+
+  const handleDirModeChange = (mode: DirectionMode) => {
+    setDirMode(mode);
+    setDirOptions(mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS);
+  };
 
   const handleAddType = () => {
     const trimmed = newType.trim();
@@ -107,7 +130,7 @@ export default function PuntSettingsPage() {
   };
 
   const handleSave = () => {
-    const settings: PuntSettings = { puntTypes: types, directionEnabled: dirEnabled, directionOptions: dirOptions };
+    const settings: PuntSettings = { puntTypes: types, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -185,6 +208,36 @@ export default function PuntSettingsPage() {
         </p>
         {dirEnabled && (
           <>
+            {/* Direction mode toggle */}
+            <div>
+              <p className="label">Direction System</p>
+              <div className="flex rounded-input border border-border overflow-hidden w-fit">
+                <button
+                  onClick={() => handleDirModeChange("numeric")}
+                  className={clsx(
+                    "px-4 py-2 text-xs font-semibold transition-colors",
+                    dirMode === "numeric" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                  )}
+                >
+                  Numeric
+                </button>
+                <button
+                  onClick={() => handleDirModeChange("field")}
+                  className={clsx(
+                    "px-4 py-2 text-xs font-semibold transition-colors border-l border-border",
+                    dirMode === "field" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                  )}
+                >
+                  Field-Based
+                </button>
+              </div>
+              <p className="text-[10px] text-muted mt-1.5">
+                {dirMode === "numeric"
+                  ? "Numeric scoring (1.0, 0.5, 0) — calculates a direction percentage."
+                  : "Field zones (Sideline-Numbers, Numbers-Hash, etc.) — shows % breakdown by zone."}
+              </p>
+            </div>
+
             <p className="label">Direction Options</p>
             <div className="space-y-2">
               {dirOptions.map((d) => (

@@ -202,7 +202,9 @@ export function processPunt(
   const hasYards = yards > 0 && !isPooch;
   const hasHang = hangTime > 0;
   const hasOT = opTime > 0;
-  const hasDA = punt.directionalAccuracy != null && punt.directionalAccuracy >= 0;
+  const daRaw = punt.directionalAccuracy;
+  const isNumericDA = typeof daRaw === "number";
+  const hasDA = isNumericDA && daRaw >= 0;
 
   // Migration: old entries may have single landingZone instead of landingZones array
   const landingZones: PuntLandingZone[] = Array.isArray(punt.landingZones)
@@ -211,11 +213,8 @@ export function processPunt(
       ? [(punt as unknown as { landingZone: PuntLandingZone }).landingZone]
       : [];
 
-  // Migration: old entries may have score instead of directionalAccuracy
-  const directionalAccuracy: number =
-    punt.directionalAccuracy !== undefined
-      ? punt.directionalAccuracy
-      : 0.5; // neutral fallback for old entries
+  // For numeric mode, use the value directly; for field-based mode (string), skip aggregation
+  const directionalAccuracy: number = isNumericDA ? daRaw : 0;
 
   const isCritical = hasDA && directionalAccuracy === 0 ? 1 : 0;
   const returnYards = punt.returnYards;
