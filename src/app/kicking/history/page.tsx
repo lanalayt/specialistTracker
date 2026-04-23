@@ -21,7 +21,7 @@ function formatResult(result: string, makeMode: "simple" | "detailed"): string {
   // Misses
   if (result === "XL") return "✗L";
   if (result === "XR") return "✗R";
-  if (result === "XS") return "✗ Short";
+  if (result === "XS") return "✗ Miss";
   return result;
 }
 
