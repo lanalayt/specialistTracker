@@ -141,6 +141,7 @@ function FGStatsView({
               <th className="table-header">%</th>
               <th className="table-header whitespace-nowrap"><span>Kick Score</span><br/><span className="text-[9px] font-normal text-muted">Out of 3</span></th>
               <th className="table-header">Long FG</th>
+              <th className="table-header">Avg OT</th>
             </tr>
           </thead>
           <tbody>
@@ -148,6 +149,7 @@ function FGStatsView({
               const s = statsMap[a.name];
               if (!s) return null;
               const o = s.overall;
+              const avgOT = (o.opTimeAtt || 0) > 0 ? ((o.totalOpTime || 0) / o.opTimeAtt).toFixed(2) : "—";
               return (
                 <tr key={a.id} className="hover:bg-surface/30 transition-colors">
                   <td className="table-name">{a.name}</td>
@@ -156,6 +158,7 @@ function FGStatsView({
                   <td className="table-cell make-pct">{makePct(o.att, o.made)}</td>
                   <td className="table-cell">{avgScore(o.att, o.score)}</td>
                   <td className="table-cell">{o.longFG > 0 ? `${o.longFG} yd` : "—"}</td>
+                  <td className="table-cell">{avgOT !== "—" ? `${avgOT}s` : "—"}</td>
                 </tr>
               );
             })}
@@ -188,6 +191,36 @@ function FGStatsView({
                     <td className="table-cell text-miss">{s.miss.XR || "—"}</td>
                     <td className="table-cell text-miss">{s.miss.XS || "—"}</td>
                     <td className="table-cell text-miss font-semibold">{total || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleSection>
+
+      {/* Op Time */}
+      <CollapsibleSection title="Operation Time">
+        <div className="card-2">
+          <table className="w-full text-sm">
+            <thead>
+              <tr>
+                <th className="table-header text-left">Athlete</th>
+                <th className="table-header">Avg OT</th>
+                <th className="table-header">Kicks w/ OT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {athletes.map((a) => {
+                const s = statsMap[a.name];
+                if (!s) return null;
+                const ot = s.overall.opTimeAtt || 0;
+                const avg = ot > 0 ? ((s.overall.totalOpTime || 0) / ot).toFixed(2) : "—";
+                return (
+                  <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                    <td className="table-name">{a.name}</td>
+                    <td className="table-cell">{avg !== "—" ? `${avg}s` : "—"}</td>
+                    <td className="table-cell text-muted">{ot || "—"}</td>
                   </tr>
                 );
               })}

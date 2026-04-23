@@ -58,7 +58,7 @@ export interface StatBucket {
 }
 
 export interface AthleteStats {
-  overall: StatBucket & { longFG: number };
+  overall: StatBucket & { longFG: number; totalOpTime: number; opTimeAtt: number };
   position: Record<FGPosition, StatBucket>;
   distance: Record<DistRange, StatBucket>;
   miss: { XL: number; XR: number; XS: number; X: number };
@@ -76,6 +76,7 @@ export interface FGKick {
   pos: FGPosition;
   result: FGResult;
   score: number;
+  opTime?: number;
   isPAT?: boolean;
   starred?: boolean;
   kickNum?: number;

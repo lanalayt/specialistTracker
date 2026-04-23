@@ -40,6 +40,7 @@ interface LogRow {
 interface PartialKickInput {
   result: FGResult | null;
   score: number;
+  opTime: string;
   starred: boolean;
 }
 
@@ -209,6 +210,7 @@ export default function KickingSessionPage() {
   const [result, setResult] = useState<FGResult | null>(draft.partialInputs?.[draft.currentKickIdx]?.result ?? null);
   const [score, setScore] = useState<number>(draft.partialInputs?.[draft.currentKickIdx]?.score ?? 0);
   const [starred, setStarred] = useState(draft.partialInputs?.[draft.currentKickIdx]?.starred ?? false);
+  const [opTime, setOpTime] = useState(draft.partialInputs?.[draft.currentKickIdx]?.opTime ?? "");
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedKicks, setCommittedKicks] = useState<FGKick[]>(draft.committedKicks ?? []);
@@ -275,7 +277,7 @@ export default function KickingSessionPage() {
   useEffect(() => {
     // Merge current input fields into partialInputs for the active kick
     const mergedPartials = sessionActive && !isPlannedLogged(currentKickIdx)
-      ? { ...partialInputs, [currentKickIdx]: { result, score, starred } }
+      ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred } }
       : partialInputs;
     saveDraftForMode({
       rows,
@@ -293,14 +295,14 @@ export default function KickingSessionPage() {
       opponent,
       gameTime,
     }, sessionMode);
-  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, partialInputs, result, score, starred, committed, committedKicks, weather, sessionMode, opponent, gameTime]);
+  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, partialInputs, result, score, opTime, starred, committed, committedKicks, weather, sessionMode, opponent, gameTime]);
 
   // ── Switch between practice / game mode with independent drafts ──
   const switchMode = (newMode: "practice" | "game") => {
     if (newMode === sessionMode) return;
     // Save current state to current mode's draft
     const mergedPartials = sessionActive
-      ? { ...partialInputs, [currentKickIdx]: { result, score, starred } }
+      ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred } }
       : partialInputs;
     const currentDraft: SessionDraft = {
       rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices,
@@ -583,6 +585,7 @@ export default function KickingSessionPage() {
   const handleLogKick = () => {
     if (!result) return;
     const plan = plannedKicks[currentKickIdx];
+    const otVal = parseFloat(opTime) || 0;
     const kick: FGKick = {
       athleteId: plan.athlete,
       athlete: plan.athlete,
@@ -590,6 +593,7 @@ export default function KickingSessionPage() {
       pos: plan.pos,
       result,
       score,
+      opTime: otVal > 0 ? otVal : undefined,
       isPAT: plan.isPAT || undefined,
       starred: starred || undefined,
       kickNum: currentKickIdx + 1,
@@ -641,10 +645,12 @@ export default function KickingSessionPage() {
     if (nextPartial) {
       setResult(nextPartial.result);
       setScore(nextPartial.score);
+      setOpTime(nextPartial.opTime ?? "");
       setStarred(nextPartial.starred);
     } else {
       setResult(null);
       setScore(0);
+      setOpTime("");
       setStarred(!!plannedKicks[advanceIdx]?.starred);
     }
     setShowAthleteDropdown(false);
@@ -751,6 +757,7 @@ export default function KickingSessionPage() {
     setCurrentKickIdx(0);
     setPartialInputs({});
     setWeather("");
+    setOpTime("");
     setCommitted(false);
     setSessionActive(false);
     setSessionMode("practice");
@@ -762,7 +769,7 @@ export default function KickingSessionPage() {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       const mergedPartials = sessionActive && !isPlannedLogged(currentKickIdx)
-        ? { ...partialInputs, [currentKickIdx]: { result, score, starred } }
+        ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred } }
         : partialInputs;
       const draft: SessionDraft = {
         rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices,
@@ -988,7 +995,7 @@ export default function KickingSessionPage() {
                             onClick={() => {
                               // Save current partial input before switching
                               if (!isPlannedLogged(currentKickIdx)) {
-                                setPartialInputs((prev) => ({ ...prev, [currentKickIdx]: { result, score, starred } }));
+                                setPartialInputs((prev) => ({ ...prev, [currentKickIdx]: { result, score, opTime, starred } }));
                               }
                               setCurrentKickIdx(i);
                               setDistInput(plannedKicks[i].isPAT ? "" : plannedKicks[i].dist.toString());
@@ -1252,6 +1259,21 @@ export default function KickingSessionPage() {
                       </div>
                     </div>
                     )}
+
+                    {/* Op Time */}
+                    <div>
+                      <p className="label">Op Time (sec)</p>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        placeholder="e.g. 1.25"
+                        value={opTime}
+                        onChange={(e) => setOpTime(e.target.value)}
+                        className="input w-full text-sm py-2"
+                      />
+                    </div>
 
                     {/* Star + Log button + Remove */}
                     <div className="flex gap-2">

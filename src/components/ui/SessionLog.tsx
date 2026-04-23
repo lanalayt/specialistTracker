@@ -54,6 +54,9 @@ export function SessionLog({ kicks, onDelete }: SessionLogProps) {
             >
               {RESULT_LABELS[k.result] ?? k.result}
             </span>
+            {k.opTime != null && k.opTime > 0 && (
+              <span className="text-[10px] text-muted w-12 shrink-0 text-right">{k.opTime.toFixed(2)}s</span>
+            )}
             <button
               onClick={() => onDelete(idx)}
               className="w-6 h-6 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm ml-2"

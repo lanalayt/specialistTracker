@@ -45,7 +45,7 @@ export function emptyAthleteStats(): AthleteStats {
     distance[r] = { att: 0, made: 0, score: 0 };
   });
   return {
-    overall: { att: 0, made: 0, score: 0, longFG: 0 },
+    overall: { att: 0, made: 0, score: 0, longFG: 0, totalOpTime: 0, opTimeAtt: 0 },
     position,
     distance,
     miss: { XL: 0, XR: 0, XS: 0, X: 0 },
@@ -70,8 +70,9 @@ export function processKick(
   kick: FGKick,
   statsMap: Record<string, AthleteStats>
 ): Record<string, AthleteStats> {
-  const { athlete, dist, pos, result, score, isPAT } = kick;
+  const { athlete, dist, pos, result, score, isPAT, opTime } = kick;
   const isMake = isFGMake(result);
+  const hasOT = (opTime ?? 0) > 0;
 
   if (!statsMap[athlete]) {
     statsMap = { ...statsMap, [athlete]: emptyAthleteStats() };
@@ -97,6 +98,8 @@ export function processKick(
     made: s.overall.made + (isMake ? 1 : 0),
     score: s.overall.score + score,
     longFG: isMake ? Math.max(s.overall.longFG, dist) : s.overall.longFG,
+    totalOpTime: (s.overall.totalOpTime || 0) + (hasOT ? opTime! : 0),
+    opTimeAtt: (s.overall.opTimeAtt || 0) + (hasOT ? 1 : 0),
   };
 
   // Position
