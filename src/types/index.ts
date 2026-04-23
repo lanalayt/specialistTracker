@@ -293,11 +293,13 @@ export const DIST_RANGES: DistRange[] = [
   "60+",
 ];
 export const PUNT_TYPES: PuntType[] = [
-  "RED",
-  "BLUE",
-  "POOCH_BLUE",
-  "POOCH_RED",
-  "BROWN",
+  "DIR_LEFT",
+  "DIR_STRAIGHT",
+  "DIR_RIGHT",
+  "POOCH_LEFT",
+  "POOCH_MIDDLE",
+  "POOCH_RIGHT",
+  "RUGBY",
 ];
 export const PUNT_HASHES: PuntHash[] = ["LH", "LM", "M", "RM", "RH"];
 export const PUNT_LANDING_ZONES: PuntLandingZone[] = [

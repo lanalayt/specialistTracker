@@ -16,11 +16,13 @@ interface PuntSettings {
 }
 
 const DEFAULT_TYPES = [
-  { id: "BLUE", label: "Blue" },
-  { id: "RED", label: "Red" },
-  { id: "POOCH_BLUE", label: "P-Blue" },
-  { id: "POOCH_RED", label: "P-Red" },
-  { id: "BROWN", label: "Brown" },
+  { id: "DIR_LEFT", label: "Left" },
+  { id: "DIR_STRAIGHT", label: "Straight" },
+  { id: "DIR_RIGHT", label: "Right" },
+  { id: "POOCH_LEFT", label: "Pooch Left" },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle" },
+  { id: "POOCH_RIGHT", label: "Pooch Right" },
+  { id: "RUGBY", label: "Rugby" },
 ];
 
 const NUMERIC_DIRECTIONS = [

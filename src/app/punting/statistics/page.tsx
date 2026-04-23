@@ -11,11 +11,13 @@ import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFi
 import { exportPuntStats } from "@/lib/exportStats";
 
 const DEFAULT_PUNT_TYPES = [
-  { id: "BLUE", label: "Blue" },
-  { id: "RED", label: "Red" },
-  { id: "POOCH_BLUE", label: "Pooch - Blue" },
-  { id: "POOCH_RED", label: "Pooch - Red" },
-  { id: "BROWN", label: "Brown" },
+  { id: "DIR_LEFT", label: "Left" },
+  { id: "DIR_STRAIGHT", label: "Straight" },
+  { id: "DIR_RIGHT", label: "Right" },
+  { id: "POOCH_LEFT", label: "Pooch Left" },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle" },
+  { id: "POOCH_RIGHT", label: "Pooch Right" },
+  { id: "RUGBY", label: "Rugby" },
 ];
 
 function loadPuntTypes(): { id: string; label: string }[] {
