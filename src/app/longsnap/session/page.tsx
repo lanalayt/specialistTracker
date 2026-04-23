@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import type { LongSnapEntry, SnapBenchmark } from "@/types";
 import clsx from "clsx";
-import { teamSet, getTeamId } from "@/lib/teamData";
+import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
 const BM_COLORS: Record<SnapBenchmark, string> = {
@@ -41,6 +41,7 @@ export default function LongSnapSessionPage() {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [weather, setWeather] = useState("");
   const [weatherLocked, setWeatherLocked] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
 
   const athleteNames = athletes.map((a) => a.name);
 
@@ -67,7 +68,7 @@ export default function LongSnapSessionPage() {
     } catch {}
   }, [weather]);
 
-  // Load draft from localStorage on mount
+  // Load draft from localStorage on mount, fallback to cloud
   useEffect(() => {
     try {
       const raw = localStorage.getItem("longsnap_session_draft");
@@ -77,9 +78,22 @@ export default function LongSnapSessionPage() {
           setSessionSnaps(draft.sessionSnaps);
           setSessionStarted(draft.sessionStarted ?? false);
           if (draft.weather) setWeather(draft.weather);
+          return;
         }
       }
     } catch {}
+
+    // Load draft from cloud if local is empty
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamGet<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(tid, "longsnap_session_draft").then((cloudDraft) => {
+        if (cloudDraft && cloudDraft.sessionSnaps && cloudDraft.sessionSnaps.length > 0) {
+          setSessionSnaps(cloudDraft.sessionSnaps);
+          setSessionStarted(cloudDraft.sessionStarted ?? false);
+          if (cloudDraft.weather) setWeather(cloudDraft.weather);
+        }
+      });
+    }
   }, []);
 
   // Save draft to cloud on demand
@@ -87,6 +101,8 @@ export default function LongSnapSessionPage() {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       teamSet(tid, "longsnap_session_draft", { sessionSnaps, sessionStarted, weather });
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2000);
     }
   }, [sessionSnaps, sessionStarted, weather]);
 
@@ -253,9 +269,9 @@ export default function LongSnapSessionPage() {
           {!viewOnly && sessionSnaps.length > 0 && (
             <button
               onClick={saveDraftToCloud}
-              className="btn-ghost text-xs py-1.5 px-3"
+              className={`btn-ghost text-xs py-1.5 px-3 ${draftSaved ? "text-make" : ""}`}
             >
-              Save Draft
+              {draftSaved ? "Saved!" : "Save Draft"}
             </button>
           )}
           <div className="flex-1" />

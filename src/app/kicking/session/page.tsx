@@ -14,7 +14,7 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
-import { teamSet, getTeamId } from "@/lib/teamData";
+import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 
 const INIT_ROWS = 12;
 
@@ -214,6 +214,7 @@ export default function KickingSessionPage() {
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(initialMode);
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
+  const [draftSaved, setDraftSaved] = useState(false);
 
   // Game mode forces manual entry (no live session)
   useEffect(() => {
@@ -244,6 +245,29 @@ export default function KickingSessionPage() {
         else if (se === false) setScoreMode("off");
       }
     });
+
+    // Load draft from cloud if local is empty
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamGet<SessionDraft>(tid, `fg_session_draft_${sessionMode}`).then((cloudDraft) => {
+        if (cloudDraft && cloudDraft.rows) {
+          const localDraft = loadDraftForMode(sessionMode);
+          const localHasData = localDraft?.rows?.some((r) => r.athlete || r.dist || r.pos);
+          if (!localHasData) {
+            setRows(cloudDraft.rows);
+            setManualEntry(cloudDraft.manualEntry);
+            setSessionActive(cloudDraft.sessionActive);
+            setPlannedKicks(cloudDraft.plannedKicks ?? []);
+            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+            setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
+            setSessionKicks(cloudDraft.sessionKicks ?? []);
+            if (cloudDraft.partialInputs) setPartialInputs(cloudDraft.partialInputs);
+            setCommitted(cloudDraft.committed ?? false);
+            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
+          }
+        }
+      });
+    }
   }, []);
 
   // Persist draft on every relevant state change
@@ -747,6 +771,8 @@ export default function KickingSessionPage() {
         sessionMode, opponent, gameTime,
       };
       teamSet(tid, `fg_session_draft_${sessionMode}`, draft);
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2000);
     }
   };
 
@@ -1312,9 +1338,9 @@ export default function KickingSessionPage() {
                 <>
                   <button
                     onClick={saveDraftToCloud}
-                    className="btn-ghost text-xs py-1.5 px-3"
+                    className={`btn-ghost text-xs py-1.5 px-3 ${draftSaved ? "text-make" : ""}`}
                   >
-                    Save Draft
+                    {draftSaved ? "Saved!" : "Save Draft"}
                   </button>
                   <div className="flex-1" />
                   <button
@@ -1962,9 +1988,9 @@ export default function KickingSessionPage() {
                   )}
                   <button
                     onClick={saveDraftToCloud}
-                    className="btn-ghost text-xs py-1.5 px-3"
+                    className={`btn-ghost text-xs py-1.5 px-3 ${draftSaved ? "text-make" : ""}`}
                   >
-                    Save Draft
+                    {draftSaved ? "Saved!" : "Save Draft"}
                   </button>
                   <button
                     onClick={() => clearLog()}

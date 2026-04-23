@@ -13,7 +13,7 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
-import { teamSet, getTeamId } from "@/lib/teamData";
+import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
@@ -242,6 +242,7 @@ export default function PuntingSessionPage() {
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedPunts, setCommittedPunts] = useState<PuntEntry[]>(draft.committedPunts ?? []);
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(initialMode);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
@@ -266,6 +267,29 @@ export default function PuntingSessionPage() {
         setPuntTypes(cloud.puntTypes);
       }
     });
+
+    // Load draft from cloud if local is empty
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamGet<SessionDraft>(tid, `punt_session_draft_${sessionMode}`).then((cloudDraft) => {
+        if (cloudDraft && cloudDraft.rows) {
+          const localDraft = loadDraftForMode(sessionMode);
+          const localHasData = localDraft?.rows?.some((r) => r.athlete || r.yards || r.type);
+          if (!localHasData) {
+            setRows(cloudDraft.rows);
+            setManualEntry(cloudDraft.manualEntry);
+            setSessionActive(cloudDraft.sessionActive);
+            setPlannedPunts(cloudDraft.plannedPunts ?? []);
+            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+            setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
+            setSessionPunts(cloudDraft.sessionPunts ?? []);
+            if (cloudDraft.partialInputs) setPartialInputs(cloudDraft.partialInputs);
+            setCommitted(cloudDraft.committed ?? false);
+            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
+          }
+        }
+      });
+    }
   }, []);
 
   // Auto-decimal: user types digits, we insert decimal 2 places from right
@@ -904,6 +928,8 @@ export default function PuntingSessionPage() {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       teamSet(tid, `punt_session_draft_${sessionMode}`, draft);
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2000);
     }
   };
 
@@ -1456,9 +1482,9 @@ export default function PuntingSessionPage() {
                 <>
                   <button
                     onClick={handleSaveDraft}
-                    className="btn-ghost text-xs py-1.5 px-3"
+                    className={`btn-ghost text-xs py-1.5 px-3 ${draftSaved ? "text-make" : ""}`}
                   >
-                    Save Draft
+                    {draftSaved ? "Saved!" : "Save Draft"}
                   </button>
                   <div className="flex-1" />
                   <button
@@ -2318,9 +2344,9 @@ export default function PuntingSessionPage() {
                 )}
                 <button
                   onClick={handleSaveDraft}
-                  className="btn-ghost text-xs py-1.5 px-3"
+                  className={`btn-ghost text-xs py-1.5 px-3 ${draftSaved ? "text-make" : ""}`}
                 >
-                  Save Draft
+                  {draftSaved ? "Saved!" : "Save Draft"}
                 </button>
               </div>
               {sessionMode === "game" ? (

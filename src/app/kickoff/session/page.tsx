@@ -12,7 +12,7 @@ import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
-import { teamSet, getTeamId } from "@/lib/teamData";
+import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
@@ -173,6 +173,7 @@ export default function KickoffSessionPage() {
         if (cloud?.directionMetrics?.length) setKoDirs(cloud.directionMetrics);
       });
     });
+
   }, []);
 
   // ── Initialize all state from localStorage ──────────────────
@@ -212,6 +213,7 @@ export default function KickoffSessionPage() {
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedKicks, setCommittedKicks] = useState<KickoffEntry[]>(draft.committedKicks ?? []);
   const [sessionMode, setSessionMode] = useState<"practice" | "game">(initialMode);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
@@ -223,6 +225,30 @@ export default function KickoffSessionPage() {
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
+
+  // Load draft from cloud if local is empty
+  useEffect(() => {
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamGet<SessionDraft>(tid, `kickoff_session_draft_${sessionMode}`).then((cloudDraft) => {
+        if (cloudDraft && cloudDraft.rows) {
+          const localDraft = loadDraftForMode(sessionMode);
+          const localHasData = localDraft?.rows?.some((r) => r.athlete || r.distance || r.type);
+          if (!localHasData) {
+            setRows(cloudDraft.rows);
+            setManualEntry(cloudDraft.manualEntry);
+            setSessionActive(cloudDraft.sessionActive);
+            setPlannedKicks(cloudDraft.plannedKicks ?? []);
+            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
+            setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
+            setSessionKicks(cloudDraft.sessionKicks ?? []);
+            setCommitted(cloudDraft.committed ?? false);
+            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
+          }
+        }
+      });
+    }
+  }, []);
 
   // Session card state
   const [distance, setDistance] = useState("");
@@ -713,6 +739,8 @@ export default function KickoffSessionPage() {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       teamSet(tid, `kickoff_session_draft_${sessionMode}`, draft);
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2000);
     }
   };
 
@@ -1782,9 +1810,9 @@ export default function KickoffSessionPage() {
               </div>
               <button
                 onClick={handleSaveDraft}
-                className="text-xs py-1.5 px-3 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                className={`text-xs py-1.5 px-3 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all ${draftSaved ? "text-make" : ""}`}
               >
-                Save Draft
+                {draftSaved ? "Saved!" : "Save Draft"}
               </button>
               {sessionMode === "game" ? (
                 <button
