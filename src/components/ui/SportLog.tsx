@@ -12,7 +12,8 @@ const RESULT_LABELS: Record<FGResult, string> = {
   YR: "✓ Good →",
   XL: "← Miss Left",
   XR: "Miss Right →",
-  XS: "✗ Miss",
+  XS: "↓ Miss Short",
+  X: "✗ Miss",
 };
 
 interface LogRow {

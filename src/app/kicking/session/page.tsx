@@ -146,7 +146,8 @@ const RESULT_LABELS: Record<string, string> = {
   YC: "Make ✓",
   YR: "Make →",
   XL: "Miss ←",
-  XS: "Miss ✗",
+  XS: "Miss ↓",
+  X: "Miss ✗",
   XR: "Miss →",
 };
 
@@ -1193,10 +1194,10 @@ export default function KickingSessionPage() {
                         {missMode === "simple" ? (
                           <div>
                             <button
-                              onClick={() => { setResult("XS"); setScore(0); }}
+                              onClick={() => { setResult("X"); setScore(0); }}
                               className={clsx(
                                 "w-full py-3 rounded-input text-xs font-bold transition-all",
-                                result === "XL" || result === "XS" || result === "XR"
+                                result === "XL" || result === "XS" || result === "XR" || result === "X"
                                   ? "bg-miss text-white shadow-lg"
                                   : "bg-miss/10 text-miss border border-miss/30 hover:bg-miss/20"
                               )}
@@ -1779,7 +1780,7 @@ export default function KickingSessionPage() {
                                 <option value="">—</option>
                                 {(() => {
                                   const makes = makeMode === "simple" ? ["YC"] : ["YL", "YC", "YR"];
-                                  const misses = missMode === "simple" ? ["XS"] : ["XL", "XS", "XR"];
+                                  const misses = missMode === "simple" ? ["X"] : ["XL", "XS", "XR"];
                                   return [...makes, ...misses].map((r) => (
                                     <option key={r} value={r}>{RESULT_LABELS[r]}</option>
                                   ));
@@ -1840,7 +1841,7 @@ export default function KickingSessionPage() {
                               <option value="">—</option>
                               {(() => {
                                 const makes = makeMode === "simple" ? ["YC"] : ["YL", "YC", "YR"];
-                                const misses = missMode === "simple" ? ["XS"] : ["XL", "XS", "XR"];
+                                const misses = missMode === "simple" ? ["X"] : ["XL", "XS", "XR"];
                                 return [...makes, ...misses].map((r) => (
                                   <option key={r} value={r}>{RESULT_LABELS[r]}</option>
                                 ));

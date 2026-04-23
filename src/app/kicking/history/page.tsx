@@ -21,7 +21,8 @@ function formatResult(result: string, makeMode: "simple" | "detailed"): string {
   // Misses
   if (result === "XL") return "✗L";
   if (result === "XR") return "✗R";
-  if (result === "XS") return "✗ Miss";
+  if (result === "XS") return "✗ Short";
+  if (result === "X") return "✗ Miss";
   return result;
 }
 
@@ -411,7 +412,7 @@ function KickingHistoryContent() {
                           </td>
                           <td className="table-cell p-1">
                             <select value={k.result} onChange={(e) => updateEntry(i, "result", e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
-                              {["YL","YC","YR","XL","XS","XR"].map((r) => <option key={r} value={r}>{r}</option>)}
+                              {["YL","YC","YR","XL","XS","XR","X"].map((r) => <option key={r} value={r}>{r}</option>)}
                             </select>
                           </td>
                           <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
