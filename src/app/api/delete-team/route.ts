@@ -5,8 +5,11 @@ import { cookies } from "next/headers";
 
 /** Server-side Supabase client with service_role for admin operations */
 function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable");
+  }
   return createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -46,45 +49,57 @@ export async function POST() {
     const admin = createAdminClient();
 
     // 2. Find all team members (athletes + coaches) to delete their auth accounts
-    const { data: members } = await admin
+    const { data: members, error: membersError } = await admin
       .from("members")
       .select("id, role")
       .eq("team_id", teamId);
+
+    if (membersError) {
+      console.error("[delete-team] Failed to fetch members:", membersError);
+    }
 
     const memberIds = (members ?? [])
       .map((m) => m.id as string)
       .filter((id) => id !== teamId); // exclude admin — deleted last
 
-    // 3. Delete all team data from every table
-    const deletes = await Promise.all([
-      admin.from("sessions").delete().eq("team_id", teamId),
-      admin.from("athletes").delete().eq("team_id", teamId),
-      admin.from("archives").delete().eq("team_id", teamId),
-      admin.from("members").delete().eq("team_id", teamId),
-      admin.from("team_data").delete().eq("team_id", teamId),
-      admin.from("teams").delete().eq("id", teamId),
-      admin.from("user_data").delete().eq("user_id", teamId),
-    ]);
-    const tableNames = ["sessions", "athletes", "archives", "members", "team_data", "teams", "user_data"];
-    deletes.forEach((r, i) => {
-      if (r.error) console.error(`[delete-team] Failed to delete ${tableNames[i]}:`, r.error);
-    });
+    // 3. Delete all team data from every table sequentially to ensure each completes
+    const tables: [string, string, string][] = [
+      ["sessions", "team_id", teamId],
+      ["athletes", "team_id", teamId],
+      ["archives", "team_id", teamId],
+      ["members", "team_id", teamId],
+      ["team_data", "team_id", teamId],
+      ["teams", "id", teamId],
+      ["user_data", "user_id", teamId],
+    ];
+
+    for (const [table, column, value] of tables) {
+      const { error } = await admin.from(table).delete().eq(column, value);
+      if (error) {
+        console.error(`[delete-team] Failed to delete from ${table}:`, error);
+      }
+    }
 
     // 4. Delete athlete/coach auth accounts
     for (const memberId of memberIds) {
-      // Also clean up their user_data
       await admin.from("user_data").delete().eq("user_id", memberId);
-      await admin.auth.admin.deleteUser(memberId);
+      const { error } = await admin.auth.admin.deleteUser(memberId);
+      if (error) {
+        console.error(`[delete-team] Failed to delete auth user ${memberId}:`, error);
+      }
     }
 
     // 5. Delete the admin's own auth account (last)
-    await admin.auth.admin.deleteUser(teamId);
+    const { error: adminDeleteError } = await admin.auth.admin.deleteUser(teamId);
+    if (adminDeleteError) {
+      console.error("[delete-team] Failed to delete admin auth:", adminDeleteError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[delete-team] Error:", err);
     return NextResponse.json(
-      { error: "Failed to delete team account" },
+      { error: err instanceof Error ? err.message : "Failed to delete team account" },
       { status: 500 }
     );
   }
