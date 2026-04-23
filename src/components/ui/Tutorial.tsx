@@ -177,11 +177,12 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Auto-show on first visit
+  // Auto-show on first visit only
   useEffect(() => {
     try {
       if (!localStorage.getItem(STORAGE_KEY)) {
-        // Small delay so the page renders first
+        // Mark as seen immediately so it never auto-shows again
+        localStorage.setItem(STORAGE_KEY, "1");
         const t = setTimeout(() => {
           setActive(true);
           setStep(0);
