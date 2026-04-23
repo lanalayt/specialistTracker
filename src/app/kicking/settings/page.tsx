@@ -22,7 +22,7 @@ const DEFAULT_SETTINGS: FGSettings = {
   snapDistance: "7",
   makeMode: "detailed",
   missMode: "detailed",
-  scoreEnabled: "on",
+  scoreEnabled: "practice",
   scoreOptions: DEFAULT_SCORE_OPTIONS,
 };
 
@@ -30,7 +30,7 @@ function parseScoreMode(val: unknown): ScoreMode {
   if (val === "on" || val === "practice" || val === "off") return val;
   if (val === true) return "on";
   if (val === false) return "off";
-  return "on";
+  return "practice";
 }
 
 function loadSettingsLocal(): FGSettings {
@@ -56,7 +56,7 @@ export default function FGSettingsPage() {
   const [snapDistance, setSnapDistance] = useState("7");
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">("detailed");
   const [missMode, setMissMode] = useState<"simple" | "detailed">("detailed");
-  const [scoreEnabled, setScoreEnabled] = useState<ScoreMode>("on");
+  const [scoreEnabled, setScoreEnabled] = useState<ScoreMode>("practice");
   const [scoreOptions, setScoreOptions] = useState<string[]>(DEFAULT_SCORE_OPTIONS);
   const [newScore, setNewScore] = useState("");
   const [saved, setSaved] = useState(false);
