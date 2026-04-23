@@ -17,14 +17,22 @@ export async function insertAthlete(
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   try {
     const supabase = createClient();
-    const { error } = await supabase.from("athletes").insert({
-      id,
-      team_id: teamId,
-      sport,
-      name: name.trim(),
-    });
+    const { data, error } = await supabase.from("athletes").upsert(
+      {
+        id,
+        team_id: teamId,
+        sport,
+        name: name.trim(),
+      },
+      { onConflict: "team_id,sport,name", ignoreDuplicates: true }
+    ).select("id, name");
     if (error) throw error;
-    return { id, name: name.trim() };
+    // Return the existing or newly inserted row
+    if (data && data.length > 0) return { id: data[0].id, name: data[0].name };
+    // If ignoreDuplicates suppressed, load the existing one
+    const existing = await loadAthletes(teamId, sport);
+    const match = existing.find((a) => a.name === name.trim());
+    return match ?? { id, name: name.trim() };
   } catch (err) {
     console.warn("[AthleteStore] insertAthlete failed:", err);
     return null;
