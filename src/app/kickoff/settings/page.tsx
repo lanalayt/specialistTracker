@@ -153,9 +153,11 @@ export default function KickoffSettingsPage() {
   };
 
   return (
-    <div className="flex-1 p-6 max-w-lg space-y-6">
+    <div className="flex-1 p-6 max-w-5xl space-y-6">
       <h2 className="text-lg font-bold text-slate-100">KO Settings</h2>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-4">
       <div className="card space-y-4">
         <p className="label">Kickoff Types</p>
         <div className="space-y-3">
@@ -246,6 +248,8 @@ export default function KickoffSettingsPage() {
         </div>
       </div>
 
+      </div>
+      <div className="space-y-4">
       <div className="card space-y-4">
         <p className="label">Direction System</p>
         <div className="flex rounded-input border border-border overflow-hidden w-fit">
@@ -314,6 +318,8 @@ export default function KickoffSettingsPage() {
             + Add
           </button>
         </div>
+      </div>
+      </div>
       </div>
 
       <button

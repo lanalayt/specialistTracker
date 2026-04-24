@@ -139,9 +139,11 @@ export default function FGSettingsPage() {
   };
 
   return (
-    <div className="flex-1 p-6 max-w-lg space-y-6">
+    <div className="flex-1 p-6 max-w-5xl space-y-6">
       <h2 className="text-lg font-bold text-slate-100">FG Settings</h2>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-4">
       <div className="card space-y-3">
         <p className="label">Snap Distance</p>
         <div className="flex gap-2">
@@ -230,6 +232,8 @@ export default function FGSettingsPage() {
         </div>
       </div>
 
+      </div>
+      <div className="space-y-4">
       <div className="card space-y-4">
         <p className="label">Kick Score</p>
         <p className="text-xs text-muted">
@@ -317,6 +321,8 @@ export default function FGSettingsPage() {
         <p className="text-xs text-muted">
           Track snap-to-kick operation time on each attempt. Existing op time data is preserved in stats even when disabled.
         </p>
+      </div>
+      </div>
       </div>
 
       <button

@@ -214,10 +214,12 @@ export default function PuntSettingsPage() {
   };
 
   return (
-    <div className="flex-1 p-6 max-w-lg space-y-6">
+    <div className="flex-1 p-6 max-w-5xl space-y-6">
       <h2 className="text-lg font-bold text-slate-100">Punt Settings</h2>
 
-      {/* Punt Categories & Types */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Left column: Punt Types */}
+      <div className="space-y-4">
       <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Punt Types</p>
       {categories.map((cat) => {
         const catTypes = types.filter((t) => t.category === cat.id);
@@ -321,6 +323,10 @@ export default function PuntSettingsPage() {
         );
       })}
 
+      </div>
+
+      {/* Right column: Direction, Op Time */}
+      <div className="space-y-4">
       {/* Direction Score */}
       <div className="card space-y-4">
         <div className="flex items-center justify-between">
@@ -439,6 +445,8 @@ export default function PuntSettingsPage() {
         <p className="text-xs text-muted">
           Track punter operation time on each punt. Existing op time data is preserved in stats even when disabled.
         </p>
+      </div>
+      </div>
       </div>
 
       <button
