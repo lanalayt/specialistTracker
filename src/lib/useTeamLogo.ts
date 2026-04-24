@@ -7,14 +7,7 @@ import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite } from "@/l
 const STORAGE_KEY = "team_logo";
 
 export function useTeamLogo() {
-  const [logo, setLogo] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      return localStorage.getItem(STORAGE_KEY) || null;
-    } catch {
-      return null;
-    }
-  });
+  const [logo, setLogo] = useState<string | null>(null);
 
   // Load from teams table on mount
   useEffect(() => {
@@ -24,6 +17,9 @@ export function useTeamLogo() {
         if (settings?.logo) {
           setLogo(settings.logo);
           try { localStorage.setItem(STORAGE_KEY, settings.logo); } catch {}
+        } else {
+          setLogo(null);
+          try { localStorage.removeItem(STORAGE_KEY); } catch {}
         }
       });
     }
