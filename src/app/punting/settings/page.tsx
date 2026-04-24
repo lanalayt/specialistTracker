@@ -11,11 +11,19 @@ export type DirectionMode = "numeric" | "field";
 export interface PuntTypeConfig {
   id: string;
   label: string;
+  category: string;
   metric: "distance" | "yardline";
   hangTime: boolean;
 }
 
+export interface PuntCategory {
+  id: string;
+  label: string;
+  enabled: boolean;
+}
+
 interface PuntSettings {
+  puntCategories: PuntCategory[];
   puntTypes: PuntTypeConfig[];
   directionEnabled: boolean;
   directionMode: DirectionMode;
@@ -23,14 +31,23 @@ interface PuntSettings {
   opTimeEnabled: boolean;
 }
 
+const DEFAULT_CATEGORIES: PuntCategory[] = [
+  { id: "DIRECTIONAL", label: "Directional", enabled: true },
+  { id: "POOCH", label: "Pooch", enabled: true },
+  { id: "BANANA", label: "Banana", enabled: true },
+  { id: "RUGBY", label: "Rugby", enabled: true },
+];
+
 const DEFAULT_TYPES: PuntTypeConfig[] = [
-  { id: "DIR_LEFT", label: "Left", metric: "distance", hangTime: true },
-  { id: "DIR_STRAIGHT", label: "Straight", metric: "distance", hangTime: true },
-  { id: "DIR_RIGHT", label: "Right", metric: "distance", hangTime: true },
-  { id: "POOCH_LEFT", label: "Pooch Left", metric: "yardline", hangTime: false },
-  { id: "POOCH_MIDDLE", label: "Pooch Middle", metric: "yardline", hangTime: false },
-  { id: "POOCH_RIGHT", label: "Pooch Right", metric: "yardline", hangTime: false },
-  { id: "RUGBY", label: "Rugby", metric: "distance", hangTime: true },
+  { id: "DIR_LEFT", label: "Left", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_STRAIGHT", label: "Straight", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_RIGHT", label: "Right", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "POOCH_LEFT", label: "Pooch Left", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_RIGHT", label: "Pooch Right", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "BANANA_LEFT", label: "Banana Left", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "BANANA_RIGHT", label: "Banana Right", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "RUGBY", label: "Rugby", category: "RUGBY", metric: "distance", hangTime: true },
 ];
 
 const NUMERIC_DIRECTIONS = [
@@ -45,6 +62,25 @@ const FIELD_DIRECTIONS = [
   { id: "TO_FIELD", label: "To The Field" },
 ];
 
+function migrateType(t: Record<string, unknown>): PuntTypeConfig {
+  const id = t.id as string;
+  const upper = id.toUpperCase();
+  let category = (t.category as string) ?? "DIRECTIONAL";
+  if (!t.category) {
+    if (upper.includes("POOCH")) category = "POOCH";
+    else if (upper.includes("BANANA")) category = "BANANA";
+    else if (upper.includes("RUGBY")) category = "RUGBY";
+    else category = "DIRECTIONAL";
+  }
+  return {
+    id,
+    label: t.label as string,
+    category,
+    metric: (t.metric as "distance" | "yardline") ?? (upper.includes("POOCH") ? "yardline" : "distance"),
+    hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
+  };
+}
+
 function loadSettings(): PuntSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -53,14 +89,12 @@ function loadSettings(): PuntSettings {
       const mode: DirectionMode = parsed.directionMode === "field" ? "field" : "numeric";
       const defaultDirs = mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS;
       const rawTypes = parsed.puntTypes?.length > 0 ? parsed.puntTypes : DEFAULT_TYPES;
-      // Migrate old format: add metric/hangTime if missing
-      const puntTypes: PuntTypeConfig[] = rawTypes.map((t: Record<string, unknown>) => ({
-        id: t.id as string,
-        label: t.label as string,
-        metric: (t.metric as string) ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
-        hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
-      }));
+      const puntTypes = rawTypes.map((t: Record<string, unknown>) => migrateType(t));
+      const puntCategories: PuntCategory[] = parsed.puntCategories?.length > 0
+        ? parsed.puntCategories
+        : DEFAULT_CATEGORIES;
       return {
+        puntCategories,
         puntTypes,
         directionEnabled: parsed.directionEnabled !== false,
         directionMode: mode,
@@ -69,12 +103,20 @@ function loadSettings(): PuntSettings {
       };
     }
   } catch {}
-  return { puntTypes: DEFAULT_TYPES, directionEnabled: true, directionMode: "numeric", directionOptions: NUMERIC_DIRECTIONS, opTimeEnabled: true };
+  return {
+    puntCategories: DEFAULT_CATEGORIES,
+    puntTypes: DEFAULT_TYPES,
+    directionEnabled: true,
+    directionMode: "numeric",
+    directionOptions: NUMERIC_DIRECTIONS,
+    opTimeEnabled: true,
+  };
 }
 
 export default function PuntSettingsPage() {
+  const [categories, setCategories] = useState<PuntCategory[]>(DEFAULT_CATEGORIES);
   const [types, setTypes] = useState<PuntTypeConfig[]>(DEFAULT_TYPES);
-  const [newType, setNewType] = useState("");
+  const [newTypes, setNewTypes] = useState<Record<string, string>>({});
   const [dirEnabled, setDirEnabled] = useState(true);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
   const [dirOptions, setDirOptions] = useState<{ id: string; label: string }[]>(NUMERIC_DIRECTIONS);
@@ -84,6 +126,7 @@ export default function PuntSettingsPage() {
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [savedSettings, setSavedSettings] = useState<PuntSettings>({
+    puntCategories: DEFAULT_CATEGORIES,
     puntTypes: DEFAULT_TYPES,
     directionEnabled: true,
     directionMode: "numeric",
@@ -93,6 +136,7 @@ export default function PuntSettingsPage() {
 
   useEffect(() => {
     const s = loadSettings();
+    setCategories(s.puntCategories);
     setTypes(s.puntTypes);
     setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
@@ -103,13 +147,15 @@ export default function PuntSettingsPage() {
 
     loadSettingsFromCloud<PuntSettings>(STORAGE_KEY).then((cloud) => {
       if (cloud) {
-        if (cloud.puntTypes?.length > 0) setTypes(cloud.puntTypes);
+        if (cloud.puntCategories?.length > 0) setCategories(cloud.puntCategories);
+        if (cloud.puntTypes?.length > 0) setTypes((cloud.puntTypes as unknown as Record<string, unknown>[]).map(migrateType));
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionOptions?.length > 0) setDirOptions(cloud.directionOptions);
         if (typeof cloud.opTimeEnabled === "boolean") setOpTimeEnabled(cloud.opTimeEnabled);
         setSavedSettings({
-          puntTypes: cloud.puntTypes?.length > 0 ? cloud.puntTypes : DEFAULT_TYPES,
+          puntCategories: cloud.puntCategories?.length > 0 ? cloud.puntCategories : DEFAULT_CATEGORIES,
+          puntTypes: cloud.puntTypes?.length > 0 ? (cloud.puntTypes as unknown as Record<string, unknown>[]).map(migrateType) : DEFAULT_TYPES,
           directionEnabled: cloud.directionEnabled !== false,
           directionMode: cloud.directionMode || "numeric",
           directionOptions: cloud.directionOptions?.length > 0 ? cloud.directionOptions : NUMERIC_DIRECTIONS,
@@ -122,6 +168,7 @@ export default function PuntSettingsPage() {
   useEffect(() => {
     if (!loaded) return;
     const changed =
+      JSON.stringify(categories) !== JSON.stringify(savedSettings.puntCategories) ||
       JSON.stringify(types) !== JSON.stringify(savedSettings.puntTypes) ||
       dirEnabled !== savedSettings.directionEnabled ||
       dirMode !== savedSettings.directionMode ||
@@ -129,20 +176,23 @@ export default function PuntSettingsPage() {
       opTimeEnabled !== savedSettings.opTimeEnabled;
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [types, dirEnabled, dirMode, dirOptions, opTimeEnabled, savedSettings, loaded]);
+  }, [categories, types, dirEnabled, dirMode, dirOptions, opTimeEnabled, savedSettings, loaded]);
 
   const handleDirModeChange = (mode: DirectionMode) => {
     setDirMode(mode);
     setDirOptions(mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS);
   };
 
-  const handleAddType = () => {
-    const trimmed = newType.trim();
+  const handleAddType = (categoryId: string) => {
+    const trimmed = (newTypes[categoryId] ?? "").trim();
     if (!trimmed) return;
     const id = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "_");
     if (types.some((t) => t.id === id)) return;
-    setTypes([...types, { id, label: trimmed, metric: "distance", hangTime: true }]);
-    setNewType("");
+    const catDefaults = categoryId === "POOCH"
+      ? { metric: "yardline" as const, hangTime: false }
+      : { metric: "distance" as const, hangTime: true };
+    setTypes([...types, { id, label: trimmed, category: categoryId, ...catDefaults }]);
+    setNewTypes({ ...newTypes, [categoryId]: "" });
   };
 
   const handleAddDir = () => {
@@ -155,7 +205,7 @@ export default function PuntSettingsPage() {
   };
 
   const handleSave = () => {
-    const settings: PuntSettings = { puntTypes: types, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, opTimeEnabled };
+    const settings: PuntSettings = { puntCategories: categories, puntTypes: types, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, opTimeEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -167,84 +217,108 @@ export default function PuntSettingsPage() {
     <div className="flex-1 p-6 max-w-lg space-y-6">
       <h2 className="text-lg font-bold text-slate-100">Punt Settings</h2>
 
-      {/* Punt Types */}
-      <div className="card space-y-4">
-        <p className="label">Punt Types</p>
-        <div className="space-y-3">
-          {types.map((t) => (
-            <div key={t.id} className="border border-border rounded-input p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={t.label}
-                  onChange={(e) => setTypes(types.map((x) => (x.id === t.id ? { ...x, label: e.target.value } : x)))}
-                  className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all"
+      {/* Punt Categories & Types */}
+      {categories.map((cat) => {
+        const catTypes = types.filter((t) => t.category === cat.id);
+        return (
+          <div key={cat.id} className="card space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="label mb-0">{cat.label}</p>
+              <button
+                onClick={() => setCategories(categories.map((c) => c.id === cat.id ? { ...c, enabled: !c.enabled } : c))}
+                className={clsx(
+                  "relative w-11 h-6 rounded-full transition-colors",
+                  cat.enabled ? "bg-accent" : "bg-border"
+                )}
+                aria-label={`Toggle ${cat.label}`}
+              >
+                <span
+                  className={clsx(
+                    "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                    cat.enabled ? "left-[22px]" : "left-0.5"
+                  )}
                 />
-                <button
-                  onClick={() => setTypes(types.filter((x) => x.id !== t.id))}
-                  className="w-8 h-8 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm"
-                  title="Remove type"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="flex items-center gap-4">
-                {/* Metric toggle */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-muted">Metric:</span>
-                  <div className="flex rounded border border-border overflow-hidden">
-                    <button
-                      onClick={() => setTypes(types.map((x) => x.id === t.id ? { ...x, metric: "distance" } : x))}
-                      className={clsx(
-                        "px-2 py-1 text-[10px] font-semibold transition-colors",
-                        t.metric === "distance" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-                      )}
-                    >
-                      Distance
-                    </button>
-                    <button
-                      onClick={() => setTypes(types.map((x) => x.id === t.id ? { ...x, metric: "yardline" } : x))}
-                      className={clsx(
-                        "px-2 py-1 text-[10px] font-semibold transition-colors border-l border-border",
-                        t.metric === "yardline" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-                      )}
-                    >
-                      Yard Line
-                    </button>
-                  </div>
-                </div>
-                {/* Hang time checkbox */}
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={t.hangTime}
-                    onChange={() => setTypes(types.map((x) => x.id === t.id ? { ...x, hangTime: !x.hangTime } : x))}
-                    className="accent-accent"
-                  />
-                  <span className="text-[10px] text-muted">Hang Time</span>
-                </label>
-              </div>
+              </button>
             </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newType}
-            onChange={(e) => setNewType(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleAddType(); }}
-            placeholder="Add new type..."
-            className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-          />
-          <button
-            onClick={handleAddType}
-            disabled={!newType.trim()}
-            className="px-4 py-2 rounded-input text-sm font-semibold bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            + Add
-          </button>
-        </div>
-      </div>
+            {cat.enabled && (
+              <>
+                <div className="space-y-3">
+                  {catTypes.map((t) => (
+                    <div key={t.id} className="border border-border rounded-input p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={t.label}
+                          onChange={(e) => setTypes(types.map((x) => (x.id === t.id ? { ...x, label: e.target.value } : x)))}
+                          className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all"
+                        />
+                        <button
+                          onClick={() => setTypes(types.filter((x) => x.id !== t.id))}
+                          className="w-8 h-8 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm"
+                          title="Remove type"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted">Metric:</span>
+                          <div className="flex rounded border border-border overflow-hidden">
+                            <button
+                              onClick={() => setTypes(types.map((x) => x.id === t.id ? { ...x, metric: "distance" } : x))}
+                              className={clsx(
+                                "px-2 py-1 text-[10px] font-semibold transition-colors",
+                                t.metric === "distance" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                              )}
+                            >
+                              Distance
+                            </button>
+                            <button
+                              onClick={() => setTypes(types.map((x) => x.id === t.id ? { ...x, metric: "yardline" } : x))}
+                              className={clsx(
+                                "px-2 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+                                t.metric === "yardline" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                              )}
+                            >
+                              Yard Line
+                            </button>
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={t.hangTime}
+                            onChange={() => setTypes(types.map((x) => x.id === t.id ? { ...x, hangTime: !x.hangTime } : x))}
+                            className="accent-accent"
+                          />
+                          <span className="text-[10px] text-muted">Hang Time</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTypes[cat.id] ?? ""}
+                    onChange={(e) => setNewTypes({ ...newTypes, [cat.id]: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAddType(cat.id); }}
+                    placeholder={`Add ${cat.label.toLowerCase()} type...`}
+                    className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+                  />
+                  <button
+                    onClick={() => handleAddType(cat.id)}
+                    disabled={!(newTypes[cat.id] ?? "").trim()}
+                    className="px-4 py-2 rounded-input text-sm font-semibold bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })}
 
       {/* Direction Score */}
       <div className="card space-y-4">
@@ -271,7 +345,6 @@ export default function PuntSettingsPage() {
         </p>
         {dirEnabled && (
           <>
-            {/* Direction mode toggle */}
             <div>
               <p className="label">Direction System</p>
               <div className="flex rounded-input border border-border overflow-hidden w-fit">

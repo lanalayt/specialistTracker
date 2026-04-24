@@ -10,41 +10,60 @@ import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportPuntStats } from "@/lib/exportStats";
 
-const DEFAULT_PUNT_TYPES: PuntTypeConfig[] = [
-  { id: "DIR_LEFT", label: "Left", metric: "distance", hangTime: true },
-  { id: "DIR_STRAIGHT", label: "Straight", metric: "distance", hangTime: true },
-  { id: "DIR_RIGHT", label: "Right", metric: "distance", hangTime: true },
-  { id: "POOCH_LEFT", label: "Pooch Left", metric: "yardline", hangTime: false },
-  { id: "POOCH_MIDDLE", label: "Pooch Middle", metric: "yardline", hangTime: false },
-  { id: "POOCH_RIGHT", label: "Pooch Right", metric: "yardline", hangTime: false },
-  { id: "RUGBY", label: "Rugby", metric: "distance", hangTime: true },
+interface PuntTypeConfig { id: string; label: string; category: string; metric: "distance" | "yardline"; hangTime: boolean }
+interface PuntCategoryConfig { id: string; label: string; enabled: boolean }
+
+const DEFAULT_CATEGORIES: PuntCategoryConfig[] = [
+  { id: "DIRECTIONAL", label: "Directional", enabled: true },
+  { id: "POOCH", label: "Pooch", enabled: true },
+  { id: "BANANA", label: "Banana", enabled: true },
+  { id: "RUGBY", label: "Rugby", enabled: true },
 ];
 
-interface PuntTypeConfig { id: string; label: string; metric: "distance" | "yardline"; hangTime: boolean }
+const DEFAULT_PUNT_TYPES: PuntTypeConfig[] = [
+  { id: "DIR_LEFT", label: "Left", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_STRAIGHT", label: "Straight", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_RIGHT", label: "Right", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "POOCH_LEFT", label: "Pooch Left", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_RIGHT", label: "Pooch Right", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "BANANA_LEFT", label: "Banana Left", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "BANANA_RIGHT", label: "Banana Right", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "RUGBY", label: "Rugby", category: "RUGBY", metric: "distance", hangTime: true },
+];
 
-function loadPuntTypes(): PuntTypeConfig[] {
-  if (typeof window === "undefined") return DEFAULT_PUNT_TYPES.map((t) => ({ ...t, metric: "distance" as const, hangTime: true }));
+function migrateType(t: Record<string, unknown>): PuntTypeConfig {
+  const id = t.id as string;
+  const upper = id.toUpperCase();
+  let category = (t.category as string) ?? "DIRECTIONAL";
+  if (!t.category) {
+    if (upper.includes("POOCH")) category = "POOCH";
+    else if (upper.includes("BANANA")) category = "BANANA";
+    else if (upper.includes("RUGBY")) category = "RUGBY";
+  }
+  return {
+    id,
+    label: t.label as string,
+    category,
+    metric: (t.metric as "distance" | "yardline") ?? (upper.includes("POOCH") ? "yardline" : "distance"),
+    hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
+  };
+}
+
+function loadPuntSettings(): { types: PuntTypeConfig[]; categories: PuntCategoryConfig[] } {
+  if (typeof window === "undefined") return { types: DEFAULT_PUNT_TYPES, categories: DEFAULT_CATEGORIES };
   try {
     const raw = localStorage.getItem("puntSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.puntTypes && parsed.puntTypes.length > 0) {
-        return parsed.puntTypes.map((t: Record<string, unknown>) => ({
-          id: t.id as string,
-          label: t.label as string,
-          metric: (t.metric as string) ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
-          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
-        }));
-      }
+      const categories: PuntCategoryConfig[] = parsed.puntCategories?.length > 0 ? parsed.puntCategories : DEFAULT_CATEGORIES;
+      const types = parsed.puntTypes?.length > 0
+        ? (parsed.puntTypes as Record<string, unknown>[]).map(migrateType)
+        : DEFAULT_PUNT_TYPES;
+      return { types, categories };
     }
   } catch {}
-  return DEFAULT_PUNT_TYPES.map((t) => ({ ...t, metric: "distance" as const, hangTime: true }));
-}
-
-function isOverallType(typeId: string, types: PuntTypeConfig[]): boolean {
-  const tc = types.find((t) => t.id === typeId);
-  if (!tc) return true;
-  return tc.metric === "distance" && tc.hangTime;
+  return { types: DEFAULT_PUNT_TYPES, categories: DEFAULT_CATEGORIES };
 }
 
 const POS_LABELS: Record<PuntHash, string> = {
@@ -178,6 +197,7 @@ function PuntStatsView({
   athletes,
   statsMap,
   puntTypes,
+  puntCategories,
   typeLabels,
   label,
   history,
@@ -186,19 +206,26 @@ function PuntStatsView({
   athletes: { id: string; name: string }[];
   statsMap: Record<string, PuntAthleteStats>;
   puntTypes: PuntTypeConfig[];
+  puntCategories: PuntCategoryConfig[];
   typeLabels: Record<string, string>;
   label: string;
   history: { entries?: PuntEntry[] }[];
   puntFilter?: (p: PuntEntry) => boolean;
 }) {
-  // Compute overall stats only from types with both distance + hang time
-  const overallStats = useMemo(() => {
-    return computeFilteredPuntStats(
-      athletes,
-      history,
-      (p) => isOverallType(p.type, puntTypes) && (puntFilter ? puntFilter(p) : true)
-    );
-  }, [athletes, history, puntTypes, puntFilter]);
+  // Compute per-category overall stats
+  const categoryStats = useMemo(() => {
+    const result: Record<string, Record<string, PuntAthleteStats>> = {};
+    puntCategories.filter((c) => c.enabled).forEach((cat) => {
+      const catTypeIds = new Set(puntTypes.filter((t) => t.category === cat.id).map((t) => t.id));
+      if (catTypeIds.size === 0) return;
+      result[cat.id] = computeFilteredPuntStats(
+        athletes,
+        history,
+        (p) => catTypeIds.has(p.type) && (puntFilter ? puntFilter(p) : true)
+      );
+    });
+    return result;
+  }, [athletes, history, puntTypes, puntCategories, puntFilter]);
   // Compute per-type stats maps for accurate position breakdowns
   const typeStatsMaps = useMemo(() => {
     const result: Record<string, Record<string, PuntAthleteStats>> = {};
@@ -247,11 +274,18 @@ function PuntStatsView({
 
   return (
     <div className="space-y-4">
-      {/* Overall Open Field */}
-      <section className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall Open Field Punts</p>
-        <PuntStatTable athletes={athletes} statsMap={overallStats} getBucket={(s) => s.overall} />
-      </section>
+      {/* Per-category overall stats */}
+      {puntCategories.filter((c) => c.enabled && categoryStats[c.id]).map((cat) => {
+        const catStats = categoryStats[cat.id];
+        const hasData = athletes.some((a) => (catStats[a.name]?.overall.att ?? 0) > 0);
+        if (!hasData) return null;
+        return (
+          <section key={cat.id} className="card-2">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall {cat.label} Punts</p>
+            <PuntStatTable athletes={athletes} statsMap={catStats} getBucket={(s) => s.overall} />
+          </section>
+        );
+      })}
 
       {/* Game chart — shows all punts with LOS + landing YL */}
       {gamePunts.length > 0 && (
@@ -401,6 +435,7 @@ function PuntStatsView({
 export default function PuntingStatisticsPage() {
   const { athletes, stats, history } = usePunt();
   const [puntTypes, setPuntTypes] = useState(DEFAULT_PUNT_TYPES);
+  const [puntCategories, setPuntCategories] = useState(DEFAULT_CATEGORIES);
   const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"all" | "starred">("all");
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
@@ -420,8 +455,9 @@ export default function PuntingStatisticsPage() {
   };
 
   useEffect(() => {
-    const types = loadPuntTypes();
+    const { types, categories } = loadPuntSettings();
     setPuntTypes(types);
+    setPuntCategories(categories);
     const map: Record<string, string> = {};
     types.forEach((t) => { map[t.id] = t.label; });
     setTypeLabels(map);
@@ -555,6 +591,7 @@ export default function PuntingStatisticsPage() {
           athletes={athletes}
           statsMap={displayStats}
           puntTypes={puntTypes}
+          puntCategories={puntCategories}
           typeLabels={typeLabels}
           label="Punts"
           history={filteredHistory}
@@ -567,6 +604,7 @@ export default function PuntingStatisticsPage() {
           athletes={athletes}
           statsMap={starredStats}
           puntTypes={puntTypes}
+          puntCategories={puntCategories}
           typeLabels={typeLabels}
           label="Live Reps"
           history={filteredHistory}

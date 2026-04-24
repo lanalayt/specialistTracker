@@ -168,38 +168,63 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
 interface PuntTypeConfig {
   id: string;
   label: string;
+  category: string;
   metric: "distance" | "yardline";
   hangTime: boolean;
 }
 
 const DEFAULT_PUNT_TYPES: PuntTypeConfig[] = [
-  { id: "DIR_LEFT", label: "Left", metric: "distance", hangTime: true },
-  { id: "DIR_STRAIGHT", label: "Straight", metric: "distance", hangTime: true },
-  { id: "DIR_RIGHT", label: "Right", metric: "distance", hangTime: true },
-  { id: "POOCH_LEFT", label: "Pooch Left", metric: "yardline", hangTime: false },
-  { id: "POOCH_MIDDLE", label: "Pooch Middle", metric: "yardline", hangTime: false },
-  { id: "POOCH_RIGHT", label: "Pooch Right", metric: "yardline", hangTime: false },
-  { id: "RUGBY", label: "Rugby", metric: "distance", hangTime: true },
+  { id: "DIR_LEFT", label: "Left", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_STRAIGHT", label: "Straight", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_RIGHT", label: "Right", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "POOCH_LEFT", label: "Pooch Left", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_RIGHT", label: "Pooch Right", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "BANANA_LEFT", label: "Banana Left", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "BANANA_RIGHT", label: "Banana Right", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "RUGBY", label: "Rugby", category: "RUGBY", metric: "distance", hangTime: true },
 ];
 
-function loadPuntTypes(): PuntTypeConfig[] {
-  if (typeof window === "undefined") return DEFAULT_PUNT_TYPES;
+interface PuntCategoryConfig { id: string; label: string; enabled: boolean }
+
+const DEFAULT_CATEGORIES: PuntCategoryConfig[] = [
+  { id: "DIRECTIONAL", label: "Directional", enabled: true },
+  { id: "POOCH", label: "Pooch", enabled: true },
+  { id: "BANANA", label: "Banana", enabled: true },
+  { id: "RUGBY", label: "Rugby", enabled: true },
+];
+
+function loadPuntTypes(): { types: PuntTypeConfig[]; categories: PuntCategoryConfig[] } {
+  if (typeof window === "undefined") return { types: DEFAULT_PUNT_TYPES, categories: DEFAULT_CATEGORIES };
   try {
     const raw = localStorage.getItem("puntSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
+      const categories: PuntCategoryConfig[] = parsed.puntCategories?.length > 0 ? parsed.puntCategories : DEFAULT_CATEGORIES;
+      const enabledCats = new Set(categories.filter((c) => c.enabled).map((c) => c.id));
       if (parsed.puntTypes && parsed.puntTypes.length > 0) {
-        // Migrate old format
-        return parsed.puntTypes.map((t: Record<string, unknown>) => ({
-          id: t.id as string,
-          label: t.label as string,
-          metric: (t.metric as string) ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
-          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
-        }));
+        const allTypes: PuntTypeConfig[] = parsed.puntTypes.map((t: Record<string, unknown>) => {
+          const id = t.id as string;
+          const upper = id.toUpperCase();
+          let category = (t.category as string) ?? "DIRECTIONAL";
+          if (!t.category) {
+            if (upper.includes("POOCH")) category = "POOCH";
+            else if (upper.includes("BANANA")) category = "BANANA";
+            else if (upper.includes("RUGBY")) category = "RUGBY";
+          }
+          return {
+            id,
+            label: t.label as string,
+            category,
+            metric: (t.metric as string) ?? (upper.includes("POOCH") ? "yardline" : "distance"),
+            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
+          };
+        });
+        return { types: allTypes.filter((t) => enabledCats.has(t.category)), categories };
       }
     }
   } catch {}
-  return DEFAULT_PUNT_TYPES;
+  return { types: DEFAULT_PUNT_TYPES, categories: DEFAULT_CATEGORIES };
 }
 
 const POS_LABELS: Record<PuntHash, string> = {
@@ -309,7 +334,7 @@ export default function PuntingSessionPage() {
   useEffect(() => {
     if (sessionMode === "game" && !manualEntry) setManualEntry(true);
   }, [sessionMode, manualEntry]);
-  const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
+  const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes().types);
   const [opTimeEnabled] = useState(() => loadOpTimeEnabled());
   const [dirSettings] = useState(() => loadDirectionSettings());
   const dirEnabled = dirSettings.enabled;
@@ -324,14 +349,27 @@ export default function PuntingSessionPage() {
 
   // Load punt types from cloud on fresh device
   useEffect(() => {
-    loadSettingsFromCloud<{ puntTypes?: Record<string, unknown>[] }>("puntSettings").then((cloud) => {
+    loadSettingsFromCloud<{ puntTypes?: Record<string, unknown>[]; puntCategories?: PuntCategoryConfig[] }>("puntSettings").then((cloud) => {
       if (cloud?.puntTypes && cloud.puntTypes.length > 0) {
-        setPuntTypes(cloud.puntTypes.map((t) => ({
-          id: t.id as string,
-          label: t.label as string,
-          metric: (t.metric as "distance" | "yardline") ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
-          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
-        })));
+        const cats = cloud.puntCategories?.length ? cloud.puntCategories : DEFAULT_CATEGORIES;
+        const enabledCats = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
+        setPuntTypes(cloud.puntTypes.map((t) => {
+          const id = t.id as string;
+          const upper = id.toUpperCase();
+          let category = (t.category as string) ?? "DIRECTIONAL";
+          if (!t.category) {
+            if (upper.includes("POOCH")) category = "POOCH";
+            else if (upper.includes("BANANA")) category = "BANANA";
+            else if (upper.includes("RUGBY")) category = "RUGBY";
+          }
+          return {
+            id,
+            label: t.label as string,
+            category,
+            metric: (t.metric as "distance" | "yardline") ?? (upper.includes("POOCH") ? "yardline" : "distance"),
+            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
+          };
+        }).filter((t) => enabledCats.has(t.category)));
       }
     });
 
