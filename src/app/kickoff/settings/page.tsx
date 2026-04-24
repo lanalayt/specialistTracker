@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const STORAGE_KEY = "kickoffSettings";
 
@@ -159,7 +160,7 @@ export default function KickoffSettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-4">
       <div className="card space-y-4">
-        <p className="label">Kickoff Types</p>
+        <p className="label">Kickoff Types<Tooltip text="Configure the types of kickoffs you track. Each type can measure distance, yard line, or neither, and optionally track hang time." /></p>
         <div className="space-y-3">
           {types.map((t) => (
             <div key={t.id} className="border border-border rounded-input p-3 space-y-2">
@@ -251,7 +252,7 @@ export default function KickoffSettingsPage() {
       </div>
       <div className="space-y-4">
       <div className="card space-y-4">
-        <p className="label">Direction System</p>
+        <p className="label">Direction System<Tooltip text="Numeric uses a percentage-based score. Field-based lets you define custom direction zones to track where each kickoff lands." /></p>
         <div className="flex rounded-input border border-border overflow-hidden w-fit">
           <button
             onClick={() => handleDirModeChange("numeric")}
@@ -278,7 +279,7 @@ export default function KickoffSettingsPage() {
             : "Field zones (Sideline-Numbers, Numbers-Hash, etc.) — shows % breakdown by zone."}
         </p>
 
-        <p className="label mt-2">Direction Options</p>
+        <p className="label mt-2">Direction Options<Tooltip text="Customize the direction options available when logging kickoffs. Add or remove options to match your grading system." /></p>
         <div className="space-y-2">
           {directions.map((d) => (
             <div key={d.id} className="flex items-center gap-2">

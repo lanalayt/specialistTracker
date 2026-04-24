@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const STORAGE_KEY = "puntSettings";
 
@@ -220,7 +221,7 @@ export default function PuntSettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Left column: Punt Types */}
       <div className="space-y-4">
-      <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Punt Types</p>
+      <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Punt Types<Tooltip text="Configure the types of punts you track. Each category (Directional, Pooch, etc.) can have multiple types. Toggle categories on/off and add or remove types within each." /></p>
       {categories.map((cat) => {
         const catTypes = types.filter((t) => t.category === cat.id);
         return (
@@ -331,7 +332,7 @@ export default function PuntSettingsPage() {
       {/* Direction Score */}
       <div className="card space-y-4">
         <div className="flex items-center justify-between">
-          <p className="label mb-0">Direction Score</p>
+          <p className="label mb-0">Direction Score<Tooltip text="Track how accurate each punt's direction is. Score each punt as 1.0 (on target), 0.5 (close), or 0 (critical miss). Stats show your directional accuracy percentage." /></p>
           <button
             onClick={() => setDirEnabled((v) => !v)}
             className={clsx(
@@ -354,7 +355,7 @@ export default function PuntSettingsPage() {
         {dirEnabled && (
           <>
             <div>
-              <p className="label">Direction System</p>
+              <p className="label">Direction System<Tooltip text="Numeric uses a 0/0.5/1 scale. Field-based lets you define custom direction zones (e.g. Sideline-Numbers, Numbers-Hash)." /></p>
               <div className="flex rounded-input border border-border overflow-hidden w-fit">
                 <button
                   onClick={() => handleDirModeChange("numeric")}
@@ -382,7 +383,7 @@ export default function PuntSettingsPage() {
               </p>
             </div>
 
-            <p className="label">Direction Options</p>
+            <p className="label">Direction Options<Tooltip text="Customize the direction scoring options available when logging punts. Add or remove options to match your grading system." /></p>
             <div className="space-y-2">
               {dirOptions.map((d) => (
                 <div key={d.id} className="flex items-center gap-2">
@@ -426,7 +427,7 @@ export default function PuntSettingsPage() {
       {/* Op Time toggle */}
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label mb-0">Operation Time</p>
+          <p className="label mb-0">Operation Time<Tooltip text="Snap-to-punt time in seconds. Measures how fast the ball goes from the snap to off the punter's foot." /></p>
           <button
             onClick={() => setOpTimeEnabled((v) => !v)}
             className={clsx(
