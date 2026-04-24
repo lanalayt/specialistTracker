@@ -395,7 +395,6 @@ export default function PuntSettingsPage() {
               <div className="space-y-2">
                 {NUMERIC_DIRECTIONS.map((d) => (
                   <div key={d.id} className="flex items-center gap-2">
-                    <span className="w-10 text-accent font-bold text-sm text-center">{d.id}</span>
                     <span className="flex-1 bg-surface-2 border border-border text-slate-400 px-3 py-2 rounded-input text-sm">{d.label}</span>
                   </div>
                 ))}

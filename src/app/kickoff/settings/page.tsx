@@ -34,7 +34,7 @@ const DEFAULT_TYPES: KOTypeConfig[] = [
 const NUMERIC_DIRECTIONS = [
   { id: "1", label: "1.0" },
   { id: "0.5", label: "0.5" },
-  { id: "OB", label: "OB" },
+  { id: "0", label: "0" },
 ];
 
 const FIELD_DIRECTIONS = [
@@ -284,7 +284,6 @@ export default function KickoffSettingsPage() {
           <div className="space-y-2">
             {NUMERIC_DIRECTIONS.map((d) => (
               <div key={d.id} className="flex items-center gap-2">
-                <span className="w-10 text-accent font-bold text-sm text-center">{d.id}</span>
                 <span className="flex-1 bg-surface-2 border border-border text-slate-400 px-3 py-2 rounded-input text-sm">{d.label}</span>
               </div>
             ))}
