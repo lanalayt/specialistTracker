@@ -865,9 +865,11 @@ export default function KickoffSessionPage() {
                             {athleteNames.map((name) => {
                               const ak = byAthlete[name];
                               const att = ak.length;
-                              const distEntries = ak.filter((k) => k.distance > 0);
-                              const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : "—";
-                              const hangEntries = ak.filter((k) => k.hangTime > 0);
+                              const distEntries = ak.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "distance");
+                              const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : null;
+                              const ylEntries = ak.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "yardline");
+                              const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, k) => s + k.distance, 0) / ylEntries.length).toFixed(1) : null;
+                              const hangEntries = ak.filter((k) => k.hangTime > 0 && koTracksHangTime(k.type, koTypes));
                               const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, k) => s + k.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                               const tbCount = ak.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
                               return (
@@ -875,7 +877,8 @@ export default function KickoffSessionPage() {
                                   <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
                                   <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
                                     <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
-                                    <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                                    {avgDist && <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>}
+                                    {avgYL && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYL}</span></div>}
                                     <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                                     <div><span className="text-muted">TB</span> <span className="text-make font-medium ml-1">{tbCount}</span></div>
                                   </div>
@@ -1286,16 +1289,19 @@ export default function KickoffSessionPage() {
             committedKicks.forEach((k) => { if (!byAthlete[k.athlete]) byAthlete[k.athlete] = []; byAthlete[k.athlete].push(k); });
             return Object.entries(byAthlete).map(([name, ak]) => {
               const att = ak.length;
-              const distEntries = ak.filter((k) => k.distance > 0);
-              const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : "—";
-              const hangEntries = ak.filter((k) => k.hangTime > 0);
+              const distEntries2 = ak.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "distance");
+              const avgDist2 = distEntries2.length > 0 ? (distEntries2.reduce((s, k) => s + k.distance, 0) / distEntries2.length).toFixed(1) : null;
+              const ylEntries2 = ak.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "yardline");
+              const avgYL2 = ylEntries2.length > 0 ? (ylEntries2.reduce((s, k) => s + k.distance, 0) / ylEntries2.length).toFixed(1) : null;
+              const hangEntries = ak.filter((k) => k.hangTime > 0 && koTracksHangTime(k.type, koTypes));
               const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, k) => s + k.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
               return (
                 <div key={name} className="card-2 p-3">
                   <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
                   <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
                     <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
-                    <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
+                    {avgDist2 && <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist2}</span></div>}
+                    {avgYL2 && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYL2}</span></div>}
                     <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                   </div>
                 </div>

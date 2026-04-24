@@ -1089,6 +1089,8 @@ export default function PuntingSessionPage() {
                               const dirScore = numDaEntries.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);
                               const dirScoreDisplay = numDaEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${numDaEntries.length}` : "—";
                               const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
+                              const ylEntries = ap.filter((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+                              const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylEntries.length).toFixed(1) : null;
                               return (
                                 <div key={name} className="card-2 p-3">
                                   <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
@@ -1097,6 +1099,7 @@ export default function PuntingSessionPage() {
                                     <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
                                     <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                                     <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
+                                    {avgYL && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYL}</span></div>}
                                     <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>
                                     <div><span className="text-muted">Dir Score</span> <span className="text-slate-200 font-medium ml-1">{dirScoreDisplay}</span></div>
                                     <div><span className="text-muted">Crit</span> <span className={`font-medium ml-1 ${criticals > 0 ? "text-miss" : "text-slate-200"}`}>{criticals}</span></div>
@@ -1752,6 +1755,8 @@ export default function PuntingSessionPage() {
                       const apI20 = ap.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
                       const apI10 = ap.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
                       const apTB = ap.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
+                      const ylE = ap.filter((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+                      const avgYLVal = ylE.length > 0 ? (ylE.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylE.length).toFixed(1) : null;
                       return (
                         <div key={name} className="card-2 p-3">
                           <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
@@ -1761,6 +1766,7 @@ export default function PuntingSessionPage() {
                             <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{netAvg}</span></div>
                             <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                             {sessionMode !== "game" && <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>}
+                            {avgYLVal && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYLVal}</span></div>}
                             {dirEnabled && <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>}
                             <div><span className="text-muted">I-20</span> <span className="text-slate-200 font-medium ml-1">{apI20}</span></div>
                             <div><span className="text-muted">I-10</span> <span className="text-slate-200 font-medium ml-1">{apI10}</span></div>
