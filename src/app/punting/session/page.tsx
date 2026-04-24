@@ -13,6 +13,7 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
+import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
@@ -305,13 +306,7 @@ export default function PuntingSessionPage() {
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
   // Warn before leaving with unsaved session data
-  useEffect(() => {
-    const hasUnsaved = sessionPunts.length > 0 && !committed;
-    if (!hasUnsaved) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [sessionPunts.length, committed]);
+  useUnsavedWarning(sessionPunts.length > 0 && !committed);
 
   // Game mode forces manual entry (no live session)
   useEffect(() => {

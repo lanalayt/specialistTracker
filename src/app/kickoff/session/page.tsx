@@ -12,6 +12,7 @@ import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
+import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
@@ -236,13 +237,7 @@ export default function KickoffSessionPage() {
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
   // Warn before leaving with unsaved session data
-  useEffect(() => {
-    const hasUnsaved = sessionKicks.length > 0 && !committed;
-    if (!hasUnsaved) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [sessionKicks.length, committed]);
+  useUnsavedWarning(sessionKicks.length > 0 && !committed);
 
   // Game mode forces manual entry (no live session)
   useEffect(() => {
