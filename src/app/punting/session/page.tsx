@@ -253,9 +253,9 @@ const DEFAULT_DA_OPTIONS = [
 ];
 
 const FIELD_DA_OPTIONS = [
-  { value: "SL-NUM", label: "Sideline-Numbers" },
-  { value: "NUM-HASH", label: "Numbers-Hash" },
-  { value: "TO_FIELD", label: "To The Field" },
+  { value: "SL-NUM", label: "Sideline-Numbers", score: 1 },
+  { value: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
+  { value: "TO_FIELD", label: "To The Field", score: 0 },
 ];
 
 function loadOpTimeEnabled(): boolean {
@@ -270,8 +270,9 @@ function loadOpTimeEnabled(): boolean {
   return true;
 }
 
-function loadDirectionSettings(): { enabled: boolean; mode: "numeric" | "field"; options: { value: string; label: string }[] } {
+function loadDirectionSettings(): { enabled: boolean; mode: "numeric" | "field"; options: { value: string; label: string; score?: number }[] } {
   if (typeof window === "undefined") return { enabled: true, mode: "numeric", options: DEFAULT_DA_OPTIONS };
+  const defaultScores = [1, 0.5, 0];
   try {
     const raw = localStorage.getItem("puntSettings");
     if (raw) {
@@ -280,7 +281,11 @@ function loadDirectionSettings(): { enabled: boolean; mode: "numeric" | "field";
       const mode: "numeric" | "field" = parsed.directionMode === "field" ? "field" : "numeric";
       const defaultOpts = mode === "field" ? FIELD_DA_OPTIONS : DEFAULT_DA_OPTIONS;
       const options = parsed.directionOptions?.length > 0
-        ? parsed.directionOptions.map((d: { id: string; label: string }) => ({ value: d.id, label: d.label }))
+        ? parsed.directionOptions.map((d: { id: string; label: string; score?: number }, i: number) => ({
+            value: d.id,
+            label: d.label,
+            score: d.score ?? (mode === "field" ? defaultScores[i] ?? 0 : undefined),
+          }))
         : defaultOpts;
       return { enabled, mode, options };
     }
@@ -688,8 +693,8 @@ export default function PuntingSessionPage() {
     const otVal = parseFloat(r.opTime) || 0;
     const retVal = r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined;
       const daVal: number | string = r.directionalAccuracy !== "" && r.directionalAccuracy != null
-      ? (dirMode === "field" ? r.directionalAccuracy : (parseFloat(r.directionalAccuracy) || 0))
-      : (dirMode === "field" ? (DA_OPTIONS[0]?.value ?? "") : 1);
+      ? (dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? 0) : (parseFloat(r.directionalAccuracy) || 0))
+      : (dirMode === "field" ? (DA_OPTIONS[0]?.score ?? 1) : 1);
     // Auto-detect touchback: landing YL of 0 = into the end zone = touchback
     const isTouchback = landingYLVal >= 100;
     // Filled index (position among filled rows)
@@ -775,7 +780,7 @@ export default function PuntingSessionPage() {
         hangTime: parseFloat(r.hangTime) || 0,
         opTime: parseFloat(r.opTime) || 0,
         landingZones: [],
-        directionalAccuracy: dirMode === "field" ? (r.directionalAccuracy || (DA_OPTIONS[0]?.value ?? "")) : (parseFloat(r.directionalAccuracy) || 0),
+        directionalAccuracy: dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? DA_OPTIONS[0]?.score ?? 1) : (parseFloat(r.directionalAccuracy) || 0),
         starred: r.starred || undefined,
         poochLandingYardLine: isPooch && r.poochYL ? (parseInt(r.poochYL) || 0) : undefined,
       };
@@ -849,7 +854,9 @@ export default function PuntingSessionPage() {
       hangTime: htVal,
       opTime: otVal,
       landingZones: liveZones,
-      directionalAccuracy,
+      directionalAccuracy: dirMode === "field"
+        ? (DA_OPTIONS.find((o) => o.value === directionalAccuracy)?.score ?? 0)
+        : directionalAccuracy,
       starred: starred || undefined,
       kickNum: currentPuntIdx + 1,
       los: losVal,

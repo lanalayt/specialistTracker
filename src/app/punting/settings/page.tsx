@@ -28,7 +28,7 @@ interface PuntSettings {
   puntTypes: PuntTypeConfig[];
   directionEnabled: boolean;
   directionMode: DirectionMode;
-  directionOptions: { id: string; label: string }[];
+  directionOptions: { id: string; label: string; score?: number }[];
   opTimeEnabled: boolean;
 }
 
@@ -58,9 +58,9 @@ const NUMERIC_DIRECTIONS = [
 ];
 
 const FIELD_DIRECTIONS = [
-  { id: "SL-NUM", label: "Sideline-Numbers" },
-  { id: "NUM-HASH", label: "Numbers-Hash" },
-  { id: "TO_FIELD", label: "To The Field" },
+  { id: "SL-NUM", label: "Sideline-Numbers", score: 1 },
+  { id: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
+  { id: "TO_FIELD", label: "To The Field", score: 0 },
 ];
 
 function migrateType(t: Record<string, unknown>): PuntTypeConfig {
@@ -120,7 +120,7 @@ export default function PuntSettingsPage() {
   const [newTypes, setNewTypes] = useState<Record<string, string>>({});
   const [dirEnabled, setDirEnabled] = useState(true);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
-  const [dirOptions, setDirOptions] = useState<{ id: string; label: string }[]>(NUMERIC_DIRECTIONS);
+  const [dirOptions, setDirOptions] = useState<{ id: string; label: string; score?: number }[]>(NUMERIC_DIRECTIONS);
   const [opTimeEnabled, setOpTimeEnabled] = useState(true);
   const [newDir, setNewDir] = useState("");
   const [saved, setSaved] = useState(false);
@@ -135,13 +135,20 @@ export default function PuntSettingsPage() {
     opTimeEnabled: true,
   });
 
+  // Ensure field-based options have scores (migration for old data)
+  const ensureScores = (opts: { id: string; label: string; score?: number }[], mode: DirectionMode) => {
+    if (mode !== "field") return opts;
+    const defaults = [1, 0.5, 0];
+    return opts.map((o, i) => ({ ...o, score: o.score ?? defaults[i] ?? 0 }));
+  };
+
   useEffect(() => {
     const s = loadSettings();
     setCategories(s.puntCategories);
     setTypes(s.puntTypes);
     setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
-    setDirOptions(s.directionOptions);
+    setDirOptions(ensureScores(s.directionOptions, s.directionMode));
     setOpTimeEnabled(s.opTimeEnabled);
     setSavedSettings(s);
     setLoaded(true);
@@ -152,7 +159,7 @@ export default function PuntSettingsPage() {
         if (cloud.puntTypes?.length > 0) setTypes((cloud.puntTypes as unknown as Record<string, unknown>[]).map(migrateType));
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
-        if (cloud.directionOptions?.length > 0) setDirOptions(cloud.directionOptions);
+        if (cloud.directionOptions?.length > 0) setDirOptions(ensureScores(cloud.directionOptions, cloud.directionMode || "numeric"));
         if (typeof cloud.opTimeEnabled === "boolean") setOpTimeEnabled(cloud.opTimeEnabled);
         setSavedSettings({
           puntCategories: cloud.puntCategories?.length > 0 ? cloud.puntCategories : DEFAULT_CATEGORIES,
@@ -201,7 +208,7 @@ export default function PuntSettingsPage() {
     if (!trimmed) return;
     const id = trimmed.replace(/[^a-zA-Z0-9.✓★]/g, "_");
     if (dirOptions.some((d) => d.id === id)) return;
-    setDirOptions([...dirOptions, { id, label: trimmed }]);
+    setDirOptions([...dirOptions, { id, label: trimmed, score: dirMode === "field" ? 0 : undefined }]);
     setNewDir("");
   };
 
@@ -387,6 +394,17 @@ export default function PuntSettingsPage() {
             <div className="space-y-2">
               {dirOptions.map((d) => (
                 <div key={d.id} className="flex items-center gap-2">
+                  {dirMode === "field" && (
+                    <select
+                      value={d.score ?? 0}
+                      onChange={(e) => setDirOptions(dirOptions.map((x) => (x.id === d.id ? { ...x, score: parseFloat(e.target.value) } : x)))}
+                      className="w-14 bg-surface-2 border border-border text-accent font-bold px-1 py-2 rounded-input text-sm text-center focus:outline-none focus:border-accent/60"
+                    >
+                      <option value={1}>1</option>
+                      <option value={0.5}>0.5</option>
+                      <option value={0}>0</option>
+                    </select>
+                  )}
                   <input
                     type="text"
                     value={d.label}
