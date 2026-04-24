@@ -7,8 +7,8 @@ import { ZoneBarChart } from "@/components/ui/Chart";
 import { KickoffSessionLog } from "@/components/ui/KickoffSessionLog";
 import { KickoffSessionSummary } from "@/components/ui/KickoffSessionSummary";
 import { KickoffFieldView } from "@/components/ui/KickoffFieldView";
-import type { KickoffEntry, KickoffType, KickoffDirection } from "@/types";
-import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES } from "@/types";
+import type { KickoffEntry, KickoffType, KickoffDirection, KickoffHash } from "@/types";
+import { KICKOFF_TYPES, KICKOFF_DIRECTIONS, KICKOFF_ZONES, KICKOFF_HASHES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
@@ -30,6 +30,7 @@ const SESSION_STORAGE_KEY = "kickoffSessionDraft";
 interface LogRow {
   athlete: string;
   type: string;
+  hash: string;
   distance: string;
   hangTime: string;
   direction: string;
@@ -45,7 +46,7 @@ interface SessionDraft {
   rows: LogRow[];
   manualEntry: boolean;
   sessionActive: boolean;
-  plannedKicks: { athlete: string; type: KickoffType }[];
+  plannedKicks: { athlete: string; type: KickoffType; hash: KickoffHash }[];
   plannedRowIndices: number[];
   currentKickIdx: number;
   sessionKicks: KickoffEntry[];
@@ -60,6 +61,7 @@ interface SessionDraft {
 const emptyRow = (): LogRow => ({
   athlete: "",
   type: "",
+  hash: "",
   distance: "",
   hangTime: "",
   direction: "",
@@ -69,6 +71,14 @@ const emptyRow = (): LogRow => ({
   returnYards: "",
   touchback: false,
 });
+
+const POS_LABELS: Record<KickoffHash, string> = {
+  LH: "LH",
+  LM: "LM",
+  M: "M",
+  RM: "RM",
+  RH: "RH",
+};
 
 function draftKey(mode: "practice" | "game"): string {
   const tid = getTeamId();
@@ -241,7 +251,7 @@ export default function KickoffSessionPage() {
   const [manualEntry, setManualEntry] = useState(draft.manualEntry);
   const [sessionActive, setSessionActive] = useState(draft.sessionActive);
   const [plannedKicks, setPlannedKicks] = useState<
-    { athlete: string; type: KickoffType }[]
+    { athlete: string; type: KickoffType; hash: KickoffHash }[]
   >(draft.plannedKicks);
   const [plannedRowIndices, setPlannedRowIndices] = useState<number[]>(draft.plannedRowIndices ?? []);
   const [currentKickIdx, setCurrentKickIdx] = useState(draft.currentKickIdx);
@@ -451,9 +461,9 @@ export default function KickoffSessionPage() {
     setRows((prev) => [...prev, emptyRow()]);
   }, []);
 
-  const planningFields = (r: LogRow) => r.athlete || r.type;
+  const planningFields = (r: LogRow) => r.athlete || r.type || r.hash;
   const allFields = (r: LogRow) =>
-    r.athlete || r.type || r.distance || r.hangTime || r.direction;
+    r.athlete || r.type || r.hash || r.distance || r.hangTime || r.direction;
 
   const filledRows = rows
     .map((r, i) => ({ r, i }))
@@ -495,6 +505,7 @@ export default function KickoffSessionPage() {
     const planned = filled.map(({ r }) => ({
       athlete: r.athlete,
       type: r.type as KickoffType,
+      hash: (r.hash || "") as KickoffHash,
     }));
 
     setPlannedKicks(planned);
@@ -547,6 +558,7 @@ export default function KickoffSessionPage() {
       athleteId: r.athlete,
       athlete: r.athlete,
       type: r.type as KickoffType,
+      hash: (r.hash || undefined) as KickoffHash | undefined,
       distance,
       hangTime: htVal,
       direction: (r.direction || "1") as KickoffDirection,
@@ -605,6 +617,7 @@ export default function KickoffSessionPage() {
       athleteId: r.athlete,
       athlete: r.athlete,
       type: r.type as KickoffType,
+      hash: (r.hash || undefined) as KickoffHash | undefined,
       distance: parseInt(r.distance) || 0,
       hangTime: parseFloat(r.hangTime) || 0,
       direction: (r.direction || "1") as KickoffDirection,
@@ -629,7 +642,7 @@ export default function KickoffSessionPage() {
 
   const currentPlan = plannedKicks[currentKickIdx];
 
-  const updateCurrentPlan = (field: "athlete" | "type", value: string) => {
+  const updateCurrentPlan = (field: "athlete" | "type" | "hash", value: string) => {
     setPlannedKicks((prev) => {
       const next = [...prev];
       next[currentKickIdx] = { ...next[currentKickIdx], [field]: value };
@@ -655,6 +668,7 @@ export default function KickoffSessionPage() {
       athleteId: plan.athlete,
       athlete: plan.athlete,
       type: plan.type,
+      hash: plan.hash || undefined,
       distance: distVal,
       hangTime: htVal,
       direction,
@@ -909,6 +923,7 @@ export default function KickoffSessionPage() {
                               <th className="table-header text-left">#</th>
                               <th className="table-header text-left">Athlete</th>
                               <th className="table-header">Type</th>
+                              <th className="table-header">Pos</th>
                               <th className="table-header">Dist</th>
                               <th className="table-header">Hang</th>
                               <th className="table-header">Dir</th>
@@ -920,6 +935,7 @@ export default function KickoffSessionPage() {
                                 <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}</td>
                                 <td className="table-name">{k.athlete}</td>
                                 <td className="table-cell text-muted">{koTypeLabels[k.type] ?? TYPE_LABELS[k.type] ?? k.type}</td>
+                                <td className="table-cell text-muted">{k.hash ? POS_LABELS[k.hash] : "—"}</td>
                                 <td className="table-cell">{k.distance > 0 ? `${k.distance} yd` : "—"}</td>
                                 <td className="table-cell text-muted">{k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s` : "—"}</td>
                                 <td className="table-cell text-muted">{koDirLabels[k.direction] ?? k.direction}</td>
@@ -1054,24 +1070,45 @@ export default function KickoffSessionPage() {
                       </div>
                     </div>
 
-                    {/* Editable: Type */}
-                    <div>
-                      <p className="label">Type</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {koTypes.map(({ id, label }) => (
-                          <button
-                            key={id}
-                            onClick={() => updateCurrentPlan("type", id)}
-                            className={clsx(
-                              "px-3 py-2 rounded-input text-xs font-semibold text-center transition-all",
-                              currentPlan.type === id
-                                ? "bg-accent/20 text-accent border border-accent/50"
-                                : "bg-surface-2 text-muted border border-border hover:text-white"
-                            )}
-                          >
-                            {label}
-                          </button>
-                        ))}
+                    {/* Editable: Type + Position */}
+                    <div className="flex gap-6 items-start flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <p className="label">Type</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {koTypes.map(({ id, label }) => (
+                            <button
+                              key={id}
+                              onClick={() => updateCurrentPlan("type", id)}
+                              className={clsx(
+                                "px-3 py-2 rounded-input text-xs font-semibold text-center transition-all",
+                                currentPlan.type === id
+                                  ? "bg-accent/20 text-accent border border-accent/50"
+                                  : "bg-surface-2 text-muted border border-border hover:text-white"
+                              )}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <p className="label">Position</p>
+                        <div className="flex gap-1.5">
+                          {KICKOFF_HASHES.map((h) => (
+                            <button
+                              key={h}
+                              onClick={() => updateCurrentPlan("hash", h)}
+                              className={clsx(
+                                "w-10 py-2 rounded-input text-xs font-semibold text-center transition-all",
+                                currentPlan.hash === h
+                                  ? "bg-accent/20 text-accent border border-accent/50"
+                                  : "bg-surface-2 text-muted border border-border hover:text-white"
+                              )}
+                            >
+                              {POS_LABELS[h]}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -1335,6 +1372,7 @@ export default function KickoffSessionPage() {
                   <th className="table-header text-left">#</th>
                   <th className="table-header text-left">Athlete</th>
                   <th className="table-header">Type</th>
+                  <th className="table-header">Pos</th>
                   <th className="table-header">Dist</th>
                   <th className="table-header">Hang</th>
                   <th className="table-header">Dir</th>
@@ -1346,6 +1384,7 @@ export default function KickoffSessionPage() {
                     <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}</td>
                     <td className="table-name">{k.athlete}</td>
                     <td className="table-cell text-muted">{koTypeLabels[k.type] ?? k.type}</td>
+                    <td className="table-cell text-muted">{k.hash ? POS_LABELS[k.hash] : "—"}</td>
                     <td className="table-cell">{k.distance > 0 ? `${k.distance} yd` : "—"}</td>
                     <td className="table-cell text-muted">{k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s` : "—"}</td>
                     <td className="table-cell text-muted">{koDirLabels[k.direction] ?? k.direction}</td>
@@ -1509,6 +1548,9 @@ export default function KickoffSessionPage() {
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">
                     Type
                   </th>
+                  <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-12 border-b border-border">
+                    Pos
+                  </th>
                   {manualEntry && sessionMode === "game" && (
                     <>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dist</th>
@@ -1596,6 +1638,23 @@ export default function KickoffSessionPage() {
                             <option value="">—</option>
                             {koTypes.map(({ id, label }) => (
                               <option key={id} value={id}>{label}</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td className="py-1 px-1">
+                        {isLocked ? (
+                          <span className="text-xs text-slate-400 text-center block">{POS_LABELS[row.hash as KickoffHash] ?? row.hash}</span>
+                        ) : (
+                          <select
+                            value={row.hash}
+                            onChange={(e) => updateRow(idx, "hash", e.target.value)}
+                            disabled={viewOnly}
+                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
+                          >
+                            <option value="">—</option>
+                            {KICKOFF_HASHES.map((h) => (
+                              <option key={h} value={h}>{POS_LABELS[h]}</option>
                             ))}
                           </select>
                         )}
@@ -1783,10 +1842,11 @@ export default function KickoffSessionPage() {
                                     onClick={() => {
                                       const filled = rows
                                         .map((r, ri) => ({ r, i: ri }))
-                                        .filter(({ r }) => r.athlete || r.type);
+                                        .filter(({ r }) => r.athlete || r.type || r.hash);
                                       const planned = filled.map(({ r }) => ({
                                         athlete: r.athlete,
                                         type: r.type as KickoffType,
+                                        hash: (r.hash || "") as KickoffHash,
                                       }));
                                       setPlannedKicks(planned);
                                       setPlannedRowIndices(filled.map(({ i: ri }) => ri));

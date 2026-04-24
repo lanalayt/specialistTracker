@@ -24,6 +24,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
+  // On localhost (HTTP), Supabase Secure cookies are rejected by the browser,
+  // so skip the cookie gate and let the client-side auth context handle it.
+  const host = request.headers.get("host") ?? "";
+  const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+  if (isLocalhost) {
+    return NextResponse.next();
+  }
+
   // Check for Supabase auth cookie (sb-*-auth-token)
   const hasAuthCookie = request.cookies.getAll().some(
     (c) => c.name.startsWith("sb-") && c.name.includes("-auth-token")

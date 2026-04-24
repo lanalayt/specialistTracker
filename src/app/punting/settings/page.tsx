@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
 
 const STORAGE_KEY = "puntSettings";
 
@@ -128,6 +129,7 @@ export default function PuntSettingsPage() {
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [pendingRenames, setPendingRenames] = useState<{ id: string; oldLabel: string; newLabel: string; category: string; metric: "distance" | "yardline"; hangTime: boolean }[]>([]);
   const [savedSettings, setSavedSettings] = useState<PuntSettings>({
     puntCategories: DEFAULT_CATEGORIES,
     puntTypes: DEFAULT_TYPES,
@@ -214,13 +216,59 @@ export default function PuntSettingsPage() {
     setNewDir("");
   };
 
-  const handleSave = () => {
-    const settings: PuntSettings = { puntCategories: categories, puntTypes: types, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, opTimeEnabled };
+  const executeSave = (typesToSave: PuntTypeConfig[]) => {
+    const settings: PuntSettings = { puntCategories: categories, puntTypes: typesToSave, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, opTimeEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
+    setTypes(typesToSave);
     setSavedSettings(settings);
     setDirty(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleSave = () => {
+    const renames: typeof pendingRenames = [];
+    for (const t of types) {
+      const saved = savedSettings.puntTypes.find((s) => s.id === t.id);
+      if (saved && saved.label !== t.label) {
+        renames.push({ id: t.id, oldLabel: saved.label, newLabel: t.label, category: t.category, metric: t.metric, hangTime: t.hangTime });
+      }
+    }
+    if (renames.length > 0) {
+      setPendingRenames(renames);
+    } else {
+      executeSave(types);
+    }
+  };
+
+  const handleRenameChoice = (choice: "rename" | "new" | "cancel") => {
+    const current = pendingRenames[0];
+    let updatedTypes = [...types];
+
+    if (choice === "cancel") {
+      updatedTypes = updatedTypes.map((t) => t.id === current.id ? { ...t, label: current.oldLabel } : t);
+    } else if (choice === "new") {
+      // Revert old type's label
+      updatedTypes = updatedTypes.map((t) => t.id === current.id ? { ...t, label: current.oldLabel } : t);
+      // Generate new id, handle duplicates
+      let newId = current.newLabel.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+      let suffix = 1;
+      while (updatedTypes.some((t) => t.id === newId)) {
+        newId = `${current.newLabel.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_${suffix}`;
+        suffix++;
+      }
+      updatedTypes.push({ id: newId, label: current.newLabel, category: current.category, metric: current.metric, hangTime: current.hangTime });
+    }
+    // "rename" — label already changed in state, nothing extra needed
+
+    const remaining = pendingRenames.slice(1);
+    if (remaining.length > 0) {
+      setTypes(updatedTypes);
+      setPendingRenames(remaining);
+    } else {
+      setPendingRenames([]);
+      executeSave(updatedTypes);
+    }
   };
 
   return (
@@ -496,6 +544,16 @@ export default function PuntSettingsPage() {
       >
         {saved ? "✓ Saved!" : "Save Settings"}
       </button>
+
+      {pendingRenames.length > 0 && (
+        <RenameTypeModal
+          oldLabel={pendingRenames[0].oldLabel}
+          newLabel={pendingRenames[0].newLabel}
+          onRename={() => handleRenameChoice("rename")}
+          onMakeNew={() => handleRenameChoice("new")}
+          onCancel={() => handleRenameChoice("cancel")}
+        />
+      )}
     </div>
   );
 }

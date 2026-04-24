@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
-import type { KickoffEntry } from "@/types";
+import type { KickoffEntry, KickoffHash } from "@/types";
+import { KICKOFF_HASHES } from "@/types";
 import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportKickoffStats } from "@/lib/exportStats";
@@ -12,6 +13,14 @@ const LEGACY_TYPE_LABELS: Record<string, string> = {
   ONSIDE: "Onside",
   SQUIB: "Squib",
   FREE: "Free",
+};
+
+const POS_LABELS: Record<KickoffHash, string> = {
+  LH: "Left Hash",
+  LM: "Left Middle",
+  M: "Middle",
+  RM: "Right Middle",
+  RH: "Right Hash",
 };
 
 type DirectionMode = "numeric" | "field";
@@ -142,9 +151,10 @@ function ezPct(s: AthleteKOStats): string {
   return s.att > 0 ? `${Math.round((s.endzones / s.att) * 100)}%` : "—";
 }
 
-function StatTable({ athletes, statsMap }: {
+function StatTable({ athletes, statsMap, showEZ = true }: {
   athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteKOStats>;
+  showEZ?: boolean;
 }) {
   const visible = athletes.filter((a) => (statsMap[a.name]?.att ?? 0) > 0);
   if (visible.length === 0) {
@@ -158,7 +168,7 @@ function StatTable({ athletes, statsMap }: {
           <th className="table-header">KOs</th>
           <th className="table-header">Dist</th>
           <th className="table-header">Hang</th>
-          <th className="table-header">EZ %</th>
+          {showEZ && <th className="table-header">EZ %</th>}
           <th className="table-header">Dir %</th>
         </tr>
       </thead>
@@ -171,7 +181,7 @@ function StatTable({ athletes, statsMap }: {
               <td className="table-cell">{s.att}</td>
               <td className="table-cell">{avgDist(s)}</td>
               <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>
-              <td className="table-cell text-make font-semibold">{ezPct(s)}</td>
+              {showEZ && <td className="table-cell text-make font-semibold">{ezPct(s)}</td>}
               <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
             </tr>
           );
@@ -206,6 +216,10 @@ function CategorySection({
   catTypeIds,
   typeLabels,
   allTypeStats,
+  history,
+  catFilter,
+  directions,
+  showEZ = true,
 }: {
   title: string;
   athletes: { id: string; name: string }[];
@@ -213,12 +227,48 @@ function CategorySection({
   catTypeIds: string[];
   typeLabels: Record<string, string>;
   allTypeStats: Record<string, Record<string, AthleteKOStats>>;
+  history: { entries?: KickoffEntry[] }[];
+  catFilter: (e: KickoffEntry) => boolean;
+  directions?: { id: string; score?: number }[];
+  showEZ?: boolean;
 }) {
   const activeTypes = catTypeIds.filter((type) =>
     athletes.some((a) => (allTypeStats[type]?.[a.name]?.att ?? 0) > 0)
   );
-  const hasMultipleTypes = activeTypes.length > 1;
-  const [subTab, setSubTab] = useState<string>("overall");
+  const hasMultipleTypes = activeTypes.length > 0;
+  const [subTab, setSubTab] = useState<string>("type");
+
+  // Compute per-type stats by hash for position breakdowns
+  const typePositionStats = useMemo(() => {
+    const result: Record<string, Record<KickoffHash, Record<string, AthleteKOStats>>> = {};
+    activeTypes.forEach((type) => {
+      const byHash: Record<string, Record<string, AthleteKOStats>> = {};
+      KICKOFF_HASHES.forEach((hash) => {
+        byHash[hash] = computeCategoryStats(
+          athletes,
+          history,
+          (e) => e.type === type && e.hash === hash && catFilter(e),
+          directions
+        );
+      });
+      result[type] = byHash as Record<KickoffHash, Record<string, AthleteKOStats>>;
+    });
+    return result;
+  }, [athletes, history, activeTypes, catFilter, directions]);
+
+  // Overall position stats for this category
+  const catPositionStats = useMemo(() => {
+    const byHash: Record<string, Record<string, AthleteKOStats>> = {};
+    KICKOFF_HASHES.forEach((hash) => {
+      byHash[hash] = computeCategoryStats(
+        athletes,
+        history,
+        (e) => e.hash === hash && catFilter(e),
+        directions
+      );
+    });
+    return byHash as Record<KickoffHash, Record<string, AthleteKOStats>>;
+  }, [athletes, history, catFilter, directions]);
 
   return (
     <div className="space-y-3">
@@ -226,35 +276,80 @@ function CategorySection({
 
       {/* Overall */}
       <section className="card-2">
-        <StatTable athletes={athletes} statsMap={catStats} />
+        <StatTable athletes={athletes} statsMap={catStats} showEZ={showEZ} />
       </section>
 
-      {/* Tab toggle: By Type */}
+      {/* Tab toggle: By Type, then each type's position breakdown */}
       {hasMultipleTypes && (
-        <>
-          <div className="flex flex-wrap rounded-input border border-border overflow-hidden w-fit">
+        <div className="flex flex-wrap rounded-input border border-border overflow-hidden w-fit">
+          <button
+            onClick={() => setSubTab("type")}
+            className={clsx(
+              "px-4 py-1.5 text-xs font-semibold transition-colors",
+              subTab === "type" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+            )}
+          >
+            By Type
+          </button>
+          {activeTypes.map((type) => (
             <button
-              onClick={() => setSubTab("overall")}
+              key={type}
+              onClick={() => setSubTab(type)}
               className={clsx(
-                "px-4 py-1.5 text-xs font-semibold transition-colors",
-                subTab === "overall" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                "px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+                subTab === type ? "bg-accent text-slate-900" : "text-muted hover:text-white"
               )}
             >
-              By Type
+              {typeLabels[type] ?? type} by Pos
             </button>
-          </div>
+          ))}
+        </div>
+      )}
 
-          {subTab === "overall" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {activeTypes.map((type) => (
-                <div key={type} className="card-2">
-                  <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
-                  <StatTable athletes={athletes} statsMap={allTypeStats[type] ?? {}} />
-                </div>
-              ))}
+      {/* By Type */}
+      {subTab === "type" && hasMultipleTypes && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {activeTypes.map((type) => (
+            <div key={type} className="card-2">
+              <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
+              <StatTable athletes={athletes} statsMap={allTypeStats[type] ?? {}} showEZ={showEZ} />
             </div>
-          )}
-        </>
+          ))}
+        </div>
+      )}
+
+      {/* Per-type position breakdown */}
+      {subTab !== "type" && typePositionStats[subTab] && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {KICKOFF_HASHES.map((hash) => {
+            const hashStats = typePositionStats[subTab][hash];
+            const hasHashData = athletes.some((a) => (hashStats[a.name]?.att ?? 0) > 0);
+            if (!hasHashData) return null;
+            return (
+              <div key={hash} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
+                <StatTable athletes={athletes} statsMap={hashStats} showEZ={showEZ} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* If only one type or none, show overall position breakdown */}
+      {!hasMultipleTypes && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {KICKOFF_HASHES.map((hash) => {
+            const hashStats = catPositionStats[hash];
+            const hasHashData = athletes.some((a) => (hashStats[a.name]?.att ?? 0) > 0);
+            if (!hasHashData) return null;
+            return (
+              <div key={hash} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
+                <StatTable athletes={athletes} statsMap={hashStats} showEZ={showEZ} />
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -459,6 +554,10 @@ export default function KickoffStatisticsPage() {
           catTypeIds={typesByCategory[selectedCat.id] ?? []}
           typeLabels={typeLabels}
           allTypeStats={allTypeStats}
+          history={filteredHistory}
+          catFilter={(e) => typeToCategory(e.type) === selectedCat.id}
+          directions={koSettings.directions}
+          showEZ={selectedCat.id === "DEEP"}
         />
       )}
     </main>

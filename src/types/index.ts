@@ -20,6 +20,7 @@ export type PuntLandingZone =
 
 // Kickoff
 export type KickoffType = "REG" | "ONSIDE" | "SQUIB" | "FREE";
+export type KickoffHash = "LH" | "LM" | "M" | "RM" | "RH";
 export type KickoffLandingZone =
   | "TB"
   | "1"
@@ -147,6 +148,7 @@ export interface KickoffEntry {
   returnYards?: number;
   kickNum?: number;
   endzone?: boolean;
+  hash?: KickoffHash;
   // Game mode only: absolute field positions 0..100
   los?: number;
   landingYL?: number;
@@ -311,6 +313,7 @@ export const PUNT_LANDING_ZONES: PuntLandingZone[] = [
   "returned",
   "fairCatch",
 ];
+export const KICKOFF_HASHES: KickoffHash[] = ["LH", "LM", "M", "RM", "RH"];
 export const KICKOFF_TYPES: KickoffType[] = ["REG", "ONSIDE", "SQUIB", "FREE"];
 export const KICKOFF_DIRECTIONS: KickoffDirection[] = ["1", "0.5", "OB"];
 export const KICKOFF_ZONES: KickoffLandingZone[] = [
