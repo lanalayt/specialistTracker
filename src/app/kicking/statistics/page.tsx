@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useFG } from "@/lib/fgContext";
 import { makePct, avgScore, processKick, emptyAthleteStats } from "@/lib/stats";
 import { POSITIONS, DIST_RANGES } from "@/types";
@@ -8,6 +8,7 @@ import type { FGPosition, DistRange, AthleteStats, FGKick } from "@/types";
 import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportFGStats } from "@/lib/exportStats";
+import { loadSettingsFromCloud } from "@/lib/settingsSync";
 
 const POS_LABELS: Record<FGPosition, string> = {
   LH: "Left Hash",
@@ -122,10 +123,12 @@ function FGStatsView({
   athletes,
   statsMap,
   label,
+  makeMode = "detailed",
 }: {
   athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteStats>;
   label: string;
+  makeMode?: "simple" | "detailed";
 }) {
   return (
     <div className="space-y-4">
@@ -199,8 +202,8 @@ function FGStatsView({
         </div>
       </CollapsibleSection>
 
-      {/* Make Chart — only shown when detailed make data exists */}
-      {athletes.some((a) => {
+      {/* Make Chart — only shown when detailed make mode and data exists */}
+      {makeMode === "detailed" && athletes.some((a) => {
         const m = statsMap[a.name]?.make;
         return m && (m.YL > 0 || m.YC > 0 || m.YR > 0);
       }) && (
@@ -323,6 +326,21 @@ export default function KickingStatisticsPage() {
   const [tab, setTab] = useState<"all" | "starred">("all");
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
   const dateFilter = useDateRangeFilter();
+
+  const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() => {
+    if (typeof window === "undefined") return "detailed";
+    try {
+      const raw = localStorage.getItem("fgSettings");
+      if (raw) return JSON.parse(raw).makeMode === "simple" ? "simple" : "detailed";
+    } catch {}
+    return "detailed";
+  });
+
+  useEffect(() => {
+    loadSettingsFromCloud<{ makeMode?: string }>("fgSettings").then((cloud) => {
+      if (cloud?.makeMode === "simple" || cloud?.makeMode === "detailed") setMakeMode(cloud.makeMode);
+    });
+  }, []);
 
   const [excludeLiveReps, setExcludeLiveReps] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -462,11 +480,11 @@ export default function KickingStatisticsPage() {
       )}
 
       {tab === "all" && (
-        <FGStatsView athletes={athletes} statsMap={displayStats} label="FG" />
+        <FGStatsView athletes={athletes} statsMap={displayStats} label="FG" makeMode={makeMode} />
       )}
 
       {tab === "starred" && starredStats && (
-        <FGStatsView athletes={athletes} statsMap={starredStats} label="Live Reps" />
+        <FGStatsView athletes={athletes} statsMap={starredStats} label="Live Reps" makeMode={makeMode} />
       )}
     </main>
   );

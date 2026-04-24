@@ -28,6 +28,7 @@ export interface KOCategory {
 interface KickoffSettings {
   kickoffTypes: KOTypeConfig[];
   kickoffCategories?: KOCategory[];
+  directionEnabled: boolean;
   directionMode: DirectionMode;
   directionMetrics: { id: string; label: string; score?: number }[];
 }
@@ -91,17 +92,19 @@ function loadSettings(): KickoffSettings {
       return {
         kickoffTypes: rawTypes.map((t: Record<string, unknown>) => migrateType(t)),
         kickoffCategories: parsed.kickoffCategories?.length > 0 ? parsed.kickoffCategories : DEFAULT_CATEGORIES,
+        directionEnabled: parsed.directionEnabled !== false,
         directionMode: parsed.directionMode === "field" ? "field" : "numeric",
         directionMetrics: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : NUMERIC_DIRECTIONS,
       };
     }
   } catch {}
-  return { kickoffTypes: DEFAULT_TYPES, kickoffCategories: DEFAULT_CATEGORIES, directionMode: "numeric", directionMetrics: NUMERIC_DIRECTIONS };
+  return { kickoffTypes: DEFAULT_TYPES, kickoffCategories: DEFAULT_CATEGORIES, directionEnabled: true, directionMode: "numeric", directionMetrics: NUMERIC_DIRECTIONS };
 }
 
 export default function KickoffSettingsPage() {
   const [types, setTypes] = useState<KOTypeConfig[]>(DEFAULT_TYPES);
   const [categories, setCategories] = useState<KOCategory[]>(DEFAULT_CATEGORIES);
+  const [dirEnabled, setDirEnabled] = useState(true);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
   const [directions, setDirections] = useState<{ id: string; label: string; score?: number }[]>(NUMERIC_DIRECTIONS);
   const [newTypes, setNewTypes] = useState<Record<string, string>>({});
@@ -113,6 +116,7 @@ export default function KickoffSettingsPage() {
   const [savedSettings, setSavedSettings] = useState<KickoffSettings>({
     kickoffTypes: DEFAULT_TYPES,
     kickoffCategories: DEFAULT_CATEGORIES,
+    directionEnabled: true,
     directionMode: "numeric",
     directionMetrics: NUMERIC_DIRECTIONS,
   });
@@ -121,6 +125,7 @@ export default function KickoffSettingsPage() {
     const s = loadSettings();
     setTypes(s.kickoffTypes);
     setCategories(s.kickoffCategories ?? DEFAULT_CATEGORIES);
+    setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
     setDirections(s.directionMetrics);
     setSavedSettings(s);
@@ -133,6 +138,7 @@ export default function KickoffSettingsPage() {
           setTypes(migrated);
         }
         if (cloud.kickoffCategories && cloud.kickoffCategories.length > 0) setCategories(cloud.kickoffCategories);
+        if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionMetrics?.length > 0) setDirections(cloud.directionMetrics);
         setSavedSettings({
@@ -140,6 +146,7 @@ export default function KickoffSettingsPage() {
             ? (cloud.kickoffTypes as unknown as Record<string, unknown>[]).map(migrateType)
             : DEFAULT_TYPES,
           kickoffCategories: (cloud.kickoffCategories && cloud.kickoffCategories.length > 0) ? cloud.kickoffCategories : DEFAULT_CATEGORIES,
+          directionEnabled: cloud.directionEnabled !== false,
           directionMode: cloud.directionMode || "numeric",
           directionMetrics: cloud.directionMetrics?.length > 0 ? cloud.directionMetrics : NUMERIC_DIRECTIONS,
         });
@@ -152,11 +159,12 @@ export default function KickoffSettingsPage() {
     const changed =
       JSON.stringify(types) !== JSON.stringify(savedSettings.kickoffTypes) ||
       JSON.stringify(categories) !== JSON.stringify(savedSettings.kickoffCategories) ||
+      dirEnabled !== savedSettings.directionEnabled ||
       dirMode !== savedSettings.directionMode ||
       JSON.stringify(directions) !== JSON.stringify(savedSettings.directionMetrics);
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [types, categories, dirMode, directions, savedSettings, loaded]);
+  }, [types, categories, dirEnabled, dirMode, directions, savedSettings, loaded]);
 
   const handleDirModeChange = (mode: DirectionMode) => {
     setDirMode(mode);
@@ -187,7 +195,7 @@ export default function KickoffSettingsPage() {
   };
 
   const executeSave = (typesToSave: KOTypeConfig[]) => {
-    const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionMode: dirMode, directionMetrics: directions };
+    const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionEnabled: dirEnabled, directionMode: dirMode, directionMetrics: directions };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setTypes(typesToSave);
     setSavedSettings(settings);
@@ -351,34 +359,59 @@ export default function KickoffSettingsPage() {
       <div className="space-y-4">
       <p className="text-sm font-bold text-slate-100 uppercase tracking-wider hidden lg:block">&nbsp;</p>
       <div className="card space-y-4">
-        <p className="label">Direction System<Tooltip text="Numeric uses a percentage-based score. Field-based lets you define custom direction zones to track where each kickoff lands." /></p>
-        <div className="flex rounded-input border border-border overflow-hidden w-fit">
+        <div className="flex items-center justify-between">
+          <p className="label mb-0">Direction Score<Tooltip text="Track how accurate each kickoff's direction is. Score each kick as 1.0 (on target), 0.5 (close), or 0 (critical miss). Stats show your directional accuracy percentage." /></p>
           <button
-            onClick={() => handleDirModeChange("numeric")}
+            onClick={() => setDirEnabled((v) => !v)}
             className={clsx(
-              "px-4 py-2 text-xs font-semibold transition-colors",
-              dirMode === "numeric" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+              "relative w-11 h-6 rounded-full transition-colors",
+              dirEnabled ? "bg-accent" : "bg-border"
             )}
+            aria-label="Toggle direction scoring"
           >
-            Numeric
-          </button>
-          <button
-            onClick={() => handleDirModeChange("field")}
-            className={clsx(
-              "px-4 py-2 text-xs font-semibold transition-colors border-l border-border",
-              dirMode === "field" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-            )}
-          >
-            Field-Based
+            <span
+              className={clsx(
+                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                dirEnabled ? "left-[22px]" : "left-0.5"
+              )}
+            />
           </button>
         </div>
-        <p className="text-[10px] text-muted">
-          {dirMode === "numeric"
-            ? "Numeric scoring (1.0, 0.5, 0) — calculates a direction percentage."
-            : "Field zones (Sideline-Numbers, Numbers-Hash, etc.) — shows % breakdown by zone."}
+        <p className="text-xs text-muted">
+          Enable to track directional accuracy on each kickoff. Disable to hide direction everywhere.
         </p>
+        {dirEnabled && (
+          <>
+            <div>
+              <p className="label">Direction System<Tooltip text="Numeric uses a 0/0.5/1 scale. Field-based lets you define custom direction zones (e.g. Sideline-Numbers, Numbers-Hash)." /></p>
+              <div className="flex rounded-input border border-border overflow-hidden w-fit">
+                <button
+                  onClick={() => handleDirModeChange("numeric")}
+                  className={clsx(
+                    "px-4 py-2 text-xs font-semibold transition-colors",
+                    dirMode === "numeric" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                  )}
+                >
+                  Numeric
+                </button>
+                <button
+                  onClick={() => handleDirModeChange("field")}
+                  className={clsx(
+                    "px-4 py-2 text-xs font-semibold transition-colors border-l border-border",
+                    dirMode === "field" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+                  )}
+                >
+                  Field-Based
+                </button>
+              </div>
+              <p className="text-[10px] text-muted mt-1.5">
+                {dirMode === "numeric"
+                  ? "Numeric scoring (1.0, 0.5, 0) — calculates a direction percentage."
+                  : "Field zones (Sideline-Numbers, Numbers-Hash, etc.) — shows % breakdown by zone."}
+              </p>
+            </div>
 
-        <p className="label mt-2">Direction Options<Tooltip text={dirMode === "numeric" ? "Fixed scoring: 1.0 (on target), 0.5 (close), 0 (OB or critical miss)." : "Assign a point value to each zone. Direction % = total points / attempts."} /></p>
+            <p className="label">Direction Options<Tooltip text={dirMode === "numeric" ? "Fixed scoring: 1.0 (on target), 0.5 (close), 0 (critical miss)." : "Assign a point value to each zone. Direction % = total points / attempts."} /></p>
         {dirMode === "numeric" ? (
           <div className="space-y-2">
             {NUMERIC_DIRECTIONS.map((d) => (
@@ -438,6 +471,8 @@ export default function KickoffSettingsPage() {
             + Add
           </button>
         </div>
+          </>
+        )}
           </>
         )}
       </div>

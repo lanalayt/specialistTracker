@@ -102,16 +102,17 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
 interface KOTypeConfig {
   id: string;
   label: string;
+  category: string;
   metric: "distance" | "yardline" | "none";
   hangTime: boolean;
 }
 
 const DEFAULT_KO_TYPES: KOTypeConfig[] = [
-  { id: "BLUE", label: "Blue", metric: "distance", hangTime: true },
-  { id: "RED", label: "Red", metric: "distance", hangTime: true },
-  { id: "SQUIB", label: "Squib", metric: "distance", hangTime: false },
-  { id: "SKY", label: "Sky", metric: "distance", hangTime: true },
-  { id: "ONSIDE", label: "Onside", metric: "none", hangTime: false },
+  { id: "BLUE", label: "Blue", category: "DEEP", metric: "distance", hangTime: true },
+  { id: "RED", label: "Red", category: "DEEP", metric: "distance", hangTime: true },
+  { id: "SQUIB", label: "Squib", category: "SQUIB", metric: "distance", hangTime: false },
+  { id: "SKY", label: "Sky", category: "SKY", metric: "distance", hangTime: true },
+  { id: "ONSIDE", label: "Onside", category: "ONSIDE", metric: "none", hangTime: false },
 ];
 
 const DEFAULT_KO_DIRS = [
@@ -148,8 +149,17 @@ function parseYardLine(input: string | undefined | null): number {
   return sign === "-" ? n : 100 - n;
 }
 
-function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string; score?: number }[]; directionMode: "numeric" | "field" } {
-  if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric" };
+interface KOCategoryConfig { id: string; label: string; enabled: boolean }
+
+const DEFAULT_KO_CATEGORIES: KOCategoryConfig[] = [
+  { id: "DEEP", label: "Deep Kickoffs", enabled: true },
+  { id: "SKY", label: "Sky Kick", enabled: true },
+  { id: "SQUIB", label: "Squib", enabled: true },
+  { id: "ONSIDE", label: "Onside", enabled: true },
+];
+
+function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string; score?: number }[]; directionMode: "numeric" | "field"; directionEnabled: boolean } {
+  if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true };
   const defaultScores = [1, 0.5, 0, -1];
   try {
     const raw = localStorage.getItem("kickoffSettings");
@@ -158,25 +168,30 @@ function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: strin
       const mode = parsed.directionMode === "field" ? "field" as const : "numeric" as const;
       const defaultDirs = mode === "field" ? FIELD_KO_DIRS : DEFAULT_KO_DIRS;
       const rawTypes = parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES;
+      const categories: KOCategoryConfig[] = parsed.kickoffCategories?.length > 0 ? parsed.kickoffCategories : DEFAULT_KO_CATEGORIES;
+      const enabledCats = new Set(categories.filter((c) => c.enabled).map((c) => c.id));
       const dirs = parsed.directionMetrics?.length > 0
         ? parsed.directionMetrics.map((d: { id: string; label: string; score?: number }, i: number) => ({
             ...d,
             score: d.score ?? (mode === "field" ? defaultScores[i] ?? 0 : undefined),
           }))
         : defaultDirs;
+      const allTypes: KOTypeConfig[] = rawTypes.map((t: Record<string, unknown>) => ({
+        id: t.id as string,
+        label: t.label as string,
+        category: (t.category as string) ?? "DEEP",
+        metric: (t.metric as string) ?? "distance",
+        hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+      }));
       return {
-        types: rawTypes.map((t: Record<string, unknown>) => ({
-          id: t.id as string,
-          label: t.label as string,
-          metric: (t.metric as string) ?? "distance",
-          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
-        })),
+        types: allTypes.filter((t) => enabledCats.has(t.category)),
         directions: dirs,
         directionMode: mode,
+        directionEnabled: parsed.directionEnabled !== false,
       };
     }
   } catch {}
-  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric" };
+  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true };
 }
 
 // Legacy labels for old data
@@ -203,8 +218,10 @@ export default function KickoffSessionPage() {
   const viewOnly = isAthlete && !canEdit;
 
   // ── Custom kickoff types + directions from settings ──────────────────
-  const [koTypes, setKoTypes] = useState(() => loadKickoffSettings().types);
-  const [koDirs, setKoDirs] = useState(() => loadKickoffSettings().directions);
+  const [koSettings] = useState(() => loadKickoffSettings());
+  const [koTypes, setKoTypes] = useState(() => koSettings.types);
+  const [koDirs, setKoDirs] = useState(() => koSettings.directions);
+  const [koDirEnabled, setKoDirEnabled] = useState(() => koSettings.directionEnabled);
   const koTypeLabels: Record<string, string> = {};
   koTypes.forEach((t) => { koTypeLabels[t.id] = t.label; });
   const koDirLabels: Record<string, string> = {};
@@ -212,13 +229,19 @@ export default function KickoffSessionPage() {
 
   useEffect(() => {
     import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
-      loadSettingsFromCloud<{ kickoffTypes?: Record<string, unknown>[]; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
-        if (cloud?.kickoffTypes?.length) setKoTypes(cloud.kickoffTypes.map((t) => ({
-          id: t.id as string,
-          label: t.label as string,
-          metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
-          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
-        })));
+      loadSettingsFromCloud<{ kickoffTypes?: Record<string, unknown>[]; kickoffCategories?: KOCategoryConfig[]; directionEnabled?: boolean; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
+        if (cloud?.kickoffTypes?.length) {
+          const cats: KOCategoryConfig[] = cloud.kickoffCategories?.length ? cloud.kickoffCategories : DEFAULT_KO_CATEGORIES;
+          const enabled = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
+          setKoTypes(cloud.kickoffTypes.map((t) => ({
+            id: t.id as string,
+            label: t.label as string,
+            category: (t.category as string) ?? "DEEP",
+            metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
+            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+          })).filter((t) => enabled.has(t.category)));
+        }
+        if (typeof cloud?.directionEnabled === "boolean") setKoDirEnabled(cloud.directionEnabled);
         if (cloud?.directionMetrics?.length) setKoDirs(cloud.directionMetrics);
       });
     });
@@ -926,7 +949,7 @@ export default function KickoffSessionPage() {
                               <th className="table-header">Pos</th>
                               <th className="table-header">Dist</th>
                               <th className="table-header">Hang</th>
-                              <th className="table-header">Dir</th>
+                              {koDirEnabled && <th className="table-header">Dir</th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -938,7 +961,7 @@ export default function KickoffSessionPage() {
                                 <td className="table-cell text-muted">{k.hash ? POS_LABELS[k.hash] : "—"}</td>
                                 <td className="table-cell">{k.distance > 0 ? `${k.distance} yd` : "—"}</td>
                                 <td className="table-cell text-muted">{k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s` : "—"}</td>
-                                <td className="table-cell text-muted">{koDirLabels[k.direction] ?? k.direction}</td>
+                                {koDirEnabled && <td className="table-cell text-muted">{koDirLabels[k.direction] ?? k.direction}</td>}
                               </tr>
                             ))}
                           </tbody>
@@ -1167,6 +1190,7 @@ export default function KickoffSessionPage() {
                     </label>
 
                     {/* Direction */}
+                    {koDirEnabled && (
                     <div>
                       <p className="label">Direction</p>
                       <div className="flex flex-wrap gap-2">
@@ -1186,6 +1210,7 @@ export default function KickoffSessionPage() {
                         ))}
                       </div>
                     </div>
+                    )}
 
                     {/* Log button + Remove */}
                     <div className="flex gap-2">
@@ -1375,7 +1400,7 @@ export default function KickoffSessionPage() {
                   <th className="table-header">Pos</th>
                   <th className="table-header">Dist</th>
                   <th className="table-header">Hang</th>
-                  <th className="table-header">Dir</th>
+                  {koDirEnabled && <th className="table-header">Dir</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1387,7 +1412,7 @@ export default function KickoffSessionPage() {
                     <td className="table-cell text-muted">{k.hash ? POS_LABELS[k.hash] : "—"}</td>
                     <td className="table-cell">{k.distance > 0 ? `${k.distance} yd` : "—"}</td>
                     <td className="table-cell text-muted">{k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s` : "—"}</td>
-                    <td className="table-cell text-muted">{koDirLabels[k.direction] ?? k.direction}</td>
+                    {koDirEnabled && <td className="table-cell text-muted">{koDirLabels[k.direction] ?? k.direction}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -1558,7 +1583,7 @@ export default function KickoffSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Endzone">EZ</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Touchback">TB</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dir</th>
+                      {koDirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dir</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
                     </>
                   )}
@@ -1573,9 +1598,11 @@ export default function KickoffSessionPage() {
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border" title="Endzone">
                         EZ
                       </th>
+                      {koDirEnabled && (
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                         Dir
                       </th>
+                      )}
                     </>
                   )}
                   <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
@@ -1727,6 +1754,7 @@ export default function KickoffSessionPage() {
                                 className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
+                            {koDirEnabled && (
                             <td className="py-1 px-1">
                               <select
                                 value={row.direction}
@@ -1740,6 +1768,7 @@ export default function KickoffSessionPage() {
                                 ))}
                               </select>
                             </td>
+                            )}
                             <td className="py-1 px-1 text-center">
                               {isSaved ? (
                                 <button
@@ -1809,6 +1838,7 @@ export default function KickoffSessionPage() {
                               className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
                             />
                           </td>
+                          {koDirEnabled && (
                           <td className="py-1 px-1">
                             <select
                               value={row.direction}
@@ -1822,6 +1852,7 @@ export default function KickoffSessionPage() {
                               ))}
                             </select>
                           </td>
+                          )}
                         </>
                       )}
                       <td className="py-1 px-1 text-center">
