@@ -4,8 +4,7 @@ import { useEffect, useRef } from "react";
 
 /**
  * Warns the user before navigating away when there is unsaved data.
- * Handles both browser close/refresh (beforeunload) and Next.js
- * client-side navigation (history.pushState interception).
+ * Handles browser close/refresh (beforeunload) and in-app link clicks.
  */
 export function useUnsavedWarning(hasUnsaved: boolean) {
   const unsavedRef = useRef(hasUnsaved);
@@ -20,45 +19,42 @@ export function useUnsavedWarning(hasUnsaved: boolean) {
     };
     window.addEventListener("beforeunload", onBeforeUnload);
 
-    // Intercept Next.js client-side navigation (pushState)
-    const originalPushState = history.pushState.bind(history);
-    history.pushState = function (...args: Parameters<typeof history.pushState>) {
-      if (unsavedRef.current) {
-        const leave = window.confirm(
-          "You have unsaved session data. Are you sure you want to leave?"
-        );
-        if (!leave) return;
+    // Intercept all link clicks within the app
+    const onClick = (e: MouseEvent) => {
+      if (!unsavedRef.current) return;
+
+      // Walk up from the click target to find an <a> tag
+      let target = e.target as HTMLElement | null;
+      while (target && target.tagName !== "A") {
+        target = target.parentElement;
       }
-      return originalPushState(...args);
+      if (!target) return;
+
+      const anchor = target as HTMLAnchorElement;
+      const href = anchor.getAttribute("href");
+      // Only intercept internal navigation links
+      if (!href || href.startsWith("http") || href.startsWith("mailto")) return;
+      // Don't intercept hash links or same-page links
+      if (href === "#" || href === window.location.pathname) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const leave = window.confirm(
+        "You have unsaved session data. Are you sure you want to leave?"
+      );
+      if (leave) {
+        unsavedRef.current = false;
+        window.location.href = href;
+      }
     };
 
-    // Also intercept popstate (back/forward buttons)
-    const onPopState = (e: PopStateEvent) => {
-      if (unsavedRef.current) {
-        const leave = window.confirm(
-          "You have unsaved session data. Are you sure you want to leave?"
-        );
-        if (!leave) {
-          // Push the current URL back to cancel the navigation
-          e.stopImmediatePropagation();
-          history.pushState = originalPushState; // temporarily restore to avoid recursion
-          history.pushState(null, "", window.location.href);
-          history.pushState = function (...a: Parameters<typeof history.pushState>) {
-            if (unsavedRef.current) {
-              const l = window.confirm("You have unsaved session data. Are you sure you want to leave?");
-              if (!l) return;
-            }
-            return originalPushState(...a);
-          };
-        }
-      }
-    };
-    window.addEventListener("popstate", onPopState);
+    // Use capture phase to intercept before Next.js router handles it
+    document.addEventListener("click", onClick, true);
 
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
-      window.removeEventListener("popstate", onPopState);
-      history.pushState = originalPushState;
+      document.removeEventListener("click", onClick, true);
     };
   }, [hasUnsaved]);
 }
