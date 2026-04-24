@@ -24,6 +24,13 @@
   margin: 0;
 }
 
+/* Force consistent dropdown colors across all OS/browser combos */
+select,
+option {
+  background-color: var(--surface-2, #1a2535);
+  color: var(--text, #f1f5f9);
+}
+
 html,
 body {
   max-width: 100vw;
