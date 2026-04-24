@@ -1064,23 +1064,31 @@ export default function KickoffSessionPage() {
 
                     {/* Distance + Hang Time */}
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="label">Distance (yds)</p>
-                        <input
-                          className="input text-center text-lg font-bold"
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder="yds"
-                          value={distance}
-                          onChange={(e) => {
-                            setDistance(e.target.value);
-                            const dist = parseInt(e.target.value) || 0;
-                            if (dist >= 65) setEndzone(true);
-                            else if (dist > 0 && dist < 65) setEndzone(false);
-                          }}
-                        />
-                      </div>
+                      {(() => {
+                        const metric = koTypes.find((t) => t.id === currentPlan?.type)?.metric ?? "distance";
+                        if (metric === "none") return null;
+                        return (
+                          <div>
+                            <p className="label">{metric === "yardline" ? "Yard Line" : "Distance (yds)"}</p>
+                            <input
+                              className="input text-center text-lg font-bold"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              placeholder={metric === "yardline" ? "YL" : "yds"}
+                              value={distance}
+                              onChange={(e) => {
+                                setDistance(e.target.value);
+                                if (metric === "distance") {
+                                  const dist = parseInt(e.target.value) || 0;
+                                  if (dist >= 65) setEndzone(true);
+                                  else if (dist > 0 && dist < 65) setEndzone(false);
+                                }
+                              }}
+                            />
+                          </div>
+                        );
+                      })()}
                       {koTracksHangTime(currentPlan?.type, koTypes) && (
                       <div>
                         <p className="label">Hang Time (s)</p>
@@ -1584,8 +1592,10 @@ export default function KickoffSessionPage() {
                         return (
                           <>
                             <td className="py-1 px-1">
+                              {(koTypes.find((t) => t.id === row.type)?.metric ?? "distance") !== "none" ? (
                               <input
-                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
+                                type="text" inputMode="numeric" pattern="[0-9]*"
+                                placeholder={(koTypes.find((t) => t.id === row.type)?.metric ?? "distance") === "yardline" ? "YL" : "yds"}
                                 value={row.distance}
                                 onChange={(e) => {
                                   updateRow(idx, "distance", e.target.value);
@@ -1596,6 +1606,9 @@ export default function KickoffSessionPage() {
                                 readOnly={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
+                              ) : (
+                                <span className="text-xs text-muted text-center block py-1">—</span>
+                              )}
                             </td>
                             <td className="py-1 px-1">
                               {koTracksHangTime(row.type, koTypes) ? (
@@ -1680,8 +1693,10 @@ export default function KickoffSessionPage() {
                       {manualEntry && sessionMode !== "game" && (
                         <>
                           <td className="py-1 px-1">
+                            {(koTypes.find((t) => t.id === row.type)?.metric ?? "distance") !== "none" ? (
                             <input
-                              type="text" inputMode="numeric" pattern="[0-9]*" placeholder="yds"
+                              type="text" inputMode="numeric" pattern="[0-9]*"
+                              placeholder={(koTypes.find((t) => t.id === row.type)?.metric ?? "distance") === "yardline" ? "YL" : "yds"}
                               value={row.distance}
                               onChange={(e) => {
                                 updateRow(idx, "distance", e.target.value);
@@ -1692,6 +1707,9 @@ export default function KickoffSessionPage() {
                               readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
+                            ) : (
+                              <span className="text-xs text-muted text-center block">—</span>
+                            )}
                           </td>
                           <td className="py-1 px-1">
                             {koTracksHangTime(row.type, koTypes) ? (
