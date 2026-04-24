@@ -250,12 +250,14 @@ const DEFAULT_DA_OPTIONS = [
   { value: "1", label: "1.0 ✓" },
   { value: "0.5", label: "0.5" },
   { value: "0", label: "0 ★" },
+  { value: "-1", label: "OB" },
 ];
 
 const FIELD_DA_OPTIONS = [
   { value: "SL-NUM", label: "Sideline-Numbers", score: 1 },
   { value: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
   { value: "TO_FIELD", label: "To The Field", score: 0 },
+  { value: "OB", label: "OB", score: -1 },
 ];
 
 function loadOpTimeEnabled(): boolean {

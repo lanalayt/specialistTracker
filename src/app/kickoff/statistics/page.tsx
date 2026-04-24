@@ -61,7 +61,8 @@ function isOverallType(typeId: string, types: KOTypeConfig[]): boolean {
 function dirToNum(d: string, directions?: { id: string; score?: number }[]): number | null {
   if (d === "1") return 1;
   if (d === "0.5") return 0.5;
-  if (d === "OB") return 0;
+  if (d === "0") return 0;
+  if (d === "-1" || d === "OB") return -1;
   // Look up score from field-based direction options
   if (directions) {
     const opt = directions.find((o) => o.id === d);

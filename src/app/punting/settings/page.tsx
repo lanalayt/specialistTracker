@@ -55,12 +55,14 @@ const NUMERIC_DIRECTIONS = [
   { id: "1", label: "1.0 ✓" },
   { id: "0.5", label: "0.5" },
   { id: "0", label: "0 ★" },
+  { id: "-1", label: "OB" },
 ];
 
 const FIELD_DIRECTIONS = [
   { id: "SL-NUM", label: "Sideline-Numbers", score: 1 },
   { id: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
   { id: "TO_FIELD", label: "To The Field", score: 0 },
+  { id: "OB", label: "OB", score: -1 },
 ];
 
 function migrateType(t: Record<string, unknown>): PuntTypeConfig {

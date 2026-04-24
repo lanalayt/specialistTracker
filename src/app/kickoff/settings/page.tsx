@@ -52,6 +52,7 @@ const NUMERIC_DIRECTIONS = [
   { id: "1", label: "1.0" },
   { id: "0.5", label: "0.5" },
   { id: "0", label: "0" },
+  { id: "-1", label: "OB" },
 ];
 
 const FIELD_DIRECTIONS = [
