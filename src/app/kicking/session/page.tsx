@@ -1544,7 +1544,7 @@ export default function KickingSessionPage() {
                     <td className="table-cell text-muted">{k.isPAT ? "—" : k.pos}</td>
                     <td className="table-cell">
                       <span className={clsx("text-xs font-semibold", k.result.startsWith("Y") ? "text-make" : "text-miss")}>
-                        {k.result.startsWith("Y") ? "✓" : "✗"}
+                        {RESULT_LABELS[k.result] ?? k.result}
                       </span>
                     </td>
                     {scoreEnabled && <td className="table-cell">{k.score}</td>}

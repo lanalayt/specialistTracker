@@ -199,6 +199,46 @@ function FGStatsView({
         </div>
       </CollapsibleSection>
 
+      {/* Make Chart — only shown when detailed make data exists */}
+      {athletes.some((a) => {
+        const m = statsMap[a.name]?.make;
+        return m && (m.YL > 0 || m.YC > 0 || m.YR > 0);
+      }) && (
+      <CollapsibleSection title="Make Chart">
+        <div className="card-2">
+          <table className="w-full text-xs sm:text-sm">
+            <thead>
+              <tr>
+                <th className="table-header text-left">Athlete</th>
+                <th className="table-header"><span className="hidden sm:inline">Make </span>Left</th>
+                <th className="table-header"><span className="hidden sm:inline">Make </span>Middle</th>
+                <th className="table-header"><span className="hidden sm:inline">Make </span>Right</th>
+                <th className="table-header">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {athletes.map((a) => {
+                const s = statsMap[a.name];
+                if (!s) return null;
+                const m = s.make ?? { YL: 0, YC: 0, YR: 0 };
+                const total = m.YL + m.YC + m.YR;
+                if (total === 0) return null;
+                return (
+                  <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                    <td className="table-name">{a.name}</td>
+                    <td className="table-cell text-make">{m.YL || "—"}</td>
+                    <td className="table-cell text-make">{m.YC || "—"}</td>
+                    <td className="table-cell text-make">{m.YR || "—"}</td>
+                    <td className="table-cell text-make font-semibold">{total || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleSection>
+      )}
+
       {/* Op Time */}
       <CollapsibleSection title="Operation Time">
         <div className="card-2">

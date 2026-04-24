@@ -49,6 +49,7 @@ export function emptyAthleteStats(): AthleteStats {
     position,
     distance,
     miss: { XL: 0, XR: 0, XS: 0, X: 0 },
+    make: { YL: 0, YC: 0, YR: 0 },
     pat: { att: 0, made: 0, score: 0 },
   };
 }
@@ -130,6 +131,12 @@ export function processKick(
   // Miss tracking
   if (!isMake && (result === "XL" || result === "XR" || result === "XS" || result === "X")) {
     s.miss = { ...s.miss, [result]: s.miss[result] + 1 };
+  }
+
+  // Make tracking (detailed)
+  if (!s.make) s.make = { YL: 0, YC: 0, YR: 0 };
+  if (isMake && (result === "YL" || result === "YC" || result === "YR")) {
+    s.make = { ...s.make, [result]: s.make[result] + 1 };
   }
 
   return { ...statsMap, [athlete]: s };
