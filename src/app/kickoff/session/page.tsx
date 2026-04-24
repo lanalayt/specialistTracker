@@ -878,7 +878,6 @@ export default function KickoffSessionPage() {
                                   <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
                                     <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
                                     {avgDist && <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>}
-                                    {avgYL && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYL}</span></div>}
                                     <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                                     <div><span className="text-muted">TB</span> <span className="text-make font-medium ml-1">{tbCount}</span></div>
                                   </div>
@@ -1301,7 +1300,6 @@ export default function KickoffSessionPage() {
                   <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
                     <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
                     {avgDist2 && <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist2}</span></div>}
-                    {avgYL2 && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYL2}</span></div>}
                     <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                   </div>
                 </div>

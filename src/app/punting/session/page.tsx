@@ -1099,7 +1099,6 @@ export default function PuntingSessionPage() {
                                     <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
                                     <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                                     <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
-                                    {avgYL && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYL}</span></div>}
                                     <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>
                                     <div><span className="text-muted">Dir Score</span> <span className="text-slate-200 font-medium ml-1">{dirScoreDisplay}</span></div>
                                     <div><span className="text-muted">Crit</span> <span className={`font-medium ml-1 ${criticals > 0 ? "text-miss" : "text-slate-200"}`}>{criticals}</span></div>
@@ -1769,7 +1768,6 @@ export default function PuntingSessionPage() {
                             <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{netAvg}</span></div>
                             <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                             {sessionMode !== "game" && <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>}
-                            {avgYLVal && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYLVal}</span></div>}
                             {dirEnabled && <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>}
                             <div><span className="text-muted">I-20</span> <span className="text-slate-200 font-medium ml-1">{apI20}</span></div>
                             <div><span className="text-muted">I-10</span> <span className="text-slate-200 font-medium ml-1">{apI10}</span></div>
