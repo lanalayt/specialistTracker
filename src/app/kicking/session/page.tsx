@@ -232,6 +232,15 @@ export default function KickingSessionPage() {
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
   const [draftSaved, setDraftSaved] = useState(false);
 
+  // Warn before leaving with unsaved session data
+  useEffect(() => {
+    const hasUnsaved = sessionKicks.length > 0 && !committed;
+    if (!hasUnsaved) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [sessionKicks.length, committed]);
+
   // Game mode forces manual entry (no live session)
   useEffect(() => {
     if (sessionMode === "game" && !manualEntry) setManualEntry(true);
