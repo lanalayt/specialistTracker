@@ -83,12 +83,19 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
   localStorage.setItem(`${SESSION_STORAGE_KEY}_${mode}`, JSON.stringify(draft));
 }
 
-const DEFAULT_KO_TYPES = [
-  { id: "BLUE", label: "Blue" },
-  { id: "RED", label: "Red" },
-  { id: "SQUIB", label: "Squib" },
-  { id: "SKY", label: "Sky" },
-  { id: "ONSIDE", label: "Onside" },
+interface KOTypeConfig {
+  id: string;
+  label: string;
+  metric: "distance" | "yardline" | "none";
+  hangTime: boolean;
+}
+
+const DEFAULT_KO_TYPES: KOTypeConfig[] = [
+  { id: "BLUE", label: "Blue", metric: "distance", hangTime: true },
+  { id: "RED", label: "Red", metric: "distance", hangTime: true },
+  { id: "SQUIB", label: "Squib", metric: "distance", hangTime: false },
+  { id: "SKY", label: "Sky", metric: "distance", hangTime: true },
+  { id: "ONSIDE", label: "Onside", metric: "none", hangTime: false },
 ];
 
 const DEFAULT_KO_DIRS = [
@@ -117,7 +124,7 @@ function parseYardLine(input: string | undefined | null): number {
   return sign === "-" ? n : 100 - n;
 }
 
-function loadKickoffSettings(): { types: { id: string; label: string }[]; directions: { id: string; label: string }[]; directionMode: "numeric" | "field" } {
+function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string }[]; directionMode: "numeric" | "field" } {
   if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric" };
   try {
     const raw = localStorage.getItem("kickoffSettings");
@@ -125,8 +132,14 @@ function loadKickoffSettings(): { types: { id: string; label: string }[]; direct
       const parsed = JSON.parse(raw);
       const mode = parsed.directionMode === "field" ? "field" as const : "numeric" as const;
       const defaultDirs = mode === "field" ? FIELD_KO_DIRS : DEFAULT_KO_DIRS;
+      const rawTypes = parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES;
       return {
-        types: parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES,
+        types: rawTypes.map((t: Record<string, unknown>) => ({
+          id: t.id as string,
+          label: t.label as string,
+          metric: (t.metric as string) ?? "distance",
+          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+        })),
         directions: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : defaultDirs,
         directionMode: mode,
       };
@@ -168,8 +181,13 @@ export default function KickoffSessionPage() {
 
   useEffect(() => {
     import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
-      loadSettingsFromCloud<{ kickoffTypes?: { id: string; label: string }[]; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
-        if (cloud?.kickoffTypes?.length) setKoTypes(cloud.kickoffTypes);
+      loadSettingsFromCloud<{ kickoffTypes?: Record<string, unknown>[]; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
+        if (cloud?.kickoffTypes?.length) setKoTypes(cloud.kickoffTypes.map((t) => ({
+          id: t.id as string,
+          label: t.label as string,
+          metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
+          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+        })));
         if (cloud?.directionMetrics?.length) setKoDirs(cloud.directionMetrics);
       });
     });

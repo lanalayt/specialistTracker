@@ -41,15 +41,34 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const { user } = useAuth();
 
+  const koTypeConfigs = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    try {
+      const raw = localStorage.getItem("kickoffSettings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.kickoffTypes?.length > 0) {
+          return parsed.kickoffTypes.map((t: Record<string, unknown>) => ({
+            id: t.id as string,
+            metric: (t.metric as string) ?? "distance",
+            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+          }));
+        }
+      }
+    } catch {}
+    return undefined;
+  }, []);
+
   const stats = useMemo(() => {
     const names = athletes.map((a) => a.name);
     return recomputeKickoffStats(
       names,
       sessions
         .filter((s) => s.mode !== "game")
-        .map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] }))
+        .map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] })),
+      koTypeConfigs
     );
-  }, [athletes, sessions]);
+  }, [athletes, sessions, koTypeConfigs]);
 
   const history = useMemo(
     () => [...sessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),

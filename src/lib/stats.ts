@@ -370,13 +370,16 @@ export function emptyKickoffStats(): KickoffAthleteStats {
 
 export function processKickoff(
   entry: KickoffEntry,
-  statsMap: Record<string, KickoffAthleteStats>
+  statsMap: Record<string, KickoffAthleteStats>,
+  typeConfig?: { metric: "distance" | "yardline" | "none"; hangTime: boolean }
 ): Record<string, KickoffAthleteStats> {
   const { athlete, distance, hangTime, landingZone, result, returnYards, endzone } =
     entry;
 
-  const hasDist = distance > 0;
-  const hasHang = hangTime > 0;
+  const metricEnabled = typeConfig ? typeConfig.metric !== "none" : true;
+  const htEnabled = typeConfig ? typeConfig.hangTime : true;
+  const hasDist = distance > 0 && metricEnabled;
+  const hasHang = hangTime > 0 && htEnabled;
 
   if (!statsMap[athlete]) {
     statsMap = { ...statsMap, [athlete]: emptyKickoffStats() };
@@ -407,7 +410,8 @@ export function processKickoff(
 
 export function recomputeKickoffStats(
   athletes: string[],
-  sessions: { entries: KickoffEntry[] }[]
+  sessions: { entries: KickoffEntry[] }[],
+  typeConfigs?: { id: string; metric: "distance" | "yardline" | "none"; hangTime: boolean }[]
 ): Record<string, KickoffAthleteStats> {
   let statsMap: Record<string, KickoffAthleteStats> = {};
   athletes.forEach((a) => {
@@ -415,7 +419,8 @@ export function recomputeKickoffStats(
   });
   sessions.forEach((s) => {
     s.entries.forEach((e) => {
-      statsMap = processKickoff(e, statsMap);
+      const tc = typeConfigs?.find((t) => t.id === e.type);
+      statsMap = processKickoff(e, statsMap, tc);
     });
   });
   return statsMap;
