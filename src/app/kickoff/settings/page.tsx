@@ -275,11 +275,11 @@ export default function KickoffSettingsPage() {
         </div>
         <p className="text-[10px] text-muted">
           {dirMode === "numeric"
-            ? "Numeric scoring (1.0, 0.5, OB) — calculates a direction percentage."
+            ? "Numeric scoring (1.0, 0.5, 0) — calculates a direction percentage."
             : "Field zones (Sideline-Numbers, Numbers-Hash, etc.) — shows % breakdown by zone."}
         </p>
 
-        <p className="label mt-2">Direction Options<Tooltip text={dirMode === "numeric" ? "Fixed scoring: 1.0 (on target), 0.5 (close), OB (out of bounds)." : "Assign a point value to each zone. Direction % = total points / attempts."} /></p>
+        <p className="label mt-2">Direction Options<Tooltip text={dirMode === "numeric" ? "Fixed scoring: 1.0 (on target), 0.5 (close), 0 (OB or critical miss)." : "Assign a point value to each zone. Direction % = total points / attempts."} /></p>
         {dirMode === "numeric" ? (
           <div className="space-y-2">
             {NUMERIC_DIRECTIONS.map((d) => (
