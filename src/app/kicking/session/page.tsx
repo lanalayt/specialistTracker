@@ -19,6 +19,15 @@ import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 
 const INIT_ROWS = 12;
 
+/** Auto-format op time: typing "132" produces "1.32" */
+function formatOpTime(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length === 0) return "";
+  if (digits.length === 1) return digits;
+  if (digits.length === 2) return digits[0] + "." + digits[1];
+  return digits.slice(0, -2) + "." + digits.slice(-2);
+}
+
 // Outlier detection for FG distance
 function checkFGOutliers(dist: number): string[] {
   const warnings: string[] = [];
@@ -1287,13 +1296,11 @@ export default function KickingSessionPage() {
                     <div>
                       <p className="label">Op Time (sec)</p>
                       <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        min="0"
-                        placeholder="e.g. 1.25"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="e.g. 132 → 1.32"
                         value={opTime}
-                        onChange={(e) => setOpTime(e.target.value)}
+                        onChange={(e) => setOpTime(formatOpTime(e.target.value))}
                         className="input w-full text-sm py-2"
                       />
                     </div>
@@ -1863,7 +1870,7 @@ export default function KickingSessionPage() {
                                 inputMode="decimal"
                                 placeholder="sec"
                                 value={row.opTime}
-                                onChange={(e) => updateRow(idx, "opTime", e.target.value)}
+                                onChange={(e) => updateRow(idx, "opTime", formatOpTime(e.target.value))}
                                 readOnly={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
@@ -1937,7 +1944,7 @@ export default function KickingSessionPage() {
                               inputMode="decimal"
                               placeholder="sec"
                               value={row.opTime}
-                              onChange={(e) => updateRow(idx, "opTime", e.target.value)}
+                              onChange={(e) => updateRow(idx, "opTime", formatOpTime(e.target.value))}
                               readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
