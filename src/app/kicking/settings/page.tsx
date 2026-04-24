@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const SNAP_DISTANCES = ["6", "7", "8"];
 const STORAGE_KEY = "fgSettings";
@@ -145,7 +146,7 @@ export default function FGSettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-4">
       <div className="card space-y-3">
-        <p className="label">Snap Distance</p>
+        <p className="label">Snap Distance<Tooltip text="Distance in yards from the line of scrimmage to the holder. Standard is 7 yards." /></p>
         <div className="flex gap-2">
           {SNAP_DISTANCES.map((d) => (
             <button
@@ -165,7 +166,7 @@ export default function FGSettingsPage() {
       </div>
 
       <div className="card space-y-3">
-        <p className="label">Make Tracking</p>
+        <p className="label">Make Tracking<Tooltip text="How detailed you want your makes to be. Simple = just 'Good'. Detailed = left third, down the middle, or right third make." /></p>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setMakeMode("simple")}
@@ -199,7 +200,7 @@ export default function FGSettingsPage() {
       </div>
 
       <div className="card space-y-3">
-        <p className="label">Miss Tracking</p>
+        <p className="label">Miss Tracking<Tooltip text="How detailed you want your misses to be. Simple = just 'Miss'. Detailed = miss left, miss right, or short." /></p>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setMissMode("simple")}
@@ -235,7 +236,7 @@ export default function FGSettingsPage() {
       </div>
       <div className="space-y-4">
       <div className="card space-y-4">
-        <p className="label">Kick Score</p>
+        <p className="label">Kick Score<Tooltip text="Create your own point system to grade each kick. Example: 1 pt for make, 1 pt for middle third, 1 pt for good ball flight/rotation, 1 pt for 50+ yard kick." /></p>
         <p className="text-xs text-muted">
           Choose when to track kick score. &quot;Practice Only&quot; hides score in game mode but shows it in practice.
         </p>
@@ -301,7 +302,7 @@ export default function FGSettingsPage() {
       {/* Op Time toggle */}
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label mb-0">Operation Time</p>
+          <p className="label mb-0">Operation Time<Tooltip text="Snap-to-kick time in seconds. Measures how fast the ball goes from the snap to off the kicker's foot. Target is typically 1.2-1.4 seconds." /></p>
           <button
             onClick={() => setOpTimeEnabled((v) => !v)}
             className={clsx(

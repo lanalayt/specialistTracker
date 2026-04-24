@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { useFG } from "@/lib/fgContext";
 import { LiveFGStats } from "@/components/ui/LiveSessionStats";
 import { SessionLog } from "@/components/ui/SessionLog";
@@ -262,10 +263,15 @@ export default function KickingSessionPage() {
   const [scoreOptions, setScoreOptions] = useState<string[]>(() => loadScoreOptions());
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
+  const [showSetupPrompt, setShowSetupPrompt] = useState(false);
 
   // Load settings from cloud on fresh device
   useEffect(() => {
+    const hasLocal = !!localStorage.getItem("fgSettings");
     loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string; scoreEnabled?: string | boolean; scoreOptions?: string[] }>("fgSettings").then((cloud) => {
+      if (!hasLocal && !cloud) {
+        setShowSetupPrompt(true);
+      }
       if (cloud) {
         if (cloud.snapDistance) setSnapDistance(parseInt(cloud.snapDistance) || 7);
         if (cloud.makeMode === "simple" || cloud.makeMode === "detailed") setMakeMode(cloud.makeMode);
@@ -1550,6 +1556,36 @@ export default function KickingSessionPage() {
           <button onClick={handleNewSession} className="btn-primary w-full py-3 text-sm font-bold">← Back to Log</button>
         </div>
       </main>
+    );
+  }
+
+  if (showSetupPrompt) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-14 h-14 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center mx-auto text-2xl">
+            <span>&#9881;</span>
+          </div>
+          <h2 className="text-lg font-bold text-slate-100">Set Up FG Settings First</h2>
+          <p className="text-sm text-slate-300 leading-relaxed">
+            Before entering any stats, it&apos;s best to configure your practice log parameters — make/miss tracking detail, kick score system, operation time, and snap distance.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Link
+              href="/kicking/settings"
+              className="btn-primary py-3 rounded-input text-sm font-bold text-center block"
+            >
+              Go to FG Settings
+            </Link>
+            <button
+              onClick={() => setShowSetupPrompt(false)}
+              className="text-xs text-muted hover:text-white transition-colors py-2"
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
