@@ -128,8 +128,8 @@ function StatTable({ athletes, statsMap, dirMode, dirOptions }: {
     return <p className="text-xs text-muted p-2">No data.</p>;
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <div>
+      <table className="w-full text-xs sm:text-sm">
         <thead>
           <tr>
             <th className="table-header text-left">Athlete</th>

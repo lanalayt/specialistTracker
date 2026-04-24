@@ -132,16 +132,16 @@ function FGStatsView({
       {/* Overall FG */}
       <section className="card-2">
         <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall {label}</p>
-        <table className="w-full text-sm">
+        <table className="w-full text-xs sm:text-sm">
           <thead>
             <tr>
               <th className="table-header text-left">Athlete</th>
               <th className="table-header">Made</th>
               <th className="table-header">Att</th>
               <th className="table-header">%</th>
-              <th className="table-header whitespace-nowrap"><span>Kick Score</span><br/><span className="text-[9px] font-normal text-muted">Out of 3</span></th>
-              <th className="table-header">Long FG</th>
-              <th className="table-header">Avg OT</th>
+              <th className="table-header whitespace-nowrap"><span className="hidden sm:inline">Kick Score</span><span className="sm:hidden">KS</span><br/><span className="text-[9px] font-normal text-muted hidden sm:inline">Out of 3</span><span className="text-[8px] font-normal text-muted sm:hidden">/3</span></th>
+              <th className="table-header"><span className="hidden sm:inline">Long FG</span><span className="sm:hidden">Long</span></th>
+              <th className="table-header"><span className="hidden sm:inline">Avg OT</span><span className="sm:hidden">OT</span></th>
             </tr>
           </thead>
           <tbody>
@@ -169,13 +169,13 @@ function FGStatsView({
       {/* Miss Chart */}
       <CollapsibleSection title="Miss Chart">
         <div className="card-2">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs sm:text-sm">
             <thead>
               <tr>
                 <th className="table-header text-left">Athlete</th>
-                <th className="table-header">Miss Left</th>
-                <th className="table-header">Miss Right</th>
-                <th className="table-header">Miss Short</th>
+                <th className="table-header"><span className="hidden sm:inline">Miss </span>Left</th>
+                <th className="table-header"><span className="hidden sm:inline">Miss </span>Right</th>
+                <th className="table-header"><span className="hidden sm:inline">Miss </span>Short</th>
                 <th className="table-header">Total</th>
               </tr>
             </thead>
@@ -202,12 +202,12 @@ function FGStatsView({
       {/* Op Time */}
       <CollapsibleSection title="Operation Time">
         <div className="card-2">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs sm:text-sm">
             <thead>
               <tr>
                 <th className="table-header text-left">Athlete</th>
                 <th className="table-header">Avg OT</th>
-                <th className="table-header">Kicks w/ OT</th>
+                <th className="table-header"><span className="hidden sm:inline">Kicks w/ </span>OT<span className="sm:hidden"> #</span></th>
               </tr>
             </thead>
             <tbody>
