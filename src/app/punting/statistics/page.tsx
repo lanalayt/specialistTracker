@@ -193,6 +193,134 @@ function computeFilteredPuntStats(
   return statsMap;
 }
 
+function CategorySection({
+  title,
+  athletes,
+  catStats,
+  statsMap,
+  catTypeIds,
+  typeLabels,
+  isPoochCat,
+  hasPoochData,
+  poochYLStats,
+}: {
+  title: string;
+  athletes: { id: string; name: string }[];
+  catStats: Record<string, PuntAthleteStats>;
+  statsMap: Record<string, PuntAthleteStats>;
+  catTypeIds: string[];
+  typeLabels: Record<string, string>;
+  isPoochCat: boolean;
+  hasPoochData: boolean;
+  poochYLStats: Record<string, { att: number; total: number }>;
+}) {
+  const [subTab, setSubTab] = useState<"type" | "hash">("type");
+  const hasMultipleTypes = catTypeIds.filter((type) => athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0)).length > 0;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold text-muted uppercase tracking-wider">{title}</p>
+
+      {/* Overall */}
+      <section className="card-2">
+        <PuntStatTable athletes={athletes} statsMap={catStats} getBucket={(s) => s.overall} />
+      </section>
+
+      {/* Pooch: Avg Landing YL */}
+      {isPoochCat && hasPoochData && (
+        <section className="card-2">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Avg Landing Yard Line</p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr>
+                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
+                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
+                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>
+                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
+                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {athletes.filter((a) => poochYLStats[a.name]?.att > 0).map((a) => {
+                const s = poochYLStats[a.name];
+                const ylVal = s.att > 0 ? (s.total / s.att).toFixed(1) : "—";
+                const catA = catStats[a.name];
+                const htVal = (catA?.overall.hangAtt ?? 0) > 0 ? (catA.overall.totalHang / (catA.overall.hangAtt ?? catA.overall.att)).toFixed(2) : "—";
+                const daVal = (catA?.overall.daAtt ?? 0) > 0 ? `${Math.round((catA.overall.totalDirectionalAccuracy / (catA.overall.daAtt ?? catA.overall.att)) * 100)}%` : "—";
+                return (
+                  <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                    <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
+                    <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{s.att}</td>
+                    <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{ylVal}</td>
+                    <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{htVal}</td>
+                    <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{daVal}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {/* Tab toggle */}
+      {hasMultipleTypes && (
+        <div className="flex rounded-input border border-border overflow-hidden w-fit">
+          <button
+            onClick={() => setSubTab("type")}
+            className={clsx(
+              "px-4 py-1.5 text-xs font-semibold transition-colors",
+              subTab === "type" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+            )}
+          >
+            By Type
+          </button>
+          <button
+            onClick={() => setSubTab("hash")}
+            className={clsx(
+              "px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+              subTab === "hash" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+            )}
+          >
+            By Position
+          </button>
+        </div>
+      )}
+
+      {/* By Type */}
+      {(subTab === "type" || !hasMultipleTypes) && hasMultipleTypes && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {catTypeIds.map((type) => {
+            const hasTypeData = athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0);
+            if (!hasTypeData) return null;
+            return (
+              <div key={type} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
+                <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* By Hash / Position */}
+      {(subTab === "hash" || !hasMultipleTypes) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {PUNT_HASHES.map((hash) => {
+            const hasHashData = athletes.some((a) => (catStats[a.name]?.byHash[hash]?.att ?? 0) > 0);
+            if (!hasHashData) return null;
+            return (
+              <div key={hash} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
+                <PuntStatTable athletes={athletes} statsMap={catStats} getBucket={(s) => s.byHash[hash]} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PuntStatsView({
   athletes,
   statsMap,
@@ -309,7 +437,7 @@ function PuntStatsView({
         </section>
       )}
 
-      {/* Per-category dropdown: Overall �� By Type → By Hash */}
+      {/* Per-category section */}
       {puntCategories.filter((c) => c.enabled && categoryStats[c.id]).map((cat) => {
         const catStats = categoryStats[cat.id];
         const hasData = athletes.some((a) => (catStats[a.name]?.overall.att ?? 0) > 0);
@@ -318,81 +446,18 @@ function PuntStatsView({
         const isPoochCat = cat.id === "POOCH";
 
         return (
-          <CollapsibleSection key={cat.id} title={`${cat.label} Punts`} defaultOpen>
-            <div className="space-y-4">
-              {/* Overall for this category */}
-              <section className="card-2">
-                <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall</p>
-                <PuntStatTable athletes={athletes} statsMap={catStats} getBucket={(s) => s.overall} />
-              </section>
-
-              {/* Pooch: Avg Landing YL summary */}
-              {isPoochCat && hasPoochData && (
-                <section className="card-2">
-                  <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Avg Landing Yard Line</p>
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr>
-                        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
-                        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
-                        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>
-                        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
-                        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {athletes.filter((a) => poochYLStats[a.name]?.att > 0).map((a) => {
-                        const s = poochYLStats[a.name];
-                        const ylVal = s.att > 0 ? (s.total / s.att).toFixed(1) : "—";
-                        const catA = catStats[a.name];
-                        const htVal = (catA?.overall.hangAtt ?? 0) > 0 ? (catA.overall.totalHang / (catA.overall.hangAtt ?? catA.overall.att)).toFixed(2) : "—";
-                        const daVal = (catA?.overall.daAtt ?? 0) > 0 ? `${Math.round((catA.overall.totalDirectionalAccuracy / (catA.overall.daAtt ?? catA.overall.att)) * 100)}%` : "—";
-                        return (
-                          <tr key={a.id} className="hover:bg-surface/30 transition-colors">
-                            <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
-                            <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{s.att}</td>
-                            <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{ylVal}</td>
-                            <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{htVal}</td>
-                            <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{daVal}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </section>
-              )}
-
-              {/* By Type within this category */}
-              {catTypeIds.length > 1 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {catTypeIds.map((type) => {
-                    const hasTypeData = athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0);
-                    if (!hasTypeData) return null;
-                    return (
-                      <div key={type} className="card-2">
-                        <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
-                        <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* By Hash / Position for this category */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {PUNT_HASHES.map((hash) => {
-                  const hasHashData = athletes.some((a) => (catStats[a.name]?.byHash[hash]?.att ?? 0) > 0);
-                  if (!hasHashData) return null;
-                  return (
-                    <div key={hash} className="card-2">
-                      <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
-                      <PuntStatTable athletes={athletes} statsMap={catStats} getBucket={(s) => s.byHash[hash]} />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </CollapsibleSection>
+          <CategorySection
+            key={cat.id}
+            title={`${cat.label} Punts`}
+            athletes={athletes}
+            catStats={catStats}
+            statsMap={statsMap}
+            catTypeIds={catTypeIds}
+            typeLabels={typeLabels}
+            isPoochCat={isPoochCat}
+            hasPoochData={hasPoochData}
+            poochYLStats={poochYLStats}
+          />
         );
       })}
     </div>
