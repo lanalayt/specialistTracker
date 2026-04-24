@@ -193,17 +193,19 @@ export function emptyPuntStats(): PuntAthleteStats {
 
 export function processPunt(
   punt: PuntEntry,
-  statsMap: Record<string, PuntAthleteStats>
+  statsMap: Record<string, PuntAthleteStats>,
+  typeConfig?: { metric: "distance" | "yardline"; hangTime: boolean }
 ): Record<string, PuntAthleteStats> {
   const { athlete, yards, hangTime, type, hash } = punt;
   const opTime = punt.opTime || 0;
 
-  // Pooch punts do NOT contribute to distance/long averages.
-  // They have their own poochLandingYardLine tracking.
-  const isPooch = typeof type === "string" && type.toUpperCase().includes("POOCH");
+  // Use type config if provided, otherwise fall back to legacy POOCH detection
+  const isYardLine = typeConfig ? typeConfig.metric === "yardline"
+    : (typeof type === "string" && type.toUpperCase().includes("POOCH"));
+  const htEnabled = typeConfig ? typeConfig.hangTime : true;
   // Determine which metrics have data (0 = not entered for numeric fields)
-  const hasYards = yards > 0 && !isPooch;
-  const hasHang = hangTime > 0;
+  const hasYards = yards > 0 && !isYardLine;
+  const hasHang = hangTime > 0 && htEnabled;
   const hasOT = opTime > 0;
   const daRaw = punt.directionalAccuracy;
   const isNumericDA = typeof daRaw === "number";
@@ -244,7 +246,7 @@ export function processPunt(
     s.overall = { ...s.overall, poochYardLineTotal: 0, poochYardLineAtt: 0 };
   }
 
-  const hasPoochYL = (type === "POOCH_BLUE" || type === "POOCH_RED") && poochLandingYardLine != null;
+  const hasPoochYL = isYardLine && poochLandingYardLine != null;
 
   s.overall = {
     att: s.overall.att + 1,
@@ -298,7 +300,8 @@ export function processPunt(
 
 export function recomputePuntStats(
   athletes: string[],
-  sessions: { punts: PuntEntry[] }[]
+  sessions: { punts: PuntEntry[] }[],
+  typeConfigs?: { id: string; metric: "distance" | "yardline"; hangTime: boolean }[]
 ): Record<string, PuntAthleteStats> {
   let statsMap: Record<string, PuntAthleteStats> = {};
   athletes.forEach((a) => {
@@ -306,7 +309,8 @@ export function recomputePuntStats(
   });
   sessions.forEach((s) => {
     s.punts.forEach((p) => {
-      statsMap = processPunt(p, statsMap);
+      const tc = typeConfigs?.find((t) => t.id === p.type);
+      statsMap = processPunt(p, statsMap, tc);
     });
   });
   return statsMap;

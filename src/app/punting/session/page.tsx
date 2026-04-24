@@ -30,9 +30,26 @@ function checkPuntOutliers(yards: number, hangTime: number, opTime: number): str
 
 // Pooch punt types are tracked separately — distance is not counted in
 // overall averages. Instead we track the yard line where the ball landed.
+// Legacy fallback — only used if type config not available
 function isPoochType(type: string | undefined | null): boolean {
   if (!type) return false;
   return type.toUpperCase().includes("POOCH");
+}
+
+/** Check if a punt type uses yard-line metric (vs distance) */
+function isYardLineType(type: string | undefined | null, typeConfigs: PuntTypeConfig[]): boolean {
+  if (!type) return false;
+  const config = typeConfigs.find((t) => t.id === type);
+  if (config) return config.metric === "yardline";
+  return isPoochType(type); // fallback for unknown types
+}
+
+/** Check if a punt type tracks hang time */
+function tracksHangTime(type: string | undefined | null, typeConfigs: PuntTypeConfig[]): boolean {
+  if (!type) return true;
+  const config = typeConfigs.find((t) => t.id === type);
+  if (config) return config.hangTime;
+  return !isPoochType(type); // fallback
 }
 
 // Touchback penalty: ball comes out to the 20, so net loses 20 yards vs gross
@@ -147,24 +164,37 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
   localStorage.setItem(`${SESSION_STORAGE_KEY}_${mode}`, JSON.stringify(draft));
 }
 
-const DEFAULT_PUNT_TYPES = [
-  { id: "DIR_LEFT", label: "Left" },
-  { id: "DIR_STRAIGHT", label: "Straight" },
-  { id: "DIR_RIGHT", label: "Right" },
-  { id: "POOCH_LEFT", label: "Pooch Left" },
-  { id: "POOCH_MIDDLE", label: "Pooch Middle" },
-  { id: "POOCH_RIGHT", label: "Pooch Right" },
-  { id: "RUGBY", label: "Rugby" },
+interface PuntTypeConfig {
+  id: string;
+  label: string;
+  metric: "distance" | "yardline";
+  hangTime: boolean;
+}
+
+const DEFAULT_PUNT_TYPES: PuntTypeConfig[] = [
+  { id: "DIR_LEFT", label: "Left", metric: "distance", hangTime: true },
+  { id: "DIR_STRAIGHT", label: "Straight", metric: "distance", hangTime: true },
+  { id: "DIR_RIGHT", label: "Right", metric: "distance", hangTime: true },
+  { id: "POOCH_LEFT", label: "Pooch Left", metric: "yardline", hangTime: false },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle", metric: "yardline", hangTime: false },
+  { id: "POOCH_RIGHT", label: "Pooch Right", metric: "yardline", hangTime: false },
+  { id: "RUGBY", label: "Rugby", metric: "distance", hangTime: true },
 ];
 
-function loadPuntTypes(): { id: string; label: string }[] {
+function loadPuntTypes(): PuntTypeConfig[] {
   if (typeof window === "undefined") return DEFAULT_PUNT_TYPES;
   try {
     const raw = localStorage.getItem("puntSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed.puntTypes && parsed.puntTypes.length > 0) {
-        return parsed.puntTypes;
+        // Migrate old format
+        return parsed.puntTypes.map((t: Record<string, unknown>) => ({
+          id: t.id as string,
+          label: t.label as string,
+          metric: (t.metric as string) ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
+          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
+        }));
       }
     }
   } catch {}
@@ -293,9 +323,14 @@ export default function PuntingSessionPage() {
 
   // Load punt types from cloud on fresh device
   useEffect(() => {
-    loadSettingsFromCloud<{ puntTypes?: { id: string; label: string }[] }>("puntSettings").then((cloud) => {
+    loadSettingsFromCloud<{ puntTypes?: Record<string, unknown>[] }>("puntSettings").then((cloud) => {
       if (cloud?.puntTypes && cloud.puntTypes.length > 0) {
-        setPuntTypes(cloud.puntTypes);
+        setPuntTypes(cloud.puntTypes.map((t) => ({
+          id: t.id as string,
+          label: t.label as string,
+          metric: (t.metric as "distance" | "yardline") ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
+          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
+        })));
       }
     });
 
@@ -685,7 +720,7 @@ export default function PuntingSessionPage() {
     setErrorRows(new Set());
 
     const punts: PuntEntry[] = filled.map(({ r }) => {
-      const isPooch = isPoochType(r.type);
+      const isPooch = isYardLineType(r.type, puntTypes);
       return {
         athleteId: r.athlete,
         athlete: r.athlete,
@@ -751,7 +786,7 @@ export default function PuntingSessionPage() {
       retVal = returnYardsInput !== "" ? parseInt(returnYardsInput) || 0 : undefined;
     }
     // Pooch punts (practice mode): don't track distance — track landing YL only
-    const isPooch = isPoochType(plan.type);
+    const isPooch = isYardLineType(plan.type, puntTypes);
     let poochYLVal: number | undefined = undefined;
     if (isPooch && sessionMode !== "game") {
       poochYLVal = poochYL !== "" ? parseInt(poochYL) || 0 : undefined;
@@ -1320,7 +1355,7 @@ export default function PuntingSessionPage() {
 
                     {/* Yards + Hang Time + Opp Time */}
                     <div className="grid grid-cols-3 gap-3">
-                      {sessionMode !== "game" && !isPoochType(currentPlan?.type) && (
+                      {sessionMode !== "game" && !isYardLineType(currentPlan?.type, puntTypes) && (
                         <div>
                           <p className="label">Yards</p>
                           <input
@@ -1334,7 +1369,7 @@ export default function PuntingSessionPage() {
                           />
                         </div>
                       )}
-                      {sessionMode !== "game" && isPoochType(currentPlan?.type) && (
+                      {sessionMode !== "game" && isYardLineType(currentPlan?.type, puntTypes) && (
                         <div>
                           <p className="label">Landing YL</p>
                           <input
@@ -2189,7 +2224,7 @@ export default function PuntingSessionPage() {
                       {manualEntry && sessionMode !== "game" && (
                         <>
                           <td className="py-1 px-1">
-                            {isPoochType(row.type) ? (
+                            {isYardLineType(row.type, puntTypes) ? (
                               <input
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="YL"
                                 value={row.poochYL ?? ""}

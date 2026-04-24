@@ -51,15 +51,35 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const { user } = useAuth();
 
+  // Load punt type configs for stats computation
+  const typeConfigs = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    try {
+      const raw = localStorage.getItem("puntSettings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.puntTypes?.length > 0) {
+          return parsed.puntTypes.map((t: Record<string, unknown>) => ({
+            id: t.id as string,
+            metric: (t.metric as string) ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
+            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
+          }));
+        }
+      }
+    } catch {}
+    return undefined;
+  }, []);
+
   const stats = useMemo(() => {
     const names = athletes.map((a) => a.name);
     return recomputePuntStats(
       names,
       sessions
         .filter((s) => s.mode !== "game")
-        .map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] }))
+        .map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] })),
+      typeConfigs
     );
-  }, [athletes, sessions]);
+  }, [athletes, sessions, typeConfigs]);
 
   const history = useMemo(
     () => [...sessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
