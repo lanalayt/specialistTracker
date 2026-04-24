@@ -239,7 +239,8 @@ function FGStatsView({
       </CollapsibleSection>
       )}
 
-      {/* Op Time */}
+      {/* Op Time — only show if any athlete has op time data */}
+      {athletes.some((a) => (statsMap[a.name]?.overall.opTimeAtt || 0) > 0) && (
       <CollapsibleSection title="Operation Time">
         <div className="card-2">
           <table className="w-full text-xs sm:text-sm">
@@ -268,6 +269,7 @@ function FGStatsView({
           </table>
         </div>
       </CollapsibleSection>
+      )}
 
       {/* By Hash / Position */}
       <CollapsibleSection title="By Hash / Position">
