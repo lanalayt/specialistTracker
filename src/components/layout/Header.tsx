@@ -43,7 +43,7 @@ export function Header({ title }: { title?: string }) {
   return (
     <>
     <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur border-b border-border">
-      <div className="flex items-center gap-4 px-4 h-14 lg:pl-[14.5rem]">
+      <div className="flex items-center gap-4 px-4 h-14">
         {/* Logo (mobile) */}
         <div className="flex items-center gap-2 lg:hidden">
           <input
