@@ -204,6 +204,8 @@ function CategorySection({
   isPoochCat,
   hasPoochData,
   poochYLStats,
+  history,
+  puntFilter,
 }: {
   title: string;
   athletes: { id: string; name: string }[];
@@ -214,9 +216,28 @@ function CategorySection({
   isPoochCat: boolean;
   hasPoochData: boolean;
   poochYLStats: Record<string, { att: number; total: number }>;
+  history: { entries?: PuntEntry[] }[];
+  puntFilter?: (p: PuntEntry) => boolean;
 }) {
-  const [subTab, setSubTab] = useState<"type" | "hash">("type");
-  const hasMultipleTypes = catTypeIds.filter((type) => athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0)).length > 0;
+  // Types that actually have data
+  const activeTypes = catTypeIds.filter((type) => athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0));
+  const hasMultipleTypes = activeTypes.length > 0;
+
+  // Tab options: "type" for By Type overview, then one per type for position breakdown
+  const [subTab, setSubTab] = useState<string>("type");
+
+  // Compute per-type stats (with byHash) for position breakdowns
+  const typePositionStats = useMemo(() => {
+    const result: Record<string, Record<string, PuntAthleteStats>> = {};
+    activeTypes.forEach((type) => {
+      result[type] = computeFilteredPuntStats(
+        athletes,
+        history,
+        (p) => p.type === type && (puntFilter ? puntFilter(p) : true)
+      );
+    });
+    return result;
+  }, [athletes, history, activeTypes, puntFilter]);
 
   return (
     <div className="space-y-3">
@@ -263,9 +284,9 @@ function CategorySection({
         </section>
       )}
 
-      {/* Tab toggle */}
+      {/* Tab toggle: By Type, then each type's position breakdown */}
       {hasMultipleTypes && (
-        <div className="flex rounded-input border border-border overflow-hidden w-fit">
+        <div className="flex flex-wrap rounded-input border border-border overflow-hidden w-fit">
           <button
             onClick={() => setSubTab("type")}
             className={clsx(
@@ -275,36 +296,52 @@ function CategorySection({
           >
             By Type
           </button>
-          <button
-            onClick={() => setSubTab("hash")}
-            className={clsx(
-              "px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border",
-              subTab === "hash" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-            )}
-          >
-            By Position
-          </button>
+          {activeTypes.map((type) => (
+            <button
+              key={type}
+              onClick={() => setSubTab(type)}
+              className={clsx(
+                "px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+                subTab === type ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+              )}
+            >
+              {typeLabels[type] ?? type} by Pos
+            </button>
+          ))}
         </div>
       )}
 
       {/* By Type */}
-      {(subTab === "type" || !hasMultipleTypes) && hasMultipleTypes && (
+      {subTab === "type" && hasMultipleTypes && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {catTypeIds.map((type) => {
-            const hasTypeData = athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0);
-            if (!hasTypeData) return null;
+          {activeTypes.map((type) => (
+            <div key={type} className="card-2">
+              <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
+              <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Per-type position breakdown */}
+      {subTab !== "type" && typePositionStats[subTab] && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {PUNT_HASHES.map((hash) => {
+            const typeStats = typePositionStats[subTab];
+            const hasHashData = athletes.some((a) => (typeStats[a.name]?.byHash[hash]?.att ?? 0) > 0);
+            if (!hasHashData) return null;
             return (
-              <div key={type} className="card-2">
-                <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
-                <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
+              <div key={hash} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
+                <PuntStatTable athletes={athletes} statsMap={typeStats} getBucket={(s) => s.byHash[hash]} />
               </div>
             );
           })}
         </div>
       )}
 
-      {/* By Hash / Position */}
-      {(subTab === "hash" || !hasMultipleTypes) && (
+      {/* If only one type or none, show overall position breakdown */}
+      {!hasMultipleTypes && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {PUNT_HASHES.map((hash) => {
             const hasHashData = athletes.some((a) => (catStats[a.name]?.byHash[hash]?.att ?? 0) > 0);
@@ -482,6 +519,8 @@ function PuntStatsView({
           isPoochCat={selectedCat.id === "POOCH"}
           hasPoochData={hasPoochData}
           poochYLStats={poochYLStats}
+          history={history}
+          puntFilter={puntFilter}
         />
       )}
     </div>
