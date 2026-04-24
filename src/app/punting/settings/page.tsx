@@ -218,6 +218,7 @@ export default function PuntSettingsPage() {
       <h2 className="text-lg font-bold text-slate-100">Punt Settings</h2>
 
       {/* Punt Categories & Types */}
+      <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Punt Types</p>
       {categories.map((cat) => {
         const catTypes = types.filter((t) => t.category === cat.id);
         return (
