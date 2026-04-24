@@ -90,6 +90,18 @@ function loadSnapDistance(): number {
   return 7;
 }
 
+function loadOpTimeEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = localStorage.getItem("fgSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed.opTimeEnabled !== false;
+    }
+  } catch {}
+  return true;
+}
+
 function loadMakeMode(): "simple" | "detailed" {
   if (typeof window === "undefined") return "simple";
   try {
@@ -225,6 +237,7 @@ export default function KickingSessionPage() {
     if (sessionMode === "game" && !manualEntry) setManualEntry(true);
   }, [sessionMode, manualEntry]);
   const [snapDistance, setSnapDistance] = useState(() => loadSnapDistance());
+  const [opTimeEnabled] = useState(() => loadOpTimeEnabled());
   const drag = useDragReorder(rows, setRows);
   const [makeMode, setMakeMode] = useState(() => loadMakeMode());
   const [missMode, setMissMode] = useState(() => loadMissMode());
@@ -1264,6 +1277,7 @@ export default function KickingSessionPage() {
                     )}
 
                     {/* Op Time */}
+                    {opTimeEnabled && (
                     <div>
                       <p className="label">Op Time (sec)</p>
                       <input
@@ -1277,6 +1291,7 @@ export default function KickingSessionPage() {
                         className="input w-full text-sm py-2"
                       />
                     </div>
+                    )}
 
                     {/* Star + Log button + Remove */}
                     <div className="flex gap-2">
@@ -1683,7 +1698,9 @@ export default function KickingSessionPage() {
                       {scoreEnabled && (
                         <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Score</th>
                       )}
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">OT</th>
+                      {opTimeEnabled && (
+                        <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">OT</th>
+                      )}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
                     </>
                   )}
@@ -1697,9 +1714,11 @@ export default function KickingSessionPage() {
                           Score
                         </th>
                       )}
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
-                        OT
-                      </th>
+                      {opTimeEnabled && (
+                        <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
+                          OT
+                        </th>
+                      )}
                     </>
                   )}
                   {sessionMode !== "game" && (
@@ -1831,6 +1850,7 @@ export default function KickingSessionPage() {
                                 </select>
                               </td>
                             )}
+                            {opTimeEnabled && (
                             <td className="py-1 px-1">
                               <input
                                 type="text"
@@ -1842,6 +1862,7 @@ export default function KickingSessionPage() {
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
+                            )}
                             <td className="py-1 px-1 text-center">
                               {isSaved ? (
                                 <button
@@ -1903,6 +1924,7 @@ export default function KickingSessionPage() {
                               </select>
                             </td>
                           )}
+                          {opTimeEnabled && (
                           <td className="py-1 px-1">
                             <input
                               type="text"
@@ -1914,6 +1936,7 @@ export default function KickingSessionPage() {
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
+                          )}
                         </>
                       )}
                       {sessionMode !== "game" && (

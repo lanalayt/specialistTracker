@@ -15,6 +15,7 @@ interface FGSettings {
   missMode: "simple" | "detailed";
   scoreEnabled: ScoreMode;
   scoreOptions: string[];
+  opTimeEnabled: boolean;
 }
 
 const DEFAULT_SCORE_OPTIONS = ["0", "1", "2", "3", "4"];
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS: FGSettings = {
   missMode: "detailed",
   scoreEnabled: "practice",
   scoreOptions: DEFAULT_SCORE_OPTIONS,
+  opTimeEnabled: true,
 };
 
 function parseScoreMode(val: unknown): ScoreMode {
@@ -46,6 +48,7 @@ function loadSettingsLocal(): FGSettings {
         scoreOptions: Array.isArray(parsed.scoreOptions) && parsed.scoreOptions.length > 0
           ? parsed.scoreOptions
           : DEFAULT_SCORE_OPTIONS,
+        opTimeEnabled: parsed.opTimeEnabled !== false,
       };
     }
   } catch {}
@@ -58,6 +61,7 @@ export default function FGSettingsPage() {
   const [missMode, setMissMode] = useState<"simple" | "detailed">("detailed");
   const [scoreEnabled, setScoreEnabled] = useState<ScoreMode>("practice");
   const [scoreOptions, setScoreOptions] = useState<string[]>(DEFAULT_SCORE_OPTIONS);
+  const [opTimeEnabled, setOpTimeEnabled] = useState(true);
   const [newScore, setNewScore] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -74,6 +78,7 @@ export default function FGSettingsPage() {
     setMissMode(local.missMode);
     setScoreEnabled(local.scoreEnabled);
     setScoreOptions(local.scoreOptions);
+    setOpTimeEnabled(local.opTimeEnabled);
     setSavedSettings(local);
     setLoaded(true);
 
@@ -85,12 +90,14 @@ export default function FGSettingsPage() {
         setMissMode(cloud.missMode ?? "detailed");
         setScoreEnabled(parseScoreMode(cloud.scoreEnabled));
         setScoreOptions(Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS);
+        if (typeof cloud.opTimeEnabled === "boolean") setOpTimeEnabled(cloud.opTimeEnabled);
         setSavedSettings({
           snapDistance: cloud.snapDistance ?? "7",
           makeMode: cloud.makeMode ?? "detailed",
           missMode: cloud.missMode ?? "detailed",
           scoreEnabled: parseScoreMode(cloud.scoreEnabled),
           scoreOptions: Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS,
+          opTimeEnabled: cloud.opTimeEnabled !== false,
         });
       }
     });
@@ -104,10 +111,11 @@ export default function FGSettingsPage() {
       makeMode !== savedSettings.makeMode ||
       missMode !== savedSettings.missMode ||
       scoreEnabled !== savedSettings.scoreEnabled ||
-      JSON.stringify(scoreOptions) !== JSON.stringify(savedSettings.scoreOptions);
+      JSON.stringify(scoreOptions) !== JSON.stringify(savedSettings.scoreOptions) ||
+      opTimeEnabled !== savedSettings.opTimeEnabled;
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, savedSettings, loaded]);
+  }, [snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, savedSettings, loaded]);
 
   const handleAddScore = () => {
     const trimmed = newScore.trim();
@@ -122,7 +130,7 @@ export default function FGSettingsPage() {
   };
 
   const handleSave = () => {
-    const settings: FGSettings = { snapDistance, makeMode, missMode, scoreEnabled, scoreOptions };
+    const settings: FGSettings = { snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -284,6 +292,31 @@ export default function FGSettingsPage() {
             </div>
           </>
         )}
+      </div>
+
+      {/* Op Time toggle */}
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="label mb-0">Operation Time</p>
+          <button
+            onClick={() => setOpTimeEnabled((v) => !v)}
+            className={clsx(
+              "relative w-11 h-6 rounded-full transition-colors",
+              opTimeEnabled ? "bg-accent" : "bg-border"
+            )}
+            aria-label="Toggle operation time"
+          >
+            <span
+              className={clsx(
+                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                opTimeEnabled ? "left-[22px]" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
+        <p className="text-xs text-muted">
+          Track snap-to-kick operation time on each attempt. Existing op time data is preserved in stats even when disabled.
+        </p>
       </div>
 
       <button

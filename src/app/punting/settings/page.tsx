@@ -13,6 +13,7 @@ interface PuntSettings {
   directionEnabled: boolean;
   directionMode: DirectionMode;
   directionOptions: { id: string; label: string }[];
+  opTimeEnabled: boolean;
 }
 
 const DEFAULT_TYPES = [
@@ -49,10 +50,11 @@ function loadSettings(): PuntSettings {
         directionEnabled: parsed.directionEnabled !== false,
         directionMode: mode,
         directionOptions: parsed.directionOptions?.length > 0 ? parsed.directionOptions : defaultDirs,
+        opTimeEnabled: parsed.opTimeEnabled !== false,
       };
     }
   } catch {}
-  return { puntTypes: DEFAULT_TYPES, directionEnabled: true, directionMode: "numeric", directionOptions: NUMERIC_DIRECTIONS };
+  return { puntTypes: DEFAULT_TYPES, directionEnabled: true, directionMode: "numeric", directionOptions: NUMERIC_DIRECTIONS, opTimeEnabled: true };
 }
 
 export default function PuntSettingsPage() {
@@ -61,6 +63,7 @@ export default function PuntSettingsPage() {
   const [dirEnabled, setDirEnabled] = useState(true);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
   const [dirOptions, setDirOptions] = useState<{ id: string; label: string }[]>(NUMERIC_DIRECTIONS);
+  const [opTimeEnabled, setOpTimeEnabled] = useState(true);
   const [newDir, setNewDir] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -70,6 +73,7 @@ export default function PuntSettingsPage() {
     directionEnabled: true,
     directionMode: "numeric",
     directionOptions: NUMERIC_DIRECTIONS,
+    opTimeEnabled: true,
   });
 
   useEffect(() => {
@@ -78,6 +82,7 @@ export default function PuntSettingsPage() {
     setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
     setDirOptions(s.directionOptions);
+    setOpTimeEnabled(s.opTimeEnabled);
     setSavedSettings(s);
     setLoaded(true);
 
@@ -87,11 +92,13 @@ export default function PuntSettingsPage() {
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionOptions?.length > 0) setDirOptions(cloud.directionOptions);
+        if (typeof cloud.opTimeEnabled === "boolean") setOpTimeEnabled(cloud.opTimeEnabled);
         setSavedSettings({
           puntTypes: cloud.puntTypes?.length > 0 ? cloud.puntTypes : DEFAULT_TYPES,
           directionEnabled: cloud.directionEnabled !== false,
           directionMode: cloud.directionMode || "numeric",
           directionOptions: cloud.directionOptions?.length > 0 ? cloud.directionOptions : NUMERIC_DIRECTIONS,
+          opTimeEnabled: cloud.opTimeEnabled !== false,
         });
       }
     });
@@ -103,10 +110,11 @@ export default function PuntSettingsPage() {
       JSON.stringify(types) !== JSON.stringify(savedSettings.puntTypes) ||
       dirEnabled !== savedSettings.directionEnabled ||
       dirMode !== savedSettings.directionMode ||
-      JSON.stringify(dirOptions) !== JSON.stringify(savedSettings.directionOptions);
+      JSON.stringify(dirOptions) !== JSON.stringify(savedSettings.directionOptions) ||
+      opTimeEnabled !== savedSettings.opTimeEnabled;
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [types, dirEnabled, dirMode, dirOptions, savedSettings, loaded]);
+  }, [types, dirEnabled, dirMode, dirOptions, opTimeEnabled, savedSettings, loaded]);
 
   const handleDirModeChange = (mode: DirectionMode) => {
     setDirMode(mode);
@@ -132,7 +140,7 @@ export default function PuntSettingsPage() {
   };
 
   const handleSave = () => {
-    const settings: PuntSettings = { puntTypes: types, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions };
+    const settings: PuntSettings = { puntTypes: types, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, opTimeEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -279,6 +287,31 @@ export default function PuntSettingsPage() {
             </div>
           </>
         )}
+      </div>
+
+      {/* Op Time toggle */}
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="label mb-0">Operation Time</p>
+          <button
+            onClick={() => setOpTimeEnabled((v) => !v)}
+            className={clsx(
+              "relative w-11 h-6 rounded-full transition-colors",
+              opTimeEnabled ? "bg-accent" : "bg-border"
+            )}
+            aria-label="Toggle operation time"
+          >
+            <span
+              className={clsx(
+                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                opTimeEnabled ? "left-[22px]" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
+        <p className="text-xs text-muted">
+          Track punter operation time on each punt. Existing op time data is preserved in stats even when disabled.
+        </p>
       </div>
 
       <button

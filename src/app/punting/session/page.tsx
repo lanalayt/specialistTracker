@@ -197,6 +197,18 @@ const FIELD_DA_OPTIONS = [
   { value: "TO_FIELD", label: "To The Field" },
 ];
 
+function loadOpTimeEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = localStorage.getItem("puntSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed.opTimeEnabled !== false;
+    }
+  } catch {}
+  return true;
+}
+
 function loadDirectionSettings(): { enabled: boolean; mode: "numeric" | "field"; options: { value: string; label: string }[] } {
   if (typeof window === "undefined") return { enabled: true, mode: "numeric", options: DEFAULT_DA_OPTIONS };
   try {
@@ -267,6 +279,7 @@ export default function PuntingSessionPage() {
     if (sessionMode === "game" && !manualEntry) setManualEntry(true);
   }, [sessionMode, manualEntry]);
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes());
+  const [opTimeEnabled] = useState(() => loadOpTimeEnabled());
   const [dirSettings] = useState(() => loadDirectionSettings());
   const dirEnabled = dirSettings.enabled;
   const dirMode = dirSettings.mode;
@@ -1346,6 +1359,7 @@ export default function PuntingSessionPage() {
                           onChange={handleAutoDecimalChange(setHangTime)}
                         />
                       </div>
+                      {opTimeEnabled && (
                       <div>
                         <p className="label">Opp Time (s)</p>
                         <input
@@ -1357,6 +1371,7 @@ export default function PuntingSessionPage() {
                           onChange={handleAutoDecimalChange(setOpTime)}
                         />
                       </div>
+                      )}
                       {sessionMode === "game" && (
                         <div>
                           <p className="label">Return Yds</p>
@@ -1924,7 +1939,7 @@ export default function PuntingSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-16 border-b border-red-500/40 text-[11px]" title="LOS yard line">LOS</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-16 border-b border-red-500/40 text-[11px]" title="Landing yard line">Land</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-red-500/40 text-[11px]">HT</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-red-500/40 text-[11px]">OT</th>
+                      {opTimeEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-red-500/40 text-[11px]">OT</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-14 border-b border-red-500/40 text-[11px]">Ret</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-10 border-b border-red-500/40 text-[11px]" title="Fair Catch">FC</th>
                       {dirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>}
@@ -1939,9 +1954,11 @@ export default function PuntingSessionPage() {
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-border text-[11px]">
                         HT
                       </th>
+                      {opTimeEnabled && (
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-border text-[11px]">
                         OT
                       </th>
+                      )}
                       {dirEnabled && (
                         <th className="bg-surface-2 text-muted font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-border text-[11px]">
                           Dir
@@ -2098,6 +2115,7 @@ export default function PuntingSessionPage() {
                                 className={clsx("w-full bg-transparent border rounded px-1.5 py-2 text-sm text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
+                            {opTimeEnabled && (
                             <td className="py-1 px-1">
                               <input
                                 type="text" inputMode="decimal" placeholder="sec"
@@ -2110,6 +2128,7 @@ export default function PuntingSessionPage() {
                                 className={clsx("w-full bg-transparent border rounded px-1.5 py-2 text-sm text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
+                            )}
                             <td className="py-1 px-1">
                               <input
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
@@ -2201,6 +2220,7 @@ export default function PuntingSessionPage() {
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
+                          {opTimeEnabled && (
                           <td className="py-1 px-1">
                             <input
                               type="text" inputMode="numeric" placeholder="sec"
@@ -2213,6 +2233,7 @@ export default function PuntingSessionPage() {
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
                           </td>
+                          )}
                           {dirEnabled && (
                             <td className="py-1 px-1">
                               <select
