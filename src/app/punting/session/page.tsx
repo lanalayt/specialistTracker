@@ -1388,6 +1388,7 @@ export default function PuntingSessionPage() {
                           />
                         </div>
                       )}
+                      {tracksHangTime(currentPlan?.type, puntTypes) && (
                       <div>
                         <p className="label">Hang Time (s)</p>
                         <input
@@ -1399,6 +1400,7 @@ export default function PuntingSessionPage() {
                           onChange={handleAutoDecimalChange(setHangTime)}
                         />
                       </div>
+                      )}
                       {opTimeEnabled && (
                       <div>
                         <p className="label">Opp Time (s)</p>
@@ -2144,6 +2146,7 @@ export default function PuntingSessionPage() {
                               </>
                             )}
                             <td className="py-1 px-1">
+                              {tracksHangTime(row.type, puntTypes) ? (
                               <input
                                 type="text" inputMode="numeric" placeholder="sec"
                                 value={row.hangTime}
@@ -2154,6 +2157,9 @@ export default function PuntingSessionPage() {
                                 readOnly={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1.5 py-2 text-sm text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
+                              ) : (
+                                <span className="text-xs text-muted text-center block py-2">—</span>
+                              )}
                             </td>
                             {opTimeEnabled && (
                             <td className="py-1 px-1">
@@ -2249,6 +2255,7 @@ export default function PuntingSessionPage() {
                             )}
                           </td>
                           <td className="py-1 px-1">
+                            {tracksHangTime(row.type, puntTypes) ? (
                             <input
                               type="text" inputMode="numeric" placeholder="sec"
                               value={row.hangTime}
@@ -2259,6 +2266,9 @@ export default function PuntingSessionPage() {
                               readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
+                            ) : (
+                              <span className="text-xs text-muted text-center block">—</span>
+                            )}
                           </td>
                           {opTimeEnabled && (
                           <td className="py-1 px-1">

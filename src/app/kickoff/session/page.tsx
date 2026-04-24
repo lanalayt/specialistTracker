@@ -112,6 +112,13 @@ const FIELD_KO_DIRS = [
   { id: "OB", label: "OB" },
 ];
 
+/** Check if a kickoff type tracks hang time */
+function koTracksHangTime(type: string | undefined | null, typeConfigs: KOTypeConfig[]): boolean {
+  if (!type) return true;
+  const config = typeConfigs.find((t) => t.id === type);
+  return config ? config.hangTime : true;
+}
+
 // Parse a yard-line input ("-20", "+25", "50") into 0..100 field position
 function parseYardLine(input: string | undefined | null): number {
   if (input == null) return NaN;
@@ -1076,6 +1083,7 @@ export default function KickoffSessionPage() {
                           }}
                         />
                       </div>
+                      {koTracksHangTime(currentPlan?.type, koTypes) && (
                       <div>
                         <p className="label">Hang Time (s)</p>
                         <input
@@ -1087,6 +1095,7 @@ export default function KickoffSessionPage() {
                           onChange={handleAutoDecimalChange(setHangTime)}
                         />
                       </div>
+                      )}
                     </div>
 
                     {/* Endzone checkbox */}
@@ -1589,6 +1598,7 @@ export default function KickoffSessionPage() {
                               />
                             </td>
                             <td className="py-1 px-1">
+                              {koTracksHangTime(row.type, koTypes) ? (
                               <input
                                 type="text" inputMode="decimal" placeholder="sec"
                                 value={row.hangTime}
@@ -1599,6 +1609,9 @@ export default function KickoffSessionPage() {
                                 readOnly={viewOnly || isSaved}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
+                              ) : (
+                                <span className="text-xs text-muted text-center block py-1">—</span>
+                              )}
                             </td>
                             <td className="py-1 px-1 text-center">
                               <input
@@ -1681,6 +1694,7 @@ export default function KickoffSessionPage() {
                             />
                           </td>
                           <td className="py-1 px-1">
+                            {koTracksHangTime(row.type, koTypes) ? (
                             <input
                               type="text" inputMode="numeric" placeholder="sec"
                               value={row.hangTime}
@@ -1691,6 +1705,9 @@ export default function KickoffSessionPage() {
                               readOnly={viewOnly}
                               className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                             />
+                            ) : (
+                              <span className="text-xs text-muted text-center block">—</span>
+                            )}
                           </td>
                           <td className="py-1 px-1 text-center">
                             <input
