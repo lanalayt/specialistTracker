@@ -158,6 +158,7 @@ function PuntStatTable({
           const s = statsMap[a.name];
           if (!s) return null;
           const b = getBucket(s);
+          if (!b) return null;
           return (
             <tr key={a.id} className="hover:bg-surface/30 transition-colors">
               <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
@@ -245,8 +246,8 @@ function CategorySection({
                 const s = poochYLStats[a.name];
                 const ylVal = s.att > 0 ? (s.total / s.att).toFixed(1) : "—";
                 const catA = catStats[a.name];
-                const htVal = (catA?.overall.hangAtt ?? 0) > 0 ? (catA.overall.totalHang / (catA.overall.hangAtt ?? catA.overall.att)).toFixed(2) : "—";
-                const daVal = (catA?.overall.daAtt ?? 0) > 0 ? `${Math.round((catA.overall.totalDirectionalAccuracy / (catA.overall.daAtt ?? catA.overall.att)) * 100)}%` : "—";
+                const htVal = (catA?.overall?.hangAtt ?? 0) > 0 ? (catA.overall.totalHang / (catA.overall.hangAtt ?? catA.overall.att)).toFixed(2) : "—";
+                const daVal = (catA?.overall?.daAtt ?? 0) > 0 ? `${Math.round((catA.overall.totalDirectionalAccuracy / (catA.overall.daAtt ?? catA.overall.att)) * 100)}%` : "—";
                 return (
                   <tr key={a.id} className="hover:bg-surface/30 transition-colors">
                     <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
