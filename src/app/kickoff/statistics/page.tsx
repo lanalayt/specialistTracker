@@ -142,11 +142,9 @@ function ezPct(s: AthleteKOStats): string {
   return s.att > 0 ? `${Math.round((s.endzones / s.att) * 100)}%` : "—";
 }
 
-function StatTable({ athletes, statsMap, dirMode, dirOptions }: {
+function StatTable({ athletes, statsMap }: {
   athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteKOStats>;
-  dirMode: DirectionMode;
-  dirOptions: { id: string; label: string }[];
 }) {
   const visible = athletes.filter((a) => (statsMap[a.name]?.att ?? 0) > 0);
   if (visible.length === 0) {
@@ -161,13 +159,7 @@ function StatTable({ athletes, statsMap, dirMode, dirOptions }: {
           <th className="table-header">Dist</th>
           <th className="table-header">Hang</th>
           <th className="table-header">EZ %</th>
-          {dirMode === "numeric" ? (
-            <th className="table-header">Dir %</th>
-          ) : (
-            dirOptions.map((d) => (
-              <th key={d.id} className="table-header text-[10px]">{d.label}</th>
-            ))
-          )}
+          <th className="table-header">Dir %</th>
         </tr>
       </thead>
       <tbody>
@@ -180,19 +172,7 @@ function StatTable({ athletes, statsMap, dirMode, dirOptions }: {
               <td className="table-cell">{avgDist(s)}</td>
               <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>
               <td className="table-cell text-make font-semibold">{ezPct(s)}</td>
-              {dirMode === "numeric" ? (
-                <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
-              ) : (
-                dirOptions.map((d) => {
-                  const count = s.dirCounts[d.id] || 0;
-                  const pct = s.att > 0 ? Math.round((count / s.att) * 100) : 0;
-                  return (
-                    <td key={d.id} className="table-cell text-accent">
-                      {s.att > 0 ? `${pct}%` : "—"}
-                    </td>
-                  );
-                })
-              )}
+              <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
             </tr>
           );
         })}
@@ -226,8 +206,6 @@ function CategorySection({
   catTypeIds,
   typeLabels,
   allTypeStats,
-  dirMode,
-  dirOptions,
 }: {
   title: string;
   athletes: { id: string; name: string }[];
@@ -235,8 +213,6 @@ function CategorySection({
   catTypeIds: string[];
   typeLabels: Record<string, string>;
   allTypeStats: Record<string, Record<string, AthleteKOStats>>;
-  dirMode: DirectionMode;
-  dirOptions: { id: string; label: string }[];
 }) {
   const activeTypes = catTypeIds.filter((type) =>
     athletes.some((a) => (allTypeStats[type]?.[a.name]?.att ?? 0) > 0)
@@ -250,7 +226,7 @@ function CategorySection({
 
       {/* Overall */}
       <section className="card-2">
-        <StatTable athletes={athletes} statsMap={catStats} dirMode={dirMode} dirOptions={dirOptions} />
+        <StatTable athletes={athletes} statsMap={catStats} />
       </section>
 
       {/* Tab toggle: By Type */}
@@ -273,7 +249,7 @@ function CategorySection({
               {activeTypes.map((type) => (
                 <div key={type} className="card-2">
                   <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
-                  <StatTable athletes={athletes} statsMap={allTypeStats[type] ?? {}} dirMode={dirMode} dirOptions={dirOptions} />
+                  <StatTable athletes={athletes} statsMap={allTypeStats[type] ?? {}} />
                 </div>
               ))}
             </div>
@@ -483,8 +459,6 @@ export default function KickoffStatisticsPage() {
           catTypeIds={typesByCategory[selectedCat.id] ?? []}
           typeLabels={typeLabels}
           allTypeStats={allTypeStats}
-          dirMode={koSettings.dirMode}
-          dirOptions={koSettings.directions}
         />
       )}
     </main>
