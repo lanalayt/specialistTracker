@@ -428,6 +428,19 @@ function PuntStatsView({
     return result;
   }, [allTypeIds, typeToCategory]);
 
+  // Categories that actually have data
+  const activeCats = useMemo(() => {
+    return puntCategories.filter((c) => {
+      if (!c.enabled || !categoryStats[c.id]) return false;
+      return athletes.some((a) => (categoryStats[c.id][a.name]?.overall.att ?? 0) > 0);
+    });
+  }, [puntCategories, categoryStats, athletes]);
+
+  const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  // Auto-select first category with data
+  const selectedCatId = activeCatId && activeCats.some((c) => c.id === activeCatId) ? activeCatId : activeCats[0]?.id ?? null;
+  const selectedCat = activeCats.find((c) => c.id === selectedCatId);
+
   return (
     <div className="space-y-4">
       {/* Game chart — shows all punts with LOS + landing YL */}
@@ -438,29 +451,39 @@ function PuntStatsView({
         </section>
       )}
 
-      {/* Per-category section */}
-      {puntCategories.filter((c) => c.enabled && categoryStats[c.id]).map((cat) => {
-        const catStats = categoryStats[cat.id];
-        const hasData = athletes.some((a) => (catStats[a.name]?.overall.att ?? 0) > 0);
-        if (!hasData) return null;
-        const catTypeIds = typesByCategory[cat.id] ?? [];
-        const isPoochCat = cat.id === "POOCH";
+      {/* Category toggle */}
+      {activeCats.length > 1 && (
+        <div className="flex rounded-input border border-border overflow-hidden w-fit">
+          {activeCats.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCatId(cat.id)}
+              className={clsx(
+                "px-4 py-1.5 text-xs font-semibold transition-colors",
+                selectedCatId === cat.id ? "bg-accent text-slate-900" : "text-muted hover:text-white",
+                cat.id !== activeCats[0].id && "border-l border-border"
+              )}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      )}
 
-        return (
-          <CategorySection
-            key={cat.id}
-            title={`${cat.label} Punts`}
-            athletes={athletes}
-            catStats={catStats}
-            statsMap={statsMap}
-            catTypeIds={catTypeIds}
-            typeLabels={typeLabels}
-            isPoochCat={isPoochCat}
-            hasPoochData={hasPoochData}
-            poochYLStats={poochYLStats}
-          />
-        );
-      })}
+      {/* Selected category */}
+      {selectedCat && categoryStats[selectedCat.id] && (
+        <CategorySection
+          title={`${selectedCat.label} Punts`}
+          athletes={athletes}
+          catStats={categoryStats[selectedCat.id]}
+          statsMap={statsMap}
+          catTypeIds={typesByCategory[selectedCat.id] ?? []}
+          typeLabels={typeLabels}
+          isPoochCat={selectedCat.id === "POOCH"}
+          hasPoochData={hasPoochData}
+          poochYLStats={poochYLStats}
+        />
+      )}
     </div>
   );
 }
