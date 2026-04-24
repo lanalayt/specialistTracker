@@ -65,10 +65,15 @@ interface SessionDraft {
 
 const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", result: "", score: "", opTime: "", starred: false });
 
+function draftKey(mode: "practice" | "game"): string {
+  const tid = getTeamId();
+  return tid ? `${SESSION_STORAGE_KEY}_${mode}_${tid}` : `${SESSION_STORAGE_KEY}_${mode}`;
+}
+
 function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(`${SESSION_STORAGE_KEY}_${mode}`);
+    const raw = localStorage.getItem(draftKey(mode));
     if (raw) return JSON.parse(raw);
   } catch {}
   return null;
@@ -76,7 +81,7 @@ function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
 
 function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
   if (typeof window === "undefined") return;
-  localStorage.setItem(`${SESSION_STORAGE_KEY}_${mode}`, JSON.stringify(draft));
+  localStorage.setItem(draftKey(mode), JSON.stringify(draft));
 }
 
 function loadSnapDistance(): number {

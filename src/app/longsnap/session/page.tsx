@@ -63,15 +63,19 @@ export default function LongSnapSessionPage() {
 
   // Save draft to localStorage
   const saveDraftLocal = useCallback((snaps: LongSnapEntry[]) => {
+    const tid = getTeamId();
+    const key = tid ? `longsnap_session_draft_${tid}` : "longsnap_session_draft";
     try {
-      localStorage.setItem("longsnap_session_draft", JSON.stringify({ sessionSnaps: snaps, sessionStarted: true, weather }));
+      localStorage.setItem(key, JSON.stringify({ sessionSnaps: snaps, sessionStarted: true, weather }));
     } catch {}
   }, [weather]);
 
   // Load draft from localStorage on mount, fallback to cloud
   useEffect(() => {
+    const tid = getTeamId();
+    const key = tid ? `longsnap_session_draft_${tid}` : "longsnap_session_draft";
     try {
-      const raw = localStorage.getItem("longsnap_session_draft");
+      const raw = localStorage.getItem(key);
       if (raw) {
         const draft = JSON.parse(raw) as { sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string };
         if (draft.sessionSnaps && draft.sessionSnaps.length > 0) {
@@ -84,7 +88,6 @@ export default function LongSnapSessionPage() {
     } catch {}
 
     // Load draft from cloud if local is empty
-    const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       teamGet<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(tid, "longsnap_session_draft").then((cloudDraft) => {
         if (cloudDraft && cloudDraft.sessionSnaps && cloudDraft.sessionSnaps.length > 0) {
@@ -127,7 +130,11 @@ export default function LongSnapSessionPage() {
     setSessionSnaps([]);
     setCommitted(true);
     setWeather("");
-    try { localStorage.removeItem("longsnap_session_draft"); } catch {}
+    try {
+      const tid = getTeamId();
+      const key = tid ? `longsnap_session_draft_${tid}` : "longsnap_session_draft";
+      localStorage.removeItem(key);
+    } catch {}
     setTimeout(() => setCommitted(false), 2000);
   };
 
