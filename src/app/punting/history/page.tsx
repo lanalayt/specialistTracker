@@ -431,9 +431,9 @@ function PuntHistoryContent() {
                             </>
                           ) : (
                             <>
-                              <td className="table-cell">
+                              <td className={clsx("table-cell", p.poochLandingYardLine != null && p.poochLandingYardLine > 0 && "!text-make font-semibold")}>
                                 {p.poochLandingYardLine != null && p.poochLandingYardLine > 0
-                                  ? <span className="text-make font-semibold">{p.poochLandingYardLine} YL</span>
+                                  ? `${p.poochLandingYardLine} YL`
                                   : p.yards > 0 ? `${p.yards} yd` : "—"}
                               </td>
                               <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
