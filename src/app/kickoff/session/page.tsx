@@ -237,7 +237,8 @@ export default function KickoffSessionPage() {
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
   // Warn before leaving with unsaved session data
-  useUnsavedWarning(sessionKicks.length > 0 && !committed);
+  const hasFilledRows = rows.some((r) => r.athlete || r.distance || r.hangTime);
+  useUnsavedWarning((sessionKicks.length > 0 || hasFilledRows) && !committed);
 
   // Game mode forces manual entry (no live session)
   useEffect(() => {

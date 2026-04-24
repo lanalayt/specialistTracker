@@ -234,7 +234,8 @@ export default function KickingSessionPage() {
   const [draftSaved, setDraftSaved] = useState(false);
 
   // Warn before leaving with unsaved session data
-  useUnsavedWarning(sessionKicks.length > 0 && !committed);
+  const hasFilledRows = rows.some((r) => r.athlete || r.dist || r.pos);
+  useUnsavedWarning((sessionKicks.length > 0 || hasFilledRows) && !committed);
 
   // Game mode forces manual entry (no live session)
   useEffect(() => {

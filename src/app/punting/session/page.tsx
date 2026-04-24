@@ -306,7 +306,8 @@ export default function PuntingSessionPage() {
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
   // Warn before leaving with unsaved session data
-  useUnsavedWarning(sessionPunts.length > 0 && !committed);
+  const hasFilledRows = rows.some((r) => r.athlete || r.yards || r.hangTime);
+  useUnsavedWarning((sessionPunts.length > 0 || hasFilledRows) && !committed);
 
   // Game mode forces manual entry (no live session)
   useEffect(() => {
