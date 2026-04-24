@@ -1126,17 +1126,20 @@ export default function PuntingSessionPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {sessionPunts.map((p, i) => (
+                            {sessionPunts.map((p, i) => {
+                              const isYL = isYardLineType(p.type, puntTypes);
+                              return (
                               <tr key={i} className="hover:bg-surface/30">
                                 <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                                 <td className="table-name">{p.athlete}</td>
                                 <td className="table-cell text-muted">{typeLabels[p.type] ?? (p.type || "—")}</td>
-                                <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
+                                <td className="table-cell">{isYL ? (p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? <span className="text-accent">{p.poochLandingYardLine} YL</span> : "—") : (p.yards > 0 ? `${p.yards} yd` : "—")}</td>
                                 <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
                                 <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
                                 <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
                               </tr>
-                            ))}
+                            );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -1796,12 +1799,14 @@ export default function PuntingSessionPage() {
                 </tr>
               </thead>
               <tbody>
-                {committedPunts.map((p, i) => (
+                {committedPunts.map((p, i) => {
+                  const isYL = isYardLineType(p.type, puntTypes);
+                  return (
                   <tr key={i} className="hover:bg-surface/30">
                     <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                     <td className="table-name">{p.athlete}</td>
                     <td className="table-cell text-muted">{typeLabels[p.type] ?? (p.type || "—")}</td>
-                    <td className="table-cell">{p.yards > 0 ? `${p.yards} yd` : "—"}</td>
+                    <td className="table-cell">{isYL ? (p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? <span className="text-accent">{p.poochLandingYardLine} YL</span> : "—") : (p.yards > 0 ? `${p.yards} yd` : "—")}</td>
                     <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
                     <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
                     {dirEnabled && (
@@ -1810,7 +1815,8 @@ export default function PuntingSessionPage() {
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
