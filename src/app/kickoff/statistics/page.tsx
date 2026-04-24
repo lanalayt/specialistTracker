@@ -27,7 +27,7 @@ type DirectionMode = "numeric" | "field";
 
 interface KOTypeConfig { id: string; label: string; metric: "distance" | "yardline" | "none"; hangTime: boolean }
 
-function loadKoSettings(): { types: KOTypeConfig[]; dirMode: DirectionMode; directions: { id: string; label: string }[] } {
+function loadKoSettings(): { types: KOTypeConfig[]; dirMode: DirectionMode; directions: { id: string; label: string; score?: number }[] } {
   const defaultTypes: KOTypeConfig[] = DEFAULT_KO_TYPES.map((t) => ({ ...t, metric: "distance" as const, hangTime: true }));
   const defaults = { types: defaultTypes, dirMode: "numeric" as DirectionMode, directions: [{ id: "1", label: "1.0" }, { id: "0.5", label: "0.5" }, { id: "OB", label: "OB" }] };
   if (typeof window === "undefined") return defaults;
@@ -58,10 +58,15 @@ function isOverallType(typeId: string, types: KOTypeConfig[]): boolean {
   return tc.metric === "distance" && tc.hangTime;
 }
 
-function dirToNum(d: string): number | null {
+function dirToNum(d: string, directions?: { id: string; score?: number }[]): number | null {
   if (d === "1") return 1;
   if (d === "0.5") return 0.5;
   if (d === "OB") return 0;
+  // Look up score from field-based direction options
+  if (directions) {
+    const opt = directions.find((o) => o.id === d);
+    if (opt && opt.score != null) return opt.score;
+  }
   return null;
 }
 
@@ -82,8 +87,8 @@ function emptyStats(): AthleteKOStats {
   return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, dirCounts: {} };
 }
 
-function addEntry(s: AthleteKOStats, e: KickoffEntry): AthleteKOStats {
-  const dir = dirToNum(e.direction);
+function addEntry(s: AthleteKOStats, e: KickoffEntry, directions?: { id: string; score?: number }[]): AthleteKOStats {
+  const dir = dirToNum(e.direction, directions);
   const dirCounts = { ...s.dirCounts };
   if (e.direction) {
     dirCounts[e.direction] = (dirCounts[e.direction] || 0) + 1;
@@ -247,7 +252,7 @@ export default function KickoffStatisticsPage() {
       (session.entries ?? []).forEach((e) => {
         if (!isOverallType(e.type, koSettings.types)) return;
         if (!map[e.athlete]) map[e.athlete] = emptyStats();
-        map[e.athlete] = addEntry(map[e.athlete], e);
+        map[e.athlete] = addEntry(map[e.athlete], e, koSettings.directions);
       });
     });
     return map;
@@ -264,7 +269,7 @@ export default function KickoffStatisticsPage() {
           athletes.forEach((a) => { result[type].map[a.name] = emptyStats(); });
         }
         if (!result[type].map[e.athlete]) result[type].map[e.athlete] = emptyStats();
-        result[type].map[e.athlete] = addEntry(result[type].map[e.athlete], e);
+        result[type].map[e.athlete] = addEntry(result[type].map[e.athlete], e, koSettings.directions);
         result[type].total += 1;
       });
     });

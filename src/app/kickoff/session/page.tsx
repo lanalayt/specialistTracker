@@ -111,10 +111,10 @@ const DEFAULT_KO_DIRS = [
 ];
 
 const FIELD_KO_DIRS = [
-  { id: "SL-NUM", label: "Sideline-Numbers" },
-  { id: "NUM-HASH", label: "Numbers-Hash" },
-  { id: "TO_FIELD", label: "To The Field" },
-  { id: "OB", label: "OB" },
+  { id: "SL-NUM", label: "Sideline-Numbers", score: 1 },
+  { id: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
+  { id: "TO_FIELD", label: "To The Field", score: 0 },
+  { id: "OB", label: "OB", score: -1 },
 ];
 
 /** Check if a kickoff type tracks hang time */
@@ -137,8 +137,9 @@ function parseYardLine(input: string | undefined | null): number {
   return sign === "-" ? n : 100 - n;
 }
 
-function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string }[]; directionMode: "numeric" | "field" } {
+function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string; score?: number }[]; directionMode: "numeric" | "field" } {
   if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric" };
+  const defaultScores = [1, 0.5, 0, -1];
   try {
     const raw = localStorage.getItem("kickoffSettings");
     if (raw) {
@@ -146,6 +147,12 @@ function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: strin
       const mode = parsed.directionMode === "field" ? "field" as const : "numeric" as const;
       const defaultDirs = mode === "field" ? FIELD_KO_DIRS : DEFAULT_KO_DIRS;
       const rawTypes = parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES;
+      const dirs = parsed.directionMetrics?.length > 0
+        ? parsed.directionMetrics.map((d: { id: string; label: string; score?: number }, i: number) => ({
+            ...d,
+            score: d.score ?? (mode === "field" ? defaultScores[i] ?? 0 : undefined),
+          }))
+        : defaultDirs;
       return {
         types: rawTypes.map((t: Record<string, unknown>) => ({
           id: t.id as string,
@@ -153,7 +160,7 @@ function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: strin
           metric: (t.metric as string) ?? "distance",
           hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
         })),
-        directions: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : defaultDirs,
+        directions: dirs,
         directionMode: mode,
       };
     }

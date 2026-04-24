@@ -20,7 +20,7 @@ export interface KOTypeConfig {
 interface KickoffSettings {
   kickoffTypes: KOTypeConfig[];
   directionMode: DirectionMode;
-  directionMetrics: { id: string; label: string }[];
+  directionMetrics: { id: string; label: string; score?: number }[];
 }
 
 const DEFAULT_TYPES: KOTypeConfig[] = [
@@ -38,10 +38,10 @@ const NUMERIC_DIRECTIONS = [
 ];
 
 const FIELD_DIRECTIONS = [
-  { id: "SL-NUM", label: "Sideline-Numbers" },
-  { id: "NUM-HASH", label: "Numbers-Hash" },
-  { id: "TO_FIELD", label: "To The Field" },
-  { id: "OB", label: "OB" },
+  { id: "SL-NUM", label: "Sideline-Numbers", score: 1 },
+  { id: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
+  { id: "TO_FIELD", label: "To The Field", score: 0 },
+  { id: "OB", label: "OB", score: -1 },
 ];
 
 function migrateType(t: Record<string, unknown>): KOTypeConfig {
@@ -72,7 +72,7 @@ function loadSettings(): KickoffSettings {
 export default function KickoffSettingsPage() {
   const [types, setTypes] = useState<KOTypeConfig[]>(DEFAULT_TYPES);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
-  const [directions, setDirections] = useState<{ id: string; label: string }[]>(NUMERIC_DIRECTIONS);
+  const [directions, setDirections] = useState<{ id: string; label: string; score?: number }[]>(NUMERIC_DIRECTIONS);
   const [newType, setNewType] = useState("");
   const [newDir, setNewDir] = useState("");
   const [saved, setSaved] = useState(false);
@@ -140,7 +140,7 @@ export default function KickoffSettingsPage() {
     if (!trimmed) return;
     const id = trimmed.toUpperCase().replace(/[^A-Z0-9.]/g, "_");
     if (directions.some((d) => d.id === id)) return;
-    setDirections([...directions, { id, label: trimmed }]);
+    setDirections([...directions, { id, label: trimmed, score: dirMode === "field" ? 0 : undefined }]);
     setNewDir("");
   };
 
@@ -279,32 +279,53 @@ export default function KickoffSettingsPage() {
             : "Field zones (Sideline-Numbers, Numbers-Hash, etc.) — shows % breakdown by zone."}
         </p>
 
-        <p className="label mt-2">Direction Options<Tooltip text="Customize the direction options available when logging kickoffs. Add or remove options to match your grading system." /></p>
-        <div className="space-y-2">
-          {directions.map((d) => (
-            <div key={d.id} className="flex items-center gap-2">
+        <p className="label mt-2">Direction Options<Tooltip text={dirMode === "numeric" ? "Fixed scoring: 1.0 (on target), 0.5 (close), OB (out of bounds)." : "Assign a point value to each zone. Direction % = total points / attempts."} /></p>
+        {dirMode === "numeric" ? (
+          <div className="space-y-2">
+            {NUMERIC_DIRECTIONS.map((d) => (
+              <div key={d.id} className="flex items-center gap-2">
+                <span className="w-10 text-accent font-bold text-sm text-center">{d.id}</span>
+                <span className="flex-1 bg-surface-2 border border-border text-slate-400 px-3 py-2 rounded-input text-sm">{d.label}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              {directions.map((d) => (
+                <div key={d.id} className="flex items-center gap-2">
+                  <select
+                    value={d.score ?? 0}
+                    onChange={(e) => setDirections(directions.map((x) => (x.id === d.id ? { ...x, score: parseFloat(e.target.value) } : x)))}
+                    className="w-16 bg-surface-2 border border-border text-accent font-bold px-1 py-2 rounded-input text-sm text-center focus:outline-none focus:border-accent/60"
+                  >
+                    <option value={1}>1</option>
+                    <option value={0.5}>0.5</option>
+                    <option value={0}>0</option>
+                    <option value={-1}>-1</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={d.label}
+                    onChange={(e) => setDirections(directions.map((x) => (x.id === d.id ? { ...x, label: e.target.value } : x)))}
+                    className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all"
+                  />
+                  <button
+                    onClick={() => setDirections(directions.filter((x) => x.id !== d.id))}
+                    className="w-8 h-8 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm"
+                    title="Remove metric"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
               <input
                 type="text"
-                value={d.label}
-                onChange={(e) => setDirections(directions.map((x) => (x.id === d.id ? { ...x, label: e.target.value } : x)))}
-                className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all"
-              />
-              <button
-                onClick={() => setDirections(directions.filter((x) => x.id !== d.id))}
-                className="w-8 h-8 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm"
-                title="Remove metric"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newDir}
-            onChange={(e) => setNewDir(e.target.value)}
+                value={newDir}
+                onChange={(e) => setNewDir(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleAddDir();
             }}
@@ -319,6 +340,8 @@ export default function KickoffSettingsPage() {
             + Add
           </button>
         </div>
+          </>
+        )}
       </div>
       </div>
       </div>

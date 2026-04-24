@@ -390,54 +390,66 @@ export default function PuntSettingsPage() {
               </p>
             </div>
 
-            <p className="label">Direction Options<Tooltip text="Customize the direction scoring options available when logging punts. Add or remove options to match your grading system." /></p>
-            <div className="space-y-2">
-              {dirOptions.map((d) => (
-                <div key={d.id} className="flex items-center gap-2">
-                  {dirMode === "field" && (
-                    <select
-                      value={d.score ?? 0}
-                      onChange={(e) => setDirOptions(dirOptions.map((x) => (x.id === d.id ? { ...x, score: parseFloat(e.target.value) } : x)))}
-                      className="w-14 bg-surface-2 border border-border text-accent font-bold px-1 py-2 rounded-input text-sm text-center focus:outline-none focus:border-accent/60"
-                    >
-                      <option value={1}>1</option>
-                      <option value={0.5}>0.5</option>
-                      <option value={0}>0</option>
-                    </select>
-                  )}
+            <p className="label">Direction Options<Tooltip text={dirMode === "numeric" ? "Fixed scoring: 1.0 (on target), 0.5 (close), 0 (critical miss)." : "Assign a point value to each zone. Direction % = total points / attempts."} /></p>
+            {dirMode === "numeric" ? (
+              <div className="space-y-2">
+                {NUMERIC_DIRECTIONS.map((d) => (
+                  <div key={d.id} className="flex items-center gap-2">
+                    <span className="w-10 text-accent font-bold text-sm text-center">{d.id}</span>
+                    <span className="flex-1 bg-surface-2 border border-border text-slate-400 px-3 py-2 rounded-input text-sm">{d.label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {dirOptions.map((d) => (
+                    <div key={d.id} className="flex items-center gap-2">
+                      <select
+                        value={d.score ?? 0}
+                        onChange={(e) => setDirOptions(dirOptions.map((x) => (x.id === d.id ? { ...x, score: parseFloat(e.target.value) } : x)))}
+                        className="w-16 bg-surface-2 border border-border text-accent font-bold px-1 py-2 rounded-input text-sm text-center focus:outline-none focus:border-accent/60"
+                      >
+                        <option value={1}>1</option>
+                        <option value={0.5}>0.5</option>
+                        <option value={0}>0</option>
+                        <option value={-1}>-1</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={d.label}
+                        onChange={(e) => setDirOptions(dirOptions.map((x) => (x.id === d.id ? { ...x, label: e.target.value } : x)))}
+                        className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all"
+                      />
+                      <button
+                        onClick={() => setDirOptions(dirOptions.filter((x) => x.id !== d.id))}
+                        className="w-8 h-8 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm"
+                        title="Remove option"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
                   <input
                     type="text"
-                    value={d.label}
-                    onChange={(e) => setDirOptions(dirOptions.map((x) => (x.id === d.id ? { ...x, label: e.target.value } : x)))}
-                    className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all"
+                    value={newDir}
+                    onChange={(e) => setNewDir(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAddDir(); }}
+                    placeholder="Add direction option..."
+                    className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
                   />
                   <button
-                    onClick={() => setDirOptions(dirOptions.filter((x) => x.id !== d.id))}
-                    className="w-8 h-8 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm"
-                    title="Remove option"
+                    onClick={handleAddDir}
+                    disabled={!newDir.trim()}
+                    className="px-4 py-2 rounded-input text-sm font-semibold bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    ×
+                    + Add
                   </button>
                 </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newDir}
-                onChange={(e) => setNewDir(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleAddDir(); }}
-                placeholder="Add direction option..."
-                className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-              />
-              <button
-                onClick={handleAddDir}
-                disabled={!newDir.trim()}
-                className="px-4 py-2 rounded-input text-sm font-semibold bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                + Add
-              </button>
-            </div>
+              </>
+            )}
           </>
         )}
       </div>
