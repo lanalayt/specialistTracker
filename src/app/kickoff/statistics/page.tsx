@@ -379,9 +379,9 @@ export default function KickoffStatisticsPage() {
         </div>
       )}
 
-      {/* By Athlete */}
+      {/* Overall Deep Kickoffs */}
       <div className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">By Athlete</p>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall Deep Kickoffs</p>
         <StatTable athletes={athletes} statsMap={overallStats} dirMode={koSettings.dirMode} dirOptions={koSettings.directions} />
       </div>
 
