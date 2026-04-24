@@ -25,21 +25,37 @@ const LEGACY_TYPE_LABELS: Record<string, string> = {
 
 type DirectionMode = "numeric" | "field";
 
-function loadKoSettings(): { types: { id: string; label: string }[]; dirMode: DirectionMode; directions: { id: string; label: string }[] } {
-  const defaults = { types: DEFAULT_KO_TYPES, dirMode: "numeric" as DirectionMode, directions: [{ id: "1", label: "1.0" }, { id: "0.5", label: "0.5" }, { id: "OB", label: "OB" }] };
+interface KOTypeConfig { id: string; label: string; metric: "distance" | "yardline" | "none"; hangTime: boolean }
+
+function loadKoSettings(): { types: KOTypeConfig[]; dirMode: DirectionMode; directions: { id: string; label: string }[] } {
+  const defaultTypes: KOTypeConfig[] = DEFAULT_KO_TYPES.map((t) => ({ ...t, metric: "distance" as const, hangTime: true }));
+  const defaults = { types: defaultTypes, dirMode: "numeric" as DirectionMode, directions: [{ id: "1", label: "1.0" }, { id: "0.5", label: "0.5" }, { id: "OB", label: "OB" }] };
   if (typeof window === "undefined") return defaults;
   try {
     const raw = localStorage.getItem("kickoffSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
+      const rawTypes = parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES;
       return {
-        types: parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : defaults.types,
+        types: rawTypes.map((t: Record<string, unknown>) => ({
+          id: t.id as string,
+          label: t.label as string,
+          metric: (t.metric as string) ?? "distance",
+          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+        })),
         dirMode: parsed.directionMode === "field" ? "field" : "numeric",
         directions: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : defaults.directions,
       };
     }
   } catch {}
   return defaults;
+}
+
+/** Returns true if a kickoff type tracks both distance and hang time (qualifies for overall stats) */
+function isOverallType(typeId: string, types: KOTypeConfig[]): boolean {
+  const tc = types.find((t) => t.id === typeId);
+  if (!tc) return true; // unknown types default to overall
+  return tc.metric === "distance" && tc.hangTime;
 }
 
 function dirToNum(d: string): number | null {
@@ -198,10 +214,15 @@ export default function KickoffStatisticsPage() {
 
   useEffect(() => {
     import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
-      loadSettingsFromCloud<{ kickoffTypes?: { id: string; label: string }[]; directionMode?: string; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
+      loadSettingsFromCloud<{ kickoffTypes?: Record<string, unknown>[]; directionMode?: string; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
         if (cloud) {
           setKoSettings({
-            types: cloud.kickoffTypes?.length ? cloud.kickoffTypes : koSettings.types,
+            types: cloud.kickoffTypes?.length ? cloud.kickoffTypes.map((t) => ({
+              id: t.id as string,
+              label: t.label as string,
+              metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
+              hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+            })) : koSettings.types,
             dirMode: cloud.directionMode === "field" ? "field" : "numeric",
             directions: cloud.directionMetrics?.length ? cloud.directionMetrics : koSettings.directions,
           });
@@ -218,18 +239,19 @@ export default function KickoffStatisticsPage() {
     return dateFilter.filterByDate(modeHistory as { date?: string; entries?: KickoffEntry[] }[]);
   }, [modeHistory, dateFilter.mode, dateFilter.range]) as { entries?: KickoffEntry[] }[];
 
-  // Compute overall per-athlete stats
+  // Compute overall per-athlete stats (only types with both distance + hang time)
   const overallStats = useMemo(() => {
     const map: Record<string, AthleteKOStats> = {};
     athletes.forEach((a) => { map[a.name] = emptyStats(); });
     filteredHistory.forEach((session) => {
       (session.entries ?? []).forEach((e) => {
+        if (!isOverallType(e.type, koSettings.types)) return;
         if (!map[e.athlete]) map[e.athlete] = emptyStats();
         map[e.athlete] = addEntry(map[e.athlete], e);
       });
     });
     return map;
-  }, [athletes, filteredHistory]);
+  }, [athletes, filteredHistory, koSettings.types]);
 
   // Compute per-type per-athlete stats
   const statsByType = useMemo(() => {
