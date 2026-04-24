@@ -327,6 +327,7 @@ export default function PuntSettingsPage() {
 
       {/* Right column: Direction, Op Time */}
       <div className="space-y-4">
+      <p className="text-sm font-bold text-slate-100 uppercase tracking-wider hidden lg:block">&nbsp;</p>
       {/* Direction Score */}
       <div className="card space-y-4">
         <div className="flex items-center justify-between">
