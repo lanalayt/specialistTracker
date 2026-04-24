@@ -10,26 +10,41 @@ import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportPuntStats } from "@/lib/exportStats";
 
-const DEFAULT_PUNT_TYPES = [
-  { id: "DIR_LEFT", label: "Left" },
-  { id: "DIR_STRAIGHT", label: "Straight" },
-  { id: "DIR_RIGHT", label: "Right" },
-  { id: "POOCH_LEFT", label: "Pooch Left" },
-  { id: "POOCH_MIDDLE", label: "Pooch Middle" },
-  { id: "POOCH_RIGHT", label: "Pooch Right" },
-  { id: "RUGBY", label: "Rugby" },
+const DEFAULT_PUNT_TYPES: PuntTypeConfig[] = [
+  { id: "DIR_LEFT", label: "Left", metric: "distance", hangTime: true },
+  { id: "DIR_STRAIGHT", label: "Straight", metric: "distance", hangTime: true },
+  { id: "DIR_RIGHT", label: "Right", metric: "distance", hangTime: true },
+  { id: "POOCH_LEFT", label: "Pooch Left", metric: "yardline", hangTime: false },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle", metric: "yardline", hangTime: false },
+  { id: "POOCH_RIGHT", label: "Pooch Right", metric: "yardline", hangTime: false },
+  { id: "RUGBY", label: "Rugby", metric: "distance", hangTime: true },
 ];
 
-function loadPuntTypes(): { id: string; label: string }[] {
-  if (typeof window === "undefined") return DEFAULT_PUNT_TYPES;
+interface PuntTypeConfig { id: string; label: string; metric: "distance" | "yardline"; hangTime: boolean }
+
+function loadPuntTypes(): PuntTypeConfig[] {
+  if (typeof window === "undefined") return DEFAULT_PUNT_TYPES.map((t) => ({ ...t, metric: "distance" as const, hangTime: true }));
   try {
     const raw = localStorage.getItem("puntSettings");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.puntTypes && parsed.puntTypes.length > 0) return parsed.puntTypes;
+      if (parsed.puntTypes && parsed.puntTypes.length > 0) {
+        return parsed.puntTypes.map((t: Record<string, unknown>) => ({
+          id: t.id as string,
+          label: t.label as string,
+          metric: (t.metric as string) ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
+          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
+        }));
+      }
     }
   } catch {}
-  return DEFAULT_PUNT_TYPES;
+  return DEFAULT_PUNT_TYPES.map((t) => ({ ...t, metric: "distance" as const, hangTime: true }));
+}
+
+function isOverallType(typeId: string, types: PuntTypeConfig[]): boolean {
+  const tc = types.find((t) => t.id === typeId);
+  if (!tc) return true;
+  return tc.metric === "distance" && tc.hangTime;
 }
 
 const POS_LABELS: Record<PuntHash, string> = {
@@ -170,12 +185,20 @@ function PuntStatsView({
 }: {
   athletes: { id: string; name: string }[];
   statsMap: Record<string, PuntAthleteStats>;
-  puntTypes: { id: string; label: string }[];
+  puntTypes: PuntTypeConfig[];
   typeLabels: Record<string, string>;
   label: string;
   history: { entries?: PuntEntry[] }[];
   puntFilter?: (p: PuntEntry) => boolean;
 }) {
+  // Compute overall stats only from types with both distance + hang time
+  const overallStats = useMemo(() => {
+    return computeFilteredPuntStats(
+      athletes,
+      history,
+      (p) => isOverallType(p.type, puntTypes) && (puntFilter ? puntFilter(p) : true)
+    );
+  }, [athletes, history, puntTypes, puntFilter]);
   // Compute per-type stats maps for accurate position breakdowns
   const typeStatsMaps = useMemo(() => {
     const result: Record<string, Record<string, PuntAthleteStats>> = {};
@@ -224,10 +247,10 @@ function PuntStatsView({
 
   return (
     <div className="space-y-4">
-      {/* Overall */}
+      {/* Overall Open Field */}
       <section className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall {label}</p>
-        <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.overall} />
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Overall Open Field Punts</p>
+        <PuntStatTable athletes={athletes} statsMap={overallStats} getBucket={(s) => s.overall} />
       </section>
 
       {/* Game chart — shows all punts with LOS + landing YL */}
