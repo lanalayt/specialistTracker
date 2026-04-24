@@ -245,6 +245,7 @@ function puntBucketRows(athletes: string[], statsMap: Record<string, PuntAthlete
     const s = statsMap[a];
     if (!s) return;
     const b = getBucket(s);
+    if (!b) return;
     const yAtt = b.yardsAtt ?? b.att;
     const hAtt = b.hangAtt ?? b.att;
     const oAtt = b.opTimeAtt ?? b.att;
