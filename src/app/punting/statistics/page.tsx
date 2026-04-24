@@ -212,25 +212,53 @@ function PuntStatsView({
   history: { entries?: PuntEntry[] }[];
   puntFilter?: (p: PuntEntry) => boolean;
 }) {
+  // Map any punt type to a category — handles legacy types not in current config
+  const typeToCategory = useMemo(() => {
+    const map: Record<string, string> = {};
+    puntTypes.forEach((t) => { map[t.id] = t.category; });
+    return (type: string): string | null => {
+      if (map[type]) return map[type];
+      const upper = type.toUpperCase();
+      if (upper.includes("POOCH")) return "POOCH";
+      if (upper.includes("BANANA")) return "BANANA";
+      if (upper.includes("RUGBY")) return "RUGBY";
+      return "DIRECTIONAL"; // default fallback for legacy types
+    };
+  }, [puntTypes]);
+
   // Compute per-category overall stats
   const categoryStats = useMemo(() => {
     const result: Record<string, Record<string, PuntAthleteStats>> = {};
     puntCategories.filter((c) => c.enabled).forEach((cat) => {
-      const catTypeIds = new Set(puntTypes.filter((t) => t.category === cat.id).map((t) => t.id));
-      if (catTypeIds.size === 0) return;
       result[cat.id] = computeFilteredPuntStats(
         athletes,
         history,
-        (p) => catTypeIds.has(p.type) && (puntFilter ? puntFilter(p) : true)
+        (p) => typeToCategory(p.type) === cat.id && (puntFilter ? puntFilter(p) : true)
       );
     });
     return result;
-  }, [athletes, history, puntTypes, puntCategories, puntFilter]);
+  }, [athletes, history, puntCategories, puntFilter, typeToCategory]);
+  // Discover all type IDs that have data (includes legacy types not in config)
+  const allTypeIds = useMemo(() => {
+    const configIds = new Set(puntTypes.map((t) => t.id));
+    const dataIds = new Set<string>();
+    athletes.forEach((a) => {
+      const s = statsMap[a.name];
+      if (!s) return;
+      Object.entries(s.byType).forEach(([type, bucket]) => {
+        if (bucket.att > 0) dataIds.add(type);
+      });
+    });
+    // Configured types first (in order), then any legacy types with data
+    const ordered: string[] = puntTypes.filter(({ id }) => dataIds.has(id)).map(({ id }) => id);
+    dataIds.forEach((id) => { if (!configIds.has(id)) ordered.push(id); });
+    return ordered;
+  }, [athletes, statsMap, puntTypes]);
+
   // Compute per-type stats maps for accurate position breakdowns
   const typeStatsMaps = useMemo(() => {
     const result: Record<string, Record<string, PuntAthleteStats>> = {};
-    puntTypes.forEach(({ id: type }) => {
-      if (!athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0)) return;
+    allTypeIds.forEach((type) => {
       result[type] = computeFilteredPuntStats(
         athletes,
         history,
@@ -238,7 +266,7 @@ function PuntStatsView({
       );
     });
     return result;
-  }, [athletes, history, puntTypes, statsMap, puntFilter]);
+  }, [athletes, history, allTypeIds, puntFilter]);
 
   // Compute per-athlete pooch landing YL from filtered history
   const poochYLStats = useMemo(() => {
@@ -345,9 +373,8 @@ function PuntStatsView({
       {/* By Type */}
       <CollapsibleSection title="By Type">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {puntTypes
-            .filter(({ id: type }) => athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0))
-            .map(({ id: type }) => {
+          {allTypeIds
+            .map((type) => {
               const isPooch = type.toUpperCase().includes("POOCH");
               if (isPooch) {
                 // Pooch types: show Avg YL instead of Dist
@@ -410,7 +437,7 @@ function PuntStatsView({
       </CollapsibleSection>
 
       {/* Per-Type Position Breakdown */}
-      {puntTypes.filter(({ id: type }) => athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0)).map(({ id: type }) => (
+      {allTypeIds.map((type) => (
         <CollapsibleSection key={type} title={`${typeLabels[type] ?? type} — By Position`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {PUNT_HASHES.map((hash) => {
