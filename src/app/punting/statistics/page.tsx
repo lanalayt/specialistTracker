@@ -243,46 +243,63 @@ function CategorySection({
     <div className="space-y-3">
       <p className="text-xs font-semibold text-muted uppercase tracking-wider">{title}</p>
 
-      {/* Overall */}
+      {/* Overall — combined with YL for pooch */}
       <section className="card-2">
-        <PuntStatTable athletes={athletes} statsMap={catStats} getBucket={(s) => s.overall} />
+        {isPoochCat && hasPoochData ? (() => {
+          const hasDistData = athletes.some((a) => {
+            const o = catStats[a.name]?.overall;
+            return o && (o.yardsAtt ?? o.att) > 0 && o.totalYards > 0;
+          });
+          return (
+            <table className="w-full text-xs">
+              <thead>
+                <tr>
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>
+                  {hasDistData && <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Dist</th>}
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {athletes.map((a) => {
+                  const o = catStats[a.name]?.overall;
+                  if (!o || o.att === 0) return null;
+                  const yl = poochYLStats[a.name];
+                  const ylVal = yl && yl.att > 0 ? (yl.total / yl.att).toFixed(1) : "—";
+                  const yAtt = o.yardsAtt ?? o.att;
+                  const distVal = yAtt > 0 && o.totalYards > 0 ? (o.totalYards / yAtt).toFixed(1) : "—";
+                  const hAtt = o.hangAtt ?? o.att;
+                  const htVal = hAtt > 0 ? (o.totalHang / hAtt).toFixed(2) : "—";
+                  const oAtt = o.opTimeAtt ?? o.att;
+                  const otVal = oAtt > 0 ? (o.totalOpTime / oAtt).toFixed(2) : "—";
+                  const dAtt = o.daAtt ?? o.att;
+                  const daVal = dAtt > 0 ? `${Math.round((o.totalDirectionalAccuracy / dAtt) * 100)}%` : "—";
+                  return (
+                    <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                      <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
+                      <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{o.att || "—"}</td>
+                      <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{ylVal}</td>
+                      {hasDistData && <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{distVal}</td>}
+                      <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{htVal}</td>
+                      <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{otVal}</td>
+                      <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{daVal}</td>
+                      <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", o.criticalDirections > 0 ? "text-miss" : "text-slate-200")}>
+                        {o.criticalDirections || "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          );
+        })() : (
+          <PuntStatTable athletes={athletes} statsMap={catStats} getBucket={(s) => s.overall} />
+        )}
       </section>
-
-      {/* Pooch: Avg Landing YL */}
-      {isPoochCat && hasPoochData && (
-        <section className="card-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Avg Landing Yard Line</p>
-          <table className="w-full text-xs">
-            <thead>
-              <tr>
-                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
-                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
-                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>
-                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
-                <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
-              </tr>
-            </thead>
-            <tbody>
-              {athletes.filter((a) => poochYLStats[a.name]?.att > 0).map((a) => {
-                const s = poochYLStats[a.name];
-                const ylVal = s.att > 0 ? (s.total / s.att).toFixed(1) : "—";
-                const catA = catStats[a.name];
-                const htVal = (catA?.overall?.hangAtt ?? 0) > 0 ? (catA.overall.totalHang / (catA.overall.hangAtt ?? catA.overall.att)).toFixed(2) : "—";
-                const daVal = (catA?.overall?.daAtt ?? 0) > 0 ? `${Math.round((catA.overall.totalDirectionalAccuracy / (catA.overall.daAtt ?? catA.overall.att)) * 100)}%` : "—";
-                return (
-                  <tr key={a.id} className="hover:bg-surface/30 transition-colors">
-                    <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
-                    <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{s.att}</td>
-                    <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{ylVal}</td>
-                    <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{htVal}</td>
-                    <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{daVal}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-      )}
 
       {/* Tab toggle: By Type, then each type's position breakdown */}
       {hasMultipleTypes && (
