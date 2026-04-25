@@ -1270,45 +1270,47 @@ export default function KickingSessionPage() {
                       </div>
                     </div>
 
-                    {/* Score pills */}
-                    {scoreEnabled && (
-                    <div>
-                      <p className="label">Score</p>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {scoreOptions.map((opt) => {
-                          const n = parseInt(opt);
-                          const value = isNaN(n) ? 0 : n;
-                          return (
-                          <button
-                            key={opt}
-                            onClick={() => setScore(value)}
-                            className={clsx(
-                              "min-w-[2.25rem] h-9 px-2 rounded-full text-sm font-bold transition-all",
-                              score === value
-                                ? "bg-accent text-slate-900"
-                                : "bg-surface-2 text-muted border border-border hover:border-accent/50"
-                            )}
-                          >
-                            {opt}
-                          </button>
-                          );
-                        })}
+                    {/* Score + Op Time */}
+                    {(scoreEnabled || opTimeEnabled) && (
+                    <div className="flex gap-3 items-end">
+                      {scoreEnabled && (
+                      <div className="flex-1 min-w-0">
+                        <p className="label">Score</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {scoreOptions.map((opt) => {
+                            const n = parseInt(opt);
+                            const value = isNaN(n) ? 0 : n;
+                            return (
+                            <button
+                              key={opt}
+                              onClick={() => setScore(value)}
+                              className={clsx(
+                                "min-w-[2.25rem] h-9 px-2 rounded-full text-sm font-bold transition-all",
+                                score === value
+                                  ? "bg-accent text-slate-900"
+                                  : "bg-surface-2 text-muted border border-border hover:border-accent/50"
+                              )}
+                            >
+                              {opt}
+                            </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                    )}
-
-                    {/* Op Time */}
-                    {opTimeEnabled && (
-                    <div>
-                      <p className="label">Op Time (sec)</p>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="e.g. 132 → 1.32"
-                        value={opTime}
-                        onChange={(e) => setOpTime(formatOpTime(e.target.value))}
-                        className="input w-full text-sm py-2"
-                      />
+                      )}
+                      {opTimeEnabled && (
+                      <div className="w-20 shrink-0">
+                        <p className="label">OT</p>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="1.32"
+                          value={opTime}
+                          onChange={(e) => setOpTime(formatOpTime(e.target.value))}
+                          className="input text-center text-sm py-2"
+                        />
+                      </div>
+                      )}
                     </div>
                     )}
 
