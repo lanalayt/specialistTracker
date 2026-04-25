@@ -10,6 +10,7 @@ import type { FGKick, PuntEntry, KickoffEntry, AthleteStats, FGPosition, DistRan
 import { POSITIONS, DIST_RANGES, PUNT_HASHES, KICKOFF_HASHES } from "@/types";
 import type { KickoffHash } from "@/types";
 import clsx from "clsx";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -243,7 +244,7 @@ function PuntStatTable({ athletes, statsMap, getBucket }: {
         <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
         <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
         <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
-        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit<Tooltip text="Critical Direction — Any punt with a direction score of 0" /></th>
       </tr></thead>
       <tbody>
         {athletes.map((a) => {

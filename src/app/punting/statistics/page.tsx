@@ -7,6 +7,7 @@ import { processPunt, emptyPuntStats } from "@/lib/stats";
 import { PUNT_HASHES } from "@/types";
 import type { PuntHash, PuntStatBucket, PuntAthleteStats, PuntEntry } from "@/types";
 import clsx from "clsx";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportPuntStats } from "@/lib/exportStats";
 
@@ -150,7 +151,7 @@ function PuntStatTable({
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
-          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit</th>
+          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit<Tooltip text="Critical Direction — Any punt with a direction score of 0" /></th>
         </tr>
       </thead>
       <tbody>
@@ -261,7 +262,7 @@ function CategorySection({
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
-                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit</th>
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit<Tooltip text="Critical Direction — Any punt with a direction score of 0" /></th>
                 </tr>
               </thead>
               <tbody>
