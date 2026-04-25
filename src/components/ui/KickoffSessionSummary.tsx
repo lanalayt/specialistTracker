@@ -103,7 +103,7 @@ export function KickoffSessionSummary({
           {byAthlete.length > 0 && (
           <div className="card-2 space-y-1.5">
             <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-              By Athlete
+              By Athlete{sessionMode === "practice" ? " — Deep Kickoffs" : ""}
             </p>
             {byAthlete.map((a) => (
               <div key={a.name} className="flex items-center justify-between text-sm">
