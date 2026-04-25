@@ -4,7 +4,6 @@ import React from "react";
 import type { FGKick, FGPosition, DistRange } from "@/types";
 import { POSITIONS, DIST_RANGES } from "@/types";
 import { getDistRange } from "@/lib/stats";
-import { DonutChart } from "./Chart";
 import { FGHeatGrid } from "./FGHeatGrid";
 import { GoalPostViz } from "./GoalPostViz";
 
@@ -13,8 +12,7 @@ interface LiveFGStatsProps {
 }
 
 export function LiveFGStats({ kicks }: LiveFGStatsProps) {
-  const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
-  const total = kicks.filter((k) => !k.isPAT).length;
+  const makes = kicks.filter((k) => k.result.startsWith("Y") && !k.isPAT).length;
 
   // Build heatmap — only regular FG kicks, not PATs
   const grid = {} as Record<FGPosition, Record<DistRange, { att: number; made: number }>>;
@@ -41,12 +39,36 @@ export function LiveFGStats({ kicks }: LiveFGStatsProps) {
   const pats = kicks.filter((k) => k.isPAT);
   const patMakes = pats.filter((k) => k.result.startsWith("Y")).length;
 
+  // Per-athlete make stats (non-PAT)
+  const fgKicks = kicks.filter((k) => !k.isPAT);
+  const athleteNames = [...new Set(fgKicks.map((k) => k.athlete))];
+  const athleteStats = athleteNames.map((name) => {
+    const ak = fgKicks.filter((k) => k.athlete === name);
+    const m = ak.filter((k) => k.result.startsWith("Y")).length;
+    const pct = ak.length > 0 ? Math.round((m / ak.length) * 100) : 0;
+    return { name, made: m, att: ak.length, pct };
+  });
+
   return (
     <div className="space-y-3">
-      <div className="flex gap-3 items-start">
-        <DonutChart made={makes} total={total} label="Session Make%" />
+      <div className="space-y-1">
+        {athleteStats.map((a) => (
+          <div key={a.name} className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-slate-200 truncate">{a.name}</span>
+            <span className="text-xs text-muted whitespace-nowrap">
+              {a.made}/{a.att}{" "}
+              <span className="font-semibold text-accent">{a.pct}%</span>
+            </span>
+          </div>
+        ))}
         {pats.length > 0 && (
-          <DonutChart made={patMakes} total={pats.length} label="PAT%" />
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/30">
+            <span className="text-xs font-medium text-slate-400">PAT</span>
+            <span className="text-xs text-muted whitespace-nowrap">
+              {patMakes}/{pats.length}{" "}
+              <span className="font-semibold text-accent">{pats.length > 0 ? Math.round((patMakes / pats.length) * 100) : 0}%</span>
+            </span>
+          </div>
         )}
       </div>
       <FGHeatGrid grid={grid} />
