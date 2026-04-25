@@ -151,17 +151,19 @@ function ezPct(s: AthleteKOStats): string {
   return s.att > 0 ? `${Math.round((s.endzones / s.att) * 100)}%` : "—";
 }
 
-function StatTable({ athletes, statsMap, showEZ = true, metric }: {
+function StatTable({ athletes, statsMap, showEZ = true, metric, showHang }: {
   athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteKOStats>;
   showEZ?: boolean;
   metric?: "distance" | "yardline" | "none";
+  showHang?: boolean;
 }) {
   const isYL = metric === "yardline";
   const visible = athletes.filter((a) => (statsMap[a.name]?.att ?? 0) > 0);
   if (visible.length === 0) {
     return <p className="text-xs text-muted p-2">No data.</p>;
   }
+  const hasHang = showHang ?? visible.some((a) => statsMap[a.name]?.hangAtt > 0);
   return (
     <table className="w-full text-xs sm:text-sm">
       <thead>
@@ -169,7 +171,7 @@ function StatTable({ athletes, statsMap, showEZ = true, metric }: {
           <th className="table-header text-left">Athlete</th>
           <th className="table-header">KOs</th>
           <th className={clsx("table-header", isYL && "text-accent")}>{isYL ? "YL" : "Dist"}</th>
-          <th className="table-header">Hang</th>
+          {hasHang && <th className="table-header">Hang</th>}
           {showEZ && <th className="table-header">EZ %</th>}
           <th className="table-header">Dir %</th>
         </tr>
@@ -182,7 +184,7 @@ function StatTable({ athletes, statsMap, showEZ = true, metric }: {
               <td className="table-name">{a.name}</td>
               <td className="table-cell">{s.att}</td>
               <td className={clsx("table-cell", isYL ? "text-accent font-semibold" : "")}>{avgDist(s)}</td>
-              <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>
+              {hasHang && <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>}
               {showEZ && <td className="table-cell text-make font-semibold">{ezPct(s)}</td>}
               <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
             </tr>
