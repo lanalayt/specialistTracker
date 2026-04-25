@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { loadArchives, deleteArchive, type StatArchive } from "@/lib/archiveManager";
-import { makePct } from "@/lib/stats";
-import type { FGKick, PuntEntry, KickoffEntry } from "@/types";
+import { makePct, avgScore, processKick, emptyAthleteStats, processPunt, emptyPuntStats } from "@/lib/stats";
+import type { FGKick, PuntEntry, KickoffEntry, AthleteStats, FGPosition, DistRange, PuntAthleteStats, PuntHash, PuntStatBucket } from "@/types";
+import { POSITIONS, DIST_RANGES, PUNT_HASHES, KICKOFF_HASHES } from "@/types";
+import type { KickoffHash } from "@/types";
 import clsx from "clsx";
+
+// ── Shared helpers ──────────────────────────────────────────────────────────
 
 function formatDate(iso: string): string {
   try {
@@ -16,6 +20,450 @@ function formatDate(iso: string): string {
     return iso;
   }
 }
+
+function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section>
+      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between py-2 group">
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider">{title}</p>
+        <span className={clsx("text-muted text-sm transition-transform", open && "rotate-180")}>▾</span>
+      </button>
+      {open && children}
+    </section>
+  );
+}
+
+type SimpleAthlete = { id: string; name: string };
+
+// ── FG Helpers ──────────────────────────────────────────────────────────────
+
+const POS_LABELS: Record<FGPosition, string> = { LH: "Left Hash", RH: "Right Hash", LM: "Left Middle", M: "Middle", RM: "Right Middle" };
+const DIST_LABELS: Record<DistRange, string> = { "20-29": "20–29 yds", "30-39": "30–39 yds", "40-49": "40–49 yds", "50-60": "50–60 yds", "60+": "60+ yds" };
+
+function FGStatTable({ athletes, statsMap, getValue, showScore = true, maxScore = 3 }: {
+  athletes: SimpleAthlete[]; statsMap: Record<string, AthleteStats>;
+  getValue: (s: AthleteStats) => { att: number; made: number; score: number };
+  showScore?: boolean; maxScore?: number;
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead><tr>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Made</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">%</th>
+        {showScore && <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5 whitespace-nowrap">KS<span className="text-[8px] font-normal"> /{maxScore}</span></th>}
+      </tr></thead>
+      <tbody>
+        {athletes.map((a) => {
+          const s = statsMap[a.name]; if (!s) return null;
+          const v = getValue(s);
+          return (
+            <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{v.made || "—"}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{v.att || "—"}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50 make-pct">{makePct(v.att, v.made)}</td>
+              {showScore && <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgScore(v.att, v.score)}</td>}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function FGArchiveStats({ athletes, statsMap }: { athletes: SimpleAthlete[]; statsMap: Record<string, AthleteStats> }) {
+  return (
+    <div className="space-y-4">
+      {/* Overall */}
+      <section className="card-2">
+        <table className="w-full text-xs sm:text-sm">
+          <thead><tr>
+            <th className="table-header text-left">Athlete</th>
+            <th className="table-header">Made</th>
+            <th className="table-header">Att</th>
+            <th className="table-header">%</th>
+            <th className="table-header whitespace-nowrap">KS<span className="text-[8px] font-normal text-muted"> /3</span></th>
+            <th className="table-header">Long</th>
+            <th className="table-header">OT</th>
+          </tr></thead>
+          <tbody>
+            {athletes.map((a) => {
+              const s = statsMap[a.name]; if (!s) return null;
+              const o = s.overall;
+              const avgOT = (o.opTimeAtt || 0) > 0 ? ((o.totalOpTime || 0) / o.opTimeAtt).toFixed(2) : "—";
+              return (
+                <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                  <td className="table-name">{a.name}</td>
+                  <td className="table-cell">{o.made || "—"}</td>
+                  <td className="table-cell">{o.att || "—"}</td>
+                  <td className="table-cell make-pct">{makePct(o.att, o.made)}</td>
+                  <td className="table-cell">{avgScore(o.att, o.score)}</td>
+                  <td className="table-cell">{o.longFG > 0 ? `${o.longFG} yd` : "—"}</td>
+                  <td className="table-cell">{avgOT !== "—" ? `${avgOT}s` : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
+
+      {/* Miss Chart */}
+      <CollapsibleSection title="Miss Chart">
+        <div className="card-2">
+          <table className="w-full text-xs sm:text-sm">
+            <thead><tr>
+              <th className="table-header text-left">Athlete</th>
+              <th className="table-header">Left</th>
+              <th className="table-header">Right</th>
+              <th className="table-header">Short</th>
+              <th className="table-header">Total</th>
+            </tr></thead>
+            <tbody>
+              {athletes.map((a) => {
+                const s = statsMap[a.name]; if (!s) return null;
+                const total = s.miss.XL + s.miss.XR + s.miss.XS + s.miss.X;
+                return (
+                  <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                    <td className="table-name">{a.name}</td>
+                    <td className="table-cell text-miss">{s.miss.XL || "—"}</td>
+                    <td className="table-cell text-miss">{s.miss.XR || "—"}</td>
+                    <td className="table-cell text-miss">{s.miss.XS || "—"}</td>
+                    <td className="table-cell text-miss font-semibold">{total || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleSection>
+
+      {/* Make Chart */}
+      {athletes.some((a) => { const m = statsMap[a.name]?.make; return m && (m.YL > 0 || m.YC > 0 || m.YR > 0); }) && (
+      <CollapsibleSection title="Make Chart">
+        <div className="card-2">
+          <table className="w-full text-xs sm:text-sm">
+            <thead><tr>
+              <th className="table-header text-left">Athlete</th>
+              <th className="table-header">Left</th>
+              <th className="table-header">Middle</th>
+              <th className="table-header">Right</th>
+              <th className="table-header">Total</th>
+            </tr></thead>
+            <tbody>
+              {athletes.map((a) => {
+                const s = statsMap[a.name]; if (!s) return null;
+                const m = s.make ?? { YL: 0, YC: 0, YR: 0 };
+                const total = m.YL + m.YC + m.YR;
+                if (total === 0) return null;
+                return (
+                  <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+                    <td className="table-name">{a.name}</td>
+                    <td className="table-cell text-make">{m.YL || "—"}</td>
+                    <td className="table-cell text-make">{m.YC || "—"}</td>
+                    <td className="table-cell text-make">{m.YR || "—"}</td>
+                    <td className="table-cell text-make font-semibold">{total || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleSection>
+      )}
+
+      {/* By Position */}
+      <CollapsibleSection title="By Hash / Position">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {(["LH", "RH"] as FGPosition[]).map((pos) => (
+              <div key={pos} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[pos]}</p>
+                <FGStatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {(["LM", "M", "RM"] as FGPosition[]).map((pos) => (
+              <div key={pos} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[pos]}</p>
+                <FGStatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* By Distance */}
+      <CollapsibleSection title="By Distance">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {DIST_RANGES.map((range) => {
+            const maxScore = range === "50-60" || range === "60+" ? 4 : 3;
+            return (
+              <div key={range} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{DIST_LABELS[range]}</p>
+                <FGStatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.distance[range]} maxScore={maxScore} />
+              </div>
+            );
+          })}
+        </div>
+      </CollapsibleSection>
+
+      {/* PAT */}
+      <CollapsibleSection title="PAT">
+        <div className="card-2">
+          <FGStatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.pat ?? { att: 0, made: 0, score: 0 }} showScore={false} />
+        </div>
+      </CollapsibleSection>
+    </div>
+  );
+}
+
+// ── Punt Helpers ─────────────────────────────────────────────────────────────
+
+const PUNT_POS_LABELS: Record<PuntHash, string> = { LH: "Left Hash", LM: "Left Middle", M: "Middle", RM: "Right Middle", RH: "Right Hash" };
+
+function avgYds(b: PuntStatBucket): string { const c = b.yardsAtt ?? b.att; return c === 0 ? "—" : (b.totalYards / c).toFixed(1); }
+function avgHT(b: PuntStatBucket): string { const c = b.hangAtt ?? b.att; return c === 0 ? "—" : (b.totalHang / c).toFixed(2); }
+function avgOT(b: PuntStatBucket): string { const c = b.opTimeAtt ?? b.att; return c === 0 ? "—" : (b.totalOpTime / c).toFixed(2); }
+function avgDA(b: PuntStatBucket): string { const c = b.daAtt ?? b.att; return c === 0 ? "—" : `${Math.round((b.totalDirectionalAccuracy / c) * 100)}%`; }
+
+function PuntStatTable({ athletes, statsMap, getBucket }: {
+  athletes: SimpleAthlete[]; statsMap: Record<string, PuntAthleteStats>;
+  getBucket: (s: PuntAthleteStats) => PuntStatBucket;
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead><tr>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Dist</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
+        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit</th>
+      </tr></thead>
+      <tbody>
+        {athletes.map((a) => {
+          const s = statsMap[a.name]; if (!s) return null;
+          const b = getBucket(s); if (!b) return null;
+          return (
+            <tr key={a.id} className="hover:bg-surface/30 transition-colors">
+              <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{b.att || "—"}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgYds(b)}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgHT(b)}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgOT(b)}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgDA(b)}</td>
+              <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", b.criticalDirections > 0 ? "text-miss" : "text-slate-200")}>
+                {b.criticalDirections || "—"}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function PuntArchiveStats({ athletes, statsMap }: { athletes: SimpleAthlete[]; statsMap: Record<string, PuntAthleteStats> }) {
+  // Discover types with data
+  const activeTypes = useMemo(() => {
+    const types = new Set<string>();
+    athletes.forEach((a) => {
+      const s = statsMap[a.name];
+      if (s) Object.keys(s.byType).forEach((t) => { if (s.byType[t]?.att > 0) types.add(t); });
+    });
+    return [...types];
+  }, [athletes, statsMap]);
+
+  return (
+    <div className="space-y-4">
+      {/* Overall */}
+      <section className="card-2">
+        <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.overall} />
+      </section>
+
+      {/* By Type */}
+      {activeTypes.length > 0 && (
+        <CollapsibleSection title="By Type">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {activeTypes.map((type) => (
+              <div key={type} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{type}</p>
+                <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* By Position */}
+      <CollapsibleSection title="By Position">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {PUNT_HASHES.map((hash) => {
+            const hasData = athletes.some((a) => (statsMap[a.name]?.byHash[hash]?.att ?? 0) > 0);
+            if (!hasData) return null;
+            return (
+              <div key={hash} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{PUNT_POS_LABELS[hash]}</p>
+                <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byHash[hash]} />
+              </div>
+            );
+          })}
+        </div>
+      </CollapsibleSection>
+    </div>
+  );
+}
+
+// ── Kickoff Helpers ─────────────────────────────────────────────────────────
+
+const KO_POS_LABELS: Record<KickoffHash, string> = { LH: "Left Hash", LM: "Left Middle", M: "Middle", RM: "Right Middle", RH: "Right Hash" };
+
+interface KOBucket { att: number; totalDist: number; distAtt: number; totalHang: number; hangAtt: number; dirSum: number; dirAtt: number; endzones: number; dirCounts: Record<string, number> }
+
+function emptyKOBucket(): KOBucket {
+  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, dirCounts: {} };
+}
+
+function addKOEntry(s: KOBucket, e: KickoffEntry): KOBucket {
+  const dirNum = e.direction === "1" ? 1 : e.direction === "0.5" ? 0.5 : e.direction === "0" ? 0 : e.direction === "-1" || e.direction === "OB" ? -1 : null;
+  const dirCounts = { ...s.dirCounts };
+  if (e.direction) dirCounts[e.direction] = (dirCounts[e.direction] || 0) + 1;
+  return {
+    att: s.att + 1,
+    totalDist: s.totalDist + (e.distance > 0 ? e.distance : 0),
+    distAtt: s.distAtt + (e.distance > 0 ? 1 : 0),
+    totalHang: s.totalHang + (e.hangTime > 0 ? e.hangTime : 0),
+    hangAtt: s.hangAtt + (e.hangTime > 0 ? 1 : 0),
+    dirSum: s.dirSum + (dirNum != null ? dirNum : 0),
+    dirAtt: s.dirAtt + (dirNum != null ? 1 : 0),
+    endzones: s.endzones + (e.endzone ? 1 : 0),
+    dirCounts,
+  };
+}
+
+function koAvgDist(s: KOBucket): string { return s.distAtt > 0 ? (s.totalDist / s.distAtt).toFixed(1) : "—"; }
+function koAvgHang(s: KOBucket): string { return s.hangAtt > 0 ? (s.totalHang / s.hangAtt).toFixed(2) : "—"; }
+function koDirPct(s: KOBucket): string { return s.dirAtt > 0 ? `${Math.round((s.dirSum / s.dirAtt) * 100)}%` : "—"; }
+function koEzPct(s: KOBucket): string { return s.att > 0 ? `${Math.round((s.endzones / s.att) * 100)}%` : "—"; }
+
+function KOStatTable({ athletes, statsMap, showEZ = true }: {
+  athletes: SimpleAthlete[]; statsMap: Record<string, KOBucket>; showEZ?: boolean;
+}) {
+  const visible = athletes.filter((a) => (statsMap[a.name]?.att ?? 0) > 0);
+  if (visible.length === 0) return <p className="text-xs text-muted p-2">No data.</p>;
+  return (
+    <table className="w-full text-xs sm:text-sm">
+      <thead><tr>
+        <th className="table-header text-left">Athlete</th>
+        <th className="table-header">KOs</th>
+        <th className="table-header">Dist</th>
+        <th className="table-header">Hang</th>
+        {showEZ && <th className="table-header">EZ %</th>}
+        <th className="table-header">Dir %</th>
+      </tr></thead>
+      <tbody>
+        {visible.map((a) => {
+          const s = statsMap[a.name];
+          return (
+            <tr key={a.id} className="hover:bg-surface/30">
+              <td className="table-name">{a.name}</td>
+              <td className="table-cell">{s.att}</td>
+              <td className="table-cell">{koAvgDist(s)}</td>
+              <td className="table-cell text-muted">{koAvgHang(s)}{koAvgHang(s) !== "—" ? "s" : ""}</td>
+              {showEZ && <td className="table-cell text-make font-semibold">{koEzPct(s)}</td>}
+              <td className="table-cell text-accent font-semibold">{koDirPct(s)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function computeKOStats(athletes: SimpleAthlete[], entries: KickoffEntry[], filter?: (e: KickoffEntry) => boolean): Record<string, KOBucket> {
+  const map: Record<string, KOBucket> = {};
+  athletes.forEach((a) => { map[a.name] = emptyKOBucket(); });
+  entries.forEach((e) => {
+    if (filter && !filter(e)) return;
+    if (!map[e.athlete]) map[e.athlete] = emptyKOBucket();
+    map[e.athlete] = addKOEntry(map[e.athlete], e);
+  });
+  return map;
+}
+
+function KOArchiveStats({ athletes, entries }: { athletes: SimpleAthlete[]; entries: KickoffEntry[] }) {
+  const overallStats = useMemo(() => computeKOStats(athletes, entries), [athletes, entries]);
+
+  // Discover types with data
+  const activeTypes = useMemo(() => {
+    const types = new Set<string>();
+    entries.forEach((e) => { if (e.type) types.add(e.type); });
+    return [...types];
+  }, [entries]);
+
+  const typeStats = useMemo(() => {
+    const result: Record<string, Record<string, KOBucket>> = {};
+    activeTypes.forEach((type) => {
+      result[type] = computeKOStats(athletes, entries, (e) => e.type === type);
+    });
+    return result;
+  }, [athletes, entries, activeTypes]);
+
+  // By hash
+  const hashStats = useMemo(() => {
+    const result: Record<string, Record<string, KOBucket>> = {};
+    KICKOFF_HASHES.forEach((hash) => {
+      result[hash] = computeKOStats(athletes, entries, (e) => e.hash === hash);
+    });
+    return result;
+  }, [athletes, entries]);
+
+  return (
+    <div className="space-y-4">
+      {/* Overall */}
+      <section className="card-2">
+        <KOStatTable athletes={athletes} statsMap={overallStats} />
+      </section>
+
+      {/* By Type */}
+      {activeTypes.length > 0 && (
+        <CollapsibleSection title="By Type">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {activeTypes.map((type) => (
+              <div key={type} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{type}</p>
+                <KOStatTable athletes={athletes} statsMap={typeStats[type] ?? {}} />
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* By Position */}
+      <CollapsibleSection title="By Position">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {KICKOFF_HASHES.map((hash) => {
+            const hasData = athletes.some((a) => (hashStats[hash]?.[a.name]?.att ?? 0) > 0);
+            if (!hasData) return null;
+            return (
+              <div key={hash} className="card-2">
+                <p className="text-xs font-semibold text-slate-300 mb-2">{KO_POS_LABELS[hash]}</p>
+                <KOStatTable athletes={athletes} statsMap={hashStats[hash] ?? {}} />
+              </div>
+            );
+          })}
+        </div>
+      </CollapsibleSection>
+    </div>
+  );
+}
+
+// ── Main Page ───────────────────────────────────────────────────────────────
 
 export default function ArchivesPage() {
   const [archives, setArchives] = useState<StatArchive[]>([]);
@@ -34,10 +482,7 @@ export default function ArchivesPage() {
   const selected = archives.find((a) => a.id === selectedId);
 
   const handleDelete = async (id: string) => {
-    if (confirmDelete !== id) {
-      setConfirmDelete(id);
-      return;
-    }
+    if (confirmDelete !== id) { setConfirmDelete(id); return; }
     await deleteArchive(id);
     const fresh = await loadArchives();
     setArchives(fresh);
@@ -57,10 +502,10 @@ export default function ArchivesPage() {
           </div>
 
           {loading ? (
-            <p className="text-sm text-muted">Loading…</p>
+            <p className="text-sm text-muted">Loading...</p>
           ) : archives.length === 0 ? (
             <div className="card text-sm text-muted">
-              No archives yet. To create one, go to Settings → Archive Stats, enter a name and confirm.
+              No archives yet. To create one, go to Settings &rarr; Archive Stats, enter a name and confirm.
             </div>
           ) : (
             <div className="flex flex-col lg:flex-row gap-6">
@@ -74,9 +519,7 @@ export default function ArchivesPage() {
                       onClick={() => setSelectedId(a.id)}
                       className={clsx(
                         "w-full text-left px-3 py-2 rounded-input border transition-all",
-                        selectedId === a.id
-                          ? "border-accent/50 bg-accent/10"
-                          : "border-border hover:bg-surface-2"
+                        selectedId === a.id ? "border-accent/50 bg-accent/10" : "border-border hover:bg-surface-2"
                       )}
                     >
                       <p className="text-sm font-semibold text-slate-100 truncate">{a.name}</p>
@@ -99,69 +542,52 @@ export default function ArchivesPage() {
   );
 }
 
-function ArchiveDetail({
-  archive,
-  onDelete,
-  confirmDelete,
-}: {
-  archive: StatArchive;
-  onDelete: (id: string) => void;
-  confirmDelete: boolean;
+function ArchiveDetail({ archive, onDelete, confirmDelete }: {
+  archive: StatArchive; onDelete: (id: string) => void; confirmDelete: boolean;
 }) {
-  // FG totals
-  const fgTotals = archive.fg.athletes.reduce(
-    (acc, a) => {
-      const s = archive.fg.stats[a];
-      if (!s) return acc;
-      return {
-        att: acc.att + (s.overall?.att ?? 0),
-        made: acc.made + (s.overall?.made ?? 0),
-        longFG: Math.max(acc.longFG, s.overall?.longFG ?? 0),
-      };
-    },
-    { att: 0, made: 0, longFG: 0 }
-  );
+  const [sportTab, setSportTab] = useState<"fg" | "punt" | "kickoff">("fg");
 
-  // Punt totals
-  const puntTotals = archive.punt.athletes.reduce(
-    (acc, a) => {
-      const s = archive.punt.stats[a];
-      if (!s) return acc;
-      return {
-        att: acc.att + (s.overall?.att ?? 0),
-        totalYards: acc.totalYards + (s.overall?.totalYards ?? 0),
-        yardsAtt: acc.yardsAtt + (s.overall?.yardsAtt ?? s.overall?.att ?? 0),
-        totalHang: acc.totalHang + (s.overall?.totalHang ?? 0),
-        hangAtt: acc.hangAtt + (s.overall?.hangAtt ?? s.overall?.att ?? 0),
-        long: Math.max(acc.long, s.overall?.long ?? 0),
-      };
-    },
-    { att: 0, totalYards: 0, yardsAtt: 0, totalHang: 0, hangAtt: 0, long: 0 }
-  );
-  const puntAvgYds = puntTotals.yardsAtt > 0 ? (puntTotals.totalYards / puntTotals.yardsAtt).toFixed(1) : "—";
-  const puntAvgHang = puntTotals.hangAtt > 0 ? (puntTotals.totalHang / puntTotals.hangAtt).toFixed(2) : "—";
+  // Recompute FG stats from entries
+  const fgAthletes: SimpleAthlete[] = useMemo(() => archive.fg.athletes.map((n) => ({ id: n, name: n })), [archive]);
+  const fgStats = useMemo(() => {
+    let statsMap: Record<string, AthleteStats> = {};
+    fgAthletes.forEach((a) => { statsMap[a.name] = emptyAthleteStats(); });
+    archive.fg.history.forEach((session) => {
+      const kicks = (session.entries ?? []) as FGKick[];
+      kicks.forEach((k) => { statsMap = processKick(k, statsMap); });
+    });
+    return statsMap;
+  }, [archive, fgAthletes]);
 
-  // Kickoff totals
-  const koTotals = archive.kickoff.athletes.reduce(
-    (acc, a) => {
-      const s = archive.kickoff.stats[a];
-      if (!s) return acc;
-      return {
-        att: acc.att + (s.overall?.att ?? 0),
-        totalDist: acc.totalDist + (s.overall?.totalDist ?? 0),
-        distAtt: acc.distAtt + ((s.overall?.distAtt ?? s.overall?.att) ?? 0),
-        totalHang: acc.totalHang + (s.overall?.totalHang ?? 0),
-        hangAtt: acc.hangAtt + ((s.overall?.hangAtt ?? s.overall?.att) ?? 0),
-        touchbacks: acc.touchbacks + (s.overall?.touchbacks ?? 0),
-      };
-    },
-    { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, touchbacks: 0 }
-  );
-  const koAvgDist = koTotals.distAtt > 0 ? (koTotals.totalDist / koTotals.distAtt).toFixed(1) : "—";
-  const koAvgHang = koTotals.hangAtt > 0 ? (koTotals.totalHang / koTotals.hangAtt).toFixed(2) : "—";
+  // Recompute punt stats from entries
+  const puntAthletes: SimpleAthlete[] = useMemo(() => archive.punt.athletes.map((n) => ({ id: n, name: n })), [archive]);
+  const puntStats = useMemo(() => {
+    let statsMap: Record<string, PuntAthleteStats> = {};
+    puntAthletes.forEach((a) => { statsMap[a.name] = emptyPuntStats(); });
+    archive.punt.history.forEach((session) => {
+      const punts = (session.entries ?? []) as PuntEntry[];
+      punts.forEach((p) => { statsMap = processPunt(p, statsMap); });
+    });
+    return statsMap;
+  }, [archive, puntAthletes]);
+
+  // Collect kickoff entries
+  const koAthletes: SimpleAthlete[] = useMemo(() => archive.kickoff.athletes.map((n) => ({ id: n, name: n })), [archive]);
+  const koEntries: KickoffEntry[] = useMemo(() => {
+    const entries: KickoffEntry[] = [];
+    archive.kickoff.history.forEach((session) => {
+      (session.entries as KickoffEntry[] ?? []).forEach((e) => entries.push(e));
+    });
+    return entries;
+  }, [archive]);
+
+  const fgTotal = fgAthletes.reduce((n, a) => n + (fgStats[a.name]?.overall.att ?? 0), 0);
+  const puntTotal = puntAthletes.reduce((n, a) => n + (puntStats[a.name]?.overall.att ?? 0), 0);
+  const koTotal = koEntries.length;
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="card-2">
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -174,9 +600,7 @@ function ArchiveDetail({
               onClick={() => onDelete(archive.id)}
               className={clsx(
                 "text-xs px-3 py-1.5 rounded-input border transition-all",
-                confirmDelete
-                  ? "bg-miss/20 border-miss/50 text-miss"
-                  : "border-border text-muted hover:text-miss hover:border-miss/50"
+                confirmDelete ? "bg-miss/20 border-miss/50 text-miss" : "border-border text-muted hover:text-miss hover:border-miss/50"
               )}
             >
               {confirmDelete ? "Confirm Delete" : "Delete"}
@@ -185,150 +609,37 @@ function ArchiveDetail({
         </div>
       </div>
 
-      {/* FG section */}
-      <section className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">FG Kicking</p>
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <MiniStat label="Attempts" value={fgTotals.att || "—"} />
-          <MiniStat label="Made" value={fgTotals.made || "—"} />
-          <MiniStat label="Pct" value={makePct(fgTotals.att, fgTotals.made)} highlight />
-        </div>
-        {archive.fg.athletes.length > 0 && (
-          <table className="w-full text-xs">
-            <thead>
-              <tr>
-                <th className="table-header text-left">Athlete</th>
-                <th className="table-header">Att</th>
-                <th className="table-header">Made</th>
-                <th className="table-header">%</th>
-                <th className="table-header">Long</th>
-              </tr>
-            </thead>
-            <tbody>
-              {archive.fg.athletes.map((a) => {
-                const s = archive.fg.stats[a];
-                const o = s?.overall;
-                if (!o || o.att === 0) return null;
-                return (
-                  <tr key={a} className="hover:bg-surface/30 transition-colors">
-                    <td className="table-name">{a}</td>
-                    <td className="table-cell">{o.att}</td>
-                    <td className="table-cell">{o.made}</td>
-                    <td className="table-cell make-pct">{makePct(o.att, o.made)}</td>
-                    <td className="table-cell">{o.longFG > 0 ? `${o.longFG} yd` : "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-        <p className="text-[10px] text-muted text-right mt-2">
-          {archive.fg.history.length} session{archive.fg.history.length !== 1 ? "s" : ""} ({archive.fg.history.reduce((n, s) => n + ((s.entries as FGKick[])?.length ?? 0), 0)} kicks)
-        </p>
-      </section>
+      {/* Sport tabs */}
+      <div className="flex rounded-input border border-border overflow-hidden w-fit">
+        {([
+          { id: "fg" as const, label: "FG Kicking", count: fgTotal },
+          { id: "punt" as const, label: "Punting", count: puntTotal },
+          { id: "kickoff" as const, label: "Kickoff", count: koTotal },
+        ]).map((tab, i) => (
+          <button
+            key={tab.id}
+            onClick={() => setSportTab(tab.id)}
+            className={clsx(
+              "px-4 py-1.5 text-xs font-semibold transition-colors",
+              sportTab === tab.id ? "bg-accent text-slate-900" : "text-muted hover:text-white",
+              i > 0 && "border-l border-border"
+            )}
+          >
+            {tab.label} ({tab.count})
+          </button>
+        ))}
+      </div>
 
-      {/* Punt section */}
-      <section className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Punting</p>
-        <div className="grid grid-cols-4 gap-2 mb-3">
-          <MiniStat label="Punts" value={puntTotals.att || "—"} />
-          <MiniStat label="Avg Yds" value={puntAvgYds} highlight />
-          <MiniStat label="Avg Hang" value={puntAvgHang !== "—" ? `${puntAvgHang}s` : "—"} />
-          <MiniStat label="Long" value={puntTotals.long > 0 ? `${puntTotals.long}` : "—"} />
-        </div>
-        {archive.punt.athletes.length > 0 && (
-          <table className="w-full text-xs">
-            <thead>
-              <tr>
-                <th className="table-header text-left">Athlete</th>
-                <th className="table-header">Att</th>
-                <th className="table-header">Avg</th>
-                <th className="table-header">Hang</th>
-                <th className="table-header">Long</th>
-              </tr>
-            </thead>
-            <tbody>
-              {archive.punt.athletes.map((a) => {
-                const s = archive.punt.stats[a];
-                const o = s?.overall;
-                if (!o || o.att === 0) return null;
-                const yCount = o.yardsAtt ?? o.att;
-                const hCount = o.hangAtt ?? o.att;
-                const avgY = yCount > 0 ? (o.totalYards / yCount).toFixed(1) : "—";
-                const avgH = hCount > 0 ? (o.totalHang / hCount).toFixed(2) : "—";
-                return (
-                  <tr key={a} className="hover:bg-surface/30 transition-colors">
-                    <td className="table-name">{a}</td>
-                    <td className="table-cell">{o.att}</td>
-                    <td className="table-cell">{avgY}</td>
-                    <td className="table-cell">{avgH !== "—" ? `${avgH}s` : "—"}</td>
-                    <td className="table-cell">{o.long > 0 ? `${o.long}` : "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-        <p className="text-[10px] text-muted text-right mt-2">
-          {archive.punt.history.length} session{archive.punt.history.length !== 1 ? "s" : ""} ({archive.punt.history.reduce((n, s) => n + ((s.entries as PuntEntry[])?.length ?? 0), 0)} punts)
-        </p>
-      </section>
-
-      {/* Kickoff section */}
-      <section className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Kickoff</p>
-        <div className="grid grid-cols-4 gap-2 mb-3">
-          <MiniStat label="KOs" value={koTotals.att || "—"} />
-          <MiniStat label="Avg Dist" value={koAvgDist} highlight />
-          <MiniStat label="Avg Hang" value={koAvgHang !== "—" ? `${koAvgHang}s` : "—"} />
-          <MiniStat label="TB" value={koTotals.touchbacks || "—"} />
-        </div>
-        {archive.kickoff.athletes.length > 0 && (
-          <table className="w-full text-xs">
-            <thead>
-              <tr>
-                <th className="table-header text-left">Athlete</th>
-                <th className="table-header">KOs</th>
-                <th className="table-header">Dist</th>
-                <th className="table-header">Hang</th>
-                <th className="table-header">TB</th>
-              </tr>
-            </thead>
-            <tbody>
-              {archive.kickoff.athletes.map((a) => {
-                const s = archive.kickoff.stats[a];
-                const o = s?.overall;
-                if (!o || o.att === 0) return null;
-                const dCount = o.distAtt ?? o.att;
-                const hCount = o.hangAtt ?? o.att;
-                const avgD = dCount > 0 ? (o.totalDist / dCount).toFixed(1) : "—";
-                const avgH = hCount > 0 ? (o.totalHang / hCount).toFixed(2) : "—";
-                return (
-                  <tr key={a} className="hover:bg-surface/30 transition-colors">
-                    <td className="table-name">{a}</td>
-                    <td className="table-cell">{o.att}</td>
-                    <td className="table-cell">{avgD}</td>
-                    <td className="table-cell">{avgH !== "—" ? `${avgH}s` : "—"}</td>
-                    <td className="table-cell">{o.touchbacks || "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-        <p className="text-[10px] text-muted text-right mt-2">
-          {archive.kickoff.history.length} session{archive.kickoff.history.length !== 1 ? "s" : ""} ({archive.kickoff.history.reduce((n, s) => n + ((s.entries as KickoffEntry[])?.length ?? 0), 0)} kickoffs)
-        </p>
-      </section>
-    </div>
-  );
-}
-
-function MiniStat({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
-  return (
-    <div className="bg-surface border border-border rounded-input p-2">
-      <p className="text-[10px] text-muted uppercase tracking-wider">{label}</p>
-      <p className={clsx("text-lg font-bold mt-0.5", highlight ? "text-accent" : "text-slate-100")}>{value}</p>
+      {/* Sport stats */}
+      {sportTab === "fg" && (
+        fgTotal > 0 ? <FGArchiveStats athletes={fgAthletes} statsMap={fgStats} /> : <p className="text-sm text-muted">No FG data in this archive.</p>
+      )}
+      {sportTab === "punt" && (
+        puntTotal > 0 ? <PuntArchiveStats athletes={puntAthletes} statsMap={puntStats} /> : <p className="text-sm text-muted">No punt data in this archive.</p>
+      )}
+      {sportTab === "kickoff" && (
+        koTotal > 0 ? <KOArchiveStats athletes={koAthletes} entries={koEntries} /> : <p className="text-sm text-muted">No kickoff data in this archive.</p>
+      )}
     </div>
   );
 }
