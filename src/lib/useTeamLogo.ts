@@ -7,7 +7,10 @@ import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite } from "@/l
 const STORAGE_KEY = "team_logo";
 
 export function useTeamLogo() {
-  const [logo, setLogo] = useState<string | null>(null);
+  const [logo, setLogo] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
+  });
 
   // Load from teams table on mount
   useEffect(() => {
