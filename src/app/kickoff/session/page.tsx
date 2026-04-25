@@ -1142,9 +1142,9 @@ export default function KickoffSessionPage() {
                         if (metric === "none") return null;
                         return (
                           <div>
-                            <p className="label">{metric === "yardline" ? "Yard Line" : "Distance (yds)"}</p>
+                            <p className={clsx("label", metric === "yardline" && "text-accent")}>{metric === "yardline" ? "Yard Line" : "Distance (yds)"}</p>
                             <input
-                              className="input text-center text-lg font-bold"
+                              className={clsx("input text-center text-lg font-bold", metric === "yardline" && "text-accent")}
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
