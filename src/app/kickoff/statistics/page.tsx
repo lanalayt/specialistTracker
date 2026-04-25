@@ -151,11 +151,13 @@ function ezPct(s: AthleteKOStats): string {
   return s.att > 0 ? `${Math.round((s.endzones / s.att) * 100)}%` : "—";
 }
 
-function StatTable({ athletes, statsMap, showEZ = true }: {
+function StatTable({ athletes, statsMap, showEZ = true, metric }: {
   athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteKOStats>;
   showEZ?: boolean;
+  metric?: "distance" | "yardline" | "none";
 }) {
+  const isYL = metric === "yardline";
   const visible = athletes.filter((a) => (statsMap[a.name]?.att ?? 0) > 0);
   if (visible.length === 0) {
     return <p className="text-xs text-muted p-2">No data.</p>;
@@ -166,7 +168,7 @@ function StatTable({ athletes, statsMap, showEZ = true }: {
         <tr>
           <th className="table-header text-left">Athlete</th>
           <th className="table-header">KOs</th>
-          <th className="table-header">Dist</th>
+          <th className={clsx("table-header", isYL && "text-accent")}>{isYL ? "YL" : "Dist"}</th>
           <th className="table-header">Hang</th>
           {showEZ && <th className="table-header">EZ %</th>}
           <th className="table-header">Dir %</th>
@@ -179,7 +181,7 @@ function StatTable({ athletes, statsMap, showEZ = true }: {
             <tr key={a.id} className="hover:bg-surface/30">
               <td className="table-name">{a.name}</td>
               <td className="table-cell">{s.att}</td>
-              <td className="table-cell">{avgDist(s)}</td>
+              <td className={clsx("table-cell", isYL ? "text-accent font-semibold" : "")}>{avgDist(s)}</td>
               <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>
               {showEZ && <td className="table-cell text-make font-semibold">{ezPct(s)}</td>}
               <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
@@ -215,22 +217,26 @@ function CategorySection({
   catStats,
   catTypeIds,
   typeLabels,
+  typeMetrics,
   allTypeStats,
   history,
   catFilter,
   directions,
   showEZ = true,
+  catMetric,
 }: {
   title: string;
   athletes: { id: string; name: string }[];
   catStats: Record<string, AthleteKOStats>;
   catTypeIds: string[];
   typeLabels: Record<string, string>;
+  typeMetrics: Record<string, "distance" | "yardline" | "none">;
   allTypeStats: Record<string, Record<string, AthleteKOStats>>;
   history: { entries?: KickoffEntry[] }[];
   catFilter: (e: KickoffEntry) => boolean;
   directions?: { id: string; score?: number }[];
   showEZ?: boolean;
+  catMetric?: "distance" | "yardline" | "none";
 }) {
   const activeTypes = catTypeIds.filter((type) =>
     athletes.some((a) => (allTypeStats[type]?.[a.name]?.att ?? 0) > 0)
@@ -276,7 +282,7 @@ function CategorySection({
 
       {/* Overall */}
       <section className="card-2">
-        <StatTable athletes={athletes} statsMap={catStats} showEZ={showEZ} />
+        <StatTable athletes={athletes} statsMap={catStats} showEZ={showEZ} metric={catMetric} />
       </section>
 
       {/* Tab toggle: By Type, then each type's position breakdown */}
@@ -312,7 +318,7 @@ function CategorySection({
           {activeTypes.map((type) => (
             <div key={type} className="card-2">
               <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
-              <StatTable athletes={athletes} statsMap={allTypeStats[type] ?? {}} showEZ={showEZ} />
+              <StatTable athletes={athletes} statsMap={allTypeStats[type] ?? {}} showEZ={showEZ} metric={typeMetrics[type]} />
             </div>
           ))}
         </div>
@@ -328,7 +334,7 @@ function CategorySection({
             return (
               <div key={hash} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
-                <StatTable athletes={athletes} statsMap={hashStats} showEZ={showEZ} />
+                <StatTable athletes={athletes} statsMap={hashStats} showEZ={showEZ} metric={typeMetrics[subTab]} />
               </div>
             );
           })}
@@ -345,7 +351,7 @@ function CategorySection({
             return (
               <div key={hash} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
-                <StatTable athletes={athletes} statsMap={hashStats} showEZ={showEZ} />
+                <StatTable athletes={athletes} statsMap={hashStats} showEZ={showEZ} metric={catMetric} />
               </div>
             );
           })}
@@ -461,6 +467,21 @@ export default function KickoffStatisticsPage() {
     return map;
   }, [koSettings.types]);
 
+  // Type metrics map
+  const typeMetrics = useMemo(() => {
+    const map: Record<string, "distance" | "yardline" | "none"> = {};
+    koSettings.types.forEach((t) => { map[t.id] = t.metric; });
+    return map;
+  }, [koSettings.types]);
+
+  // Determine dominant metric for a category (if all types share the same metric)
+  const getCatMetric = (catId: string): "distance" | "yardline" | "none" | undefined => {
+    const catTypes = koSettings.types.filter((t) => t.category === catId);
+    if (catTypes.length === 0) return undefined;
+    const metrics = new Set(catTypes.map((t) => t.metric));
+    return metrics.size === 1 ? catTypes[0].metric : undefined;
+  };
+
   // Categories with data
   const activeCats = useMemo(() => {
     return koSettings.categories.filter((c) => {
@@ -553,11 +574,13 @@ export default function KickoffStatisticsPage() {
           catStats={categoryStats[selectedCat.id]}
           catTypeIds={typesByCategory[selectedCat.id] ?? []}
           typeLabels={typeLabels}
+          typeMetrics={typeMetrics}
           allTypeStats={allTypeStats}
           history={filteredHistory}
           catFilter={(e) => typeToCategory(e.type) === selectedCat.id}
           directions={koSettings.directions}
           showEZ={selectedCat.id === "DEEP"}
+          catMetric={getCatMetric(selectedCat.id)}
         />
       )}
     </main>
