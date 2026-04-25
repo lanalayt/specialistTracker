@@ -136,18 +136,21 @@ function PuntStatTable({
   athletes,
   statsMap,
   getBucket,
+  metric,
 }: {
   athletes: { id: string; name: string }[];
   statsMap: Record<string, PuntAthleteStats>;
   getBucket: (s: PuntAthleteStats) => PuntStatBucket;
+  metric?: "distance" | "yardline";
 }) {
+  const isYL = metric === "yardline";
   return (
     <table className="w-full text-xs">
       <thead>
         <tr>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
-          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Dist</th>
+          <th className={clsx("text-[10px] font-semibold uppercase tracking-wider text-right py-1.5 px-1.5", isYL ? "text-accent" : "text-muted")}>{isYL ? "YL" : "Dist"}</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
@@ -164,7 +167,7 @@ function PuntStatTable({
             <tr key={a.id} className="hover:bg-surface/30 transition-colors">
               <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{b.att || "—"}</td>
-              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgYds(b)}</td>
+              <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", isYL ? "text-accent font-semibold" : "text-slate-200")}>{avgYds(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgHT(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgOT(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgDA(b)}</td>
@@ -202,6 +205,7 @@ function CategorySection({
   statsMap,
   catTypeIds,
   typeLabels,
+  typeMetrics,
   isPoochCat,
   hasPoochData,
   poochYLStats,
@@ -214,6 +218,7 @@ function CategorySection({
   statsMap: Record<string, PuntAthleteStats>;
   catTypeIds: string[];
   typeLabels: Record<string, string>;
+  typeMetrics: Record<string, "distance" | "yardline">;
   isPoochCat: boolean;
   hasPoochData: boolean;
   poochYLStats: Record<string, { att: number; total: number }>;
@@ -335,7 +340,7 @@ function CategorySection({
           {activeTypes.map((type) => (
             <div key={type} className="card-2">
               <p className="text-xs font-semibold text-slate-300 mb-2">{typeLabels[type] ?? type}</p>
-              <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} />
+              <PuntStatTable athletes={athletes} statsMap={statsMap} getBucket={(s) => s.byType[type]} metric={typeMetrics[type]} />
             </div>
           ))}
         </div>
@@ -351,7 +356,7 @@ function CategorySection({
             return (
               <div key={hash} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[hash]}</p>
-                <PuntStatTable athletes={athletes} statsMap={typeStats} getBucket={(s) => s.byHash[hash]} />
+                <PuntStatTable athletes={athletes} statsMap={typeStats} getBucket={(s) => s.byHash[hash]} metric={typeMetrics[subTab]} />
               </div>
             );
           })}
@@ -383,6 +388,7 @@ function PuntStatsView({
   puntTypes,
   puntCategories,
   typeLabels,
+  typeMetrics,
   label,
   history,
   puntFilter,
@@ -392,6 +398,7 @@ function PuntStatsView({
   puntTypes: PuntTypeConfig[];
   puntCategories: PuntCategoryConfig[];
   typeLabels: Record<string, string>;
+  typeMetrics: Record<string, "distance" | "yardline">;
   label: string;
   history: { entries?: PuntEntry[] }[];
   puntFilter?: (p: PuntEntry) => boolean;
@@ -534,6 +541,7 @@ function PuntStatsView({
           statsMap={statsMap}
           catTypeIds={typesByCategory[selectedCat.id] ?? []}
           typeLabels={typeLabels}
+          typeMetrics={typeMetrics}
           isPoochCat={selectedCat.id === "POOCH"}
           hasPoochData={hasPoochData}
           poochYLStats={poochYLStats}
@@ -550,6 +558,7 @@ export default function PuntingStatisticsPage() {
   const [puntTypes, setPuntTypes] = useState(DEFAULT_PUNT_TYPES);
   const [puntCategories, setPuntCategories] = useState(DEFAULT_CATEGORIES);
   const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
+  const [typeMetrics, setTypeMetrics] = useState<Record<string, "distance" | "yardline">>({});
   const [tab, setTab] = useState<"all" | "starred">("all");
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
   const dateFilter = useDateRangeFilter();
@@ -572,8 +581,10 @@ export default function PuntingStatisticsPage() {
     setPuntTypes(types);
     setPuntCategories(categories);
     const map: Record<string, string> = {};
-    types.forEach((t) => { map[t.id] = t.label; });
+    const metrics: Record<string, "distance" | "yardline"> = {};
+    types.forEach((t) => { map[t.id] = t.label; metrics[t.id] = t.metric; });
     setTypeLabels(map);
+    setTypeMetrics(metrics);
   }, []);
 
   const modeHistory = useMemo(() => {
@@ -706,6 +717,7 @@ export default function PuntingStatisticsPage() {
           puntTypes={puntTypes}
           puntCategories={puntCategories}
           typeLabels={typeLabels}
+          typeMetrics={typeMetrics}
           label="Punts"
           history={filteredHistory}
           puntFilter={!hasStarred || !excludeLiveReps ? undefined : (p) => !p.starred}
@@ -719,6 +731,7 @@ export default function PuntingStatisticsPage() {
           puntTypes={puntTypes}
           puntCategories={puntCategories}
           typeLabels={typeLabels}
+          typeMetrics={typeMetrics}
           label="Live Reps"
           history={filteredHistory}
           puntFilter={(p) => !!p.starred}

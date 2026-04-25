@@ -231,16 +231,18 @@ function avgHT(b: PuntStatBucket): string { const c = b.hangAtt ?? b.att; return
 function avgOT(b: PuntStatBucket): string { const c = b.opTimeAtt ?? b.att; return c === 0 ? "—" : (b.totalOpTime / c).toFixed(2); }
 function avgDA(b: PuntStatBucket): string { const c = b.daAtt ?? b.att; return c === 0 ? "—" : `${Math.round((b.totalDirectionalAccuracy / c) * 100)}%`; }
 
-function PuntStatTable({ athletes, statsMap, getBucket }: {
+function PuntStatTable({ athletes, statsMap, getBucket, metric }: {
   athletes: SimpleAthlete[]; statsMap: Record<string, PuntAthleteStats>;
   getBucket: (s: PuntAthleteStats) => PuntStatBucket;
+  metric?: "distance" | "yardline";
 }) {
+  const isYL = metric === "yardline";
   return (
     <table className="w-full text-xs">
       <thead><tr>
         <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
         <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
-        <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Dist</th>
+        <th className={clsx("text-[10px] font-semibold uppercase tracking-wider text-right py-1.5 px-1.5", isYL ? "text-accent" : "text-muted")}>{isYL ? "YL" : "Dist"}</th>
         <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
         <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
         <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
@@ -254,7 +256,7 @@ function PuntStatTable({ athletes, statsMap, getBucket }: {
             <tr key={a.id} className="hover:bg-surface/30 transition-colors">
               <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{b.att || "—"}</td>
-              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgYds(b)}</td>
+              <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", isYL ? "text-accent font-semibold" : "text-slate-200")}>{avgYds(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgHT(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgOT(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgDA(b)}</td>
