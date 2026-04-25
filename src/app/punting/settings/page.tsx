@@ -441,19 +441,11 @@ export default function PuntSettingsPage() {
             </div>
 
             <p className="label">Direction Options<Tooltip text={dirMode === "numeric" ? "Fixed scoring: 1.0 (on target), 0.5 (close), 0 (critical miss)." : "Assign a point value to each zone. Direction % = total points / attempts."} /></p>
-            {dirMode === "numeric" ? (
-              <div className="space-y-2">
-                {NUMERIC_DIRECTIONS.map((d) => (
-                  <div key={d.id} className="flex items-center gap-2">
-                    <span className="flex-1 bg-surface-2 border border-border text-slate-400 px-3 py-2 rounded-input text-sm">{d.label}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
+            <>
                 <div className="space-y-2">
                   {dirOptions.map((d) => (
                     <div key={d.id} className="flex items-center gap-2">
+                      {dirMode === "field" && (
                       <select
                         value={d.score ?? 0}
                         onChange={(e) => setDirOptions(dirOptions.map((x) => (x.id === d.id ? { ...x, score: parseFloat(e.target.value) } : x)))}
@@ -464,6 +456,7 @@ export default function PuntSettingsPage() {
                         <option value={0}>0</option>
                         <option value={-1}>-1</option>
                       </select>
+                      )}
                       <input
                         type="text"
                         value={d.label}
@@ -498,7 +491,6 @@ export default function PuntSettingsPage() {
                   </button>
                 </div>
               </>
-            )}
           </>
         )}
       </div>

@@ -412,19 +412,11 @@ export default function KickoffSettingsPage() {
             </div>
 
             <p className="label">Direction Options<Tooltip text={dirMode === "numeric" ? "Fixed scoring: 1.0 (on target), 0.5 (close), 0 (critical miss)." : "Assign a point value to each zone. Direction % = total points / attempts."} /></p>
-        {dirMode === "numeric" ? (
-          <div className="space-y-2">
-            {NUMERIC_DIRECTIONS.map((d) => (
-              <div key={d.id} className="flex items-center gap-2">
-                <span className="flex-1 bg-surface-2 border border-border text-slate-400 px-3 py-2 rounded-input text-sm">{d.label}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <>
+        <>
             <div className="space-y-2">
               {directions.map((d) => (
                 <div key={d.id} className="flex items-center gap-2">
+                  {dirMode === "field" && (
                   <select
                     value={d.score ?? 0}
                     onChange={(e) => setDirections(directions.map((x) => (x.id === d.id ? { ...x, score: parseFloat(e.target.value) } : x)))}
@@ -435,6 +427,7 @@ export default function KickoffSettingsPage() {
                     <option value={0}>0</option>
                     <option value={-1}>-1</option>
                   </select>
+                  )}
                   <input
                     type="text"
                     value={d.label}
@@ -444,35 +437,31 @@ export default function KickoffSettingsPage() {
                   <button
                     onClick={() => setDirections(directions.filter((x) => x.id !== d.id))}
                     className="w-8 h-8 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm"
-                    title="Remove metric"
+                    title="Remove option"
                   >
                     ×
                   </button>
                 </div>
               ))}
             </div>
-
             <div className="flex gap-2">
               <input
                 type="text"
                 value={newDir}
                 onChange={(e) => setNewDir(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAddDir();
-            }}
-            placeholder="Add new direction..."
-            className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-          />
-          <button
-            onClick={handleAddDir}
-            disabled={!newDir.trim()}
-            className="px-4 py-2 rounded-input text-sm font-semibold bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            + Add
-          </button>
-        </div>
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddDir(); }}
+                placeholder="Add direction option..."
+                className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+              />
+              <button
+                onClick={handleAddDir}
+                disabled={!newDir.trim()}
+                className="px-4 py-2 rounded-input text-sm font-semibold bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                + Add
+              </button>
+            </div>
           </>
-        )}
           </>
         )}
       </div>
