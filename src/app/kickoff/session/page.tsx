@@ -1304,9 +1304,11 @@ export default function KickoffSessionPage() {
               const sAtt = sessionKicks.length;
               const sTB = sessionKicks.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
               const sTBRate = sAtt > 0 ? `${Math.round((sTB / sAtt) * 100)}%` : "—";
-              const kicksWithDist = sessionKicks.filter((k) => k.distance > 0);
+              const distKicks = sessionKicks.filter((k) => k.distance > 0 && (koTypes.find((t) => t.id === k.type)?.metric ?? "distance") === "distance");
+              const ylKicks = sessionKicks.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "yardline");
               const kicksWithHang = sessionKicks.filter((k) => k.hangTime > 0);
-              const sAvgDist = kicksWithDist.length > 0 ? (kicksWithDist.reduce((s, k) => s + k.distance, 0) / kicksWithDist.length).toFixed(1) : "—";
+              const sAvgDist = distKicks.length > 0 ? (distKicks.reduce((s, k) => s + k.distance, 0) / distKicks.length).toFixed(1) : null;
+              const sAvgYL = ylKicks.length > 0 ? (ylKicks.reduce((s, k) => s + k.distance, 0) / ylKicks.length).toFixed(1) : null;
               const sAvgHang = kicksWithHang.length > 0 ? (kicksWithHang.reduce((s, k) => s + k.hangTime, 0) / kicksWithHang.length).toFixed(2) : "—";
               const sZoneData = KICKOFF_ZONES.map((z) => ({
                 zone: z === "TB" ? "TB" : `Zone ${z}`,
@@ -1316,7 +1318,8 @@ export default function KickoffSessionPage() {
                 <>
                   <div className="grid grid-cols-3 gap-2">
                     <StatCard label="TB Rate" value={sTBRate} accent glow />
-                    <StatCard label="Avg Dist" value={sAtt > 0 ? `${sAvgDist} yd` : "—"} />
+                    {sAvgDist && <StatCard label="Avg Dist" value={`${sAvgDist} yd`} />}
+                    {sAvgYL && <StatCard label="Avg YL" value={sAvgYL} accent />}
                     <StatCard label="Avg Hang" value={sAtt > 0 ? `${sAvgHang}s` : "—"} />
                   </div>
                   <ZoneBarChart data={sZoneData} />

@@ -20,6 +20,10 @@ interface KickoffSessionSummaryProps {
   typeConfigs?: KOTypeConfig[];
 }
 
+function getMetric(type: string, typeConfigs?: KOTypeConfig[]): string {
+  return typeConfigs?.find((t) => t.id === type)?.metric ?? "distance";
+}
+
 export function KickoffSessionSummary({
   kicks,
   label,
@@ -29,7 +33,6 @@ export function KickoffSessionSummary({
   typeConfigs,
 }: KickoffSessionSummaryProps) {
   // In practice mode, only show deep kickoffs in the recap
-  // In game mode, show all kickoffs
   const recapKicks = sessionMode === "practice" && typeConfigs
     ? kicks.filter((k) => {
         const cfg = typeConfigs.find((t) => t.id === k.type);
@@ -37,29 +40,39 @@ export function KickoffSessionSummary({
       })
     : kicks;
 
-  const distEntries = recapKicks.filter((k) => k.distance > 0);
+  // Separate distance vs yardline kicks
+  const distKicks = recapKicks.filter((k) => k.distance > 0 && getMetric(k.type, typeConfigs) === "distance");
+  const ylKicks = recapKicks.filter((k) => k.distance > 0 && getMetric(k.type, typeConfigs) === "yardline");
   const htEntries = recapKicks.filter((k) => k.hangTime > 0);
-  const totalDist = distEntries.reduce((s, k) => s + k.distance, 0);
-  const totalHang = htEntries.reduce((s, k) => s + k.hangTime, 0);
-  const avgDist = distEntries.length > 0 ? (totalDist / distEntries.length).toFixed(1) : "—";
-  const avgHT = htEntries.length > 0 ? (totalHang / htEntries.length).toFixed(2) : "—";
+
+  const avgDist = distKicks.length > 0 ? (distKicks.reduce((s, k) => s + k.distance, 0) / distKicks.length).toFixed(1) : null;
+  const avgYL = ylKicks.length > 0 ? (ylKicks.reduce((s, k) => s + k.distance, 0) / ylKicks.length).toFixed(1) : null;
+  const avgHT = htEntries.length > 0 ? (htEntries.reduce((s, k) => s + k.hangTime, 0) / htEntries.length).toFixed(2) : "—";
   const athletes = [...new Set(recapKicks.map((k) => k.athlete))];
 
   const byAthlete = athletes.map((a) => {
     const ak = recapKicks.filter((k) => k.athlete === a);
-    const akDist = ak.filter((k) => k.distance > 0);
+    const akDist = ak.filter((k) => k.distance > 0 && getMetric(k.type, typeConfigs) === "distance");
+    const akYL = ak.filter((k) => k.distance > 0 && getMetric(k.type, typeConfigs) === "yardline");
     const akHt = ak.filter((k) => k.hangTime > 0);
-    const aDist = akDist.reduce((s, k) => s + k.distance, 0);
-    const aHt = akHt.reduce((s, k) => s + k.hangTime, 0);
     return {
       name: a,
       count: ak.length,
-      avgDist: akDist.length > 0 ? (aDist / akDist.length).toFixed(1) : "—",
-      avgHT: akHt.length > 0 ? (aHt / akHt.length).toFixed(2) : "—",
+      avgDist: akDist.length > 0 ? (akDist.reduce((s, k) => s + k.distance, 0) / akDist.length).toFixed(1) : null,
+      avgYL: akYL.length > 0 ? (akYL.reduce((s, k) => s + k.distance, 0) / akYL.length).toFixed(1) : null,
+      avgHT: akHt.length > 0 ? (akHt.reduce((s, k) => s + k.hangTime, 0) / akHt.length).toFixed(2) : "—",
     };
   });
 
   const nonDeepCount = kicks.length - recapKicks.length;
+
+  // How many summary stat cards to show
+  const statCards: { value: string; label: string; color: string }[] = [
+    { value: String(recapKicks.length), label: sessionMode === "practice" ? "Deep KOs" : "Kickoffs", color: "text-accent" },
+  ];
+  if (avgDist) statCards.push({ value: avgDist, label: "Avg Dist", color: "text-make" });
+  if (avgYL) statCards.push({ value: avgYL, label: "Avg YL", color: "text-accent" });
+  statCards.push({ value: `${avgHT}s`, label: "Avg HT", color: "text-slate-100" });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -78,21 +91,13 @@ export function KickoffSessionSummary({
             </p>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="card-2 text-center">
-              <p className="text-2xl font-extrabold text-accent">{recapKicks.length}</p>
-              <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">
-                {sessionMode === "practice" ? "Deep KOs" : "Kickoffs"}
-              </p>
-            </div>
-            <div className="card-2 text-center">
-              <p className="text-2xl font-extrabold text-make">{avgDist}</p>
-              <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Avg Dist</p>
-            </div>
-            <div className="card-2 text-center">
-              <p className="text-2xl font-extrabold text-slate-100">{avgHT}s</p>
-              <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Avg HT</p>
-            </div>
+          <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${Math.min(statCards.length, 4)}, minmax(0, 1fr))` }}>
+            {statCards.map((card) => (
+              <div key={card.label} className="card-2 text-center">
+                <p className={`text-2xl font-extrabold ${card.color}`}>{card.value}</p>
+                <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">{card.label}</p>
+              </div>
+            ))}
           </div>
 
           {byAthlete.length > 0 && (
@@ -104,8 +109,9 @@ export function KickoffSessionSummary({
               <div key={a.name} className="flex items-center justify-between text-sm">
                 <span className="font-medium text-slate-200">{a.name}</span>
                 <span className="text-muted">
-                  {a.count} kicks ·{" "}
-                  <span className="text-accent font-semibold">{a.avgDist} avg</span>
+                  {a.count} kicks
+                  {a.avgDist && <> · <span className="text-slate-300 font-semibold">{a.avgDist} yd</span></>}
+                  {a.avgYL && <> · <span className="text-accent font-semibold">{a.avgYL} YL</span></>}
                   {a.avgHT !== "—" && <span className="text-slate-300"> · {a.avgHT}s</span>}
                 </span>
               </div>
