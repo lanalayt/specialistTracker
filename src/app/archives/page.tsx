@@ -117,8 +117,8 @@ function FGArchiveStats({ athletes, statsMap }: { athletes: SimpleAthlete[]; sta
             <thead><tr>
               <th className="table-header text-left">Athlete</th>
               <th className="table-header">Left</th>
-              <th className="table-header">Right</th>
               <th className="table-header">Short</th>
+              <th className="table-header">Right</th>
               <th className="table-header">Total</th>
             </tr></thead>
             <tbody>
@@ -129,8 +129,8 @@ function FGArchiveStats({ athletes, statsMap }: { athletes: SimpleAthlete[]; sta
                   <tr key={a.id} className="hover:bg-surface/30 transition-colors">
                     <td className="table-name">{a.name}</td>
                     <td className="table-cell text-miss">{s.miss.XL || "—"}</td>
-                    <td className="table-cell text-miss">{s.miss.XR || "—"}</td>
                     <td className="table-cell text-miss">{s.miss.XS || "—"}</td>
+                    <td className="table-cell text-miss">{s.miss.XR || "—"}</td>
                     <td className="table-cell text-miss font-semibold">{total || "—"}</td>
                   </tr>
                 );

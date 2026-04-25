@@ -177,8 +177,8 @@ function FGStatsView({
               <tr>
                 <th className="table-header text-left">Athlete</th>
                 <th className="table-header"><span className="hidden sm:inline">Miss </span>Left</th>
-                <th className="table-header"><span className="hidden sm:inline">Miss </span>Right</th>
                 <th className="table-header"><span className="hidden sm:inline">Miss </span>Short</th>
+                <th className="table-header"><span className="hidden sm:inline">Miss </span>Right</th>
                 <th className="table-header">Total</th>
               </tr>
             </thead>
@@ -191,8 +191,8 @@ function FGStatsView({
                   <tr key={a.id} className="hover:bg-surface/30 transition-colors">
                     <td className="table-name">{a.name}</td>
                     <td className="table-cell text-miss">{s.miss.XL || "—"}</td>
-                    <td className="table-cell text-miss">{s.miss.XR || "—"}</td>
                     <td className="table-cell text-miss">{s.miss.XS || "—"}</td>
+                    <td className="table-cell text-miss">{s.miss.XR || "—"}</td>
                     <td className="table-cell text-miss font-semibold">{total || "—"}</td>
                   </tr>
                 );
