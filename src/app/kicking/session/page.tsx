@@ -1129,7 +1129,7 @@ export default function KickingSessionPage() {
                             </div>
                           </div>
                           <div className="shrink-0">
-                            <p className="label">Distance (yd)</p>
+                            <p className="label text-slate-100">Distance (yd)</p>
                             <input
                               className="input w-20 text-center text-lg font-bold"
                               type="text"
@@ -1146,7 +1146,7 @@ export default function KickingSessionPage() {
                         </>
                       )}
                       <div className="flex-1">
-                        <p className="label">Position</p>
+                        <p className="label text-slate-100">Position</p>
                         <div className="flex gap-1.5">
                           {POSITIONS.map((p) => (
                             <button
@@ -1201,7 +1201,7 @@ export default function KickingSessionPage() {
 
                     {/* Result buttons */}
                     <div>
-                      <p className="label">Result</p>
+                      <p className="label text-slate-100">Result</p>
                       <div className="space-y-1.5">
                         {makeMode === "simple" ? (
                           <div>
@@ -1275,7 +1275,7 @@ export default function KickingSessionPage() {
                     <div className="flex gap-3 items-end">
                       {scoreEnabled && (
                       <div className="flex-1 min-w-0">
-                        <p className="label">Score</p>
+                        <p className="label text-slate-100">Score</p>
                         <div className="flex gap-1.5 flex-wrap">
                           {scoreOptions.map((opt) => {
                             const n = parseInt(opt);
@@ -1300,7 +1300,7 @@ export default function KickingSessionPage() {
                       )}
                       {opTimeEnabled && (
                       <div className="w-20 shrink-0">
-                        <p className="label">OT</p>
+                        <p className="label text-slate-100">OT</p>
                         <input
                           type="text"
                           inputMode="numeric"
