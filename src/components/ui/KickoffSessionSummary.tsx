@@ -3,11 +3,21 @@
 import React from "react";
 import type { KickoffEntry } from "@/types";
 
+interface KOTypeConfig {
+  id: string;
+  label: string;
+  category: string;
+  metric: string;
+  hangTime: boolean;
+}
+
 interface KickoffSessionSummaryProps {
   kicks: KickoffEntry[];
   label: string;
   onConfirm: () => void;
   onCancel: () => void;
+  sessionMode?: "practice" | "game";
+  typeConfigs?: KOTypeConfig[];
 }
 
 export function KickoffSessionSummary({
@@ -15,17 +25,28 @@ export function KickoffSessionSummary({
   label,
   onConfirm,
   onCancel,
+  sessionMode = "practice",
+  typeConfigs,
 }: KickoffSessionSummaryProps) {
-  const distEntries = kicks.filter((k) => k.distance > 0);
-  const htEntries = kicks.filter((k) => k.hangTime > 0);
+  // In practice mode, only show deep kickoffs in the recap
+  // In game mode, show all kickoffs
+  const recapKicks = sessionMode === "practice" && typeConfigs
+    ? kicks.filter((k) => {
+        const cfg = typeConfigs.find((t) => t.id === k.type);
+        return cfg ? cfg.category === "DEEP" : true;
+      })
+    : kicks;
+
+  const distEntries = recapKicks.filter((k) => k.distance > 0);
+  const htEntries = recapKicks.filter((k) => k.hangTime > 0);
   const totalDist = distEntries.reduce((s, k) => s + k.distance, 0);
   const totalHang = htEntries.reduce((s, k) => s + k.hangTime, 0);
   const avgDist = distEntries.length > 0 ? (totalDist / distEntries.length).toFixed(1) : "—";
   const avgHT = htEntries.length > 0 ? (totalHang / htEntries.length).toFixed(2) : "—";
-  const athletes = [...new Set(kicks.map((k) => k.athlete))];
+  const athletes = [...new Set(recapKicks.map((k) => k.athlete))];
 
   const byAthlete = athletes.map((a) => {
-    const ak = kicks.filter((k) => k.athlete === a);
+    const ak = recapKicks.filter((k) => k.athlete === a);
     const akDist = ak.filter((k) => k.distance > 0);
     const akHt = ak.filter((k) => k.hangTime > 0);
     const aDist = akDist.reduce((s, k) => s + k.distance, 0);
@@ -38,19 +59,31 @@ export function KickoffSessionSummary({
     };
   });
 
+  const nonDeepCount = kicks.length - recapKicks.length;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-surface border border-border rounded-card w-full max-w-md shadow-accent-lg">
         <div className="p-5 border-b border-border">
-          <h2 className="text-lg font-bold text-slate-100">Commit Practice</h2>
+          <h2 className="text-lg font-bold text-slate-100">
+            {sessionMode === "game" ? "Commit Game" : "Commit Practice"}
+          </h2>
           <p className="text-sm text-muted mt-0.5">{label}</p>
         </div>
 
         <div className="p-5 space-y-4">
+          {sessionMode === "practice" && nonDeepCount > 0 && (
+            <p className="text-[10px] text-muted">
+              Showing deep kickoffs only. {nonDeepCount} other kickoff{nonDeepCount !== 1 ? "s" : ""} (sky, squib, onside) will still be saved.
+            </p>
+          )}
+
           <div className="grid grid-cols-3 gap-3">
             <div className="card-2 text-center">
-              <p className="text-2xl font-extrabold text-accent">{kicks.length}</p>
-              <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">Kickoffs</p>
+              <p className="text-2xl font-extrabold text-accent">{recapKicks.length}</p>
+              <p className="text-[10px] text-muted uppercase tracking-wider mt-0.5">
+                {sessionMode === "practice" ? "Deep KOs" : "Kickoffs"}
+              </p>
             </div>
             <div className="card-2 text-center">
               <p className="text-2xl font-extrabold text-make">{avgDist}</p>
@@ -62,6 +95,7 @@ export function KickoffSessionSummary({
             </div>
           </div>
 
+          {byAthlete.length > 0 && (
           <div className="card-2 space-y-1.5">
             <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
               By Athlete
@@ -77,9 +111,10 @@ export function KickoffSessionSummary({
               </div>
             ))}
           </div>
+          )}
 
           <p className="text-xs text-muted">
-            This will be added to cumulative stats. You can undo once after committing.
+            This will save all {kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} to cumulative stats. You can undo once after committing.
           </p>
         </div>
 

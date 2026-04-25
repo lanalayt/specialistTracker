@@ -1336,6 +1336,8 @@ export default function KickoffSessionPage() {
             })}
             onConfirm={handleConfirmCommit}
             onCancel={() => setPendingKicks(null)}
+            sessionMode={sessionMode}
+            typeConfigs={koTypes}
           />
         )}
       </>
@@ -2063,6 +2065,8 @@ export default function KickoffSessionPage() {
           })}
           onConfirm={handleConfirmCommit}
           onCancel={() => setPendingKicks(null)}
+          sessionMode={sessionMode}
+          typeConfigs={koTypes}
         />
       )}
     </>
