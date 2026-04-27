@@ -41,7 +41,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
         ref={containerRef}
         onClick={handleClick}
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none"
-        style={{ width: 220, height: 460, background: "rgba(30,41,59,0.3)" }}
+        style={{ width: 280, height: 500, background: "rgba(30,41,59,0.3)" }}
       >
         {/* Player SVG */}
         <svg

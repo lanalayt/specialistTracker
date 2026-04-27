@@ -102,7 +102,7 @@ export default function LongSnapPuntSessionPage() {
     // Find the row index for this snap number (1-based → match to filled rows or sequential rows)
     const rowIdx = marker.num - 1;
     if (rowIdx < rows.length) {
-      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: marker.inZone ? "Ball" : "Strike" } : r));
+      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: marker.inZone ? "Strike" : "Ball" } : r));
     }
     setSnapMarkers((prev) => [...prev, marker]);
   };
