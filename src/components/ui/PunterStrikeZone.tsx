@@ -16,7 +16,12 @@ interface PunterStrikeZoneProps {
 }
 
 // Strike zone bounds as percentages of the clickable area
-const ZONE = { top: 28, bottom: 72, left: 24, right: 76 };
+// Strike zone: nipple (~y=110/480) to knee (~y=300/480) of player SVG
+// Player is 88% of container height, anchored to bottom
+// nipple in container: 100 - 88 + 88*(110/480) = 12 + 20.2 = ~32%
+// knee in container: 100 - 88 + 88*(300/480) = 12 + 55 = ~67%
+// body width ~60-140 out of 200 SVG, player centered, ~1 ball outside
+const ZONE = { top: 32, bottom: 67, left: 26, right: 74 };
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
@@ -41,13 +46,13 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
         ref={containerRef}
         onClick={handleClick}
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none"
-        style={{ width: 280, height: 520, background: "rgba(30,41,59,0.3)" }}
+        style={{ width: 280, height: 480, background: "rgba(30,41,59,0.3)" }}
       >
-        {/* Player SVG */}
+        {/* Player SVG — anchored to bottom, space above head */}
         <svg
           viewBox="0 0 200 480"
           className="absolute drop-shadow-lg pointer-events-none"
-          style={{ top: "10%", left: "50%", transform: "translateX(-50%)", height: "85%", width: "auto" }}
+          style={{ bottom: "8px", left: "50%", transform: "translateX(-50%)", height: "88%", width: "auto" }}
         >
           <defs>
             <linearGradient id="bodyFill" x1="0" y1="0" x2="0" y2="1">
