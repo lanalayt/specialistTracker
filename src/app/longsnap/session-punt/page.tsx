@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { StatCard } from "@/components/ui/StatCard";
-import { PunterStrikeZone } from "@/components/ui/PunterStrikeZone";
+import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import { makePct, getSnapBenchmark } from "@/lib/stats";
@@ -39,6 +39,7 @@ export default function LongSnapPuntSessionPage() {
   const [weather, setWeather] = useState("");
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [committed, setCommitted] = useState(false);
+  const [snapMarkers, setSnapMarkers] = useState<SnapMarker[]>([]);
 
   const athleteNames = athletes.map((a) => a.name);
 
@@ -94,6 +95,18 @@ export default function LongSnapPuntSessionPage() {
 
   const filledRows = rows.filter((r) => r.athlete || r.time || r.accuracy);
 
+  // Find the next row that needs accuracy filled
+  const nextSnapNum = snapMarkers.length + 1;
+
+  const handleSnapClick = (marker: SnapMarker) => {
+    // Find the row index for this snap number (1-based → match to filled rows or sequential rows)
+    const rowIdx = marker.num - 1;
+    if (rowIdx < rows.length) {
+      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: marker.inZone ? "Ball" : "Strike" } : r));
+    }
+    setSnapMarkers((prev) => [...prev, marker]);
+  };
+
   const formatAutoDecimal = (raw: string): string => {
     const digits = raw.replace(/\D/g, "");
     if (!digits) return "";
@@ -108,7 +121,7 @@ export default function LongSnapPuntSessionPage() {
 
     const snaps: LongSnapEntry[] = filled.map((r) => {
       const time = parseFloat(r.time) || 0;
-      const accuracy = (r.accuracy || "ON_TARGET") as SnapAccuracy;
+      const accuracy: SnapAccuracy = r.accuracy === "Ball" ? "ON_TARGET" : r.accuracy === "Strike" ? "HIGH" : (r.accuracy || "ON_TARGET") as SnapAccuracy;
       return {
         athleteId: r.athlete,
         athlete: r.athlete,
@@ -122,6 +135,7 @@ export default function LongSnapPuntSessionPage() {
 
     commitPractice(snaps, undefined, weather);
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
+    setSnapMarkers([]);
     setWeather("");
     setCommitted(true);
     try { localStorage.removeItem(draftKey()); } catch {}
@@ -202,16 +216,21 @@ export default function LongSnapPuntSessionPage() {
                       className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                     />
                   </td>
-                  <td className="py-1 px-1">
-                    <select
-                      value={row.accuracy}
-                      onChange={(e) => updateRow(idx, "accuracy", e.target.value)}
-                      disabled={viewOnly}
-                      className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
-                    >
-                      <option value="">—</option>
-                      {ACC_OPTIONS.map((a) => <option key={a.value} value={a.value}>{a.label} {a.value === "ON_TARGET" ? "On" : a.value.charAt(0) + a.value.slice(1).toLowerCase()}</option>)}
-                    </select>
+                  <td className="py-1 px-1 text-center">
+                    {row.accuracy === "Ball" || row.accuracy === "Strike" ? (
+                      <span className={clsx("text-xs font-bold", row.accuracy === "Ball" ? "text-make" : "text-miss")}>{row.accuracy}</span>
+                    ) : (
+                      <select
+                        value={row.accuracy}
+                        onChange={(e) => updateRow(idx, "accuracy", e.target.value)}
+                        disabled={viewOnly}
+                        className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
+                      >
+                        <option value="">—</option>
+                        <option value="Ball">Ball</option>
+                        <option value="Strike">Strike</option>
+                      </select>
+                    )}
                   </td>
                   <td className="py-1 px-1 text-center">
                     {!viewOnly && (
@@ -248,7 +267,7 @@ export default function LongSnapPuntSessionPage() {
           <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
           <StatCard label="Punt Snaps" value={totals.att || "—"} />
         </div>
-        <PunterStrikeZone />
+        <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} />
       </div>
     </main>
   );
