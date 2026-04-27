@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { StatCard } from "@/components/ui/StatCard";
 import { SnapEntryCard } from "@/components/ui/SnapEntryCard";
 import { SnapTimeBars } from "@/components/ui/SnapTimeBars";
+import { PunterStrikeZone } from "@/components/ui/PunterStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
@@ -179,6 +180,7 @@ export default function LongSnapPuntSessionPage() {
           <StatCard label="Punt Snaps" value={totals.att || "—"} />
         </div>
         <SnapTimeBars entries={sessionSnaps} athletes={athleteNames} />
+        <PunterStrikeZone />
       </div>
     </main>
   );
