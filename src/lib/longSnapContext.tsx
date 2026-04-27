@@ -23,6 +23,8 @@ interface LongSnapContextValue {
   athletes: StoredAthlete[];
   stats: Record<string, LongSnapAthleteStats>;
   history: Session[];
+  addAthletes: (names: string[]) => void;
+  removeAthlete: (athleteId: string) => void;
   commitPractice: (entries: LongSnapEntry[], label?: string, weather?: string) => Session;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   deleteSession: (sessionId: string) => void;
@@ -123,6 +125,32 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
 
   useAthleteSync(tid, "LONGSNAP", (dbAthletes) => setAthletes(dbAthletes));
 
+  const addAthletes = useCallback((names: string[]) => {
+    const tid = getTeamId();
+    const existing = new Set(athletes.map((a) => a.name));
+    const toAdd = names.filter((n) => n.trim() && !existing.has(n.trim()));
+    if (toAdd.length === 0) return;
+    if (tid && tid !== "local-dev") {
+      stampAthleteWrite(tid);
+      Promise.all(toAdd.map((n) => insertAthlete(tid, "LONGSNAP", n))).then((results) => {
+        const added = results.filter(Boolean) as StoredAthlete[];
+        setAthletes((prev) => [...prev, ...added]);
+      });
+    } else {
+      const added = toAdd.map((n) => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: n.trim() }));
+      setAthletes((prev) => [...prev, ...added]);
+    }
+  }, [athletes]);
+
+  const removeAthleteAction = useCallback((athleteId: string) => {
+    const tid = getTeamId();
+    setAthletes((prev) => prev.filter((a) => a.id !== athleteId));
+    if (tid && tid !== "local-dev") {
+      stampAthleteWrite(tid);
+      removeAthleteRow(tid, athleteId);
+    }
+  }, []);
+
   const commitPractice = useCallback((entries: LongSnapEntry[], label?: string, weather?: string): Session => {
     const tid = getTeamId();
     const session: Session = {
@@ -149,7 +177,7 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LongSnapContext.Provider value={{
-      athletes, stats, history, commitPractice, updateSessionWeather, deleteSession,
+      athletes, stats, history, addAthletes, removeAthlete: removeAthleteAction, commitPractice, updateSessionWeather, deleteSession,
     }}>
       {children}
     </LongSnapContext.Provider>

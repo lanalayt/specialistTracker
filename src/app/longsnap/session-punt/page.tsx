@@ -107,6 +107,16 @@ export default function LongSnapPuntSessionPage() {
     setSnapMarkers((prev) => [...prev, marker]);
   };
 
+  const handleUndoSnap = () => {
+    if (snapMarkers.length === 0) return;
+    const last = snapMarkers[snapMarkers.length - 1];
+    const rowIdx = last.num - 1;
+    if (rowIdx < rows.length) {
+      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: "" } : r));
+    }
+    setSnapMarkers((prev) => prev.slice(0, -1));
+  };
+
   const formatAutoDecimal = (raw: string): string => {
     const digits = raw.replace(/\D/g, "");
     if (!digits) return "";
@@ -268,6 +278,14 @@ export default function LongSnapPuntSessionPage() {
           <StatCard label="Punt Snaps" value={totals.att || "—"} />
         </div>
         <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} />
+        {snapMarkers.length > 0 && (
+          <button
+            onClick={handleUndoSnap}
+            className="w-full text-xs py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
+          >
+            Undo Snap #{snapMarkers.length}
+          </button>
+        )}
       </div>
     </main>
   );
