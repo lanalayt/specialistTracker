@@ -799,9 +799,12 @@ export default function KickoffSessionPage() {
     setWeather("");
     setCommitted(false);
     setSessionActive(false);
-    setSessionMode("practice");
+    setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setOpponent("");
     setGameTime("");
+    if (typeof window !== "undefined") {
+      try { localStorage.removeItem(draftKey(sessionMode)); } catch {}
+    }
   };
 
   const handleSaveDraft = () => {

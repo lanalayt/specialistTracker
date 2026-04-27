@@ -797,9 +797,13 @@ export default function KickingSessionPage() {
     setOpTime("");
     setCommitted(false);
     setSessionActive(false);
-    setSessionMode("practice");
+    setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setOpponent("");
     setGameTime("");
+    // Clear the saved draft for the current mode
+    if (typeof window !== "undefined") {
+      try { localStorage.removeItem(draftKey(sessionMode)); } catch {}
+    }
   };
 
   const saveDraftToCloud = () => {

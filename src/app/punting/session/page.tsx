@@ -1008,9 +1008,12 @@ export default function PuntingSessionPage() {
     setWeather("");
     setCommitted(false);
     setSessionActive(false);
-    setSessionMode("practice");
+    setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setOpponent("");
     setGameTime("");
+    if (typeof window !== "undefined") {
+      try { localStorage.removeItem(draftKey(sessionMode)); } catch {}
+    }
   };
 
   const [clearUndoData, setClearUndoData] = useState<{ rows: typeof rows; sessionPunts: typeof sessionPunts; plannedPunts: typeof plannedPunts; plannedRowIndices: number[]; partialInputs: typeof partialInputs } | null>(null);
