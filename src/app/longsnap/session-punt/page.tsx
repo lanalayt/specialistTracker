@@ -241,7 +241,7 @@ export default function LongSnapPuntSessionPage() {
                   </td>
                   <td className="py-1 px-1 text-center">
                     {row.accuracy === "Ball" || row.accuracy === "Strike" ? (
-                      <span className={clsx("text-xs font-bold", row.accuracy === "Ball" ? "text-make" : "text-miss")}>{row.accuracy}</span>
+                      <span className={clsx("text-xs font-bold", row.accuracy === "Strike" ? "text-make" : "text-miss")}>{row.accuracy}</span>
                     ) : (
                       <select
                         value={row.accuracy}
