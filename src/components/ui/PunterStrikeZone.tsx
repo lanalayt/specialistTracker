@@ -16,12 +16,10 @@ interface PunterStrikeZoneProps {
 }
 
 // Strike zone bounds as percentages of the clickable area
-// Strike zone: nipple (~y=110/480) to knee (~y=300/480) of player SVG
-// Player is 88% of container height, anchored to bottom
-// nipple in container: 100 - 88 + 88*(110/480) = 12 + 20.2 = ~32%
-// knee in container: 100 - 88 + 88*(300/480) = 12 + 55 = ~67%
-// body width ~60-140 out of 200 SVG, player centered, ~1 ball outside
-const ZONE = { top: 32, bottom: 67, left: 26, right: 74 };
+// Strike zone: nipple (~y=110/385) to knee (~y=300/385) of player SVG
+// SVG is 75% width centered, with 40px top margin, ~10px bottom margin
+// These percentages are relative to the outer container
+const ZONE = { top: 30, bottom: 68, left: 24, right: 76 };
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
@@ -45,14 +43,14 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
       <div
         ref={containerRef}
         onClick={handleClick}
-        className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none"
-        style={{ width: 280, height: 480, background: "rgba(30,41,59,0.3)" }}
+        className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden"
+        style={{ width: 280, background: "rgba(30,41,59,0.3)" }}
       >
-        {/* Player SVG — anchored to bottom, space above head */}
+        {/* Player SVG — cropped viewBox to actual content (0-385), centered horizontally */}
         <svg
-          viewBox="0 0 200 480"
-          className="absolute drop-shadow-lg pointer-events-none"
-          style={{ bottom: "8px", left: "50%", transform: "translateX(-50%)", height: "88%", width: "auto" }}
+          viewBox="0 0 200 385"
+          className="block drop-shadow-lg pointer-events-none mx-auto"
+          style={{ width: "75%", marginTop: "40px", marginBottom: "10px" }}
         >
           <defs>
             <linearGradient id="bodyFill" x1="0" y1="0" x2="0" y2="1">
