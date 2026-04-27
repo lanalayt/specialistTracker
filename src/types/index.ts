@@ -148,6 +148,7 @@ export interface KickoffEntry {
   returnYards?: number;
   kickNum?: number;
   endzone?: boolean;
+  fairCatch?: boolean;
   hash?: KickoffHash;
   // Game mode only: absolute field positions 0..100
   los?: number;

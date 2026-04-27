@@ -326,10 +326,10 @@ function PuntArchiveStats({ athletes, statsMap }: { athletes: SimpleAthlete[]; s
 
 const KO_POS_LABELS: Record<KickoffHash, string> = { LH: "Left Hash", LM: "Left Middle", M: "Middle", RM: "Right Middle", RH: "Right Hash" };
 
-interface KOBucket { att: number; totalDist: number; distAtt: number; totalHang: number; hangAtt: number; dirSum: number; dirAtt: number; endzones: number; dirCounts: Record<string, number> }
+interface KOBucket { att: number; totalDist: number; distAtt: number; totalHang: number; hangAtt: number; dirSum: number; dirAtt: number; endzones: number; fairCatches: number; dirCounts: Record<string, number> }
 
 function emptyKOBucket(): KOBucket {
-  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, dirCounts: {} };
+  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, fairCatches: 0, dirCounts: {} };
 }
 
 function addKOEntry(s: KOBucket, e: KickoffEntry): KOBucket {
@@ -345,6 +345,7 @@ function addKOEntry(s: KOBucket, e: KickoffEntry): KOBucket {
     dirSum: s.dirSum + (dirNum != null ? dirNum : 0),
     dirAtt: s.dirAtt + (dirNum != null ? 1 : 0),
     endzones: s.endzones + (e.endzone ? 1 : 0),
+    fairCatches: s.fairCatches + (e.fairCatch ? 1 : 0),
     dirCounts,
   };
 }
@@ -359,6 +360,7 @@ function KOStatTable({ athletes, statsMap, showEZ = true }: {
 }) {
   const visible = athletes.filter((a) => (statsMap[a.name]?.att ?? 0) > 0);
   if (visible.length === 0) return <p className="text-xs text-muted p-2">No data.</p>;
+  const hasFC = visible.some((a) => statsMap[a.name]?.fairCatches > 0);
   return (
     <table className="w-full text-xs sm:text-sm">
       <thead><tr>
@@ -367,6 +369,7 @@ function KOStatTable({ athletes, statsMap, showEZ = true }: {
         <th className="table-header">Dist</th>
         <th className="table-header">Hang</th>
         {showEZ && <th className="table-header">EZ %</th>}
+        {hasFC && <th className="table-header">FC</th>}
         <th className="table-header">Dir %</th>
       </tr></thead>
       <tbody>
@@ -379,6 +382,7 @@ function KOStatTable({ athletes, statsMap, showEZ = true }: {
               <td className="table-cell">{koAvgDist(s)}</td>
               <td className="table-cell text-muted">{koAvgHang(s)}{koAvgHang(s) !== "—" ? "s" : ""}</td>
               {showEZ && <td className="table-cell text-make font-semibold">{koEzPct(s)}</td>}
+              {hasFC && <td className="table-cell">{s.fairCatches || "—"}</td>}
               <td className="table-cell text-accent font-semibold">{koDirPct(s)}</td>
             </tr>
           );

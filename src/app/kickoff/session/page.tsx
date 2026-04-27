@@ -35,6 +35,7 @@ interface LogRow {
   hangTime: string;
   direction: string;
   endzone?: boolean;
+  fairCatch?: boolean;
   // Game mode only
   los?: string;
   landingYL?: string;
@@ -66,6 +67,7 @@ const emptyRow = (): LogRow => ({
   hangTime: "",
   direction: "",
   endzone: false,
+  fairCatch: false,
   los: "",
   landingYL: "",
   returnYards: "",
@@ -327,6 +329,7 @@ export default function KickoffSessionPage() {
   const [hangTime, setHangTime] = useState("");
   const [direction, setDirection] = useState<KickoffDirection>("1");
   const [endzone, setEndzone] = useState(false);
+  const [fairCatch, setFairCatch] = useState(false);
   // score removed — not used for kickoff
 
   // Auto-decimal: user types digits, we insert decimal 2 places from right
@@ -592,6 +595,7 @@ export default function KickoffSessionPage() {
       returnYards: retVal,
       result: r.touchback ? "TB" : undefined,
       endzone: r.endzone || undefined,
+      fairCatch: r.fairCatch || undefined,
     };
     setSessionKicks((prev) => {
       const existing = prev.findIndex((k) => k.kickNum === kickNum);
@@ -698,6 +702,7 @@ export default function KickoffSessionPage() {
       score: 0,
       kickNum: currentKickIdx + 1,
       endzone: endzone || undefined,
+      fairCatch: fairCatch || undefined,
     };
 
     // Outlier check
@@ -729,6 +734,7 @@ export default function KickoffSessionPage() {
     setHangTime("");
     setDirection("1" as KickoffDirection);
     setEndzone(false);
+    setFairCatch(false);
     setShowAthleteDropdown(false);
   };
 
@@ -1180,17 +1186,28 @@ export default function KickoffSessionPage() {
                       )}
                     </div>
 
-                    {/* Endzone checkbox */}
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={endzone}
-                        onChange={(e) => setEndzone(e.target.checked)}
-                        className="w-5 h-5 accent-accent cursor-pointer"
-                      />
-                      <span className="text-sm font-semibold text-slate-200">Endzone</span>
-                      <span className="text-[10px] text-muted">(auto-checked at 65+ yds)</span>
-                    </label>
+                    {/* Endzone + Fair Catch checkboxes */}
+                    <div className="flex items-center gap-6">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={endzone}
+                          onChange={(e) => setEndzone(e.target.checked)}
+                          className="w-5 h-5 accent-accent cursor-pointer"
+                        />
+                        <span className="text-sm font-semibold text-slate-200">Endzone</span>
+                        <span className="text-[10px] text-muted">(auto at 65+)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={fairCatch}
+                          onChange={(e) => setFairCatch(e.target.checked)}
+                          className="w-5 h-5 accent-accent cursor-pointer"
+                        />
+                        <span className="text-sm font-semibold text-slate-200">Fair Catch</span>
+                      </label>
+                    </div>
 
                     {/* Direction */}
                     {koDirEnabled && (
@@ -1589,6 +1606,7 @@ export default function KickoffSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dist</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">HT</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Endzone">EZ</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Fair Catch">FC</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Touchback">TB</th>
                       {koDirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dir</th>}
@@ -1605,6 +1623,9 @@ export default function KickoffSessionPage() {
                       </th>
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border" title="Endzone">
                         EZ
+                      </th>
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border" title="Fair Catch">
+                        FC
                       </th>
                       {koDirEnabled && (
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
@@ -1743,6 +1764,16 @@ export default function KickoffSessionPage() {
                                 className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
+                            <td className="py-1 px-1 text-center">
+                              <input
+                                type="checkbox"
+                                checked={!!row.fairCatch}
+                                disabled={viewOnly || isSaved}
+                                onChange={(e) => updateRow(idx, "fairCatch", e.target.checked)}
+                                title="Fair Catch"
+                                className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </td>
                             <td className="py-1 px-1">
                               <input
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
@@ -1843,6 +1874,16 @@ export default function KickoffSessionPage() {
                               disabled={viewOnly}
                               onChange={(e) => updateRow(idx, "endzone", e.target.checked)}
                               title="Endzone"
+                              className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
+                            />
+                          </td>
+                          <td className="py-1 px-1 text-center">
+                            <input
+                              type="checkbox"
+                              checked={!!row.fairCatch}
+                              disabled={viewOnly}
+                              onChange={(e) => updateRow(idx, "fairCatch", e.target.checked)}
+                              title="Fair Catch"
                               className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
                             />
                           </td>

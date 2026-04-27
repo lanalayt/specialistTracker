@@ -109,11 +109,12 @@ interface AthleteKOStats {
   dirSum: number;
   dirAtt: number;
   endzones: number;
+  fairCatches: number;
   dirCounts: Record<string, number>;
 }
 
 function emptyStats(): AthleteKOStats {
-  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, dirCounts: {} };
+  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, fairCatches: 0, dirCounts: {} };
 }
 
 function addEntry(s: AthleteKOStats, e: KickoffEntry, directions?: { id: string; score?: number }[]): AthleteKOStats {
@@ -131,6 +132,7 @@ function addEntry(s: AthleteKOStats, e: KickoffEntry, directions?: { id: string;
     dirSum: s.dirSum + (dir != null ? dir : 0),
     dirAtt: s.dirAtt + (dir != null ? 1 : 0),
     endzones: s.endzones + (e.endzone ? 1 : 0),
+    fairCatches: s.fairCatches + (e.fairCatch ? 1 : 0),
     dirCounts,
   };
 }
@@ -164,6 +166,7 @@ function StatTable({ athletes, statsMap, showEZ = true, metric, showHang }: {
     return <p className="text-xs text-muted p-2">No data.</p>;
   }
   const hasHang = showHang ?? visible.some((a) => statsMap[a.name]?.hangAtt > 0);
+  const hasFC = visible.some((a) => statsMap[a.name]?.fairCatches > 0);
   return (
     <table className="w-full text-xs sm:text-sm">
       <thead>
@@ -173,6 +176,7 @@ function StatTable({ athletes, statsMap, showEZ = true, metric, showHang }: {
           <th className={clsx("table-header", isYL && "text-accent")}>{isYL ? "YL" : "Dist"}</th>
           {hasHang && <th className="table-header">Hang</th>}
           {showEZ && <th className="table-header">EZ %</th>}
+          {hasFC && <th className="table-header">FC</th>}
           <th className="table-header">Dir %</th>
         </tr>
       </thead>
@@ -186,6 +190,7 @@ function StatTable({ athletes, statsMap, showEZ = true, metric, showHang }: {
               <td className={clsx("table-cell", isYL ? "text-accent font-semibold" : "")}>{avgDist(s)}</td>
               {hasHang && <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>}
               {showEZ && <td className="table-cell text-make font-semibold">{ezPct(s)}</td>}
+              {hasFC && <td className="table-cell">{s.fairCatches || "—"}</td>}
               <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
             </tr>
           );
