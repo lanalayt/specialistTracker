@@ -16,7 +16,7 @@ interface PunterStrikeZoneProps {
 }
 
 // Strike zone bounds as percentages of the clickable area
-const ZONE = { top: 22, bottom: 72, left: 18, right: 82 };
+const ZONE = { top: 25, bottom: 68, left: 24, right: 76 };
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
