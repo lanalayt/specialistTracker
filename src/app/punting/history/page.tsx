@@ -27,7 +27,7 @@ export default function PuntHistoryPage() {
 }
 
 function PuntHistoryContent() {
-  const { history, updateSessionDate, updateSessionWeather, updateSessionEntries, deleteSession } = usePunt();
+  const { history, updateSessionDate, updateSessionWeather, updateSessionOpponent, updateSessionEntries, deleteSession } = usePunt();
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
   const searchParams = useSearchParams();
@@ -160,7 +160,7 @@ function PuntHistoryContent() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
               {!viewOnly && editingId === selected.id ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <input
                     type="date"
                     defaultValue={formatDateForInput(selected.date)}
@@ -175,6 +175,16 @@ function PuntHistoryContent() {
                     }}
                     className="input text-sm px-2 py-1 w-auto"
                   />
+                  {selected.mode === "game" && (
+                    <input
+                      type="text"
+                      defaultValue={selected.opponent ?? ""}
+                      placeholder="Opponent"
+                      onBlur={(e) => updateSessionOpponent(selected.id, e.target.value.trim())}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      className="input text-sm px-2 py-1 w-32"
+                    />
+                  )}
                   <button
                     onClick={() => setEditingId(null)}
                     className="text-xs text-accent hover:underline"

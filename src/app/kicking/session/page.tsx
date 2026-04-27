@@ -988,7 +988,7 @@ export default function KickingSessionPage() {
                               <th className="table-header">Dist</th>
                               <th className="table-header">Pos</th>
                               <th className="table-header">Result</th>
-                              <th className="table-header">Score</th>
+                              {scoreEnabled && <th className="table-header">Score</th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -1003,7 +1003,7 @@ export default function KickingSessionPage() {
                                     {k.result}
                                   </span>
                                 </td>
-                                <td className="table-cell">{k.score}</td>
+                                {scoreEnabled && <td className="table-cell">{k.score}</td>}
                               </tr>
                             ))}
                           </tbody>

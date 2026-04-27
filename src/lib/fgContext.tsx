@@ -39,6 +39,7 @@ interface FGContextValue {
   resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  updateSessionOpponent: (sessionId: string, opponent: string) => void;
   updateSessionEntries: (sessionId: string, entries: FGKick[]) => void;
   deleteSession: (sessionId: string) => void;
   restoreSession: (session: Session) => void;
@@ -285,6 +286,20 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateSessionOpponent = useCallback(
+    (sessionId: string, opponent: string) => {
+      setSessions((prev) => prev.map((s) =>
+        s.id === sessionId ? { ...s, opponent: opponent || undefined } : s
+      ));
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        stampSessionWrite(tid);
+        updateSessionRow(tid, sessionId, { opponent: opponent || undefined });
+      }
+    },
+    []
+  );
+
   const updateSessionEntries = useCallback((sessionId: string, entries: FGKick[]) => {
     setSessions((prev) => prev.map((s) =>
       s.id === sessionId ? { ...s, entries } : s
@@ -340,6 +355,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         resetStatsKeepAthletes,
         updateSessionDate,
         updateSessionWeather,
+        updateSessionOpponent,
         updateSessionEntries,
         deleteSession,
         restoreSession: restoreSessionAction,

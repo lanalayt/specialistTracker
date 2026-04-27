@@ -39,6 +39,7 @@ interface PuntContextValue {
   resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  updateSessionOpponent: (sessionId: string, opponent: string) => void;
   updateSessionEntries: (sessionId: string, entries: PuntEntry[]) => void;
   deleteSession: (sessionId: string) => void;
   restoreSession: (session: Session) => void;
@@ -211,6 +212,12 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
     if (tid && tid !== "local-dev") { stampSessionWrite(tid); updateSessionRow(tid, sessionId, { weather: weather || undefined }); }
   }, []);
 
+  const updateSessionOpponent = useCallback((sessionId: string, opponent: string) => {
+    setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, opponent: opponent || undefined } : s));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); updateSessionRow(tid, sessionId, { opponent: opponent || undefined }); }
+  }, []);
+
   const updateSessionEntries = useCallback((sessionId: string, entries: PuntEntry[]) => {
     setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, entries } : s));
     const tid = getTeamId();
@@ -241,7 +248,7 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
   return (
     <PuntContext.Provider value={{
       athletes, stats, history, addAthletes, removeAthlete: removeAthleteAction,
-      commitPractice, resetStatsKeepAthletes, updateSessionDate, updateSessionWeather,
+      commitPractice, resetStatsKeepAthletes, updateSessionDate, updateSessionWeather, updateSessionOpponent,
       updateSessionEntries, deleteSession, restoreSession: restoreSessionAction,
     }}>
       {children}
