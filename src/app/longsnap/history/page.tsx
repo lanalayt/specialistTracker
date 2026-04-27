@@ -146,7 +146,6 @@ export default function LongSnapHistoryPage() {
                     <th className="table-header">Type</th>
                     <th className="table-header">Time</th>
                     <th className="table-header">Accuracy</th>
-                    <th className="table-header">Benchmark</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -160,13 +159,6 @@ export default function LongSnapHistoryPage() {
                         <span className={clsx("text-xs", s.accuracy === "ON_TARGET" ? "text-make" : "text-warn")}>
                           {ACC_LABEL[s.accuracy] ?? s.accuracy}
                         </span>
-                      </td>
-                      <td className="table-cell">
-                        {s.benchmark ? (
-                          <span className={clsx("text-xs font-semibold", BM_COLORS[s.benchmark])}>
-                            {s.benchmark}
-                          </span>
-                        ) : "—"}
                       </td>
                     </tr>
                   ))}

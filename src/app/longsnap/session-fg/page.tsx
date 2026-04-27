@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { StatCard } from "@/components/ui/StatCard";
-import { SnapTimeBars } from "@/components/ui/SnapTimeBars";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import { makePct, getSnapBenchmark } from "@/lib/stats";

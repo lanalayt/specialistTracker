@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { StatCard } from "@/components/ui/StatCard";
-import { SnapTimeBars } from "@/components/ui/SnapTimeBars";
 import { PunterStrikeZone } from "@/components/ui/PunterStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";

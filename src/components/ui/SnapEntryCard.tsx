@@ -124,15 +124,10 @@ export function SnapEntryCard({ athletes, snapCount, onAdd, lockedType }: SnapEn
             </button>
           ))}
         </div>
-        <p className="text-[10px] text-muted mt-1.5">{TYPE_BENCHMARKS[snapType]}</p>
       </div>
-      ) : (
-      <div>
-        <p className="text-[10px] text-muted">{TYPE_BENCHMARKS[snapType]}</p>
-      </div>
-      )}
+      ) : null}
 
-      {/* Time + benchmark */}
+      {/* Time */}
       <div>
         <p className="label">Time (seconds)</p>
         <div className="flex items-center gap-3">
@@ -144,11 +139,6 @@ export function SnapEntryCard({ athletes, snapCount, onAdd, lockedType }: SnapEn
             value={time}
             onChange={(e) => setTime(e.target.value)}
           />
-          {benchmark && (
-            <span className={clsx("text-sm font-bold", BENCHMARK_STYLES[benchmark])}>
-              {BENCHMARK_LABELS[benchmark]}
-            </span>
-          )}
         </div>
       </div>
 
