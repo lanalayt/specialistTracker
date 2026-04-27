@@ -15,7 +15,7 @@ export default function LongSnapLayout({ children }: { children: React.ReactNode
       <div className="flex overflow-x-hidden max-w-[100vw]">
         <Sidebar />
         <div className="lg:pl-56 flex-1 flex flex-col min-h-screen pb-20 lg:pb-0 min-w-0">
-          <Header title="Long Snapping" />
+          <Header title="Snapping" />
           {!isHub && <SportSubNav basePath="/longsnap" tabs={[
             { label: "Session", slug: "session", coachOnly: false },
             { label: "Statistics", slug: "statistics", coachOnly: false },

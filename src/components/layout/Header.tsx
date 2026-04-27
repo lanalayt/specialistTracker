@@ -15,7 +15,7 @@ const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.Re
   { href: "/kicking", label: "Kicking", iconEl: <GoalpostIcon size={20} /> },
   { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
-  { href: "/longsnap", label: "Long Snap", icon: "📏" },
+  { href: "/longsnap", label: "Snapping", icon: "📏" },
   { href: "/analytics", label: "Analytics", icon: "📊" },
   { href: "/archives", label: "Archived Stats", icon: "🗄" },
 ];

@@ -17,7 +17,7 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
   { href: "/kicking", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
   { href: "/punting", iconEl: <PuntFootIcon size={36} />, label: "Punting" },
   { href: "/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
-  { href: "/longsnap", icon: "📏", label: "Long Snapping" },
+  { href: "/longsnap", icon: "📏", label: "Snapping" },
 ];
 
 function SeasonHighlights() {
