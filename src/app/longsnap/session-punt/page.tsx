@@ -65,21 +65,24 @@ export default function LongSnapPuntSessionPage() {
       const raw = localStorage.getItem(draftKey());
       if (raw) {
         const draft = JSON.parse(raw);
-        if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); return; }
+        if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); }
+        if (draft.snapMarkers?.length) setSnapMarkers(draft.snapMarkers);
+        if (draft.rows?.length || draft.snapMarkers?.length) return;
       }
     } catch {}
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamGet<{ rows: LogRow[]; weather?: string }>(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`).then((d) => {
+      teamGet<{ rows: LogRow[]; weather?: string; snapMarkers?: SnapMarker[] }>(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`).then((d) => {
         if (d?.rows?.length) { setRows(d.rows); if (d.weather) setWeather(d.weather); }
+        if (d?.snapMarkers?.length) setSnapMarkers(d.snapMarkers);
       });
     }
   }, []);
 
   // Auto-save draft
   useEffect(() => {
-    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather })); } catch {}
-  }, [rows, weather]);
+    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers })); } catch {}
+  }, [rows, weather, snapMarkers]);
 
   const updateRow = (idx: number, field: keyof LogRow, value: string) => {
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
@@ -181,7 +184,17 @@ export default function LongSnapPuntSessionPage() {
             {filledRows.length > 0 && <span className="text-accent">({filledRows.length})</span>}
           </h2>
           {!viewOnly && (
-            <button onClick={addRow} className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">+ Row</button>
+            <div className="flex gap-2">
+              {filledRows.length > 0 && (
+                <button
+                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); } catch {} }}
+                  className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
+                >
+                  Clear
+                </button>
+              )}
+              <button onClick={addRow} className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">+ Row</button>
+            </div>
           )}
         </div>
 
