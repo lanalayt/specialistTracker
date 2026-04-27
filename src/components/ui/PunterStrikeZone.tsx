@@ -16,7 +16,7 @@ interface PunterStrikeZoneProps {
 }
 
 // Strike zone bounds as percentages of the clickable area
-const ZONE = { top: 25, bottom: 68, left: 24, right: 76 };
+const ZONE = { top: 28, bottom: 72, left: 24, right: 76 };
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
@@ -41,13 +41,13 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
         ref={containerRef}
         onClick={handleClick}
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none"
-        style={{ width: 280, height: 500, background: "rgba(30,41,59,0.3)" }}
+        style={{ width: 280, height: 560, background: "rgba(30,41,59,0.3)" }}
       >
         {/* Player SVG */}
         <svg
           viewBox="0 0 200 480"
           className="absolute drop-shadow-lg pointer-events-none"
-          style={{ top: "3%", left: "50%", transform: "translateX(-50%)", height: "94%", width: "auto" }}
+          style={{ top: "12%", left: "50%", transform: "translateX(-50%)", height: "80%", width: "auto" }}
         >
           <defs>
             <linearGradient id="bodyFill" x1="0" y1="0" x2="0" y2="1">
