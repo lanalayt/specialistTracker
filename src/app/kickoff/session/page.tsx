@@ -229,6 +229,22 @@ export default function KickoffSessionPage() {
   const koDirLabels: Record<string, string> = {};
   koDirs.forEach((d) => { koDirLabels[d.id] = d.label; });
 
+  // Re-read settings when they change
+  useEffect(() => {
+    const reload = () => {
+      const fresh = loadKickoffSettings();
+      setKoTypes(fresh.types);
+      setKoDirs(fresh.directions);
+      setKoDirEnabled(fresh.directionEnabled);
+    };
+    window.addEventListener("focus", reload);
+    window.addEventListener("settingsChanged", reload);
+    return () => {
+      window.removeEventListener("focus", reload);
+      window.removeEventListener("settingsChanged", reload);
+    };
+  }, []);
+
   useEffect(() => {
     import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
       loadSettingsFromCloud<{ kickoffTypes?: Record<string, unknown>[]; kickoffCategories?: KOCategoryConfig[]; directionEnabled?: boolean; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {

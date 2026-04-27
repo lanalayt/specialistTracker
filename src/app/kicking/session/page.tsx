@@ -253,7 +253,7 @@ export default function KickingSessionPage() {
     if (sessionMode === "game" && !manualEntry) setManualEntry(true);
   }, [sessionMode, manualEntry]);
   const [snapDistance, setSnapDistance] = useState(() => loadSnapDistance());
-  const [opTimeEnabled] = useState(() => loadOpTimeEnabled());
+  const [opTimeEnabled, setOpTimeEnabled] = useState(() => loadOpTimeEnabled());
   const drag = useDragReorder(rows, setRows);
   const [makeMode, setMakeMode] = useState(() => loadMakeMode());
   const [missMode, setMissMode] = useState(() => loadMissMode());
@@ -264,6 +264,24 @@ export default function KickingSessionPage() {
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [showSetupPrompt, setShowSetupPrompt] = useState(false);
+
+  // Re-read settings when they change (settings page dispatches this event)
+  useEffect(() => {
+    const reload = () => {
+      setOpTimeEnabled(loadOpTimeEnabled());
+      setSnapDistance(loadSnapDistance());
+      setMakeMode(loadMakeMode());
+      setMissMode(loadMissMode());
+      setScoreMode(loadScoreMode());
+      setScoreOptions(loadScoreOptions());
+    };
+    window.addEventListener("focus", reload);
+    window.addEventListener("settingsChanged", reload);
+    return () => {
+      window.removeEventListener("focus", reload);
+      window.removeEventListener("settingsChanged", reload);
+    };
+  }, []);
 
   // Load settings from cloud on fresh device
   useEffect(() => {

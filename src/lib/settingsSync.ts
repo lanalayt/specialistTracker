@@ -34,4 +34,9 @@ export function saveSettingsToCloud<T>(localKey: string, data: T): void {
   if (userId && userId !== "local-dev") {
     cloudSet(userId, `settings_${localKey}`, data);
   }
+
+  // Notify any open session pages that settings changed
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("settingsChanged"));
+  }
 }

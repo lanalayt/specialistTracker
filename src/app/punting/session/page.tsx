@@ -347,8 +347,8 @@ export default function PuntingSessionPage() {
     if (sessionMode === "game" && !manualEntry) setManualEntry(true);
   }, [sessionMode, manualEntry]);
   const [puntTypes, setPuntTypes] = useState(() => loadPuntTypes().types);
-  const [opTimeEnabled] = useState(() => loadOpTimeEnabled());
-  const [dirSettings] = useState(() => loadDirectionSettings());
+  const [opTimeEnabled, setOpTimeEnabled] = useState(() => loadOpTimeEnabled());
+  const [dirSettings, setDirSettings] = useState(() => loadDirectionSettings());
   const dirEnabled = dirSettings.enabled;
   const dirMode = dirSettings.mode;
   const DA_OPTIONS = dirSettings.options;
@@ -358,6 +358,21 @@ export default function PuntingSessionPage() {
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
+
+  // Re-read settings when they change
+  useEffect(() => {
+    const reload = () => {
+      setOpTimeEnabled(loadOpTimeEnabled());
+      setDirSettings(loadDirectionSettings());
+      setPuntTypes(loadPuntTypes().types);
+    };
+    window.addEventListener("focus", reload);
+    window.addEventListener("settingsChanged", reload);
+    return () => {
+      window.removeEventListener("focus", reload);
+      window.removeEventListener("settingsChanged", reload);
+    };
+  }, []);
 
   // Load punt types from cloud on fresh device
   useEffect(() => {

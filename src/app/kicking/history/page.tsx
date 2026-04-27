@@ -154,7 +154,12 @@ function KickingHistoryContent() {
                     selectedId === s.id && (modeFilter === "game" ? "bg-red-500/10 border-l-2 border-red-500" : "bg-accent/10 border-l-2 border-accent")
                   )}
                 >
-                  <p className="text-sm font-semibold text-slate-200">{s.label}</p>
+                  <p className="text-sm font-semibold text-slate-200">
+                    {s.mode === "game" && s.opponent ? `vs ${s.opponent}` : s.label}
+                  </p>
+                  {s.mode === "game" && s.opponent && (
+                    <p className="text-[10px] text-muted">{s.label}{s.gameTime ? ` · ${s.gameTime}` : ""}</p>
+                  )}
                   <p className="text-xs text-muted mt-0.5">
                     {sk.length} kick{sk.length !== 1 ? "s" : ""} ·{" "}
                     <span className={modeFilter === "game" ? "text-red-400" : "text-accent"}>{makePct(sk.length, sm)}</span>
