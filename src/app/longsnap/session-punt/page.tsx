@@ -99,27 +99,6 @@ export default function LongSnapPuntSessionPage() {
     setTimeout(() => setCommitted(false), 2000);
   };
 
-  if (!sessionStarted) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="text-5xl mb-4">📋</div>
-          <h2 className="text-xl font-bold text-slate-100">Punt Snap Session</h2>
-          <p className="text-sm text-muted">
-            {sessionSnaps.length > 0 ? `${sessionSnaps.length} snap${sessionSnaps.length !== 1 ? "s" : ""} in progress.` : "Ready to log punt snaps."}
-          </p>
-          {!viewOnly ? (
-            <button onClick={() => setSessionStarted(true)} className="btn-primary py-3 px-8 text-sm w-full">
-              {sessionSnaps.length > 0 ? "Continue Session" : "Start Session"}
-            </button>
-          ) : (
-            <p className="text-xs text-warn font-semibold">View Only</p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
       <div className="lg:w-[55%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
