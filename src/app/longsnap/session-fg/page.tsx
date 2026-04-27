@@ -2,37 +2,46 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { StatCard } from "@/components/ui/StatCard";
-import { SnapEntryCard } from "@/components/ui/SnapEntryCard";
 import { SnapTimeBars } from "@/components/ui/SnapTimeBars";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
-import { makePct } from "@/lib/stats";
-import type { LongSnapEntry, SnapBenchmark } from "@/types";
+import { makePct, getSnapBenchmark } from "@/lib/stats";
+import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 import clsx from "clsx";
-import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
+import { teamGet, getTeamId } from "@/lib/teamData";
 
-const BM_COLORS: Record<SnapBenchmark, string> = { excellent: "text-make", good: "text-accent", needsWork: "text-miss" };
-const BM_LABELS: Record<SnapBenchmark, string> = { excellent: "Exc", good: "Good", needsWork: "NW" };
-const ACC_LABEL: Record<string, string> = { ON_TARGET: "✓", HIGH: "↑", LOW: "↓", LEFT: "←", RIGHT: "→" };
-
-const SNAP_TYPE = "FG" as const;
 const DRAFT_SUFFIX = "fg";
+const INIT_ROWS = 12;
+
+const ACC_OPTIONS: { value: SnapAccuracy; label: string }[] = [
+  { value: "ON_TARGET", label: "✓" },
+  { value: "HIGH", label: "↑" },
+  { value: "LOW", label: "↓" },
+  { value: "LEFT", label: "←" },
+  { value: "RIGHT", label: "→" },
+];
+
+interface LogRow {
+  athlete: string;
+  snapType: string;
+  time: string;
+  accuracy: string;
+}
+
+const emptyRow = (): LogRow => ({ athlete: "", snapType: "FG", time: "", accuracy: "" });
 
 export default function LongSnapFGSessionPage() {
   const { athletes, stats, commitPractice } = useLongSnap();
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
-  const [sessionSnaps, setSessionSnaps] = useState<LongSnapEntry[]>([]);
-  const [committed, setCommitted] = useState(false);
-  const [sessionStarted, setSessionStarted] = useState(false);
+
+  const [rows, setRows] = useState<LogRow[]>(Array.from({ length: INIT_ROWS }, emptyRow));
   const [weather, setWeather] = useState("");
   const [weatherLocked, setWeatherLocked] = useState(false);
-  const [draftSaved, setDraftSaved] = useState(false);
-  const [fgOrPat, setFgOrPat] = useState<"FG" | "PAT">("FG");
+  const [committed, setCommitted] = useState(false);
 
   const athleteNames = athletes.map((a) => a.name);
 
-  // Stats filtered to FG + PAT
   const totals = athletes.reduce(
     (acc, a) => {
       const fg = stats[a.name]?.byType?.FG;
@@ -50,64 +59,82 @@ export default function LongSnapFGSessionPage() {
 
   const draftKey = () => {
     const tid = getTeamId();
-    return tid ? `longsnap_session_draft_${DRAFT_SUFFIX}_${tid}` : `longsnap_session_draft_${DRAFT_SUFFIX}`;
+    return tid ? `longsnap_manual_draft_${DRAFT_SUFFIX}_${tid}` : `longsnap_manual_draft_${DRAFT_SUFFIX}`;
   };
-
-  const saveDraftLocal = useCallback((snaps: LongSnapEntry[]) => {
-    try { localStorage.setItem(draftKey(), JSON.stringify({ sessionSnaps: snaps, sessionStarted: true, weather })); } catch {}
-  }, [weather]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(draftKey());
       if (raw) {
         const draft = JSON.parse(raw);
-        if (draft.sessionSnaps?.length > 0) {
-          setSessionSnaps(draft.sessionSnaps);
-          setSessionStarted(draft.sessionStarted ?? false);
-          if (draft.weather) setWeather(draft.weather);
-          return;
-        }
+        if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); return; }
       }
     } catch {}
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamGet<{ sessionSnaps: LongSnapEntry[]; sessionStarted: boolean; weather?: string }>(tid, `longsnap_session_draft_${DRAFT_SUFFIX}`).then((d) => {
-        if (d?.sessionSnaps?.length) { setSessionSnaps(d.sessionSnaps); setSessionStarted(d.sessionStarted ?? false); if (d.weather) setWeather(d.weather); }
+      teamGet<{ rows: LogRow[]; weather?: string }>(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`).then((d) => {
+        if (d?.rows?.length) { setRows(d.rows); if (d.weather) setWeather(d.weather); }
       });
     }
   }, []);
 
-  const saveDraftToCloud = useCallback(() => {
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
-      teamSet(tid, `longsnap_session_draft_${DRAFT_SUFFIX}`, { sessionSnaps, sessionStarted, weather });
-      setDraftSaved(true);
-      setTimeout(() => setDraftSaved(false), 2000);
-    }
-  }, [sessionSnaps, sessionStarted, weather]);
+  useEffect(() => {
+    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather })); } catch {}
+  }, [rows, weather]);
 
-  const handleAddSnap = (snap: LongSnapEntry) => {
-    // Override snap type with FG/PAT toggle
-    const entry = { ...snap, snapType: fgOrPat };
-    setSessionSnaps((prev) => { const next = [...prev, entry]; saveDraftLocal(next); return next; });
+  const updateRow = (idx: number, field: keyof LogRow, value: string) => {
+    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
   };
-  const handleDeleteSnap = (idx: number) => {
-    setSessionSnaps((prev) => { const next = prev.filter((_, i) => i !== idx); saveDraftLocal(next); return next; });
+
+  const addRow = useCallback(() => {
+    setRows((prev) => [...prev, emptyRow()]);
+  }, []);
+
+  const deleteRow = (idx: number) => {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
   };
+
+  const filledRows = rows.filter((r) => r.athlete || r.time || r.accuracy);
+
+  const formatAutoDecimal = (raw: string): string => {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    const padded = digits.padStart(3, "0");
+    const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
+    return `${whole}.${padded.slice(-2)}`;
+  };
+
   const handleCommit = () => {
-    if (sessionSnaps.length === 0) return;
-    commitPractice(sessionSnaps, undefined, weather);
-    setSessionSnaps([]);
-    setCommitted(true);
+    const filled = rows.filter((r) => r.athlete && r.time);
+    if (filled.length === 0) return;
+
+    const snaps: LongSnapEntry[] = filled.map((r) => {
+      const time = parseFloat(r.time) || 0;
+      const accuracy = (r.accuracy || "ON_TARGET") as SnapAccuracy;
+      const snapType = (r.snapType || "FG") as SnapType;
+      return {
+        athleteId: r.athlete,
+        athlete: r.athlete,
+        snapType,
+        time,
+        accuracy,
+        score: 0,
+        benchmark: getSnapBenchmark(snapType, time),
+      };
+    });
+
+    commitPractice(snaps, undefined, weather);
+    setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setWeather("");
+    setCommitted(true);
     try { localStorage.removeItem(draftKey()); } catch {}
     setTimeout(() => setCommitted(false), 2000);
   };
 
   return (
     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-      <div className="lg:w-[55%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
+      <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
+        {/* Weather */}
         <div className="px-4 py-2 border-b border-border shrink-0">
           {weatherLocked || viewOnly ? (
             <div className="flex items-center gap-2">
@@ -124,55 +151,102 @@ export default function LongSnapFGSessionPage() {
             </div>
           )}
         </div>
-        {/* FG / PAT toggle */}
-        <div className="px-4 py-2 border-b border-border shrink-0">
-          <div className="flex rounded-input border border-border overflow-hidden w-fit">
-            <button onClick={() => setFgOrPat("FG")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", fgOrPat === "FG" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>FG</button>
-            <button onClick={() => setFgOrPat("PAT")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", fgOrPat === "PAT" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>PAT</button>
-          </div>
-        </div>
-        <div className="overflow-y-auto border-b border-border">
-          <div className={viewOnly ? "pointer-events-none opacity-60" : ""}>
-            <SnapEntryCard athletes={athleteNames} snapCount={sessionSnaps.length} onAdd={handleAddSnap} lockedType={fgOrPat} />
-          </div>
-        </div>
+
+        {/* Header */}
         <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider">Session Log{sessionSnaps.length > 0 && <span className="text-accent ml-2">({sessionSnaps.length})</span>}</p>
-        </div>
-        <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-border/30">
-          {sessionSnaps.length === 0 ? (
-            <div className="flex items-center justify-center h-16 text-xs text-muted">No snaps logged yet</div>
-          ) : (
-            [...sessionSnaps].reverse().map((s, ri) => {
-              const idx = sessionSnaps.length - 1 - ri;
-              const bm = s.benchmark;
-              return (
-                <div key={idx} className="flex items-center px-4 py-2.5 hover:bg-surface-2/30 transition-colors">
-                  <span className="text-xs text-muted w-6 shrink-0">#{idx + 1}</span>
-                  <span className="text-sm font-medium text-slate-200 w-20 shrink-0 truncate">{s.athlete}</span>
-                  <span className="text-xs text-muted w-12 shrink-0">{s.snapType}</span>
-                  <span className="text-xs font-bold text-slate-100 w-16 shrink-0">{s.time.toFixed(3)}s</span>
-                  <span className={clsx("text-xs font-semibold w-8 shrink-0", s.accuracy === "ON_TARGET" ? "text-make" : "text-warn")}>{ACC_LABEL[s.accuracy] ?? s.accuracy}</span>
-                  {bm && <span className={clsx("text-xs font-bold flex-1", BM_COLORS[bm])}>{BM_LABELS[bm]}</span>}
-                  {!viewOnly && <button onClick={() => handleDeleteSnap(idx)} className="w-6 h-6 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm ml-2">×</button>}
-                </div>
-              );
-            })
+          <h2 className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-2">
+            FG / PAT Snap Log
+            {filledRows.length > 0 && <span className="text-accent">({filledRows.length})</span>}
+          </h2>
+          {!viewOnly && (
+            <button onClick={addRow} className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">+ Row</button>
           )}
         </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="sticky top-0 z-10">
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center border-b border-border">Athlete</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Type</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr key={idx} className="border-b border-border/30 transition-colors">
+                  <td className="text-center text-muted py-1 px-1">{idx + 1}</td>
+                  <td className="py-1 px-1">
+                    <select value={row.athlete} onChange={(e) => updateRow(idx, "athlete", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
+                      <option value="">—</option>
+                      {athleteNames.map((a) => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </td>
+                  <td className="py-1 px-1">
+                    <select value={row.snapType} onChange={(e) => updateRow(idx, "snapType", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
+                      <option value="FG">FG</option>
+                      <option value="PAT">PAT</option>
+                    </select>
+                  </td>
+                  <td className="py-1 px-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="0.38"
+                      value={row.time}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, "");
+                        updateRow(idx, "time", digits ? formatAutoDecimal(digits) : "");
+                      }}
+                      readOnly={viewOnly}
+                      className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
+                    />
+                  </td>
+                  <td className="py-1 px-1">
+                    <select value={row.accuracy} onChange={(e) => updateRow(idx, "accuracy", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
+                      <option value="">—</option>
+                      {ACC_OPTIONS.map((a) => <option key={a.value} value={a.value}>{a.label} {a.value === "ON_TARGET" ? "On" : a.value.charAt(0) + a.value.slice(1).toLowerCase()}</option>)}
+                    </select>
+                  </td>
+                  <td className="py-1 px-1 text-center">
+                    {!viewOnly && (
+                      <button onClick={() => deleteRow(idx)} className="text-border hover:text-miss transition-colors text-sm leading-none px-1" title="Delete row">×</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
         <div className="border-t border-border p-3 flex items-center gap-2 shrink-0">
-          {!viewOnly && sessionSnaps.length > 0 && <button onClick={saveDraftToCloud} className={`btn-ghost text-xs py-1.5 px-3 ${draftSaved ? "text-make" : ""}`}>{draftSaved ? "Saved!" : "Save Draft"}</button>}
-          <div className="flex-1" />
-          {!viewOnly && <button onClick={handleCommit} disabled={sessionSnaps.length === 0} className={clsx("btn-primary text-xs py-2 px-5", committed && "bg-make/90")}>{committed ? "Committed!" : `Commit Session${sessionSnaps.length > 0 ? ` (${sessionSnaps.length})` : ""}`}</button>}
+          <span className="text-xs text-muted flex-1">
+            {filledRows.length === 0 ? "0 snaps entered" : `${filledRows.length} snap${filledRows.length !== 1 ? "s" : ""} entered`}
+          </span>
+          {!viewOnly && (
+            <button
+              onClick={handleCommit}
+              disabled={filledRows.length === 0}
+              className={clsx("btn-primary text-xs py-2 px-5", committed && "bg-make/90")}
+            >
+              {committed ? "✓ Committed!" : `Commit Session${filledRows.length > 0 ? ` (${filledRows.length})` : ""}`}
+            </button>
+          )}
         </div>
       </div>
-      <div className="lg:w-[45%] overflow-y-auto p-4 space-y-3">
+
+      {/* Right: Stats */}
+      <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
         <div className="grid grid-cols-3 gap-2">
           <StatCard label="On-Target%" value={onTargetPct} accent glow />
           <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
           <StatCard label="FG/PAT Snaps" value={totals.att || "—"} />
         </div>
-        <SnapTimeBars entries={sessionSnaps} athletes={athleteNames} />
       </div>
     </main>
   );
