@@ -184,6 +184,7 @@ export interface LongSnapEntry {
   accuracy: SnapAccuracy;
   score: number;
   benchmark?: SnapBenchmark;
+  critical?: boolean;
 }
 
 // ─── Long Snap stats ─────────────────────────────────────────────────────────
@@ -196,6 +197,7 @@ export interface LongSnapStatBucket {
   excellent: number;
   good: number;
   needsWork: number;
+  criticals: number;
 }
 
 export interface LongSnapAthleteStats {

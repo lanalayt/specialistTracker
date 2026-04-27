@@ -80,14 +80,15 @@ export default function LongSnapStatisticsPage() {
               <th className="table-header">Snaps</th>
               <th className="table-header">On Target%</th>
               <th className="table-header">Avg Time</th>
+              <th className="table-header">Crit</th>
             </tr>
           </thead>
           <tbody>
             {SNAP_TYPES.map((t) => {
-              let att = 0, onTarget = 0, totalTime = 0;
+              let att = 0, onTarget = 0, totalTime = 0, criticals = 0;
               athletes.forEach((a) => {
                 const s = displayStats[a.name]?.byType[t];
-                if (s) { att += s.att; onTarget += s.onTarget; totalTime += s.totalTime; }
+                if (s) { att += s.att; onTarget += s.onTarget; totalTime += s.totalTime; criticals += (s.criticals || 0); }
               });
               return (
                 <tr key={t} className="hover:bg-surface/30">
@@ -97,6 +98,7 @@ export default function LongSnapStatisticsPage() {
                   <td className="table-cell text-muted">
                     {att > 0 ? `${(totalTime / att).toFixed(3)}s` : "—"}
                   </td>
+                  <td className={`table-cell ${criticals > 0 ? "text-miss font-semibold" : ""}`}>{criticals || "—"}</td>
                 </tr>
               );
             })}
@@ -116,6 +118,7 @@ export default function LongSnapStatisticsPage() {
                 <th className="table-header">Snaps</th>
                 <th className="table-header">On Target%</th>
                 <th className="table-header">Avg Time</th>
+                <th className="table-header">Crit</th>
               </tr>
             </thead>
             <tbody>
@@ -130,6 +133,7 @@ export default function LongSnapStatisticsPage() {
                     <td className="table-cell text-muted">
                       {s.overall.att > 0 ? `${(s.overall.totalTime / s.overall.att).toFixed(3)}s` : "—"}
                     </td>
+                    <td className={`table-cell ${(s.overall.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{s.overall.criticals || "—"}</td>
                   </tr>
                 );
               })}

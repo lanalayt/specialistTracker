@@ -26,9 +26,10 @@ interface LogRow {
   athlete: string;
   time: string;
   accuracy: string;
+  critical?: boolean;
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", time: "", accuracy: "" });
+const emptyRow = (): LogRow => ({ athlete: "", time: "", accuracy: "", critical: false });
 
 export default function LongSnapPuntSessionPage() {
   const { athletes, stats, commitPractice } = useLongSnap();
@@ -84,7 +85,7 @@ export default function LongSnapPuntSessionPage() {
     try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers })); } catch {}
   }, [rows, weather, snapMarkers]);
 
-  const updateRow = (idx: number, field: keyof LogRow, value: string) => {
+  const updateRow = (idx: number, field: keyof LogRow, value: string | boolean) => {
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
   };
 
@@ -143,6 +144,7 @@ export default function LongSnapPuntSessionPage() {
         accuracy,
         score: 0,
         benchmark: getSnapBenchmark(SNAP_TYPE, time),
+        critical: !!r.critical,
       };
     });
 
@@ -197,6 +199,7 @@ export default function LongSnapPuntSessionPage() {
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center border-b border-border">Athlete</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Crit</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
               </tr>
             </thead>
@@ -244,6 +247,15 @@ export default function LongSnapPuntSessionPage() {
                         <option value="Strike">Strike</option>
                       </select>
                     )}
+                  </td>
+                  <td className="py-1 px-1 text-center">
+                    <input
+                      type="checkbox"
+                      checked={!!row.critical}
+                      disabled={viewOnly}
+                      onChange={(e) => updateRow(idx, "critical", e.target.checked)}
+                      className="w-4 h-4 accent-miss cursor-pointer disabled:cursor-not-allowed"
+                    />
                   </td>
                   <td className="py-1 px-1 text-center">
                     {!viewOnly && (

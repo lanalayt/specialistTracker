@@ -436,7 +436,7 @@ export function recomputeKickoffStats(
 // ─── Long Snap ────────────────────────────────────────────────────────────────
 
 function emptySnapBucket(): LongSnapStatBucket {
-  return { att: 0, onTarget: 0, totalTime: 0, score: 0, excellent: 0, good: 0, needsWork: 0 };
+  return { att: 0, onTarget: 0, totalTime: 0, score: 0, excellent: 0, good: 0, needsWork: 0, criticals: 0 };
 }
 
 export function emptyLongSnapStats(): LongSnapAthleteStats {
@@ -474,6 +474,7 @@ export function processLongSnap(
     s.overall = { ...s.overall, excellent: 0, good: 0, needsWork: 0 };
   }
 
+  const isCritical = entry.critical ? 1 : 0;
   const updateBucket = (b: LongSnapStatBucket): LongSnapStatBucket => ({
     att: b.att + 1,
     onTarget: b.onTarget + (isOnTarget ? 1 : 0),
@@ -482,6 +483,7 @@ export function processLongSnap(
     excellent: (b.excellent || 0) + (bm === "excellent" ? 1 : 0),
     good: (b.good || 0) + (bm === "good" ? 1 : 0),
     needsWork: (b.needsWork || 0) + (bm === "needsWork" ? 1 : 0),
+    criticals: (b.criticals || 0) + isCritical,
   });
 
   s.overall = updateBucket(s.overall);

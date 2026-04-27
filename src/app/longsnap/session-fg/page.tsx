@@ -25,9 +25,10 @@ interface LogRow {
   snapType: string;
   time: string;
   accuracy: string;
+  critical?: boolean;
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", snapType: "FG", time: "", accuracy: "" });
+const emptyRow = (): LogRow => ({ athlete: "", snapType: "FG", time: "", accuracy: "", critical: false });
 
 export default function LongSnapFGSessionPage() {
   const { athletes, stats, commitPractice } = useLongSnap();
@@ -81,7 +82,7 @@ export default function LongSnapFGSessionPage() {
     try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather })); } catch {}
   }, [rows, weather]);
 
-  const updateRow = (idx: number, field: keyof LogRow, value: string) => {
+  const updateRow = (idx: number, field: keyof LogRow, value: string | boolean) => {
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
   };
 
@@ -119,6 +120,7 @@ export default function LongSnapFGSessionPage() {
         accuracy,
         score: 0,
         benchmark: getSnapBenchmark(snapType, time),
+        critical: !!r.critical,
       };
     });
 
@@ -172,6 +174,7 @@ export default function LongSnapFGSessionPage() {
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Type</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Crit</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
               </tr>
             </thead>
@@ -210,6 +213,15 @@ export default function LongSnapFGSessionPage() {
                       <option value="">—</option>
                       {ACC_OPTIONS.map((a) => <option key={a.value} value={a.value}>{a.label} {a.value === "ON_TARGET" ? "On" : a.value.charAt(0) + a.value.slice(1).toLowerCase()}</option>)}
                     </select>
+                  </td>
+                  <td className="py-1 px-1 text-center">
+                    <input
+                      type="checkbox"
+                      checked={!!row.critical}
+                      disabled={viewOnly}
+                      onChange={(e) => updateRow(idx, "critical", e.target.checked)}
+                      className="w-4 h-4 accent-miss cursor-pointer disabled:cursor-not-allowed"
+                    />
                   </td>
                   <td className="py-1 px-1 text-center">
                     {!viewOnly && (
