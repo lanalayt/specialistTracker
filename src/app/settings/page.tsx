@@ -293,7 +293,7 @@ function SettingsContent() {
                   value={newThemeName}
                   onChange={(e) => setNewThemeName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleSaveCustomTheme(); }}
-                  placeholder="Theme name (e.g. College of Idaho)"
+                  placeholder="Color Scheme Name"
                   className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
                 />
                 <button
