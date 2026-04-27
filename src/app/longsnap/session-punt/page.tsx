@@ -184,17 +184,7 @@ export default function LongSnapPuntSessionPage() {
             {filledRows.length > 0 && <span className="text-accent">({filledRows.length})</span>}
           </h2>
           {!viewOnly && (
-            <div className="flex gap-2">
-              {filledRows.length > 0 && (
-                <button
-                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); } catch {} }}
-                  className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
-                >
-                  Clear
-                </button>
-              )}
-              <button onClick={addRow} className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">+ Row</button>
-            </div>
+            <button onClick={addRow} className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">+ Row</button>
           )}
         </div>
 
@@ -271,6 +261,14 @@ export default function LongSnapPuntSessionPage() {
           <span className="text-xs text-muted flex-1">
             {filledRows.length === 0 ? "0 snaps entered" : `${filledRows.length} snap${filledRows.length !== 1 ? "s" : ""} entered`}
           </span>
+          {!viewOnly && filledRows.length > 0 && (
+            <button
+              onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); } catch {} }}
+              className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
+            >
+              Clear Log
+            </button>
+          )}
           {!viewOnly && (
             <button
               onClick={handleCommit}
