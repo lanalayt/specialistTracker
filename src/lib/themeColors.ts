@@ -5,6 +5,7 @@
 
 import { getTeamId } from "@/lib/teamData";
 import { updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
+import { saveSettingsToCloud, loadSettingsFromCloud } from "@/lib/settingsSync";
 
 const STORAGE_KEY = "st_theme";
 
@@ -73,6 +74,39 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// ── Custom saved themes (per-team) ──────────────────────────────────────────
+
+const CUSTOM_THEMES_KEY = "st_custom_themes";
+
+export interface SavedTheme {
+  name: string;
+  colors: ThemeColors;
+}
+
+export function loadCustomThemes(): SavedTheme[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
+    if (raw) return JSON.parse(raw) as SavedTheme[];
+  } catch {}
+  return [];
+}
+
+export function saveCustomThemes(themes: SavedTheme[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));
+  saveSettingsToCloud(CUSTOM_THEMES_KEY, { themes });
+}
+
+export async function loadCustomThemesFromCloud(): Promise<SavedTheme[]> {
+  const cloud = await loadSettingsFromCloud<{ themes: SavedTheme[] }>(CUSTOM_THEMES_KEY);
+  if (cloud?.themes?.length) {
+    localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(cloud.themes));
+    return cloud.themes;
+  }
+  return loadCustomThemes();
+}
+
 /** Derive all CSS variables from the 3 user-chosen colors */
 export function applyTheme(colors: ThemeColors): void {
   if (typeof document === "undefined") return;
@@ -84,10 +118,10 @@ export function applyTheme(colors: ThemeColors): void {
   root.style.setProperty("--surface", lighten(colors.secondary, 0.06));
   root.style.setProperty("--surface-2", lighten(colors.secondary, 0.10));
   root.style.setProperty("--border", colors.tertiary);
-  root.style.setProperty("--muted", lighten(colors.secondary, 0.35));
+  root.style.setProperty("--muted", lighten(colors.secondary, 0.45));
   root.style.setProperty("--miss", "#ef4444");
   root.style.setProperty("--warn", "#f59e0b");
-  root.style.setProperty("--text", "#f1f5f9");
+  root.style.setProperty("--text", "#ffffff");
 }
 
 /** Load from localStorage immediately + apply. Cloud load is handled by AppProviders via useTeamSettingsSync. */

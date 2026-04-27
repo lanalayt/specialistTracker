@@ -11,7 +11,7 @@ import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { createArchive } from "@/lib/archiveManager";
 import { getTeamId } from "@/lib/teamData";
 import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
-import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, type ThemeColors } from "@/lib/themeColors";
+import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, loadCustomThemes, saveCustomThemes, loadCustomThemesFromCloud, type ThemeColors, type SavedTheme } from "@/lib/themeColors";
 import clsx from "clsx";
 
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
@@ -39,6 +39,13 @@ function SettingsContent() {
     typeof window !== "undefined" ? loadAndApplyTheme() : DEFAULT_THEME
   );
 
+  const [customThemes, setCustomThemes] = useState<SavedTheme[]>(() => loadCustomThemes());
+  const [newThemeName, setNewThemeName] = useState("");
+
+  useEffect(() => {
+    loadCustomThemesFromCloud().then((ct) => { if (ct.length) setCustomThemes(ct); });
+  }, []);
+
   const handlePreset = (colors: ThemeColors) => {
     setTheme(colors);
     saveTheme(colors);
@@ -48,6 +55,22 @@ function SettingsContent() {
     const next = { ...theme, [field]: hex };
     setTheme(next);
     saveTheme(next);
+  };
+
+  const handleSaveCustomTheme = () => {
+    const name = newThemeName.trim();
+    if (!name) return;
+    const existing = customThemes.filter((t) => t.name !== name);
+    const next = [...existing, { name, colors: { ...theme } }];
+    setCustomThemes(next);
+    saveCustomThemes(next);
+    setNewThemeName("");
+  };
+
+  const handleDeleteCustomTheme = (name: string) => {
+    const next = customThemes.filter((t) => t.name !== name);
+    setCustomThemes(next);
+    saveCustomThemes(next);
   };
 
   // Archive UI state
@@ -260,6 +283,67 @@ function SettingsContent() {
                 </div>
               </div>
             </div>
+
+            {/* Save current as custom theme */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <p className="text-[10px] font-semibold text-muted uppercase tracking-wider">Save Current Colors</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newThemeName}
+                  onChange={(e) => setNewThemeName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveCustomTheme(); }}
+                  placeholder="Theme name (e.g. College of Idaho)"
+                  className="flex-1 bg-surface-2 border border-border text-slate-200 px-3 py-2 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+                />
+                <button
+                  onClick={handleSaveCustomTheme}
+                  disabled={!newThemeName.trim()}
+                  className="px-4 py-2 rounded-input text-sm font-semibold bg-accent/20 text-accent border border-accent/50 hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+
+            {/* Custom saved themes */}
+            {customThemes.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="text-[10px] font-semibold text-muted uppercase tracking-wider">Your Saved Themes</p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {customThemes.map((ct) => {
+                    const isActive = theme.primary === ct.colors.primary && theme.secondary === ct.colors.secondary && theme.tertiary === ct.colors.tertiary;
+                    return (
+                      <div key={ct.name} className="relative group">
+                        <button
+                          onClick={() => handlePreset(ct.colors)}
+                          className={clsx(
+                            "w-full flex flex-col items-center gap-1.5 p-2 rounded-input border transition-all",
+                            isActive
+                              ? "border-accent/60 bg-accent/10 ring-1 ring-accent/40"
+                              : "border-border hover:border-accent/40 hover:bg-surface-2"
+                          )}
+                        >
+                          <div className="flex gap-1">
+                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: ct.colors.primary }} />
+                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: ct.colors.secondary }} />
+                            <div className="w-5 h-5 rounded-full border border-white/20" style={{ backgroundColor: ct.colors.tertiary }} />
+                          </div>
+                          <span className="text-[9px] text-slate-300 font-medium leading-tight text-center">{ct.name}</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCustomTheme(ct.name)}
+                          className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-surface-2 border border-border text-muted hover:text-miss hover:border-miss/50 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete theme"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
           </div>
 
