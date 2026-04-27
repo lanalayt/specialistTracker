@@ -41,7 +41,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
         ref={containerRef}
         onClick={handleClick}
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex flex-col items-center"
-        style={{ width: 280, background: "rgba(30,41,59,0.3)", paddingTop: 50, paddingBottom: 10 }}
+        style={{ width: 280, background: "#000000", paddingTop: 50, paddingBottom: 10 }}
       >
         {/* Player image */}
         <img
@@ -54,13 +54,13 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
 
         {/* Strike zone box overlay */}
         <div
-          className="absolute border-2 border-dashed border-accent/50 rounded pointer-events-none"
+          className="absolute border-2 border-red-500 rounded pointer-events-none"
           style={{
             top: `${ZONE.top}%`,
             left: `${ZONE.left}%`,
             width: `${ZONE.right - ZONE.left}%`,
             height: `${ZONE.bottom - ZONE.top}%`,
-            backgroundColor: "rgba(0, 212, 160, 0.08)",
+            backgroundColor: "rgba(239, 68, 68, 0.06)",
           }}
         />
 
