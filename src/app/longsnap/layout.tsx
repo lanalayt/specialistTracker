@@ -16,7 +16,13 @@ export default function LongSnapLayout({ children }: { children: React.ReactNode
         <Sidebar />
         <div className="lg:pl-56 flex-1 flex flex-col min-h-screen pb-20 lg:pb-0 min-w-0">
           <Header title="Long Snapping" />
-          {!isHub && <SportSubNav basePath="/longsnap" />}
+          {!isHub && <SportSubNav basePath="/longsnap" tabs={[
+            { label: "Punt Snap", slug: "session-punt", coachOnly: false },
+            { label: "FG Snap", slug: "session-fg", coachOnly: false },
+            { label: "Statistics", slug: "statistics", coachOnly: false },
+            { label: "History", slug: "history", coachOnly: false },
+            { label: "Athletes", slug: "athletes", coachOnly: true },
+          ]} />}
           <AthleteViewOnly>{children}</AthleteViewOnly>
         </div>
         <MobileNav />

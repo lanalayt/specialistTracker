@@ -44,11 +44,12 @@ interface SnapEntryCardProps {
   athletes: string[];
   snapCount: number;
   onAdd: (snap: LongSnapEntry) => void;
+  lockedType?: SnapType;
 }
 
-export function SnapEntryCard({ athletes, snapCount, onAdd }: SnapEntryCardProps) {
+export function SnapEntryCard({ athletes, snapCount, onAdd, lockedType }: SnapEntryCardProps) {
   const [athlete, setAthlete] = useState<string>(athletes[0] ?? "");
-  const [snapType, setSnapType] = useState<SnapType>("PUNT");
+  const [snapType, setSnapType] = useState<SnapType>(lockedType ?? "PUNT");
   const [time, setTime] = useState<string>("0.74");
   const [accuracy, setAccuracy] = useState<SnapAccuracy>("ON_TARGET");
   const [score, setScore] = useState<number>(0);
@@ -104,6 +105,7 @@ export function SnapEntryCard({ athletes, snapCount, onAdd }: SnapEntryCardProps
       </div>
 
       {/* Snap type */}
+      {!lockedType ? (
       <div>
         <p className="label">Snap Type</p>
         <div className="flex gap-2">
@@ -124,6 +126,11 @@ export function SnapEntryCard({ athletes, snapCount, onAdd }: SnapEntryCardProps
         </div>
         <p className="text-[10px] text-muted mt-1.5">{TYPE_BENCHMARKS[snapType]}</p>
       </div>
+      ) : (
+      <div>
+        <p className="text-[10px] text-muted">{TYPE_BENCHMARKS[snapType]}</p>
+      </div>
+      )}
 
       {/* Time + benchmark */}
       <div>

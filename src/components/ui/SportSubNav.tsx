@@ -15,13 +15,14 @@ const TABS = [
 interface SportSubNavProps {
   basePath: string;
   extraTabs?: { label: string; slug: string }[];
+  tabs?: { label: string; slug: string; coachOnly: boolean }[];
 }
 
-export function SportSubNav({ basePath, extraTabs }: SportSubNavProps) {
+export function SportSubNav({ basePath, extraTabs, tabs }: SportSubNavProps) {
   const { isAthlete } = useAuth();
   // Extra tabs (like Settings) are coach-only
   const extraWithRole = (extraTabs ?? []).map((t) => ({ ...t, coachOnly: true }));
-  const allTabs = [...TABS, ...extraWithRole];
+  const allTabs = tabs ?? [...TABS, ...extraWithRole];
   const visibleTabs = isAthlete ? allTabs.filter((t) => !t.coachOnly) : allTabs;
   const pathname = usePathname();
 
