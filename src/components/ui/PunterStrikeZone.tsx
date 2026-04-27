@@ -3,161 +3,116 @@
 export function PunterStrikeZone() {
   return (
     <div className="flex justify-center">
-      <svg viewBox="0 0 220 380" width="220" height="380" className="drop-shadow-lg">
-        <defs>
-          {/* Skin gradient */}
-          <radialGradient id="skinGrad" cx="50%" cy="40%" r="50%">
-            <stop offset="0%" stopColor="#d4a574" />
-            <stop offset="100%" stopColor="#b8895a" />
-          </radialGradient>
-          {/* Jersey gradient */}
-          <linearGradient id="jerseyGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#475569" />
-            <stop offset="50%" stopColor="#334155" />
-            <stop offset="100%" stopColor="#2d3a4a" />
-          </linearGradient>
-          {/* Pants gradient */}
-          <linearGradient id="pantsGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#f8fafc" />
-            <stop offset="100%" stopColor="#cbd5e1" />
-          </linearGradient>
-          {/* Shadow beneath */}
-          <radialGradient id="shadowGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(0,0,0,0.25)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-          </radialGradient>
-          {/* Helmet gradient */}
-          <radialGradient id="helmetGrad" cx="45%" cy="35%" r="55%">
-            <stop offset="0%" stopColor="#64748b" />
-            <stop offset="100%" stopColor="#334155" />
-          </radialGradient>
-        </defs>
+      <div className="relative inline-block">
+        <svg viewBox="0 0 200 480" width="180" height="430" className="drop-shadow-lg">
+          <defs>
+            <linearGradient id="bodyFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1a1a1a" />
+              <stop offset="100%" stopColor="#0a0a0a" />
+            </linearGradient>
+          </defs>
 
-        {/* Ground shadow */}
-        <ellipse cx="110" cy="348" rx="50" ry="8" fill="url(#shadowGrad)" />
+          {/* ── HELMET ── */}
+          <path d="M100 8 C72 8 58 22 56 44 C54 56 58 66 66 72 L68 68 C68 68 78 74 100 74 C122 74 132 68 132 68 L134 72 C142 66 146 56 144 44 C142 22 128 8 100 8Z" fill="#111" />
+          {/* Facemask */}
+          <path d="M72 56 C72 56 80 68 100 68 C120 68 128 56 128 56" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round"/>
+          <path d="M76 62 C76 62 86 70 100 70 C114 70 124 62 124 62" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"/>
+          <line x1="84" y1="56" x2="82" y2="66" stroke="#ccc" strokeWidth="1.5"/>
+          <line x1="100" y1="54" x2="100" y2="70" stroke="#ccc" strokeWidth="1.5"/>
+          <line x1="116" y1="56" x2="118" y2="66" stroke="#ccc" strokeWidth="1.5"/>
+          {/* Helmet highlight */}
+          <path d="M100 10 C100 10 90 12 86 20" fill="none" stroke="#333" strokeWidth="1.5"/>
 
-        {/* ── LEGS ── */}
-        {/* Left leg */}
-        <path
-          d="M88 200 Q86 230 84 260 Q82 280 80 300 L78 310 Q78 316 85 316 L95 316 Q98 316 98 312 L96 300 Q94 280 94 260 Q94 240 95 220 L95 200"
-          fill="url(#pantsGrad)" stroke="#94a3b8" strokeWidth="0.5"
-        />
-        {/* Right leg */}
-        <path
-          d="M125 200 Q127 230 129 260 Q131 280 133 300 L135 310 Q135 316 128 316 L118 316 Q115 316 115 312 L117 300 Q119 280 119 260 Q119 240 118 220 L118 200"
-          fill="url(#pantsGrad)" stroke="#94a3b8" strokeWidth="0.5"
-        />
-        {/* Cleats */}
-        <path d="M76 314 Q74 320 78 324 L96 324 Q100 320 98 314" fill="#1e293b" />
-        <path d="M115 314 Q113 320 117 324 L135 324 Q139 320 137 314" fill="#1e293b" />
-        {/* Cleat studs */}
-        <rect x="80" y="323" width="3" height="3" rx="1" fill="#475569" />
-        <rect x="87" y="323" width="3" height="3" rx="1" fill="#475569" />
-        <rect x="94" y="323" width="3" height="3" rx="1" fill="#475569" />
-        <rect x="119" y="323" width="3" height="3" rx="1" fill="#475569" />
-        <rect x="126" y="323" width="3" height="3" rx="1" fill="#475569" />
-        <rect x="133" y="323" width="3" height="3" rx="1" fill="#475569" />
-        {/* Knee pads */}
-        <ellipse cx="87" cy="262" rx="9" ry="12" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="0.5" />
-        <ellipse cx="126" cy="262" rx="9" ry="12" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="0.5" />
+          {/* ── NECK ── */}
+          <path d="M88 72 L88 82 Q100 86 112 82 L112 72" fill="#111"/>
 
-        {/* ── TORSO ── */}
-        {/* Jersey body */}
-        <path
-          d="M72 88 Q70 90 68 100 L66 140 Q66 165 68 185 L70 200 Q80 205 110 205 Q140 205 143 200 L145 185 Q147 165 147 140 L145 100 Q143 90 141 88"
-          fill="url(#jerseyGrad)" stroke="#2d3a4a" strokeWidth="1"
-        />
-        {/* Jersey number */}
-        <text x="107" y="155" textAnchor="middle" fill="rgba(255,255,255,0.15)" fontSize="42" fontWeight="900" fontFamily="sans-serif">8</text>
-        {/* Jersey collar */}
-        <path
-          d="M90 82 Q100 86 107 86 Q114 86 123 82"
-          fill="none" stroke="#1e293b" strokeWidth="2.5" strokeLinecap="round"
-        />
-        {/* Jersey seam lines */}
-        <line x1="107" y1="88" x2="107" y2="200" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+          {/* ── SHOULDER PADS ── */}
+          <path d="M40 84 C42 76 56 72 72 74 L72 96 C60 96 48 92 40 84Z" fill="#111" stroke="#222" strokeWidth="0.5"/>
+          <path d="M160 84 C158 76 144 72 128 74 L128 96 C140 96 152 92 160 84Z" fill="#111" stroke="#222" strokeWidth="0.5"/>
+          {/* Pad edge lines */}
+          <path d="M42 84 C44 78 56 74 72 74" fill="none" stroke="#333" strokeWidth="1.2"/>
+          <path d="M158 84 C156 78 144 74 128 74" fill="none" stroke="#333" strokeWidth="1.2"/>
+          {/* Pad bottom curve */}
+          <path d="M46 92 Q60 104 72 96" fill="none" stroke="#333" strokeWidth="0.8"/>
+          <path d="M154 92 Q140 104 128 96" fill="none" stroke="#333" strokeWidth="0.8"/>
 
-        {/* ── SHOULDER PADS ── */}
-        <path
-          d="M56 78 Q58 70 72 68 L72 88 Q66 90 60 96 L52 96 Q50 90 56 78"
-          fill="#4a5568" stroke="#2d3a4a" strokeWidth="1"
-        />
-        <path
-          d="M158 78 Q156 70 141 68 L141 88 Q147 90 153 96 L161 96 Q163 90 158 78"
-          fill="#4a5568" stroke="#2d3a4a" strokeWidth="1"
-        />
-        {/* Pad edge highlight */}
-        <path d="M56 78 Q58 72 72 68" fill="none" stroke="#64748b" strokeWidth="1.5" />
-        <path d="M158 78 Q156 72 141 68" fill="none" stroke="#64748b" strokeWidth="1.5" />
+          {/* ── JERSEY / TORSO ── */}
+          <path d="M72 82 L72 96 Q72 100 68 110 L64 180 Q64 196 68 210 L70 220 Q84 228 100 228 Q116 228 130 220 L132 210 Q136 196 136 180 L132 110 Q128 100 128 96 L128 82 Q114 90 100 90 Q86 90 72 82Z" fill="url(#bodyFill)" stroke="#222" strokeWidth="0.5"/>
+          {/* Jersey seam */}
+          <line x1="100" y1="92" x2="100" y2="224" stroke="#222" strokeWidth="0.5"/>
+          {/* Jersey bottom hem */}
+          <path d="M70 220 Q100 230 130 220" fill="none" stroke="#333" strokeWidth="0.8"/>
+          {/* Collar line */}
+          <path d="M82 82 Q100 88 118 82" fill="none" stroke="#333" strokeWidth="1.2"/>
 
-        {/* ── ARMS ── */}
-        {/* Left arm */}
-        <path
-          d="M56 96 Q50 115 46 138 Q44 150 46 155"
-          fill="none" stroke="url(#skinGrad)" strokeWidth="14" strokeLinecap="round"
-        />
-        {/* Right arm */}
-        <path
-          d="M158 96 Q163 115 167 138 Q169 150 167 155"
-          fill="none" stroke="url(#skinGrad)" strokeWidth="14" strokeLinecap="round"
-        />
-        {/* Left forearm/hand */}
-        <circle cx="46" cy="158" r="7" fill="#d4a574" stroke="#b8895a" strokeWidth="0.5" />
-        {/* Right forearm/hand */}
-        <circle cx="167" cy="158" r="7" fill="#d4a574" stroke="#b8895a" strokeWidth="0.5" />
+          {/* ── ARMS ── */}
+          {/* Left arm */}
+          <path d="M46 92 Q40 120 38 148 Q36 166 40 180 L44 184 Q50 170 50 148 Q52 120 56 96" fill="#111" stroke="#222" strokeWidth="0.5"/>
+          {/* Right arm */}
+          <path d="M154 92 Q160 120 162 148 Q164 166 160 180 L156 184 Q150 170 150 148 Q148 120 144 96" fill="#111" stroke="#222" strokeWidth="0.5"/>
+          {/* Arm muscle lines */}
+          <path d="M44 110 Q46 130 42 150" fill="none" stroke="#222" strokeWidth="0.6"/>
+          <path d="M156 110 Q154 130 158 150" fill="none" stroke="#222" strokeWidth="0.6"/>
 
-        {/* ── NECK ── */}
-        <path
-          d="M95 68 Q100 72 107 72 Q114 72 118 68 L118 60 Q114 64 107 64 Q100 64 95 60 Z"
-          fill="#d4a574"
-        />
+          {/* ── HANDS ── */}
+          <path d="M38 178 Q34 186 36 190 Q38 194 44 192 Q48 190 48 184 L44 178Z" fill="#111"/>
+          <path d="M162 178 Q166 186 164 190 Q162 194 156 192 Q152 190 152 184 L156 178Z" fill="#111"/>
+          {/* Finger lines */}
+          <line x1="38" y1="186" x2="40" y2="190" stroke="#222" strokeWidth="0.5"/>
+          <line x1="42" y1="186" x2="43" y2="190" stroke="#222" strokeWidth="0.5"/>
+          <line x1="160" y1="186" x2="162" y2="190" stroke="#222" strokeWidth="0.5"/>
+          <line x1="158" y1="186" x2="157" y2="190" stroke="#222" strokeWidth="0.5"/>
 
-        {/* ── HELMET ── */}
-        <ellipse cx="107" cy="42" rx="24" ry="26" fill="url(#helmetGrad)" />
-        {/* Face mask */}
-        <path
-          d="M90 48 Q92 58 107 60 Q122 58 124 48"
-          fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round"
-        />
-        <path
-          d="M93 52 Q107 56 121 52"
-          fill="none" stroke="#94a3b8" strokeWidth="1.5"
-        />
-        {/* Facemask bars */}
-        <line x1="96" y1="48" x2="96" y2="56" stroke="#94a3b8" strokeWidth="1.2" />
-        <line x1="107" y1="48" x2="107" y2="58" stroke="#94a3b8" strokeWidth="1.2" />
-        <line x1="118" y1="48" x2="118" y2="56" stroke="#94a3b8" strokeWidth="1.2" />
-        {/* Helmet stripe */}
-        <path
-          d="M107 16 Q107 18 107 42"
-          fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3"
-        />
-        {/* Ear hole */}
-        <ellipse cx="83" cy="44" rx="3" ry="5" fill="#2d3a4a" />
-        <ellipse cx="131" cy="44" rx="3" ry="5" fill="#2d3a4a" />
-        {/* Chin strap */}
-        <path d="M86 56 Q86 64 95 66" fill="none" stroke="#64748b" strokeWidth="1.5" />
-        <path d="M128 56 Q128 64 118 66" fill="none" stroke="#64748b" strokeWidth="1.5" />
+          {/* ── BELT ── */}
+          <rect x="66" y="218" width="68" height="8" rx="2" fill="#0a0a0a" stroke="#333" strokeWidth="0.8"/>
+          <rect x="96" y="217" width="8" height="10" rx="1.5" fill="#333" stroke="#444" strokeWidth="0.5"/>
 
-        {/* ── BELT ── */}
-        <rect x="68" y="196" width="77" height="6" rx="2" fill="#1e293b" />
-        <rect x="103" y="195" width="8" height="8" rx="1.5" fill="#94a3b8" stroke="#64748b" strokeWidth="0.5" />
+          {/* ── PANTS / LEGS ── */}
+          {/* Left leg */}
+          <path d="M70 226 Q68 250 66 280 Q64 310 64 340 L60 360 Q60 368 68 368 L82 368 Q86 368 86 362 L84 340 Q84 310 86 280 Q88 250 90 226Z" fill="url(#bodyFill)" stroke="#222" strokeWidth="0.5"/>
+          {/* Right leg */}
+          <path d="M110 226 Q112 250 114 280 Q116 310 116 340 L120 360 Q120 368 112 368 L98 368 Q94 368 94 362 L96 340 Q96 310 94 280 Q92 250 90 226Z" fill="url(#bodyFill)" stroke="#222" strokeWidth="0.5"/>
 
-        {/* ═══ STRIKE ZONE BOX ═══ */}
-        {/* Nipple line ≈ y=105, Knee line ≈ y=265 */}
-        {/* Body edges ~68-145, one ball width (~12px) outside → 56-157 */}
-        <rect
-          x="54"
-          y="105"
-          width="105"
-          height="160"
-          rx="4"
-          fill="rgba(0, 212, 160, 0.10)"
-          stroke="rgba(0, 212, 160, 0.5)"
-          strokeWidth="2"
-          strokeDasharray="6 3"
+          {/* Knee pads */}
+          <path d="M66 296 Q64 304 66 316 Q72 322 82 316 Q84 304 82 296 Q74 290 66 296Z" fill="#151515" stroke="#333" strokeWidth="0.8"/>
+          <path d="M118 296 Q120 304 118 316 Q112 322 102 316 Q100 304 102 296 Q110 290 118 296Z" fill="#151515" stroke="#333" strokeWidth="0.8"/>
+          {/* Knee pad lines */}
+          <path d="M70 300 Q74 308 70 312" fill="none" stroke="#282828" strokeWidth="0.6"/>
+          <path d="M114 300 Q110 308 114 312" fill="none" stroke="#282828" strokeWidth="0.6"/>
+
+          {/* Leg muscle/seam lines */}
+          <path d="M78 240 Q76 270 76 296" fill="none" stroke="#222" strokeWidth="0.5"/>
+          <path d="M102 240 Q104 270 104 296" fill="none" stroke="#222" strokeWidth="0.5"/>
+          <path d="M76 320 Q74 340 72 358" fill="none" stroke="#222" strokeWidth="0.5"/>
+          <path d="M104 320 Q106 340 108 358" fill="none" stroke="#222" strokeWidth="0.5"/>
+
+          {/* ── SOCKS ── */}
+          <rect x="60" y="354" width="26" height="14" rx="2" fill="#0a0a0a" stroke="#222" strokeWidth="0.5"/>
+          <rect x="94" y="354" width="26" height="14" rx="2" fill="#0a0a0a" stroke="#222" strokeWidth="0.5"/>
+          {/* Sock stripes */}
+          <line x1="62" y1="358" x2="84" y2="358" stroke="#222" strokeWidth="0.8"/>
+          <line x1="96" y1="358" x2="118" y2="358" stroke="#222" strokeWidth="0.8"/>
+
+          {/* ── CLEATS ── */}
+          <path d="M56 366 Q54 372 58 378 L86 378 Q90 374 88 366" fill="#0a0a0a" stroke="#222" strokeWidth="0.5"/>
+          <path d="M92 366 Q90 372 94 378 L122 378 Q126 374 124 366" fill="#0a0a0a" stroke="#222" strokeWidth="0.5"/>
+          {/* Cleat soles */}
+          <path d="M58 376 L86 376" fill="none" stroke="#333" strokeWidth="1"/>
+          <path d="M94 376 L122 376" fill="none" stroke="#333" strokeWidth="1"/>
+        </svg>
+
+        {/* ═══ STRIKE ZONE OVERLAY ═══ */}
+        <div
+          className="absolute border-2 border-dashed border-accent/50 rounded"
+          style={{
+            top: "25%",
+            bottom: "30%",
+            left: "12%",
+            right: "12%",
+            backgroundColor: "rgba(0, 212, 160, 0.10)",
+          }}
         />
-      </svg>
+      </div>
     </div>
   );
 }
