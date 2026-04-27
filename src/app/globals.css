@@ -15,7 +15,7 @@
   --miss: #ef4444;
   --warn: #f59e0b;
   --text: #f1f5f9;
-  --muted: #8494a7;
+  --muted: #9aa8b8;
 }
 
 * {
@@ -109,7 +109,7 @@ body {
     background: rgba(245, 158, 11, 0.15);
   }
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium text-muted transition-all hover:text-white hover:bg-surface-2;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium text-slate-300 transition-all hover:text-white hover:bg-surface-2;
   }
   .nav-link-active {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-semibold text-accent;
