@@ -17,7 +17,7 @@ interface PunterStrikeZoneProps {
 
 // Strike zone bounds as percentages of the outer container
 // Nipple to knee on the player image, one ball-width outside body
-const ZONE = { top: 32, bottom: 69, left: 25, right: 75 };
+const ZONE = { top: 34, bottom: 72, left: 25, right: 75 };
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
