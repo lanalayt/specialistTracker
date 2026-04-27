@@ -353,7 +353,7 @@ function KickoffHistoryContent() {
                       {editing ? (
                         <>
                           <td className="table-cell p-1"><input type="text" inputMode="numeric" value={e.distance || ""} onChange={(ev) => updateEntry(i, "distance", parseInt(ev.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
-                          <td className="table-cell p-1"><input type="text" inputMode="decimal" value={e.hangTime || ""} onChange={(ev) => updateEntry(i, "hangTime", parseFloat(ev.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={e.hangTime || ""} onChange={(ev) => { const d = ev.target.value.replace(/\D/g, ""); updateEntry(i, "hangTime", d ? parseFloat(`${d.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${d.padStart(3, "0").slice(-2)}`) : 0); }} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                           <td className="table-cell p-1">
                             <select value={e.direction} onChange={(ev) => updateEntry(i, "direction", ev.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
                               <option value="1">1</option>
