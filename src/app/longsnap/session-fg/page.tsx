@@ -295,6 +295,14 @@ export default function LongSnapFGSessionPage() {
           <span className="text-xs text-muted flex-1">
             {filledRows.length === 0 ? "0 snaps entered" : `${filledRows.length} snap${filledRows.length !== 1 ? "s" : ""} entered`}
           </span>
+          {!viewOnly && filledRows.length > 0 && (
+            <button
+              onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); } catch {} }}
+              className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
+            >
+              Clear Log
+            </button>
+          )}
           {!viewOnly && (
             <button
               onClick={handleCommit}
