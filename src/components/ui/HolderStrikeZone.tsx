@@ -15,8 +15,8 @@ interface HolderStrikeZoneProps {
   nextNum?: number;
 }
 
-// Strike zone — the holder's target area (hands/chest region)
-const ZONE = { top: 30, bottom: 65, left: 25, right: 75 };
+// Strike zone — target area around the hands/chest
+const ZONE = { top: 20, bottom: 58, left: 22, right: 72 };
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
@@ -40,89 +40,99 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1 }: HolderSt
         ref={containerRef}
         onClick={handleClick}
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex flex-col items-center"
-        style={{ width: 280, background: "#000000", paddingTop: 40, paddingBottom: 10 }}
+        style={{ width: 280, background: "#000000", paddingTop: 30, paddingBottom: 10 }}
       >
-        {/* Holder SVG — front-facing, kneeling, left hand down, right hand open toward camera */}
-        <svg viewBox="0 0 200 360" className="pointer-events-none select-none" style={{ height: 340, width: "auto" }}>
-          <defs>
-            <linearGradient id="hBodyFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#e8e8e8" />
-              <stop offset="100%" stopColor="#c0c0c0" />
-            </linearGradient>
-          </defs>
+        {/* Holder outline sketch — kneeling, facing camera, right hand reaching for incoming snap */}
+        <svg viewBox="0 0 240 340" className="pointer-events-none select-none" style={{ height: 320, width: "auto" }}>
+          {/* All strokes white/light grey on black background — outline sketch style */}
 
-          {/* ── HELMET ── */}
-          <ellipse cx="100" cy="38" rx="22" ry="24" fill="#d4d4d4" />
+          {/* ── HEAD / HELMET ── */}
+          {/* Helmet shell */}
+          <ellipse cx="120" cy="42" rx="26" ry="28" fill="none" stroke="#ccc" strokeWidth="2"/>
           {/* Facemask */}
-          <path d="M82 46 Q90 56 100 58 Q110 56 118 46" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round"/>
-          <path d="M85 50 Q95 58 100 59 Q105 58 115 50" fill="none" stroke="#888" strokeWidth="1.5"/>
-          <line x1="92" y1="46" x2="91" y2="54" stroke="#888" strokeWidth="1.2"/>
-          <line x1="100" y1="44" x2="100" y2="58" stroke="#888" strokeWidth="1.2"/>
-          <line x1="108" y1="46" x2="109" y2="54" stroke="#888" strokeWidth="1.2"/>
+          <path d="M100 50 Q110 62 120 64 Q130 62 140 50" fill="none" stroke="#999" strokeWidth="1.8"/>
+          <path d="M103 55 Q115 64 120 65 Q125 64 137 55" fill="none" stroke="#999" strokeWidth="1.2"/>
+          <line x1="110" y1="50" x2="108" y2="60" stroke="#999" strokeWidth="1"/>
+          <line x1="120" y1="48" x2="120" y2="64" stroke="#999" strokeWidth="1"/>
+          <line x1="130" y1="50" x2="132" y2="60" stroke="#999" strokeWidth="1"/>
           {/* Helmet stripe */}
-          <path d="M100 14 L100 38" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="2.5"/>
+          <path d="M120 14 L120 42" fill="none" stroke="#666" strokeWidth="2"/>
           {/* Ear holes */}
-          <ellipse cx="78" cy="40" rx="2.5" ry="4" fill="#999"/>
-          <ellipse cx="122" cy="40" rx="2.5" ry="4" fill="#999"/>
+          <ellipse cx="94" cy="44" rx="3" ry="5" fill="none" stroke="#888" strokeWidth="1"/>
+          <ellipse cx="146" cy="44" rx="3" ry="5" fill="none" stroke="#888" strokeWidth="1"/>
 
           {/* ── NECK ── */}
-          <rect x="92" y="60" width="16" height="10" rx="3" fill="#d0d0d0"/>
+          <path d="M108 68 L108 78 Q120 82 132 78 L132 68" fill="none" stroke="#bbb" strokeWidth="1.5"/>
 
           {/* ── SHOULDER PADS ── */}
-          <path d="M50 72 Q55 64 75 62 L75 82 Q60 82 50 72Z" fill="#ccc" stroke="#aaa" strokeWidth="0.5"/>
-          <path d="M150 72 Q145 64 125 62 L125 82 Q140 82 150 72Z" fill="#ccc" stroke="#aaa" strokeWidth="0.5"/>
-          <path d="M52 72 Q55 66 75 62" fill="none" stroke="#ddd" strokeWidth="1"/>
-          <path d="M148 72 Q145 66 125 62" fill="none" stroke="#ddd" strokeWidth="1"/>
+          <path d="M60 82 Q68 72 90 70 L90 90 Q72 90 60 82Z" fill="none" stroke="#ccc" strokeWidth="1.5"/>
+          <path d="M180 82 Q172 72 150 70 L150 90 Q168 90 180 82Z" fill="none" stroke="#ccc" strokeWidth="1.5"/>
 
-          {/* ── JERSEY / TORSO ── */}
-          <path d="M75 68 L75 82 Q74 90 72 105 L68 160 Q68 172 72 182 L74 192 Q88 200 100 200 Q112 200 126 192 L128 182 Q132 172 132 160 L128 105 Q126 90 125 82 L125 68 Q112 76 100 76 Q88 76 75 68Z" fill="url(#hBodyFill)" stroke="#aaa" strokeWidth="0.5"/>
+          {/* ── TORSO / JERSEY ── */}
+          {/* Slightly crouched/leaning forward */}
+          <path d="M90 78 Q88 95 85 115 L82 155 Q82 168 86 178 L90 188 Q105 195 120 195 Q135 195 148 188 L152 178 Q156 168 156 155 L153 115 Q150 95 148 78" fill="none" stroke="#ccc" strokeWidth="1.8"/>
           {/* Jersey seam */}
-          <line x1="100" y1="78" x2="100" y2="196" stroke="#bbb" strokeWidth="0.4"/>
+          <line x1="120" y1="82" x2="120" y2="190" stroke="#555" strokeWidth="0.6"/>
           {/* Collar */}
-          <path d="M85 68 Q100 74 115 68" fill="none" stroke="#ccc" strokeWidth="1"/>
-          {/* Number */}
-          <text x="100" y="145" textAnchor="middle" fill="rgba(0,0,0,0.08)" fontSize="36" fontWeight="900" fontFamily="sans-serif">7</text>
+          <path d="M100 76 Q120 82 140 76" fill="none" stroke="#999" strokeWidth="1.2"/>
 
-          {/* ── LEFT ARM — down, touching ground ── */}
-          <path d="M50 72 Q42 100 38 130 Q35 155 38 175 L40 185" fill="none" stroke="#d4d4d4" strokeWidth="13" strokeLinecap="round"/>
-          {/* Left hand — flat on ground */}
-          <ellipse cx="40" cy="190" rx="8" ry="5" fill="#d4d4d4" stroke="#bbb" strokeWidth="0.5"/>
-          {/* Fingers */}
-          <line x1="33" y1="189" x2="33" y2="193" stroke="#bbb" strokeWidth="0.8"/>
-          <line x1="36" y1="190" x2="36" y2="195" stroke="#bbb" strokeWidth="0.8"/>
-          <line x1="40" y1="190" x2="40" y2="196" stroke="#bbb" strokeWidth="0.8"/>
-          <line x1="44" y1="190" x2="44" y2="195" stroke="#bbb" strokeWidth="0.8"/>
+          {/* ── RIGHT ARM — reaching out toward snap, hand open ── */}
+          {/* Upper arm */}
+          <path d="M150 90 Q158 100 164 115" fill="none" stroke="#ccc" strokeWidth="3" strokeLinecap="round"/>
+          {/* Forearm extending forward/down */}
+          <path d="M164 115 Q172 130 178 142" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round"/>
+          {/* Right hand — open, fingers spread, reaching for ball */}
+          <path d="M178 142 L182 148" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"/>
+          {/* Thumb */}
+          <path d="M176 144 L170 140" fill="none" stroke="#ccc" strokeWidth="1.8" strokeLinecap="round"/>
+          {/* Index */}
+          <path d="M178 143 L184 136" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round"/>
+          {/* Middle */}
+          <path d="M180 145 L188 140" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round"/>
+          {/* Ring */}
+          <path d="M181 148 L190 145" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round"/>
+          {/* Pinky */}
+          <path d="M182 150 L190 150" fill="none" stroke="#ccc" strokeWidth="1.3" strokeLinecap="round"/>
+          {/* Palm outline */}
+          <path d="M175 140 Q180 145 182 152" fill="none" stroke="#aaa" strokeWidth="1"/>
 
-          {/* ── RIGHT ARM — extended forward, hand open toward viewer ── */}
-          <path d="M150 72 Q156 95 158 115 Q160 130 158 142" fill="none" stroke="#d4d4d4" strokeWidth="13" strokeLinecap="round"/>
-          {/* Right hand — open, facing forward (circle to show palm) */}
-          <circle cx="158" cy="150" r="12" fill="#d4d4d4" stroke="#bbb" strokeWidth="0.8"/>
-          {/* Palm lines */}
-          <path d="M152 148 Q158 152 164 148" fill="none" stroke="#bbb" strokeWidth="0.6"/>
-          <path d="M153 152 Q158 155 163 152" fill="none" stroke="#bbb" strokeWidth="0.5"/>
-          {/* Fingers spread */}
-          <line x1="150" y1="142" x2="147" y2="136" stroke="#d4d4d4" strokeWidth="3" strokeLinecap="round"/>
-          <line x1="154" y1="140" x2="152" y2="133" stroke="#d4d4d4" strokeWidth="3" strokeLinecap="round"/>
-          <line x1="158" y1="138" x2="158" y2="131" stroke="#d4d4d4" strokeWidth="3" strokeLinecap="round"/>
-          <line x1="162" y1="140" x2="164" y2="133" stroke="#d4d4d4" strokeWidth="3" strokeLinecap="round"/>
-          <line x1="166" y1="142" x2="169" y2="136" stroke="#d4d4d4" strokeWidth="3" strokeLinecap="round"/>
+          {/* ── LEFT ARM — down, fingers touching ground for balance ── */}
+          {/* Upper arm */}
+          <path d="M60 82 Q52 100 48 120" fill="none" stroke="#ccc" strokeWidth="3" strokeLinecap="round"/>
+          {/* Forearm going down */}
+          <path d="M48 120 Q44 145 42 165" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round"/>
+          {/* Left hand — fingers down on ground */}
+          <path d="M42 165 L38 175" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round"/>
+          <path d="M40 168 L35 176" fill="none" stroke="#ccc" strokeWidth="1.3" strokeLinecap="round"/>
+          <path d="M42 167 L40 177" fill="none" stroke="#ccc" strokeWidth="1.3" strokeLinecap="round"/>
+          <path d="M44 168 L44 177" fill="none" stroke="#ccc" strokeWidth="1.3" strokeLinecap="round"/>
+          <path d="M46 167 L48 175" fill="none" stroke="#ccc" strokeWidth="1.3" strokeLinecap="round"/>
 
           {/* ── BELT ── */}
-          <rect x="70" y="190" width="60" height="6" rx="2" fill="#999" stroke="#888" strokeWidth="0.5"/>
-          <rect x="96" y="189" width="8" height="8" rx="1.5" fill="#bbb" stroke="#999" strokeWidth="0.5"/>
+          <path d="M86 186 L152 186" fill="none" stroke="#999" strokeWidth="2"/>
+          <rect x="116" y="184" width="8" height="6" rx="1" fill="none" stroke="#aaa" strokeWidth="1"/>
 
-          {/* ── KNEELING LEGS ── */}
-          {/* Left leg — kneeling, shin tucked under */}
-          <path d="M74 196 Q72 210 70 225 Q68 240 72 250 L80 255 Q88 250 88 240 Q88 225 86 210 L86 196" fill="#d0d0d0" stroke="#aaa" strokeWidth="0.5"/>
-          {/* Right leg — kneeling */}
-          <path d="M114 196 Q116 210 118 225 Q120 240 116 250 L108 255 Q100 250 100 240 Q100 225 102 210 L102 196" fill="#d0d0d0" stroke="#aaa" strokeWidth="0.5"/>
-          {/* Knee pads */}
-          <ellipse cx="79" cy="248" rx="10" ry="8" fill="#bbb" stroke="#999" strokeWidth="0.5"/>
-          <ellipse cx="109" cy="248" rx="10" ry="8" fill="#bbb" stroke="#999" strokeWidth="0.5"/>
+          {/* ── LEGS — kneeling ── */}
+          {/* Left thigh — going down and slightly forward */}
+          <path d="M90 192 Q86 210 82 228 Q78 242 80 252" fill="none" stroke="#ccc" strokeWidth="2.5"/>
+          {/* Left shin — tucked under */}
+          <path d="M80 252 Q76 262 74 272 L70 280" fill="none" stroke="#ccc" strokeWidth="2"/>
+          {/* Left knee */}
+          <ellipse cx="80" cy="252" rx="10" ry="8" fill="none" stroke="#aaa" strokeWidth="1.2"/>
 
-          {/* ── FEET/CLEATS (tucked under) ── */}
-          <path d="M68 252 Q66 260 70 264 L88 264 Q92 260 90 252" fill="#999" stroke="#888" strokeWidth="0.5"/>
-          <path d="M98 252 Q96 260 100 264 L118 264 Q122 260 120 252" fill="#999" stroke="#888" strokeWidth="0.5"/>
+          {/* Right thigh */}
+          <path d="M148 192 Q152 210 156 228 Q160 242 158 252" fill="none" stroke="#ccc" strokeWidth="2.5"/>
+          {/* Right shin — tucked under */}
+          <path d="M158 252 Q162 262 164 272 L168 280" fill="none" stroke="#ccc" strokeWidth="2"/>
+          {/* Right knee */}
+          <ellipse cx="158" cy="252" rx="10" ry="8" fill="none" stroke="#aaa" strokeWidth="1.2"/>
+
+          {/* ── CLEATS ── */}
+          <path d="M66 278 Q64 284 68 288 L78 288 Q82 284 80 278" fill="none" stroke="#999" strokeWidth="1.2"/>
+          <path d="M164 278 Q162 284 166 288 L176 288 Q180 284 178 278" fill="none" stroke="#999" strokeWidth="1.2"/>
+
+          {/* ── GROUND LINE ── */}
+          <line x1="25" y1="290" x2="215" y2="290" stroke="#444" strokeWidth="0.8" strokeDasharray="4 3"/>
         </svg>
 
         {/* Strike zone box */}
