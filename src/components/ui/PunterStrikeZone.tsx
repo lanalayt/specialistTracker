@@ -162,16 +162,6 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
 
         {/* Snap markers */}
         {markers.map((m) => {
-          const isDetailedHit = isDetailedStrike && m.inZone && m.zoneCell;
-          const isDetailedMissHit = isDetailedMiss && !m.inZone && m.missCell;
-          let symbol: string;
-          if (isDetailedHit) {
-            symbol = CELL_ARROWS[m.zoneCell!] ?? "✓";
-          } else if (isDetailedMissHit) {
-            symbol = MISS_ARROWS[m.missCell!] ?? "✗";
-          } else {
-            symbol = String(m.num);
-          }
 
           return (
             <div
@@ -188,7 +178,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
                 border: `2px solid ${m.inZone ? "#00d4a0" : "#ef4444"}`,
               }}
             >
-              <span className="text-[10px] font-black text-white leading-none">{symbol}</span>
+              <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
             </div>
           );
         })}
