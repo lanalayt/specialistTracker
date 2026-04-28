@@ -120,14 +120,6 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
         {/* Detailed miss lines — diagonals from zone corners + extensions of zone edges to outer box */}
         {isDetailedMiss && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-            {/* Top-left corner diagonal to outer box top-left */}
-            <line x1={ZONE.left} y1={ZONE.top} x2="0" y2="0" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            {/* Top-right corner diagonal to outer box top-right */}
-            <line x1={ZONE.right} y1={ZONE.top} x2="100" y2="0" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            {/* Bottom-left corner diagonal to outer box bottom-left */}
-            <line x1={ZONE.left} y1={ZONE.bottom} x2="0" y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            {/* Bottom-right corner diagonal to outer box bottom-right */}
-            <line x1={ZONE.right} y1={ZONE.bottom} x2="100" y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
             {/* Extend zone left edge up and down */}
             <line x1={ZONE.left} y1="0" x2={ZONE.left} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
             <line x1={ZONE.left} y1={ZONE.bottom} x2={ZONE.left} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
