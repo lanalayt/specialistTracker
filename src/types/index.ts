@@ -185,6 +185,7 @@ export interface LongSnapEntry {
   score: number;
   benchmark?: SnapBenchmark;
   critical?: boolean;
+  laces?: string;
 }
 
 // ─── Long Snap stats ─────────────────────────────────────────────────────────
