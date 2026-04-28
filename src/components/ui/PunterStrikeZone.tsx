@@ -7,8 +7,8 @@ export interface SnapMarker {
   y: number;
   num: number;
   inZone: boolean;
-  zoneCell?: string; // e.g. "TL", "TC", "TR", "ML", "MC", "MR", "BL", "BC", "BR"
-  missCell?: string; // e.g. "HIGH_L", "HIGH", "HIGH_R", "LEFT", "RIGHT", "LOW_L", "LOW", "LOW_R"
+  zoneCell?: string;
+  missCell?: string;
 }
 
 interface PunterStrikeZoneProps {
@@ -22,18 +22,15 @@ interface PunterStrikeZoneProps {
 // Strike zone bounds — LOCKED, do not change
 const ZONE = { top: 34, bottom: 72, left: 25, right: 75 };
 
-// Grid cell labels for strikes
 const CELL_ROWS = ["T", "M", "B"];
 const CELL_COLS = ["L", "C", "R"];
 
-// Arrow symbols for strike cells
 const CELL_ARROWS: Record<string, string> = {
   TL: "↖", TC: "↑", TR: "↗",
   ML: "←", MC: "✓", MR: "→",
   BL: "↙", BC: "↓", BR: "↘",
 };
 
-// Arrow symbols for miss cells (outside zone)
 const MISS_ARROWS: Record<string, string> = {
   HIGH_L: "↖", HIGH: "↑", HIGH_R: "↗",
   LEFT: "←", RIGHT: "→",
@@ -56,29 +53,41 @@ function getZoneCell(xPct: number, yPct: number): string | undefined {
 }
 
 function getMissCell(xPct: number, yPct: number): string {
-  const midX = (ZONE.left + ZONE.right) / 2;
+  // Diagonal lines from strike zone corners to outer box corners divide
+  // the miss area into 8 regions: HIGH_L, HIGH, HIGH_R, LEFT, RIGHT, LOW_L, LOW, LOW_R
+  const isAbove = yPct < ZONE.top;
+  const isBelow = yPct > ZONE.bottom;
   const isLeft = xPct < ZONE.left;
   const isRight = xPct > ZONE.right;
-  const isHigh = yPct < ZONE.top;
-  const isLow = yPct > ZONE.bottom;
 
-  if (isHigh && isLeft) return "HIGH_L";
-  if (isHigh && isRight) return "HIGH_R";
-  if (isHigh) return "HIGH";
-  if (isLow && isLeft) return "LOW_L";
-  if (isLow && isRight) return "LOW_R";
-  if (isLow) return "LOW";
+  if (isAbove && isLeft) return "HIGH_L";
+  if (isAbove && isRight) return "HIGH_R";
+  if (isBelow && isLeft) return "LOW_L";
+  if (isBelow && isRight) return "LOW_R";
+
+  if (isAbove) {
+    // Between top-left and top-right corners — check diagonal slopes
+    const relX = (xPct - ZONE.left) / (ZONE.right - ZONE.left);
+    const relY = (ZONE.top - yPct) / ZONE.top; // how far above
+    if (relX < 0.33) return "HIGH_L";
+    if (relX > 0.67) return "HIGH_R";
+    return "HIGH";
+  }
+  if (isBelow) {
+    const relX = (xPct - ZONE.left) / (ZONE.right - ZONE.left);
+    if (relX < 0.33) return "LOW_L";
+    if (relX > 0.67) return "LOW_R";
+    return "LOW";
+  }
   if (isLeft) return "LEFT";
   if (isRight) return "RIGHT";
-  // Shouldn't get here if not in zone, but fallback
-  return xPct < midX ? "LEFT" : "RIGHT";
+  return "HIGH";
 }
 
 export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode = "simple", missMode = "simple" }: PunterStrikeZoneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDetailedStrike = chartMode === "detailed";
   const isDetailedMiss = missMode === "detailed";
-  const showGrid = isDetailedStrike || isDetailedMiss;
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!onSnap || !containerRef.current) return;
@@ -89,18 +98,6 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
     const zoneCell = isDetailedStrike && inZone ? getZoneCell(xPct, yPct) : undefined;
     const missCell = isDetailedMiss && !inZone ? getMissCell(xPct, yPct) : undefined;
     onSnap({ x: xPct, y: yPct, num: nextNum, inZone, zoneCell, missCell });
-  };
-
-  // Outer grid extends one cell-width outside the strike zone on each side
-  const zoneW = ZONE.right - ZONE.left;
-  const zoneH = ZONE.bottom - ZONE.top;
-  const cellW = zoneW / 3;
-  const cellH = zoneH / 3;
-  const outerGrid = {
-    top: ZONE.top - cellH,
-    left: ZONE.left - cellW,
-    width: zoneW + cellW * 2,
-    height: zoneH + cellH * 2,
   };
 
   return (
@@ -120,35 +117,30 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
           draggable={false}
         />
 
-        {/* Extended outer grid (detailed miss mode) */}
+        {/* Detailed miss lines — diagonals from zone corners + extensions of zone edges to outer box */}
         {isDetailedMiss && (
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: `${outerGrid.top}%`,
-              left: `${outerGrid.left}%`,
-              width: `${outerGrid.width}%`,
-              height: `${outerGrid.height}%`,
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr",
-              gridTemplateRows: "1fr 1fr 1fr 1fr 1fr",
-            }}
-          >
-            {Array.from({ length: 25 }).map((_, i) => {
-              const row = Math.floor(i / 5);
-              const col = i % 5;
-              // Inner 3x3 (rows 1-3, cols 1-3) is the strike zone — skip those, they're drawn separately
-              const isInner = row >= 1 && row <= 3 && col >= 1 && col <= 3;
-              if (isInner) return <div key={i} />;
-              return (
-                <div
-                  key={i}
-                  className="border pointer-events-none"
-                  style={{ borderColor: "rgba(239, 68, 68, 0.2)" }}
-                />
-              );
-            })}
-          </div>
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {/* Top-left corner diagonal to outer box top-left */}
+            <line x1={ZONE.left} y1={ZONE.top} x2="0" y2="0" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            {/* Top-right corner diagonal to outer box top-right */}
+            <line x1={ZONE.right} y1={ZONE.top} x2="100" y2="0" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            {/* Bottom-left corner diagonal to outer box bottom-left */}
+            <line x1={ZONE.left} y1={ZONE.bottom} x2="0" y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            {/* Bottom-right corner diagonal to outer box bottom-right */}
+            <line x1={ZONE.right} y1={ZONE.bottom} x2="100" y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            {/* Extend zone left edge up and down */}
+            <line x1={ZONE.left} y1="0" x2={ZONE.left} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.left} y1={ZONE.bottom} x2={ZONE.left} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            {/* Extend zone right edge up and down */}
+            <line x1={ZONE.right} y1="0" x2={ZONE.right} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.right} y1={ZONE.bottom} x2={ZONE.right} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            {/* Extend zone top edge left and right */}
+            <line x1="0" y1={ZONE.top} x2={ZONE.left} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.right} y1={ZONE.top} x2="100" y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            {/* Extend zone bottom edge left and right */}
+            <line x1="0" y1={ZONE.bottom} x2={ZONE.left} y2={ZONE.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.right} y1={ZONE.bottom} x2="100" y2={ZONE.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+          </svg>
         )}
 
         {/* Strike zone box overlay */}
