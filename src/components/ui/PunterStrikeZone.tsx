@@ -7,24 +7,48 @@ export interface SnapMarker {
   y: number;
   num: number;
   inZone: boolean;
+  zoneCell?: string; // e.g. "TL", "TC", "TR", "ML", "MC", "MR", "BL", "BC", "BR"
 }
 
 interface PunterStrikeZoneProps {
   markers?: SnapMarker[];
   onSnap?: (marker: SnapMarker) => void;
   nextNum?: number;
+  chartMode?: "simple" | "detailed";
 }
 
-// Strike zone bounds as percentages of the outer container
-// Nipple to knee on the player image, one ball-width outside body
+// Strike zone bounds — LOCKED, do not change
 const ZONE = { top: 34, bottom: 72, left: 25, right: 75 };
+
+// Grid cell labels: row (T/M/B) + col (L/C/R)
+const CELL_ROWS = ["T", "M", "B"];
+const CELL_COLS = ["L", "C", "R"];
+
+// Arrow symbols for each cell direction
+const CELL_ARROWS: Record<string, string> = {
+  TL: "↖", TC: "↑", TR: "↗",
+  ML: "←", MC: "✓", MR: "→",
+  BL: "↙", BC: "↓", BR: "↘",
+};
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
 }
 
-export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterStrikeZoneProps) {
+function getZoneCell(xPct: number, yPct: number): string | undefined {
+  if (!isInZone(xPct, yPct)) return undefined;
+  const zoneW = ZONE.right - ZONE.left;
+  const zoneH = ZONE.bottom - ZONE.top;
+  const relX = (xPct - ZONE.left) / zoneW;
+  const relY = (yPct - ZONE.top) / zoneH;
+  const col = relX < 1 / 3 ? 0 : relX < 2 / 3 ? 1 : 2;
+  const row = relY < 1 / 3 ? 0 : relY < 2 / 3 ? 1 : 2;
+  return CELL_ROWS[row] + CELL_COLS[col];
+}
+
+export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode = "simple" }: PunterStrikeZoneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const isDetailed = chartMode === "detailed";
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!onSnap || !containerRef.current) return;
@@ -32,7 +56,8 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
     const xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
     const inZone = isInZone(xPct, yPct);
-    onSnap({ x: xPct, y: yPct, num: nextNum, inZone });
+    const zoneCell = isDetailed && inZone ? getZoneCell(xPct, yPct) : undefined;
+    onSnap({ x: xPct, y: yPct, num: nextNum, inZone, zoneCell });
   };
 
   return (
@@ -52,7 +77,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
           draggable={false}
         />
 
-        {/* Strike zone box overlay with 3x3 grid */}
+        {/* Strike zone box overlay */}
         <div
           className="absolute border-2 border-red-500 rounded pointer-events-none"
           style={{
@@ -61,12 +86,14 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
             width: `${ZONE.right - ZONE.left}%`,
             height: `${ZONE.bottom - ZONE.top}%`,
             backgroundColor: "rgba(239, 68, 68, 0.06)",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gridTemplateRows: "1fr 1fr 1fr",
+            ...(isDetailed ? {
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gridTemplateRows: "1fr 1fr 1fr",
+            } : {}),
           }}
         >
-          {Array.from({ length: 9 }).map((_, i) => (
+          {isDetailed && Array.from({ length: 9 }).map((_, i) => (
             <div
               key={i}
               className="border pointer-events-none"
@@ -84,14 +111,20 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
               left: `${m.x}%`,
               top: `${m.y}%`,
               transform: "translate(-50%, -50%)",
-              width: 24,
-              height: 24,
+              width: isDetailed && m.inZone ? 28 : 24,
+              height: isDetailed && m.inZone ? 28 : 24,
               borderRadius: "50%",
               backgroundColor: m.inZone ? "rgba(0, 212, 160, 0.85)" : "rgba(239, 68, 68, 0.85)",
               border: `2px solid ${m.inZone ? "#00d4a0" : "#ef4444"}`,
             }}
           >
-            <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
+            {isDetailed && m.inZone && m.zoneCell ? (
+              <span className="text-[10px] font-black text-white leading-none">
+                {CELL_ARROWS[m.zoneCell] ?? "✓"}
+              </span>
+            ) : (
+              <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
+            )}
           </div>
         ))}
       </div>

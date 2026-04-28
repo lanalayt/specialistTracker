@@ -41,6 +41,21 @@ export default function LongSnapPuntSessionPage() {
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [committed, setCommitted] = useState(false);
   const [snapMarkers, setSnapMarkers] = useState<SnapMarker[]>([]);
+  const [chartMode, setChartMode] = useState<"simple" | "detailed">(() => {
+    if (typeof window === "undefined") return "simple";
+    try { const r = localStorage.getItem("snapSettings"); if (r) return JSON.parse(r).chartMode === "detailed" ? "detailed" : "simple"; } catch {}
+    return "simple";
+  });
+
+  // Re-read settings when changed
+  useEffect(() => {
+    const reload = () => {
+      try { const r = localStorage.getItem("snapSettings"); if (r) setChartMode(JSON.parse(r).chartMode === "detailed" ? "detailed" : "simple"); } catch {}
+    };
+    window.addEventListener("focus", reload);
+    window.addEventListener("settingsChanged", reload);
+    return () => { window.removeEventListener("focus", reload); window.removeEventListener("settingsChanged", reload); };
+  }, []);
 
   const athleteNames = athletes.map((a) => a.name);
 
@@ -102,11 +117,24 @@ export default function LongSnapPuntSessionPage() {
   // Find the next row that needs accuracy filled
   const nextSnapNum = snapMarkers.length + 1;
 
+  const CELL_ARROWS: Record<string, string> = {
+    TL: "✓↖", TC: "✓↑", TR: "✓↗",
+    ML: "✓←", MC: "✓", MR: "✓→",
+    BL: "✓↙", BC: "✓↓", BR: "✓↘",
+  };
+
   const handleSnapClick = (marker: SnapMarker) => {
-    // Find the row index for this snap number (1-based → match to filled rows or sequential rows)
     const rowIdx = marker.num - 1;
     if (rowIdx < rows.length) {
-      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: marker.inZone ? "Strike" : "Ball" } : r));
+      let acc: string;
+      if (!marker.inZone) {
+        acc = "Ball";
+      } else if (chartMode === "detailed" && marker.zoneCell) {
+        acc = CELL_ARROWS[marker.zoneCell] ?? "Strike";
+      } else {
+        acc = "Strike";
+      }
+      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: acc } : r));
     }
     setSnapMarkers((prev) => [...prev, marker]);
   };
@@ -233,8 +261,8 @@ export default function LongSnapPuntSessionPage() {
                     />
                   </td>
                   <td className="py-1 px-1 text-center">
-                    {row.accuracy === "Ball" || row.accuracy === "Strike" ? (
-                      <span className={clsx("text-xs font-bold", row.accuracy === "Strike" ? "text-make" : "text-miss")}>{row.accuracy}</span>
+                    {row.accuracy === "Ball" || row.accuracy === "Strike" || row.accuracy.startsWith("✓") ? (
+                      <span className={clsx("text-xs font-bold", row.accuracy === "Ball" ? "text-miss" : "text-make")}>{row.accuracy}</span>
                     ) : (
                       <select
                         value={row.accuracy}
@@ -300,7 +328,7 @@ export default function LongSnapPuntSessionPage() {
           <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
           <StatCard label="Punt Snaps" value={totals.att || "—"} />
         </div>
-        <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} />
+        <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} />
         {snapMarkers.length > 0 && (
           <button
             onClick={handleUndoSnap}
