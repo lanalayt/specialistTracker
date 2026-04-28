@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { StatCard } from "@/components/ui/StatCard";
+import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import { makePct, getSnapBenchmark } from "@/lib/stats";
@@ -42,6 +43,28 @@ export default function LongSnapFGSessionPage() {
   const [weather, setWeather] = useState("");
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [committed, setCommitted] = useState(false);
+  const [snapMarkers, setSnapMarkers] = useState<ShortSnapMarker[]>([]);
+
+  const nextSnapNum = snapMarkers.length + 1;
+
+  const handleSnapClick = (marker: ShortSnapMarker) => {
+    const rowIdx = marker.num - 1;
+    if (rowIdx < rows.length) {
+      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: marker.inZone ? "Strike" : "Ball" } : r));
+    }
+    setSnapMarkers((prev) => [...prev, marker]);
+  };
+
+  const handleUndoSnap = () => {
+    if (snapMarkers.length === 0) return;
+    const last = snapMarkers[snapMarkers.length - 1];
+    const rowIdx = last.num - 1;
+    if (rowIdx < rows.length) {
+      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: "" } : r));
+    }
+    setSnapMarkers((prev) => prev.slice(0, -1));
+  };
+
   const [showTime, setShowTime] = useState(() => {
     if (typeof window === "undefined") return false;
     try { const r = localStorage.getItem("snapSettings"); if (r) return JSON.parse(r).shortSnapTime === true; } catch {}
@@ -84,7 +107,7 @@ export default function LongSnapFGSessionPage() {
       const raw = localStorage.getItem(draftKey());
       if (raw) {
         const draft = JSON.parse(raw);
-        if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); return; }
+        if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); if (draft.snapMarkers?.length) setSnapMarkers(draft.snapMarkers); return; }
       }
     } catch {}
     const tid = getTeamId();
@@ -96,8 +119,8 @@ export default function LongSnapFGSessionPage() {
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather })); } catch {}
-  }, [rows, weather]);
+    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers })); } catch {}
+  }, [rows, weather, snapMarkers]);
 
   const updateRow = (idx: number, field: keyof LogRow, value: string | boolean) => {
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
@@ -144,6 +167,7 @@ export default function LongSnapFGSessionPage() {
 
     commitPractice(snaps, undefined, weather);
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
+    setSnapMarkers([]);
     setWeather("");
     setCommitted(true);
     try { localStorage.removeItem(draftKey()); } catch {}
@@ -229,11 +253,16 @@ export default function LongSnapFGSessionPage() {
                     />
                   </td>
                   )}
-                  <td className="py-1 px-1">
-                    <select value={row.accuracy} onChange={(e) => updateRow(idx, "accuracy", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
-                      <option value="">—</option>
-                      {ACC_OPTIONS.map((a) => <option key={a.value} value={a.value}>{a.label} {a.value === "ON_TARGET" ? "On" : a.value.charAt(0) + a.value.slice(1).toLowerCase()}</option>)}
-                    </select>
+                  <td className="py-1 px-1 text-center">
+                    {row.accuracy === "Ball" || row.accuracy === "Strike" ? (
+                      <span className={clsx("text-xs font-bold", row.accuracy === "Strike" ? "text-make" : "text-miss")}>{row.accuracy}</span>
+                    ) : (
+                      <select value={row.accuracy} onChange={(e) => updateRow(idx, "accuracy", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
+                        <option value="">—</option>
+                        <option value="Ball">Ball</option>
+                        <option value="Strike">Strike</option>
+                      </select>
+                    )}
                   </td>
                   <td className="py-1 px-1">
                     <select value={row.laces} onChange={(e) => updateRow(idx, "laces", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
@@ -285,6 +314,15 @@ export default function LongSnapFGSessionPage() {
           <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
           <StatCard label="FG/PAT Snaps" value={totals.att || "—"} />
         </div>
+        <HolderStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} />
+        {snapMarkers.length > 0 && (
+          <button
+            onClick={handleUndoSnap}
+            className="w-full text-xs py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
+          >
+            Undo Snap #{snapMarkers.length}
+          </button>
+        )}
       </div>
     </main>
   );
