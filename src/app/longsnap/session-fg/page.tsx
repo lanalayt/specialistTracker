@@ -39,6 +39,20 @@ export default function LongSnapFGSessionPage() {
   const [weather, setWeather] = useState("");
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [committed, setCommitted] = useState(false);
+  const [showTime, setShowTime] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { const r = localStorage.getItem("snapSettings"); if (r) return JSON.parse(r).shortSnapTime === true; } catch {}
+    return false;
+  });
+
+  useEffect(() => {
+    const reload = () => {
+      try { const r = localStorage.getItem("snapSettings"); if (r) setShowTime(JSON.parse(r).shortSnapTime === true); } catch {}
+    };
+    window.addEventListener("focus", reload);
+    window.addEventListener("settingsChanged", reload);
+    return () => { window.removeEventListener("focus", reload); window.removeEventListener("settingsChanged", reload); };
+  }, []);
 
   const athleteNames = athletes.map((a) => a.name);
 
@@ -172,7 +186,7 @@ export default function LongSnapFGSessionPage() {
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center border-b border-border">Athlete</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Type</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>
+                {showTime && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>}
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Crit</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
@@ -194,6 +208,7 @@ export default function LongSnapFGSessionPage() {
                       <option value="PAT">PAT</option>
                     </select>
                   </td>
+                  {showTime && (
                   <td className="py-1 px-1">
                     <input
                       type="text"
@@ -208,6 +223,7 @@ export default function LongSnapFGSessionPage() {
                       className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                     />
                   </td>
+                  )}
                   <td className="py-1 px-1">
                     <select value={row.accuracy} onChange={(e) => updateRow(idx, "accuracy", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
                       <option value="">—</option>
