@@ -70,7 +70,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
             <div
               key={i}
               className="border pointer-events-none"
-              style={{ borderColor: "rgba(255,255,255,0.08)" }}
+              style={{ borderColor: "rgba(239, 68, 68, 0.35)" }}
             />
           ))}
         </div>
