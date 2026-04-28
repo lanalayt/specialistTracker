@@ -370,6 +370,8 @@ function KickingHistoryContent() {
                     const fgAvgSc = fgAtt > 0 ? (fgKicks.reduce((s, k) => s + k.score, 0) / fgAtt).toFixed(1) : "—";
                     const fgMadeKicks = fgKicks.filter((k) => k.result.startsWith("Y"));
                     const long = fgMadeKicks.length > 0 ? Math.max(...fgMadeKicks.map((k) => k.dist)) : 0;
+                    const otKicks = fgKicks.filter((k) => k.opTime && k.opTime > 0);
+                    const avgOT = otKicks.length > 0 ? (otKicks.reduce((s, k) => s + (k.opTime ?? 0), 0) / otKicks.length).toFixed(2) : null;
                     const patAtt = patKicks.length;
                     const patMade = patKicks.filter((k) => k.result.startsWith("Y")).length;
                     const patPct = patAtt > 0 ? `${Math.round((patMade / patAtt) * 100)}%` : "—";
@@ -383,6 +385,7 @@ function KickingHistoryContent() {
                           <div><span className="text-muted">Pct</span> <span className="text-accent font-medium ml-1">{fgPct}</span></div>
                           <div><span className="text-muted">Score</span> <span className="text-slate-200 font-medium ml-1">{fgAvgSc}</span></div>
                           <div><span className="text-muted">Long</span> <span className="text-slate-200 font-medium ml-1">{long > 0 ? `${long}` : "—"}</span></div>
+                          {avgOT && <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}s</span></div>}
                         </div>
                         {patAtt > 0 && (
                           <>
@@ -410,6 +413,7 @@ function KickingHistoryContent() {
                     <th className="table-header">Pos</th>
                     <th className="table-header">Result</th>
                     <th className="table-header">Score</th>
+                    <th className="table-header">OT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -431,6 +435,7 @@ function KickingHistoryContent() {
                             </select>
                           </td>
                           <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.opTime || ""} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); updateEntry(i, "opTime", d ? parseFloat(`${d.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${d.padStart(3, "0").slice(-2)}`) : 0); }} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                         </>
                       ) : (
                         <>
@@ -442,6 +447,7 @@ function KickingHistoryContent() {
                             </span>
                           </td>
                           <td className="table-cell">{k.score}</td>
+                          <td className="table-cell text-muted">{k.opTime && k.opTime > 0 ? `${k.opTime.toFixed(2)}s` : "—"}</td>
                         </>
                       )}
                     </tr>

@@ -947,6 +947,8 @@ export default function KickingSessionPage() {
                               const fgAvgSc = fgAtt > 0 ? (fgKicks.reduce((s, k) => s + k.score, 0) / fgAtt).toFixed(1) : "—";
                               const fgMadeKicks = fgKicks.filter((k) => k.result.startsWith("Y"));
                               const long = fgMadeKicks.length > 0 ? Math.max(...fgMadeKicks.map((k) => k.dist)) : 0;
+                              const otKicks = fgKicks.filter((k) => k.opTime && k.opTime > 0);
+                              const avgOT = otKicks.length > 0 ? (otKicks.reduce((s, k) => s + (k.opTime ?? 0), 0) / otKicks.length).toFixed(2) : null;
                               const patAtt = patKicks.length;
                               const patMade = patKicks.filter((k) => k.result.startsWith("Y")).length;
                               const patPct = patAtt > 0 ? `${Math.round((patMade / patAtt) * 100)}%` : "—";
@@ -960,6 +962,7 @@ export default function KickingSessionPage() {
                                     <div><span className="text-muted">Pct</span> <span className="text-accent font-medium ml-1">{fgPct}</span></div>
                                     <div><span className="text-muted">Score</span> <span className="text-slate-200 font-medium ml-1">{fgAvgSc}</span></div>
                                     <div><span className="text-muted">Long</span> <span className="text-slate-200 font-medium ml-1">{long > 0 ? `${long}` : "—"}</span></div>
+                                    {avgOT && <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}s</span></div>}
                                   </div>
                                   {patAtt > 0 && (
                                     <>
@@ -989,6 +992,7 @@ export default function KickingSessionPage() {
                               <th className="table-header">Pos</th>
                               <th className="table-header">Result</th>
                               {scoreEnabled && <th className="table-header">Score</th>}
+                              {opTimeEnabled && <th className="table-header">OT</th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -1004,6 +1008,7 @@ export default function KickingSessionPage() {
                                   </span>
                                 </td>
                                 {scoreEnabled && <td className="table-cell">{k.score}</td>}
+                                {opTimeEnabled && <td className="table-cell text-muted">{k.opTime && k.opTime > 0 ? `${k.opTime.toFixed(2)}s` : "—"}</td>}
                               </tr>
                             ))}
                           </tbody>
@@ -1520,6 +1525,8 @@ export default function KickingSessionPage() {
               const fgAvgSc = fgAtt > 0 ? (fgKicks.reduce((s, k) => s + k.score, 0) / fgAtt).toFixed(1) : "—";
               const fgMadeKicks = fgKicks.filter((k) => k.result.startsWith("Y"));
               const long = fgMadeKicks.length > 0 ? Math.max(...fgMadeKicks.map((k) => k.dist)) : 0;
+              const otK = fgKicks.filter((k) => k.opTime && k.opTime > 0);
+              const aOT = otK.length > 0 ? (otK.reduce((s, k) => s + (k.opTime ?? 0), 0) / otK.length).toFixed(2) : null;
               const patAtt = patKicks.length;
               const patMade = patKicks.filter((k) => k.result.startsWith("Y")).length;
               return (
@@ -1532,6 +1539,7 @@ export default function KickingSessionPage() {
                     <div><span className="text-muted">Pct</span> <span className="text-accent font-medium ml-1">{fgPct}</span></div>
                     {scoreEnabled && <div><span className="text-muted">Score</span> <span className="text-slate-200 font-medium ml-1">{fgAvgSc}</span></div>}
                     <div><span className="text-muted">Long</span> <span className="text-slate-200 font-medium ml-1">{long > 0 ? `${long}` : "—"}</span></div>
+                    {aOT && <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{aOT}s</span></div>}
                   </div>
                   {patAtt > 0 && (
                     <>
@@ -1557,6 +1565,7 @@ export default function KickingSessionPage() {
                   <th className="table-header">Pos</th>
                   <th className="table-header">Result</th>
                   {scoreEnabled && <th className="table-header">Score</th>}
+                  {opTimeEnabled && <th className="table-header">OT</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1572,6 +1581,7 @@ export default function KickingSessionPage() {
                       </span>
                     </td>
                     {scoreEnabled && <td className="table-cell">{k.score}</td>}
+                    {opTimeEnabled && <td className="table-cell text-muted">{k.opTime && k.opTime > 0 ? `${k.opTime.toFixed(2)}s` : "—"}</td>}
                   </tr>
                 ))}
               </tbody>
