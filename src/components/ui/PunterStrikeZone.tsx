@@ -52,7 +52,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
           draggable={false}
         />
 
-        {/* Strike zone box overlay */}
+        {/* Strike zone box overlay with 3x3 grid */}
         <div
           className="absolute border-2 border-red-500 rounded pointer-events-none"
           style={{
@@ -61,8 +61,19 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1 }: PunterSt
             width: `${ZONE.right - ZONE.left}%`,
             height: `${ZONE.bottom - ZONE.top}%`,
             backgroundColor: "rgba(239, 68, 68, 0.06)",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateRows: "1fr 1fr 1fr",
           }}
-        />
+        >
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div
+              key={i}
+              className="border pointer-events-none"
+              style={{ borderColor: "rgba(255,255,255,0.08)" }}
+            />
+          ))}
+        </div>
 
         {/* Snap markers */}
         {markers.map((m) => (
