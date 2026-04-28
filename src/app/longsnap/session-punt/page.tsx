@@ -46,11 +46,23 @@ export default function LongSnapPuntSessionPage() {
     try { const r = localStorage.getItem("snapSettings"); if (r) return JSON.parse(r).chartMode === "detailed" ? "detailed" : "simple"; } catch {}
     return "simple";
   });
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => {
+    if (typeof window === "undefined") return "simple";
+    try { const r = localStorage.getItem("snapSettings"); if (r) return JSON.parse(r).missMode === "detailed" ? "detailed" : "simple"; } catch {}
+    return "simple";
+  });
 
   // Re-read settings when changed
   useEffect(() => {
     const reload = () => {
-      try { const r = localStorage.getItem("snapSettings"); if (r) setChartMode(JSON.parse(r).chartMode === "detailed" ? "detailed" : "simple"); } catch {}
+      try {
+        const r = localStorage.getItem("snapSettings");
+        if (r) {
+          const p = JSON.parse(r);
+          setChartMode(p.chartMode === "detailed" ? "detailed" : "simple");
+          setMissMode(p.missMode === "detailed" ? "detailed" : "simple");
+        }
+      } catch {}
     };
     window.addEventListener("focus", reload);
     window.addEventListener("settingsChanged", reload);
@@ -123,16 +135,28 @@ export default function LongSnapPuntSessionPage() {
     BL: "✓↙", BC: "✓↓", BR: "✓↘",
   };
 
+  const MISS_ARROWS: Record<string, string> = {
+    HIGH_L: "✗↖", HIGH: "✗↑", HIGH_R: "✗↗",
+    LEFT: "✗←", RIGHT: "✗→",
+    LOW_L: "✗↙", LOW: "✗↓", LOW_R: "✗↘",
+  };
+
   const handleSnapClick = (marker: SnapMarker) => {
     const rowIdx = marker.num - 1;
     if (rowIdx < rows.length) {
       let acc: string;
-      if (!marker.inZone) {
-        acc = "Ball";
-      } else if (chartMode === "detailed" && marker.zoneCell) {
-        acc = CELL_ARROWS[marker.zoneCell] ?? "Strike";
+      if (marker.inZone) {
+        if (chartMode === "detailed" && marker.zoneCell) {
+          acc = CELL_ARROWS[marker.zoneCell] ?? "Strike";
+        } else {
+          acc = "Strike";
+        }
       } else {
-        acc = "Strike";
+        if (missMode === "detailed" && marker.missCell) {
+          acc = MISS_ARROWS[marker.missCell] ?? "Ball";
+        } else {
+          acc = "Ball";
+        }
       }
       setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: acc } : r));
     }
@@ -261,8 +285,8 @@ export default function LongSnapPuntSessionPage() {
                     />
                   </td>
                   <td className="py-1 px-1 text-center">
-                    {row.accuracy === "Ball" || row.accuracy === "Strike" || row.accuracy.startsWith("✓") ? (
-                      <span className={clsx("text-xs font-bold", row.accuracy === "Ball" ? "text-miss" : "text-make")}>{row.accuracy}</span>
+                    {row.accuracy === "Ball" || row.accuracy === "Strike" || row.accuracy.startsWith("✓") || row.accuracy.startsWith("✗") ? (
+                      <span className={clsx("text-xs font-bold", row.accuracy === "Ball" || row.accuracy.startsWith("✗") ? "text-miss" : "text-make")}>{row.accuracy}</span>
                     ) : (
                       <select
                         value={row.accuracy}
@@ -328,7 +352,7 @@ export default function LongSnapPuntSessionPage() {
           <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
           <StatCard label="Punt Snaps" value={totals.att || "—"} />
         </div>
-        <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} />
+        <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} />
         {snapMarkers.length > 0 && (
           <button
             onClick={handleUndoSnap}

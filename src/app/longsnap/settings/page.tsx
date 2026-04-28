@@ -8,6 +8,7 @@ const STORAGE_KEY = "snapSettings";
 
 interface SnapSettings {
   chartMode: "simple" | "detailed";
+  missMode: "simple" | "detailed";
 }
 
 function loadSettings(): SnapSettings {
@@ -15,14 +16,18 @@ function loadSettings(): SnapSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { chartMode: parsed.chartMode === "detailed" ? "detailed" : "simple" };
+      return {
+        chartMode: parsed.chartMode === "detailed" ? "detailed" : "simple",
+        missMode: parsed.missMode === "detailed" ? "detailed" : "simple",
+      };
     }
   } catch {}
-  return { chartMode: "simple" };
+  return { chartMode: "simple", missMode: "simple" };
 }
 
 export default function SnapSettingsPage() {
   const [chartMode, setChartMode] = useState<"simple" | "detailed">(() => loadSettings().chartMode);
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => loadSettings().missMode);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [savedSettings, setSavedSettings] = useState<SnapSettings>(() => loadSettings());
@@ -31,18 +36,23 @@ export default function SnapSettingsPage() {
     loadSettingsFromCloud<SnapSettings>(STORAGE_KEY).then((cloud) => {
       if (cloud) {
         if (cloud.chartMode === "simple" || cloud.chartMode === "detailed") setChartMode(cloud.chartMode);
-        setSavedSettings({ chartMode: cloud.chartMode === "detailed" ? "detailed" : "simple" });
+        if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
+        setSavedSettings({
+          chartMode: cloud.chartMode === "detailed" ? "detailed" : "simple",
+          missMode: cloud.missMode === "detailed" ? "detailed" : "simple",
+        });
       }
     });
   }, []);
 
   useEffect(() => {
-    setDirty(chartMode !== savedSettings.chartMode);
-    if (chartMode !== savedSettings.chartMode) setSaved(false);
-  }, [chartMode, savedSettings]);
+    const changed = chartMode !== savedSettings.chartMode || missMode !== savedSettings.missMode;
+    setDirty(changed);
+    if (changed) setSaved(false);
+  }, [chartMode, missMode, savedSettings]);
 
   const handleSave = () => {
-    const settings: SnapSettings = { chartMode };
+    const settings: SnapSettings = { chartMode, missMode };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -55,29 +65,24 @@ export default function SnapSettingsPage() {
       <h2 className="text-lg font-bold text-slate-100">Snapping Settings</h2>
 
       <div className="card space-y-4">
-        <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Strike Zone Charting</p>
+        <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Strike Charting</p>
         <p className="text-xs text-muted">
-          Simple mode tracks Strike/Ball only. Detailed mode adds a 3×3 grid to track exactly where the snap lands with directional arrows.
+          Simple tracks Strike/Ball only. Detailed adds a 3x3 grid to track exactly where the snap lands with directional arrows.
         </p>
         <div className="flex rounded-input border border-border overflow-hidden w-fit">
-          <button
-            onClick={() => setChartMode("simple")}
-            className={clsx(
-              "px-4 py-2 text-xs font-semibold transition-colors",
-              chartMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-            )}
-          >
-            Simple
-          </button>
-          <button
-            onClick={() => setChartMode("detailed")}
-            className={clsx(
-              "px-4 py-2 text-xs font-semibold transition-colors border-l border-border",
-              chartMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-            )}
-          >
-            Detailed
-          </button>
+          <button onClick={() => setChartMode("simple")} className={clsx("px-4 py-2 text-xs font-semibold transition-colors", chartMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+          <button onClick={() => setChartMode("detailed")} className={clsx("px-4 py-2 text-xs font-semibold transition-colors border-l border-border", chartMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+        </div>
+      </div>
+
+      <div className="card space-y-4">
+        <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Miss Charting</p>
+        <p className="text-xs text-muted">
+          Simple tracks Ball only. Detailed extends the grid outside the strike zone to track exactly where the miss landed with directional arrows.
+        </p>
+        <div className="flex rounded-input border border-border overflow-hidden w-fit">
+          <button onClick={() => setMissMode("simple")} className={clsx("px-4 py-2 text-xs font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+          <button onClick={() => setMissMode("detailed")} className={clsx("px-4 py-2 text-xs font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
         </div>
       </div>
 
@@ -86,11 +91,7 @@ export default function SnapSettingsPage() {
         disabled={!dirty}
         className={clsx(
           "w-full py-3 rounded-input text-sm font-bold transition-all",
-          saved
-            ? "bg-make text-slate-900"
-            : dirty
-              ? "btn-primary"
-              : "bg-surface-2 text-muted border border-border cursor-not-allowed"
+          saved ? "bg-make text-slate-900" : dirty ? "btn-primary" : "bg-surface-2 text-muted border border-border cursor-not-allowed"
         )}
       >
         {saved ? "Saved!" : "Save Settings"}
