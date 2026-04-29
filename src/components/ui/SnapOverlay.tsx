@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
-import { useLongSnap } from "@/lib/longSnapContext";
-import { getSnapBenchmark } from "@/lib/stats";
-import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
+import { getTeamId } from "@/lib/teamData";
+import type { SnapType } from "@/types";
 import clsx from "clsx";
 
 interface SnapOverlayProps {
@@ -32,8 +31,8 @@ function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simp
 }
 
 export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps) {
-  const { athletes, commitPractice } = useLongSnap();
-  const athleteNames = athletes.map((a) => a.name);
+  // Load snapping athletes from localStorage (same source as longSnapContext)
+  const [athleteNames, setAthleteNames] = useState<string[]>([]);
 
   const [chartMode] = useState(() => loadSnapSettings().chartMode);
   const [missMode] = useState(() => loadSnapSettings().missMode);
@@ -56,13 +55,22 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
     return [];
   });
 
-  const [athlete, setAthlete] = useState<string>(() => athleteNames[0] ?? "");
+  const [athlete, setAthlete] = useState<string>("");
   const [committed, setCommitted] = useState(false);
 
-  // Update athlete when athletes load asynchronously
+  // Load snapping athletes
   useEffect(() => {
-    if (!athlete && athleteNames.length > 0) setAthlete(athleteNames[0]);
-  }, [athleteNames, athlete]);
+    import("@/lib/athleteStore").then(({ loadAthletes }) => {
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        loadAthletes(tid, "LONGSNAP").then((a) => {
+          const names = a.map((x) => x.name);
+          setAthleteNames(names);
+          if (!athlete && names.length > 0) setAthlete(names[0]);
+        });
+      }
+    });
+  }, []);
 
   // Ensure rows match entry count
   useEffect(() => {
@@ -133,25 +141,48 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
   const filledRows = rows.filter((r) => r.time || r.accuracy);
 
-  const handleCommit = () => {
+  const handleSaveToDraft = () => {
     if (filledRows.length === 0) return;
     const snapAthlete = athlete || "Unknown";
-    const snaps: LongSnapEntry[] = rows
+    const draftSuffix = snapType === "PUNT" ? "punt" : "fg";
+    const tid = getTeamId();
+    const draftKey = tid ? `longsnap_manual_draft_${draftSuffix}_${tid}` : `longsnap_manual_draft_${draftSuffix}`;
+
+    // Load existing draft rows
+    let existingRows: { athlete: string; time: string; accuracy: string; critical?: boolean; snapType?: string }[] = [];
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft.rows?.length) existingRows = draft.rows;
+      }
+    } catch {}
+
+    // Build new rows from filled snap data
+    const newRows = rows
       .filter((r) => r.time || r.accuracy)
-      .map((r) => {
-        const time = parseFloat(r.time) || 0;
-        const accuracy: SnapAccuracy = r.accuracy === "Ball" ? "HIGH" : r.accuracy === "Strike" ? "ON_TARGET" : "ON_TARGET";
-        return {
-          athleteId: snapAthlete,
-          athlete: snapAthlete,
-          snapType,
-          time,
-          accuracy,
-          score: 0,
-          benchmark: getSnapBenchmark(snapType, time),
-        };
-      });
-    commitPractice(snaps);
+      .map((r) => ({
+        athlete: snapAthlete,
+        time: r.time,
+        accuracy: r.accuracy,
+        critical: false,
+        ...(snapType === "FG" ? { snapType: "FG" } : {}),
+      }));
+
+    // Merge: append new rows to existing, replacing empty rows first
+    const merged = [...existingRows];
+    let insertIdx = merged.findIndex((r) => !r.athlete && !r.time && !r.accuracy);
+    for (const nr of newRows) {
+      if (insertIdx >= 0 && insertIdx < merged.length) {
+        merged[insertIdx] = nr;
+        insertIdx = merged.findIndex((r, i) => i > insertIdx && !r.athlete && !r.time && !r.accuracy);
+      } else {
+        merged.push(nr);
+      }
+    }
+
+    try { localStorage.setItem(draftKey, JSON.stringify({ rows: merged, weather: "" })); } catch {}
+
     setRows(Array.from({ length: entryCount }, () => ({ time: "", accuracy: "" })));
     setSnapMarkers([]);
     try { localStorage.removeItem(storageKey); localStorage.removeItem(storageKey + "_markers"); } catch {}
@@ -245,7 +276,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted flex-1">{filledRows.length} of {entryCount} snaps</span>
               <button
-                onClick={handleCommit}
+                onClick={handleSaveToDraft}
                 disabled={filledRows.length === 0}
                 className={clsx("btn-primary text-xs py-1.5 px-4", committed && "bg-make/90")}
               >
