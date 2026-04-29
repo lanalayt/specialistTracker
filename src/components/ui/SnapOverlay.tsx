@@ -19,6 +19,15 @@ interface SnapRow {
 
 const STORAGE_PREFIX = "snapOverlay_";
 
+/** Call this to clear snap overlay data when the parent log is cleared */
+export function clearSnapOverlayData(snapType: "PUNT" | "FG") {
+  const key = `${STORAGE_PREFIX}${snapType}`;
+  try {
+    localStorage.removeItem(key);
+    localStorage.removeItem(key + "_markers");
+  } catch {}
+}
+
 function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simple" | "detailed" } {
   try {
     const raw = localStorage.getItem("snapSettings");
@@ -183,9 +192,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
     try { localStorage.setItem(draftKey, JSON.stringify({ rows: merged, weather: "" })); } catch {}
 
-    setRows(Array.from({ length: entryCount }, () => ({ time: "", accuracy: "" })));
-    setSnapMarkers([]);
-    try { localStorage.removeItem(storageKey); localStorage.removeItem(storageKey + "_markers"); } catch {}
+    // Don't clear — keep data in overlay
     setCommitted(true);
     setTimeout(() => setCommitted(false), 2000);
   };

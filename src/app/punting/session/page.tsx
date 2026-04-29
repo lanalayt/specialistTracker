@@ -12,7 +12,7 @@ import { PUNT_HASHES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
-import { SnapOverlay } from "@/components/ui/SnapOverlay";
+import { SnapOverlay, clearSnapOverlayData } from "@/components/ui/SnapOverlay";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
@@ -1044,6 +1044,7 @@ export default function PuntingSessionPage() {
     setPlannedRowIndices([]);
     setCurrentPuntIdx(0);
     setPartialInputs({});
+    clearSnapOverlayData("PUNT");
   };
 
   const undoClear = () => {

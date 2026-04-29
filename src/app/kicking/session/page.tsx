@@ -13,7 +13,7 @@ import type { FGKick, FGPosition, FGResult } from "@/types";
 import { POSITIONS, RESULTS } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
-import { SnapOverlay } from "@/components/ui/SnapOverlay";
+import { SnapOverlay, clearSnapOverlayData } from "@/components/ui/SnapOverlay";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
@@ -856,6 +856,7 @@ export default function KickingSessionPage() {
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
     setPartialInputs({});
+    clearSnapOverlayData("FG");
   };
 
   const undoClear = () => {
