@@ -183,6 +183,7 @@ export default function ThirtyPointGamePage() {
 
   // Game in progress
   const runningTotal = results.reduce((s, r) => s + r.points, 0);
+  const runningMax = results.length * 3;
 
   return (
     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
@@ -196,7 +197,7 @@ export default function ThirtyPointGamePage() {
           </div>
           <div className="text-right">
             <p className="text-2xl font-black text-accent">{runningTotal}</p>
-            <p className="text-[10px] text-muted">/ {MAX_POINTS}</p>
+            <p className="text-[10px] text-muted">/ {runningMax || MAX_POINTS}</p>
           </div>
         </div>
 
