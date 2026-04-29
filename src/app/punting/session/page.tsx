@@ -1045,6 +1045,7 @@ export default function PuntingSessionPage() {
     setCurrentPuntIdx(0);
     setPartialInputs({});
     clearSnapOverlayData("PUNT");
+    setShowSnapOverlay(false);
   };
 
   const undoClear = () => {

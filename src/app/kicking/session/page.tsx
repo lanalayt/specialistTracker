@@ -857,6 +857,7 @@ export default function KickingSessionPage() {
     setCurrentKickIdx(0);
     setPartialInputs({});
     clearSnapOverlayData("FG");
+    setShowSnapOverlay(false);
   };
 
   const undoClear = () => {
