@@ -91,7 +91,7 @@ export default function LongSnapFGSessionPage() {
       const raw = localStorage.getItem(draftKey());
       if (raw) {
         const draft = JSON.parse(raw);
-        if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); if (draft.snapMarkers?.length) setSnapMarkers(draft.snapMarkers); return; }
+        if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); if (draft.snapMarkers?.length) setSnapMarkers(draft.snapMarkers); if (draft.committed) setCommitted(true); return; }
       }
     } catch {}
     const tid = getTeamId();
@@ -142,7 +142,7 @@ export default function LongSnapFGSessionPage() {
 
     commitPractice(snaps, undefined, weather);
     setCommitted(true);
-    try { localStorage.removeItem(draftKey()); } catch {}
+    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers, committed: true })); } catch {}
   };
 
   const handleNewSession = () => {
@@ -196,7 +196,7 @@ export default function LongSnapFGSessionPage() {
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Pos</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Laces</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Spiral</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">✓Spiral</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Crit</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
               </tr>
@@ -222,6 +222,7 @@ export default function LongSnapFGSessionPage() {
                       <option value="M">M</option>
                       <option value="RM">RM</option>
                       <option value="RH">RH</option>
+                      <option value="PAT">PAT</option>
                     </select>
                   </td>
                   <td className="py-1 px-1 text-center">
@@ -241,12 +242,14 @@ export default function LongSnapFGSessionPage() {
                       {LACES_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
                     </select>
                   </td>
-                  <td className="py-1 px-1">
-                    <select value={row.spiral} onChange={(e) => updateRow(idx, "spiral", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
-                      <option value="">—</option>
-                      <option value="Good">Good</option>
-                      <option value="No Good">No Good</option>
-                    </select>
+                  <td className="py-1 px-1 text-center">
+                    <input
+                      type="checkbox"
+                      checked={row.spiral === "Good"}
+                      disabled={viewOnly}
+                      onChange={(e) => updateRow(idx, "spiral", e.target.checked ? "Good" : "")}
+                      className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
+                    />
                   </td>
                   <td className="py-1 px-1 text-center">
                     <input

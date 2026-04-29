@@ -236,7 +236,7 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Pos</th>}
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Laces</th>}
-                    {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Spiral</th>}
+                    {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">✓Spiral</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -291,12 +291,13 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                       </td>
                       )}
                       {snapType === "FG" && (
-                      <td className="py-1 px-1">
-                        <select value={row.spiral} onChange={(e) => updateRow(idx, "spiral", e.target.value)} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60">
-                          <option value="">—</option>
-                          <option value="Good">Good</option>
-                          <option value="No Good">No Good</option>
-                        </select>
+                      <td className="py-1 px-1 text-center">
+                        <input
+                          type="checkbox"
+                          checked={row.spiral === "Good"}
+                          onChange={(e) => updateRow(idx, "spiral", e.target.checked ? "Good" : "")}
+                          className="w-4 h-4 accent-accent cursor-pointer"
+                        />
                       </td>
                       )}
                     </tr>

@@ -95,6 +95,7 @@ export default function LongSnapPuntSessionPage() {
         const draft = JSON.parse(raw);
         if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); }
         if (draft.snapMarkers?.length) setSnapMarkers(draft.snapMarkers);
+        if (draft.committed) setCommitted(true);
         if (draft.rows?.length || draft.snapMarkers?.length) return;
       }
     } catch {}
@@ -202,7 +203,8 @@ export default function LongSnapPuntSessionPage() {
 
     commitPractice(snaps, undefined, weather);
     setCommitted(true);
-    try { localStorage.removeItem(draftKey()); } catch {}
+    // Keep data in draft but mark as committed
+    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers, committed: true })); } catch {}
   };
 
   const handleNewSession = () => {
