@@ -167,8 +167,8 @@ export default function ThirtyPointGamePage() {
                   <tr key={i} className="border-t border-border/30">
                     <td className="text-muted py-1 px-1">{i + 1}</td>
                     <td className={clsx("text-center py-1 px-1 font-semibold", r.accuracy === "Strike" ? "text-make" : "text-miss")}>{r.accuracy}</td>
-                    <td className={clsx("text-center py-1 px-1", r.laces === "Good" ? "text-make" : r.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{r.laces}</td>
-                    <td className={clsx("text-center py-1 px-1", r.spiral === "Good" ? "text-make" : "text-miss")}>{r.spiral}</td>
+                    <td className={clsx("text-center py-1 px-1", r.laces === "Good" ? "text-make" : r.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{r.laces === "Good" ? "Perfect" : r.laces}</td>
+                    <td className={clsx("text-center py-1 px-1", r.spiral === "Good" ? "text-make" : "text-miss")}>{r.spiral === "Good" ? "Tight" : "Open"}</td>
                     <td className="text-right py-1 px-1 font-bold text-accent">{r.points}</td>
                   </tr>
                 ))}
@@ -193,9 +193,8 @@ export default function ThirtyPointGamePage() {
   const runningMax = results.length * 3;
 
   return (
-    <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-      {/* Left: Snap entry */}
-      <div className="lg:w-[55%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0 p-4 space-y-4">
+    <main className="flex-1 overflow-y-auto p-4">
+      <div className="max-w-lg mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -213,33 +212,35 @@ export default function ThirtyPointGamePage() {
           <div className="h-full bg-accent transition-all" style={{ width: `${(results.length / TOTAL_SNAPS) * 100}%` }} />
         </div>
 
-        {/* Accuracy — auto-filled by diagram */}
-        <div>
-          <p className="label text-slate-100">Accuracy</p>
-          <div className="flex gap-2">
-            <button onClick={() => setAccuracy("Strike")} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border transition-all", accuracy === "Strike" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Strike (1pt)</button>
-            <button onClick={() => setAccuracy("Ball")} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border transition-all", accuracy === "Ball" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Ball (0pt)</button>
+        {/* Diagram with Laces on left, Spiral on right */}
+        <div className="flex items-center gap-3">
+          {/* Laces — left side, vertical stack */}
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <p className="text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-1">Laces</p>
+            <button onClick={() => setLaces("Good")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", laces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Perfect</button>
+            <button onClick={() => setLaces("1/4 Turn")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", laces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4 Turn</button>
+            <button onClick={() => setLaces("Back")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
+          </div>
+
+          {/* Diagram — center */}
+          <div className="flex-1 min-w-0">
+            <HolderStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={currentSnap + 1} chartMode="simple" missMode="simple" editable />
+          </div>
+
+          {/* Spiral — right side, vertical stack */}
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <p className="text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-1">Spiral</p>
+            <button onClick={() => setSpiral("Good")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+            <button onClick={() => setSpiral("Bad")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
           </div>
         </div>
 
-        {/* Laces */}
-        <div>
-          <p className="label text-slate-100">Laces</p>
-          <div className="flex gap-2">
-            <button onClick={() => setLaces("Good")} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border transition-all", laces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Good (1pt)</button>
-            <button onClick={() => setLaces("1/4 Turn")} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border transition-all", laces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4 Turn (0.5)</button>
-            <button onClick={() => setLaces("Back")} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back (0pt)</button>
+        {/* Accuracy indicator — auto-filled from diagram click */}
+        {accuracy && (
+          <div className="text-center">
+            <span className={clsx("text-sm font-bold", accuracy === "Strike" ? "text-make" : "text-miss")}>{accuracy}</span>
           </div>
-        </div>
-
-        {/* Spiral */}
-        <div>
-          <p className="label text-slate-100">Spiral</p>
-          <div className="flex gap-2">
-            <button onClick={() => setSpiral("Good")} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Good (1pt)</button>
-            <button onClick={() => setSpiral("Bad")} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Bad (0pt)</button>
-          </div>
-        </div>
+        )}
 
         {/* Log + Undo */}
         <div className="flex gap-2">
@@ -258,20 +259,12 @@ export default function ThirtyPointGamePage() {
               <div key={i} className="flex items-center text-xs gap-2">
                 <span className="text-muted w-5">#{i + 1}</span>
                 <span className={clsx("font-semibold w-12", r.accuracy === "Strike" ? "text-make" : "text-miss")}>{r.accuracy}</span>
-                <span className={clsx("w-14", r.laces === "Good" ? "text-make" : r.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{r.laces}</span>
-                <span className={clsx("w-12", r.spiral === "Good" ? "text-make" : "text-miss")}>{r.spiral}</span>
+                <span className={clsx("w-14", r.laces === "Good" ? "text-make" : r.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{r.laces === "Good" ? "Perfect" : r.laces}</span>
+                <span className={clsx("w-12", r.spiral === "Good" ? "text-make" : "text-miss")}>{r.spiral === "Good" ? "Tight" : "Open"}</span>
                 <span className="text-accent font-bold ml-auto">{r.points}pt</span>
               </div>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* Right: Holder diagram */}
-      <div className="lg:w-[45%] overflow-y-auto p-4 space-y-3">
-        <HolderStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={currentSnap + 1} chartMode="simple" missMode="simple" editable />
-        {markers.length > 0 && (
-          <button onClick={handleUndo} className="w-full text-xs py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">Undo Snap #{markers.length}</button>
         )}
       </div>
     </main>
