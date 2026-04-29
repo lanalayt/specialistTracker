@@ -16,6 +16,8 @@ interface SnapOverlayProps {
 interface SnapRow {
   time: string;
   accuracy: string;
+  laces: string;
+  spiral: string;
 }
 
 const STORAGE_PREFIX = "snapOverlay_";
@@ -90,7 +92,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
   useEffect(() => {
     setRows((prev) => {
       if (prev.length >= entryCount) return prev.slice(0, entryCount);
-      const extra = Array.from({ length: entryCount - prev.length }, () => ({ time: "", accuracy: "" }));
+      const extra = Array.from({ length: entryCount - prev.length }, () => ({ time: "", accuracy: "", laces: "", spiral: "" }));
       return [...prev, ...extra];
     });
   }, [entryCount]);
@@ -153,7 +155,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
     setSnapMarkers((prev) => prev.slice(0, -1));
   };
 
-  const filledRows = rows.filter((r) => r.time || r.accuracy);
+  const filledRows = rows.filter((r) => r.time || r.accuracy || r.laces || r.spiral);
 
   const handleSaveToDraft = () => {
     // Only save rows that haven't been saved yet
@@ -184,7 +186,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
       time: r.time,
       accuracy: r.accuracy,
       critical: false,
-      ...(snapType === "FG" ? { snapType: "FG" } : {}),
+      ...(snapType === "FG" ? { snapType: "FG", laces: r.laces, spiral: r.spiral } : {}),
     }));
 
     // Only new markers (after lastSavedCount)
@@ -255,19 +257,22 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
                 <thead>
                   <tr className="sticky top-0 z-10">
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
-                    <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>
+                    {snapType === "PUNT" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>}
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
+                    {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Laces</th>}
+                    {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Spiral</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row, idx) => (
                     <tr key={idx} className="border-b border-border/30">
                       <td className="text-center text-muted py-1 px-1">{idx + 1}</td>
+                      {snapType === "PUNT" && (
                       <td className="py-1 px-1">
                         <input
                           type="text"
                           inputMode="numeric"
-                          placeholder={snapType === "PUNT" ? "0.74" : "0.38"}
+                          placeholder="0.74"
                           value={row.time}
                           onChange={(e) => {
                             const digits = e.target.value.replace(/\D/g, "");
@@ -276,6 +281,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
                           className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
                         />
                       </td>
+                      )}
                       <td className="py-1 px-1 text-center">
                         {row.accuracy === "Ball" || row.accuracy === "Strike" || row.accuracy.startsWith("✓") || row.accuracy.startsWith("✗") ? (
                           <span className={clsx("text-xs font-bold", row.accuracy === "Ball" || row.accuracy.startsWith("✗") ? "text-miss" : "text-make")}>{row.accuracy}</span>
@@ -291,6 +297,26 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
                           </select>
                         )}
                       </td>
+                      {snapType === "FG" && (
+                      <td className="py-1 px-1">
+                        <select value={row.laces} onChange={(e) => updateRow(idx, "laces", e.target.value)} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60">
+                          <option value="">—</option>
+                          <option value="Good">Good</option>
+                          <option value="1/4 Out">1/4 Out</option>
+                          <option value="1/4 In">1/4 In</option>
+                          <option value="Back">Back</option>
+                        </select>
+                      </td>
+                      )}
+                      {snapType === "FG" && (
+                      <td className="py-1 px-1">
+                        <select value={row.spiral} onChange={(e) => updateRow(idx, "spiral", e.target.value)} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60">
+                          <option value="">—</option>
+                          <option value="Good">Good</option>
+                          <option value="No Good">No Good</option>
+                        </select>
+                      </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

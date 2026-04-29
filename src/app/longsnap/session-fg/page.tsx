@@ -25,13 +25,13 @@ const LACES_OPTIONS = ["Good", "1/4 Out", "1/4 In", "Back"];
 
 interface LogRow {
   athlete: string;
-  snapType: string;
   accuracy: string;
   laces: string;
+  spiral: string;
   critical?: boolean;
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", snapType: "FG", accuracy: "", laces: "", critical: false });
+const emptyRow = (): LogRow => ({ athlete: "", accuracy: "", laces: "", spiral: "", critical: false });
 
 export default function LongSnapFGSessionPage() {
   const { athletes, stats, commitPractice } = useLongSnap();
@@ -125,16 +125,16 @@ export default function LongSnapFGSessionPage() {
 
     const snaps: LongSnapEntry[] = filled.map((r) => {
       const accuracy = (r.accuracy || "ON_TARGET") as SnapAccuracy;
-      const snapType = (r.snapType || "FG") as SnapType;
       return {
         athleteId: r.athlete,
         athlete: r.athlete,
-        snapType,
+        snapType: "FG" as SnapType,
         time: 0,
         accuracy,
         score: 0,
         critical: !!r.critical,
         laces: r.laces || undefined,
+        spiral: r.spiral || undefined,
       };
     });
 
@@ -186,9 +186,9 @@ export default function LongSnapFGSessionPage() {
               <tr className="sticky top-0 z-10">
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center border-b border-border">Athlete</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Type</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Laces</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Spiral</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Crit</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
               </tr>
@@ -201,12 +201,6 @@ export default function LongSnapFGSessionPage() {
                     <select value={row.athlete} onChange={(e) => updateRow(idx, "athlete", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
                       <option value="">—</option>
                       {athleteNames.map((a) => <option key={a} value={a}>{a}</option>)}
-                    </select>
-                  </td>
-                  <td className="py-1 px-1">
-                    <select value={row.snapType} onChange={(e) => updateRow(idx, "snapType", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
-                      <option value="FG">FG</option>
-                      <option value="PAT">PAT</option>
                     </select>
                   </td>
                   <td className="py-1 px-1 text-center">
@@ -224,6 +218,13 @@ export default function LongSnapFGSessionPage() {
                     <select value={row.laces} onChange={(e) => updateRow(idx, "laces", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
                       <option value="">—</option>
                       {LACES_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </td>
+                  <td className="py-1 px-1">
+                    <select value={row.spiral} onChange={(e) => updateRow(idx, "spiral", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
+                      <option value="">—</option>
+                      <option value="Good">Good</option>
+                      <option value="No Good">No Good</option>
                     </select>
                   </td>
                   <td className="py-1 px-1 text-center">
