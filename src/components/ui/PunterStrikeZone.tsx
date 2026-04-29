@@ -29,8 +29,8 @@ interface PunterStrikeZoneProps {
 }
 
 // Default strike zone — preset
-const DEFAULT_ZONE: ZoneBounds = { top: 44, bottom: 70, left: 25, right: 75 };
-const ZONE_STORAGE_KEY = "strikeZoneBounds";
+const DEFAULT_ZONE: ZoneBounds = { top: 50, bottom: 73, left: 25, right: 75 };
+const ZONE_STORAGE_KEY = "strikeZoneBounds_v2";
 
 function loadZone(): ZoneBounds {
   try {
