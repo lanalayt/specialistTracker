@@ -9,7 +9,6 @@ const STORAGE_KEY = "snapSettings";
 interface SnapSettings {
   chartMode: "simple" | "detailed";
   missMode: "simple" | "detailed";
-  shortSnapTime: boolean;
 }
 
 function loadSettings(): SnapSettings {
@@ -20,17 +19,15 @@ function loadSettings(): SnapSettings {
       return {
         chartMode: parsed.chartMode === "detailed" ? "detailed" : "simple",
         missMode: parsed.missMode === "detailed" ? "detailed" : "simple",
-        shortSnapTime: parsed.shortSnapTime === true,
       };
     }
   } catch {}
-  return { chartMode: "simple", missMode: "simple", shortSnapTime: false };
+  return { chartMode: "simple", missMode: "simple" };
 }
 
 export default function SnapSettingsPage() {
   const [chartMode, setChartMode] = useState<"simple" | "detailed">(() => loadSettings().chartMode);
   const [missMode, setMissMode] = useState<"simple" | "detailed">(() => loadSettings().missMode);
-  const [shortSnapTime, setShortSnapTime] = useState(() => loadSettings().shortSnapTime);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [savedSettings, setSavedSettings] = useState<SnapSettings>(() => loadSettings());
@@ -40,24 +37,22 @@ export default function SnapSettingsPage() {
       if (cloud) {
         if (cloud.chartMode === "simple" || cloud.chartMode === "detailed") setChartMode(cloud.chartMode);
         if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
-        if (typeof cloud.shortSnapTime === "boolean") setShortSnapTime(cloud.shortSnapTime);
         setSavedSettings({
           chartMode: cloud.chartMode === "detailed" ? "detailed" : "simple",
           missMode: cloud.missMode === "detailed" ? "detailed" : "simple",
-          shortSnapTime: cloud.shortSnapTime === true,
         });
       }
     });
   }, []);
 
   useEffect(() => {
-    const changed = chartMode !== savedSettings.chartMode || missMode !== savedSettings.missMode || shortSnapTime !== savedSettings.shortSnapTime;
+    const changed = chartMode !== savedSettings.chartMode || missMode !== savedSettings.missMode;
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [chartMode, missMode, shortSnapTime, savedSettings]);
+  }, [chartMode, missMode, savedSettings]);
 
   const handleSave = () => {
-    const settings: SnapSettings = { chartMode, missMode, shortSnapTime };
+    const settings: SnapSettings = { chartMode, missMode };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -88,22 +83,6 @@ export default function SnapSettingsPage() {
         <div className="flex rounded-input border border-border overflow-hidden w-fit">
           <button onClick={() => setMissMode("simple")} className={clsx("px-4 py-2 text-xs font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
           <button onClick={() => setMissMode("detailed")} className={clsx("px-4 py-2 text-xs font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
-        </div>
-      </div>
-
-      <div className="card space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Short Snap Time</p>
-            <p className="text-xs text-muted mt-1">Track snap time for FG/PAT snaps. Disable to hide the time column from the short snap session.</p>
-          </div>
-          <button
-            onClick={() => setShortSnapTime((v) => !v)}
-            className={clsx("relative w-11 h-6 rounded-full transition-colors", shortSnapTime ? "bg-accent" : "bg-border")}
-            aria-label="Toggle short snap time"
-          >
-            <span className={clsx("absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform", shortSnapTime ? "left-[22px]" : "left-0.5")} />
-          </button>
         </div>
       </div>
 

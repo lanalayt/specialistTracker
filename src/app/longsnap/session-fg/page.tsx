@@ -5,7 +5,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
-import { makePct, getSnapBenchmark } from "@/lib/stats";
+import { makePct } from "@/lib/stats";
 import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 import clsx from "clsx";
 import { teamGet, getTeamId } from "@/lib/teamData";
@@ -26,13 +26,12 @@ const LACES_OPTIONS = ["Good", "1/4 Out", "1/4 In", "Back"];
 interface LogRow {
   athlete: string;
   snapType: string;
-  time: string;
   accuracy: string;
   laces: string;
   critical?: boolean;
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", snapType: "FG", time: "", accuracy: "", laces: "", critical: false });
+const emptyRow = (): LogRow => ({ athlete: "", snapType: "FG", accuracy: "", laces: "", critical: false });
 
 export default function LongSnapFGSessionPage() {
   const { athletes, stats, commitPractice } = useLongSnap();
@@ -65,21 +64,6 @@ export default function LongSnapFGSessionPage() {
     setSnapMarkers((prev) => prev.slice(0, -1));
   };
 
-  const [showTime, setShowTime] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try { const r = localStorage.getItem("snapSettings"); if (r) return JSON.parse(r).shortSnapTime === true; } catch {}
-    return false;
-  });
-
-  useEffect(() => {
-    const reload = () => {
-      try { const r = localStorage.getItem("snapSettings"); if (r) setShowTime(JSON.parse(r).shortSnapTime === true); } catch {}
-    };
-    window.addEventListener("focus", reload);
-    window.addEventListener("settingsChanged", reload);
-    return () => { window.removeEventListener("focus", reload); window.removeEventListener("settingsChanged", reload); };
-  }, []);
-
   const athleteNames = athletes.map((a) => a.name);
 
   const totals = athletes.reduce(
@@ -89,12 +73,10 @@ export default function LongSnapFGSessionPage() {
       return {
         att: acc.att + (fg?.att ?? 0) + (pat?.att ?? 0),
         onTarget: acc.onTarget + (fg?.onTarget ?? 0) + (pat?.onTarget ?? 0),
-        totalTime: acc.totalTime + (fg?.totalTime ?? 0) + (pat?.totalTime ?? 0),
       };
     },
-    { att: 0, onTarget: 0, totalTime: 0 }
+    { att: 0, onTarget: 0 }
   );
-  const avgTime = totals.att > 0 ? (totals.totalTime / totals.att).toFixed(2) : "—";
   const onTargetPct = makePct(totals.att, totals.onTarget);
 
   const draftKey = () => {
@@ -134,32 +116,23 @@ export default function LongSnapFGSessionPage() {
     setRows((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const filledRows = rows.filter((r) => r.athlete || r.time || r.accuracy);
+  const filledRows = rows.filter((r) => r.athlete || r.accuracy || r.laces);
 
-  const formatAutoDecimal = (raw: string): string => {
-    const digits = raw.replace(/\D/g, "");
-    if (!digits) return "";
-    const padded = digits.padStart(3, "0");
-    const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
-    return `${whole}.${padded.slice(-2)}`;
-  };
 
   const handleCommit = () => {
-    const filled = rows.filter((r) => r.athlete && r.time);
+    const filled = rows.filter((r) => r.athlete || r.accuracy || r.laces);
     if (filled.length === 0) return;
 
     const snaps: LongSnapEntry[] = filled.map((r) => {
-      const time = parseFloat(r.time) || 0;
       const accuracy = (r.accuracy || "ON_TARGET") as SnapAccuracy;
       const snapType = (r.snapType || "FG") as SnapType;
       return {
         athleteId: r.athlete,
         athlete: r.athlete,
         snapType,
-        time,
+        time: 0,
         accuracy,
         score: 0,
-        benchmark: getSnapBenchmark(snapType, time),
         critical: !!r.critical,
         laces: r.laces || undefined,
       };
@@ -214,7 +187,6 @@ export default function LongSnapFGSessionPage() {
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center border-b border-border">Athlete</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Type</th>
-                {showTime && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>}
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Laces</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Crit</th>
@@ -237,22 +209,6 @@ export default function LongSnapFGSessionPage() {
                       <option value="PAT">PAT</option>
                     </select>
                   </td>
-                  {showTime && (
-                  <td className="py-1 px-1">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="0.38"
-                      value={row.time}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, "");
-                        updateRow(idx, "time", digits ? formatAutoDecimal(digits) : "");
-                      }}
-                      readOnly={viewOnly}
-                      className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60"
-                    />
-                  </td>
-                  )}
                   <td className="py-1 px-1 text-center">
                     {row.accuracy === "Ball" || row.accuracy === "Strike" ? (
                       <span className={clsx("text-xs font-bold", row.accuracy === "Strike" ? "text-make" : "text-miss")}>{row.accuracy}</span>
@@ -317,9 +273,8 @@ export default function LongSnapFGSessionPage() {
 
       {/* Right: Stats */}
       <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <StatCard label="On-Target%" value={onTargetPct} accent glow />
-          <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
           <StatCard label="FG/PAT Snaps" value={totals.att || "—"} />
         </div>
         <HolderStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} />
