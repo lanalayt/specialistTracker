@@ -16,7 +16,7 @@ interface HolderStrikeZoneProps {
 }
 
 // Strike zone — small box at bottom-right near the holder's hands
-const ZONE = { top: 55, bottom: 80, left: 55, right: 85 };
+const ZONE = { top: 45, bottom: 78, left: 48, right: 82 };
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
@@ -40,7 +40,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1 }: HolderSt
         ref={containerRef}
         onClick={handleClick}
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex items-end"
-        style={{ width: 380, height: 260, background: "#000000", padding: 10 }}
+        style={{ width: 300, height: 260, background: "#000000", padding: 10 }}
       >
         {/* Holder image — left side */}
         <img
