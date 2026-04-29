@@ -25,6 +25,7 @@ export function clearSnapOverlayData(snapType: "PUNT" | "FG") {
   try {
     localStorage.removeItem(key);
     localStorage.removeItem(key + "_markers");
+    localStorage.removeItem(key + "_savedCount");
   } catch {}
 }
 
@@ -66,6 +67,9 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
   const [athlete, setAthlete] = useState<string>("");
   const [committed, setCommitted] = useState(false);
+  const [lastSavedCount, setLastSavedCount] = useState<number>(() => {
+    try { const v = localStorage.getItem(storageKey + "_savedCount"); return v ? parseInt(v) || 0 : 0; } catch { return 0; }
+  });
 
   // Load snapping athletes
   useEffect(() => {
@@ -151,7 +155,11 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
   const filledRows = rows.filter((r) => r.time || r.accuracy);
 
   const handleSaveToDraft = () => {
-    if (filledRows.length === 0) return;
+    // Only save rows that haven't been saved yet
+    const allFilled = rows.map((r, i) => ({ ...r, idx: i })).filter((r) => r.time || r.accuracy);
+    const unsaved = allFilled.filter((r) => r.idx >= lastSavedCount);
+    if (unsaved.length === 0) return;
+
     const snapAthlete = athlete || "Unknown";
     const draftSuffix = snapType === "PUNT" ? "punt" : "fg";
     const tid = getTeamId();
@@ -159,24 +167,27 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
     // Load existing draft rows
     let existingRows: { athlete: string; time: string; accuracy: string; critical?: boolean; snapType?: string }[] = [];
+    let existingMarkers: SnapMarker[] = [];
     try {
       const raw = localStorage.getItem(draftKey);
       if (raw) {
         const draft = JSON.parse(raw);
         if (draft.rows?.length) existingRows = draft.rows;
+        if (draft.snapMarkers?.length) existingMarkers = draft.snapMarkers;
       }
     } catch {}
 
-    // Build new rows from filled snap data
-    const newRows = rows
-      .filter((r) => r.time || r.accuracy)
-      .map((r) => ({
-        athlete: snapAthlete,
-        time: r.time,
-        accuracy: r.accuracy,
-        critical: false,
-        ...(snapType === "FG" ? { snapType: "FG" } : {}),
-      }));
+    // Build only NEW rows
+    const newRows = unsaved.map((r) => ({
+      athlete: snapAthlete,
+      time: r.time,
+      accuracy: r.accuracy,
+      critical: false,
+      ...(snapType === "FG" ? { snapType: "FG" } : {}),
+    }));
+
+    // Only new markers (after lastSavedCount)
+    const newMarkers = snapMarkers.filter((m) => m.num > lastSavedCount);
 
     // Merge: append new rows to existing, replacing empty rows first
     const merged = [...existingRows];
@@ -190,9 +201,15 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
       }
     }
 
-    try { localStorage.setItem(draftKey, JSON.stringify({ rows: merged, weather: "", snapMarkers })); } catch {}
+    const mergedMarkers = [...existingMarkers, ...newMarkers];
 
-    // Don't clear — keep data in overlay
+    try { localStorage.setItem(draftKey, JSON.stringify({ rows: merged, weather: "", snapMarkers: mergedMarkers })); } catch {}
+
+    // Track what we've saved
+    const newSavedCount = allFilled.length;
+    setLastSavedCount(newSavedCount);
+    try { localStorage.setItem(storageKey + "_savedCount", String(newSavedCount)); } catch {}
+
     setCommitted(true);
     setTimeout(() => setCommitted(false), 2000);
   };
