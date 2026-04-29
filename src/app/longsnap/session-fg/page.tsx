@@ -141,12 +141,16 @@ export default function LongSnapFGSessionPage() {
     });
 
     commitPractice(snaps, undefined, weather);
+    setCommitted(true);
+    try { localStorage.removeItem(draftKey()); } catch {}
+  };
+
+  const handleNewSession = () => {
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setSnapMarkers([]);
     setWeather("");
-    setCommitted(true);
+    setCommitted(false);
     try { localStorage.removeItem(draftKey()); } catch {}
-    setTimeout(() => setCommitted(false), 2000);
   };
 
   return (
@@ -266,25 +270,34 @@ export default function LongSnapFGSessionPage() {
 
         {/* Footer */}
         <div className="border-t border-border p-3 flex items-center gap-2 shrink-0">
-          <span className="text-xs text-muted flex-1">
-            {filledRows.length === 0 ? "0 snaps entered" : `${filledRows.length} snap${filledRows.length !== 1 ? "s" : ""} entered`}
-          </span>
-          {!viewOnly && filledRows.length > 0 && (
-            <button
-              onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); } catch {} }}
-              className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
-            >
-              Clear Log
-            </button>
-          )}
-          {!viewOnly && (
-            <button
-              onClick={handleCommit}
-              disabled={filledRows.length === 0}
-              className={clsx("btn-primary text-xs py-2 px-5", committed && "bg-make/90")}
-            >
-              {committed ? "✓ Committed!" : `Commit Session${filledRows.length > 0 ? ` (${filledRows.length})` : ""}`}
-            </button>
+          {committed ? (
+            <>
+              <span className="text-xs text-make font-semibold flex-1">Session Committed ({filledRows.length} snaps)</span>
+              <button onClick={handleNewSession} className="btn-primary text-xs py-2 px-5">← Back to Log</button>
+            </>
+          ) : (
+            <>
+              <span className="text-xs text-muted flex-1">
+                {filledRows.length === 0 ? "0 snaps entered" : `${filledRows.length} snap${filledRows.length !== 1 ? "s" : ""} entered`}
+              </span>
+              {!viewOnly && filledRows.length > 0 && (
+                <button
+                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); } catch {} }}
+                  className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
+                >
+                  Clear Log
+                </button>
+              )}
+              {!viewOnly && (
+                <button
+                  onClick={handleCommit}
+                  disabled={filledRows.length === 0}
+                  className="btn-primary text-xs py-2 px-5"
+                >
+                  Commit Session{filledRows.length > 0 ? ` (${filledRows.length})` : ""}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
