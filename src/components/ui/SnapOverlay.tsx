@@ -20,9 +20,23 @@ interface SnapRow {
 
 const STORAGE_PREFIX = "snapOverlay_";
 
+function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simple" | "detailed" } {
+  try {
+    const raw = localStorage.getItem("snapSettings");
+    if (raw) {
+      const p = JSON.parse(raw);
+      return { chartMode: p.chartMode === "detailed" ? "detailed" : "simple", missMode: p.missMode === "detailed" ? "detailed" : "simple" };
+    }
+  } catch {}
+  return { chartMode: "simple", missMode: "simple" };
+}
+
 export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps) {
   const { athletes, commitPractice } = useLongSnap();
   const athleteNames = athletes.map((a) => a.name);
+
+  const [chartMode] = useState(() => loadSnapSettings().chartMode);
+  const [missMode] = useState(() => loadSnapSettings().missMode);
 
   const storageKey = `${STORAGE_PREFIX}${snapType}`;
 
@@ -82,10 +96,27 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
   const nextSnapNum = snapMarkers.length + 1;
 
+  const CELL_ARROWS: Record<string, string> = {
+    TL: "✓↖", TC: "✓↑", TR: "✓↗",
+    ML: "✓←", MC: "✓", MR: "✓→",
+    BL: "✓↙", BC: "✓↓", BR: "✓↘",
+  };
+  const MISS_ARROWS: Record<string, string> = {
+    HIGH_L: "✗↖", HIGH: "✗↑", HIGH_R: "✗↗",
+    LEFT: "✗←", RIGHT: "✗→",
+    LOW_L: "✗↙", LOW: "✗↓", LOW_R: "✗↘",
+  };
+
   const handleSnapClick = (marker: SnapMarker) => {
     const rowIdx = marker.num - 1;
     if (rowIdx < rows.length) {
-      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: marker.inZone ? "Strike" : "Ball" } : r));
+      let acc: string;
+      if (marker.inZone) {
+        acc = chartMode === "detailed" && marker.zoneCell ? (CELL_ARROWS[marker.zoneCell] ?? "Strike") : "Strike";
+      } else {
+        acc = missMode === "detailed" && marker.missCell ? (MISS_ARROWS[marker.missCell] ?? "Ball") : "Ball";
+      }
+      setRows((prev) => prev.map((r, i) => i === rowIdx ? { ...r, accuracy: acc } : r));
     }
     setSnapMarkers((prev) => [...prev, marker]);
   };
@@ -190,8 +221,8 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
                         />
                       </td>
                       <td className="py-1 px-1 text-center">
-                        {row.accuracy === "Ball" || row.accuracy === "Strike" ? (
-                          <span className={clsx("text-xs font-bold", row.accuracy === "Strike" ? "text-make" : "text-miss")}>{row.accuracy}</span>
+                        {row.accuracy === "Ball" || row.accuracy === "Strike" || row.accuracy.startsWith("✓") || row.accuracy.startsWith("✗") ? (
+                          <span className={clsx("text-xs font-bold", row.accuracy === "Ball" || row.accuracy.startsWith("✗") ? "text-miss" : "text-make")}>{row.accuracy}</span>
                         ) : (
                           <select
                             value={row.accuracy}
@@ -225,7 +256,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
           {/* Right: Strike zone */}
           <div className="lg:w-[45%] p-4 space-y-2">
-            <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} />
+            <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} />
             {snapMarkers.length > 0 && (
               <button
                 onClick={handleUndoSnap}
