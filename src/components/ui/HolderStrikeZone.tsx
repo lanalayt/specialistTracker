@@ -47,7 +47,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1 }: HolderSt
           src="/holder-silhouette.png?v=7"
           alt="Holder"
           className="pointer-events-none select-none"
-          style={{ height: "130%", width: "auto", objectFit: "contain", marginLeft: -20 }}
+          style={{ height: "130%", width: "auto", objectFit: "contain", marginLeft: -20, position: "absolute", bottom: -10, left: 0 }}
           draggable={false}
         />
 
