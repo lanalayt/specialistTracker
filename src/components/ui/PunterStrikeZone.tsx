@@ -265,21 +265,9 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
 
         {/* Edit controls */}
         {editable && (
-          <div className="flex gap-2 justify-center">
-            <button
-              onClick={() => setIsEditing((v) => !v)}
-              className={`text-[10px] px-2 py-1 rounded-input border font-semibold transition-all ${isEditing ? "border-accent/50 text-accent bg-accent/10" : "border-border text-muted hover:text-white"}`}
-            >
-              {isEditing ? "Done Editing" : "Edit Zone"}
-            </button>
-            {isEditing && (
-              <button
-                onClick={resetZone}
-                className="text-[10px] px-2 py-1 rounded-input border border-border text-muted hover:text-white font-semibold transition-all"
-              >
-                Reset Default
-              </button>
-            )}
+          <div className="flex gap-1 justify-center mt-1">
+            <button onClick={() => setIsEditing((v) => !v)} className={`text-[8px] px-1.5 py-0.5 rounded border font-semibold transition-all ${isEditing ? "border-accent/50 text-accent bg-accent/10" : "border-border/50 text-muted/60 hover:text-white"}`}>{isEditing ? "Done" : "Edit Zone"}</button>
+            {isEditing && <button onClick={resetZone} className="text-[8px] px-1.5 py-0.5 rounded border border-border/50 text-muted/60 hover:text-white font-semibold transition-all">Reset</button>}
           </div>
         )}
       </div>
