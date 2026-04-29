@@ -352,7 +352,7 @@ export default function LongSnapPuntSessionPage() {
           <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
           <StatCard label="Punt Snaps" value={totals.att || "—"} />
         </div>
-        <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} />
+        <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} editable />
         {snapMarkers.length > 0 && (
           <button
             onClick={handleUndoSnap}

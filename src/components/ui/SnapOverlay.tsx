@@ -311,7 +311,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
           {/* Right: Strike zone */}
           <div className="lg:w-[45%] p-4 space-y-2">
-            <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} />
+            <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} editable />
             {snapMarkers.length > 0 && (
               <button
                 onClick={handleUndoSnap}
