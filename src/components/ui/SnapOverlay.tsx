@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
+import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { getTeamId } from "@/lib/teamData";
 import type { SnapType } from "@/types";
 import clsx from "clsx";
@@ -311,7 +312,11 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
           {/* Right: Strike zone */}
           <div className="lg:w-[45%] p-4 space-y-2">
-            <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} editable />
+            {snapType === "PUNT" ? (
+              <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} editable />
+            ) : (
+              <HolderStrikeZone markers={snapMarkers as ShortSnapMarker[]} onSnap={(m) => handleSnapClick({ ...m, zoneCell: undefined, missCell: undefined })} nextNum={nextSnapNum} />
+            )}
             {snapMarkers.length > 0 && (
               <button
                 onClick={handleUndoSnap}
