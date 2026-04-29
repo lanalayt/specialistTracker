@@ -45,6 +45,11 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
   const [athlete, setAthlete] = useState<string>(() => athleteNames[0] ?? "");
   const [committed, setCommitted] = useState(false);
 
+  // Update athlete when athletes load asynchronously
+  useEffect(() => {
+    if (!athlete && athleteNames.length > 0) setAthlete(athleteNames[0]);
+  }, [athleteNames, athlete]);
+
   // Ensure rows match entry count
   useEffect(() => {
     setRows((prev) => {
@@ -98,15 +103,16 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
   const filledRows = rows.filter((r) => r.time || r.accuracy);
 
   const handleCommit = () => {
-    if (filledRows.length === 0 || !athlete) return;
+    if (filledRows.length === 0) return;
+    const snapAthlete = athlete || "Unknown";
     const snaps: LongSnapEntry[] = rows
       .filter((r) => r.time || r.accuracy)
       .map((r) => {
         const time = parseFloat(r.time) || 0;
         const accuracy: SnapAccuracy = r.accuracy === "Ball" ? "HIGH" : r.accuracy === "Strike" ? "ON_TARGET" : "ON_TARGET";
         return {
-          athleteId: athlete,
-          athlete,
+          athleteId: snapAthlete,
+          athlete: snapAthlete,
           snapType,
           time,
           accuracy,
@@ -209,7 +215,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
               <span className="text-xs text-muted flex-1">{filledRows.length} of {entryCount} snaps</span>
               <button
                 onClick={handleCommit}
-                disabled={filledRows.length === 0 || !athlete}
+                disabled={filledRows.length === 0}
                 className={clsx("btn-primary text-xs py-1.5 px-4", committed && "bg-make/90")}
               >
                 {committed ? "✓ Saved!" : "Save to Snapping"}
