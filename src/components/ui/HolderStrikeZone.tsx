@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 
 export interface ShortSnapMarker {
   x: number;
@@ -13,6 +13,8 @@ interface HolderStrikeZoneProps {
   markers?: ShortSnapMarker[];
   onSnap?: (marker: ShortSnapMarker) => void;
   nextNum?: number;
+  chartMode?: "simple" | "detailed";
+  missMode?: "simple" | "detailed";
 }
 
 // Strike zone — small box at bottom-right near the holder's hands
@@ -22,8 +24,24 @@ function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
 }
 
-export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1 }: HolderStrikeZoneProps) {
+function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simple" | "detailed" } {
+  try {
+    const raw = localStorage.getItem("snapSettings");
+    if (raw) {
+      const p = JSON.parse(raw);
+      return { chartMode: p.chartMode === "detailed" ? "detailed" : "simple", missMode: p.missMode === "detailed" ? "detailed" : "simple" };
+    }
+  } catch {}
+  return { chartMode: "simple", missMode: "simple" };
+}
+
+export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode, missMode }: HolderStrikeZoneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Load from settings if not passed as props
+  const [settings] = useState(() => loadSnapSettings());
+  const isDetailedStrike = (chartMode ?? settings.chartMode) === "detailed";
+  const isDetailedMiss = (missMode ?? settings.missMode) === "detailed";
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!onSnap || !containerRef.current) return;
@@ -42,7 +60,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1 }: HolderSt
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex items-end"
         style={{ width: 300, height: 260, background: "#000000", padding: 0 }}
       >
-        {/* Holder image — left side, scaled up so knee is near bottom */}
+        {/* Holder image — left side, scaled up */}
         <img
           src="/holder-silhouette.png?v=7"
           alt="Holder"
@@ -51,7 +69,21 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1 }: HolderSt
           draggable={false}
         />
 
-        {/* Strike zone box */}
+        {/* Detailed miss lines — zone edges extended to outer box */}
+        {isDetailedMiss && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line x1={ZONE.left} y1="0" x2={ZONE.left} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.left} y1={ZONE.bottom} x2={ZONE.left} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.right} y1="0" x2={ZONE.right} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.right} y1={ZONE.bottom} x2={ZONE.right} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1="0" y1={ZONE.top} x2={ZONE.left} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.right} y1={ZONE.top} x2="100" y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1="0" y1={ZONE.bottom} x2={ZONE.left} y2={ZONE.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={ZONE.right} y1={ZONE.bottom} x2="100" y2={ZONE.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+          </svg>
+        )}
+
+        {/* Strike zone box overlay */}
         <div
           className="absolute border-2 border-red-500 rounded pointer-events-none"
           style={{
@@ -60,8 +92,17 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1 }: HolderSt
             width: `${ZONE.right - ZONE.left}%`,
             height: `${ZONE.bottom - ZONE.top}%`,
             backgroundColor: "rgba(239, 68, 68, 0.06)",
+            ...(isDetailedStrike ? {
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gridTemplateRows: "1fr 1fr 1fr",
+            } : {}),
           }}
-        />
+        >
+          {isDetailedStrike && Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="border pointer-events-none" style={{ borderColor: "rgba(239, 68, 68, 0.35)" }} />
+          ))}
+        </div>
 
         {/* Snap markers */}
         {markers.map((m) => (
