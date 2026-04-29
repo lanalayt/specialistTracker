@@ -361,17 +361,18 @@ export default function PuntingSessionPage() {
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
 
-  // Re-read settings when they change
+  // Re-read settings — poll every 2s to catch SPA navigation changes
   useEffect(() => {
     const reload = () => {
       setOpTimeEnabled(loadOpTimeEnabled());
       setDirSettings(loadDirectionSettings());
       setPuntTypes(loadPuntTypes().types);
     };
-    window.addEventListener("focus", reload);
+    reload();
+    const interval = setInterval(reload, 2000);
     window.addEventListener("settingsChanged", reload);
     return () => {
-      window.removeEventListener("focus", reload);
+      clearInterval(interval);
       window.removeEventListener("settingsChanged", reload);
     };
   }, []);

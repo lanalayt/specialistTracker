@@ -229,7 +229,7 @@ export default function KickoffSessionPage() {
   const koDirLabels: Record<string, string> = {};
   koDirs.forEach((d) => { koDirLabels[d.id] = d.label; });
 
-  // Re-read settings when they change
+  // Re-read settings — poll every 2s to catch SPA navigation changes
   useEffect(() => {
     const reload = () => {
       const fresh = loadKickoffSettings();
@@ -237,10 +237,11 @@ export default function KickoffSessionPage() {
       setKoDirs(fresh.directions);
       setKoDirEnabled(fresh.directionEnabled);
     };
-    window.addEventListener("focus", reload);
+    reload();
+    const interval = setInterval(reload, 2000);
     window.addEventListener("settingsChanged", reload);
     return () => {
-      window.removeEventListener("focus", reload);
+      clearInterval(interval);
       window.removeEventListener("settingsChanged", reload);
     };
   }, []);

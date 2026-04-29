@@ -267,7 +267,7 @@ export default function KickingSessionPage() {
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [showSetupPrompt, setShowSetupPrompt] = useState(false);
 
-  // Re-read settings when they change (settings page dispatches this event)
+  // Re-read settings — poll every 2s to catch SPA navigation changes
   useEffect(() => {
     const reload = () => {
       setOpTimeEnabled(loadOpTimeEnabled());
@@ -277,10 +277,11 @@ export default function KickingSessionPage() {
       setScoreMode(loadScoreMode());
       setScoreOptions(loadScoreOptions());
     };
-    window.addEventListener("focus", reload);
+    reload();
+    const interval = setInterval(reload, 2000);
     window.addEventListener("settingsChanged", reload);
     return () => {
-      window.removeEventListener("focus", reload);
+      clearInterval(interval);
       window.removeEventListener("settingsChanged", reload);
     };
   }, []);
