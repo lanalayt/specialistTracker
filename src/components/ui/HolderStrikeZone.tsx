@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 
 export interface ShortSnapMarker {
   x: number;
@@ -15,13 +15,22 @@ interface HolderStrikeZoneProps {
   nextNum?: number;
   chartMode?: "simple" | "detailed";
   missMode?: "simple" | "detailed";
+  editable?: boolean;
 }
 
-// Strike zone — small box at bottom-right near the holder's hands
-const ZONE = { top: 45, bottom: 78, left: 42, right: 76 };
+const DEFAULT_HOLDER_ZONE = { top: 45, bottom: 78, left: 42, right: 76 };
+const HOLDER_ZONE_KEY = "holderStrikeZoneBounds";
 
-function isInZone(xPct: number, yPct: number): boolean {
-  return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
+function loadHolderZone() {
+  try { const r = localStorage.getItem(HOLDER_ZONE_KEY); if (r) { const z = JSON.parse(r); if (z.top != null) return z; } } catch {}
+  return { ...DEFAULT_HOLDER_ZONE };
+}
+function saveHolderZone(z: typeof DEFAULT_HOLDER_ZONE) {
+  try { localStorage.setItem(HOLDER_ZONE_KEY, JSON.stringify(z)); } catch {}
+}
+
+function isInZone(xPct: number, yPct: number, zone: typeof DEFAULT_HOLDER_ZONE): boolean {
+  return xPct >= zone.left && xPct <= zone.right && yPct >= zone.top && yPct <= zone.bottom;
 }
 
 function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simple" | "detailed" } {
@@ -35,22 +44,52 @@ function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simp
   return { chartMode: "simple", missMode: "simple" };
 }
 
-export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode, missMode }: HolderStrikeZoneProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+type DragEdge = "top" | "bottom" | "left" | "right" | null;
 
-  // Load from settings if not passed as props
+export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode, missMode, editable = false }: HolderStrikeZoneProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [zone, setZone] = useState(loadHolderZone);
+  const [dragEdge, setDragEdge] = useState<DragEdge>(null);
+  const [isEditing, setIsEditing] = useState(false);
+
   const [settings] = useState(() => loadSnapSettings());
   const isDetailedStrike = (chartMode ?? settings.chartMode) === "detailed";
   const isDetailedMiss = (missMode ?? settings.missMode) === "detailed";
 
+  useEffect(() => { saveHolderZone(zone); }, [zone]);
+
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isEditing || dragEdge) return;
     if (!onSnap || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
-    const inZone = isInZone(xPct, yPct);
-    onSnap({ x: xPct, y: yPct, num: nextNum, inZone });
+    const inZone2 = isInZone(xPct, yPct, zone);
+    onSnap({ x: xPct, y: yPct, num: nextNum, inZone: inZone2 });
   };
+
+  const handleEdgeDrag = useCallback((e: MouseEvent) => {
+    if (!dragEdge || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const yPct = Math.max(5, Math.min(95, ((e.clientY - rect.top) / rect.height) * 100));
+    const xPct = Math.max(5, Math.min(95, ((e.clientX - rect.left) / rect.width) * 100));
+    setZone((prev: typeof DEFAULT_HOLDER_ZONE) => {
+      if (dragEdge === "top") return { ...prev, top: Math.min(yPct, prev.bottom - 10) };
+      if (dragEdge === "bottom") return { ...prev, bottom: Math.max(yPct, prev.top + 10) };
+      if (dragEdge === "left") return { ...prev, left: Math.min(xPct, prev.right - 10) };
+      if (dragEdge === "right") return { ...prev, right: Math.max(xPct, prev.left + 10) };
+      return prev;
+    });
+  }, [dragEdge]);
+
+  useEffect(() => {
+    if (!dragEdge) return;
+    const handleMove = (e: MouseEvent) => handleEdgeDrag(e);
+    const handleUp = () => setDragEdge(null);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
+  }, [dragEdge, handleEdgeDrag]);
 
   return (
     <div className="flex justify-center">
@@ -72,14 +111,14 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
         {/* Detailed miss lines — zone edges extended to outer box */}
         {isDetailedMiss && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <line x1={ZONE.left} y1="0" x2={ZONE.left} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={ZONE.left} y1={ZONE.bottom} x2={ZONE.left} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={ZONE.right} y1="0" x2={ZONE.right} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={ZONE.right} y1={ZONE.bottom} x2={ZONE.right} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1="0" y1={ZONE.top} x2={ZONE.left} y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={ZONE.right} y1={ZONE.top} x2="100" y2={ZONE.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1="0" y1={ZONE.bottom} x2={ZONE.left} y2={ZONE.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={ZONE.right} y1={ZONE.bottom} x2="100" y2={ZONE.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={zone.left} y1="0" x2={zone.left} y2={zone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={zone.left} y1={zone.bottom} x2={zone.left} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={zone.right} y1="0" x2={zone.right} y2={zone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={zone.right} y1={zone.bottom} x2={zone.right} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1="0" y1={zone.top} x2={zone.left} y2={zone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={zone.right} y1={zone.top} x2="100" y2={zone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1="0" y1={zone.bottom} x2={zone.left} y2={zone.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={zone.right} y1={zone.bottom} x2="100" y2={zone.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
           </svg>
         )}
 
@@ -87,10 +126,10 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
         <div
           className="absolute border-2 border-red-500 rounded pointer-events-none"
           style={{
-            top: `${ZONE.top}%`,
-            left: `${ZONE.left}%`,
-            width: `${ZONE.right - ZONE.left}%`,
-            height: `${ZONE.bottom - ZONE.top}%`,
+            top: `${zone.top}%`,
+            left: `${zone.left}%`,
+            width: `${zone.right - zone.left}%`,
+            height: `${zone.bottom - zone.top}%`,
             backgroundColor: "rgba(239, 68, 68, 0.06)",
             ...(isDetailedStrike ? {
               display: "grid",
@@ -123,7 +162,25 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
             <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
           </div>
         ))}
+
+        {/* Drag handles when editing */}
+        {isEditing && (
+          <>
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${zone.top}%`, left: `${zone.left}%`, width: `${zone.right - zone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("top"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${zone.bottom}%`, left: `${zone.left}%`, width: `${zone.right - zone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("bottom"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${zone.top}%`, left: `${zone.left}%`, width: 6, height: `${zone.bottom - zone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("left"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${zone.top}%`, left: `${zone.right}%`, width: 6, height: `${zone.bottom - zone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("right"); }} />
+          </>
+        )}
       </div>
+
+      {/* Edit controls */}
+      {editable && (
+        <div className="flex gap-2 justify-center mt-2">
+          <button onClick={() => setIsEditing((v) => !v)} className={`text-[10px] px-2 py-1 rounded-input border font-semibold transition-all ${isEditing ? "border-accent/50 text-accent bg-accent/10" : "border-border text-muted hover:text-white"}`}>{isEditing ? "Done Editing" : "Edit Zone"}</button>
+          {isEditing && <button onClick={() => setZone({ ...DEFAULT_HOLDER_ZONE })} className="text-[10px] px-2 py-1 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Reset Default</button>}
+        </div>
+      )}
     </div>
   );
 }

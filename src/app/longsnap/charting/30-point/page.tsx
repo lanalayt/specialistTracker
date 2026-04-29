@@ -269,7 +269,10 @@ export default function ThirtyPointGamePage() {
 
       {/* Right: Holder diagram */}
       <div className="lg:w-[45%] overflow-y-auto p-4 space-y-3">
-        <HolderStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={currentSnap + 1} />
+        <HolderStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={currentSnap + 1} chartMode="simple" missMode="simple" editable />
+        {markers.length > 0 && (
+          <button onClick={handleUndo} className="w-full text-xs py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">Undo Snap #{markers.length}</button>
+        )}
       </div>
     </main>
   );

@@ -311,7 +311,7 @@ export default function LongSnapFGSessionPage() {
           <StatCard label="Strike %" value={onTargetPct} accent glow />
           <StatCard label="FG/PAT Snaps" value={totals.att || "—"} />
         </div>
-        <HolderStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} />
+        <HolderStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} editable />
         {snapMarkers.length > 0 && (
           <button
             onClick={handleUndoSnap}

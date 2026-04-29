@@ -246,7 +246,10 @@ export default function BallsStrikesPage() {
 
       {/* Right: Holder diagram */}
       <div className="lg:w-[45%] overflow-y-auto p-4 space-y-3">
-        <PunterStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={snaps.length + 1} />
+        <PunterStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={snaps.length + 1} editable />
+        {snaps.length > 0 && (
+          <button onClick={handleUndo} className="w-full text-xs py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">Undo Snap #{snaps.length}</button>
+        )}
       </div>
     </main>
   );
