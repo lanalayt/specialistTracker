@@ -13,6 +13,7 @@ import type { FGKick, FGPosition, FGResult } from "@/types";
 import { POSITIONS, RESULTS } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
+import { SnapOverlay } from "@/components/ui/SnapOverlay";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
@@ -263,6 +264,7 @@ export default function KickingSessionPage() {
   const [scoreOptions, setScoreOptions] = useState<string[]>(() => loadScoreOptions());
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
+  const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [showSetupPrompt, setShowSetupPrompt] = useState(false);
 
   // Re-read settings when they change (settings page dispatches this event)
@@ -1749,12 +1751,20 @@ export default function KickingSessionPage() {
               )}
             </h2>
             {!viewOnly && (
-              <button
-                onClick={addRow}
-                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
-              >
-                + Row
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSnapOverlay(true)}
+                  className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                >
+                  Snap
+                </button>
+                <button
+                  onClick={addRow}
+                  className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
+                >
+                  + Row
+                </button>
+              </div>
             )}
           </div>
 
@@ -2250,6 +2260,14 @@ export default function KickingSessionPage() {
           })}
           onConfirm={handleConfirmCommit}
           onCancel={() => setPendingKicks(null)}
+        />
+      )}
+
+      {showSnapOverlay && (
+        <SnapOverlay
+          snapType="FG"
+          entryCount={filledCount}
+          onClose={() => setShowSnapOverlay(false)}
         />
       )}
     </>

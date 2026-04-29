@@ -12,6 +12,7 @@ import { PUNT_HASHES } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
+import { SnapOverlay } from "@/components/ui/SnapOverlay";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
@@ -358,6 +359,7 @@ export default function PuntingSessionPage() {
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
+  const [showSnapOverlay, setShowSnapOverlay] = useState(false);
 
   // Re-read settings when they change
   useEffect(() => {
@@ -2026,12 +2028,20 @@ export default function PuntingSessionPage() {
               )}
             </h2>
             {!viewOnly && (
-              <button
-                onClick={addRow}
-                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
-              >
-                + Row
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSnapOverlay(true)}
+                  className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                >
+                  Snap
+                </button>
+                <button
+                  onClick={addRow}
+                  className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
+                >
+                  + Row
+                </button>
+              </div>
             )}
           </div>
 
@@ -2656,6 +2666,14 @@ export default function PuntingSessionPage() {
           })}
           onConfirm={handleConfirmCommit}
           onCancel={() => setPendingPunts(null)}
+        />
+      )}
+
+      {showSnapOverlay && (
+        <SnapOverlay
+          snapType="PUNT"
+          entryCount={filledCount}
+          onClose={() => setShowSnapOverlay(false)}
         />
       )}
     </>
