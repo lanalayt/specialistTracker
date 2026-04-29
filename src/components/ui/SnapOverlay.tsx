@@ -159,7 +159,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
 
   const handleSaveToDraft = () => {
     // Only save rows that haven't been saved yet
-    const allFilled = rows.map((r, i) => ({ ...r, idx: i })).filter((r) => r.time || r.accuracy);
+    const allFilled = rows.map((r, i) => ({ ...r, idx: i })).filter((r) => r.time || r.accuracy || r.laces || r.spiral);
     const unsaved = allFilled.filter((r) => r.idx >= lastSavedCount);
     if (unsaved.length === 0) return;
 
