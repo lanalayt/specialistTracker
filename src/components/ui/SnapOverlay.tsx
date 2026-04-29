@@ -20,6 +20,7 @@ interface SnapOverlayProps {
 }
 
 interface SnapRow {
+  snapper: string;
   time: string;
   accuracy: string;
   laces: string;
@@ -95,7 +96,7 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
   useEffect(() => {
     setRows((prev) => {
       if (prev.length >= entryCount) return prev.slice(0, entryCount);
-      const extra = Array.from({ length: entryCount - prev.length }, () => ({ time: "", accuracy: "", laces: "", spiral: "" }));
+      const extra = Array.from({ length: entryCount - prev.length }, () => ({ snapper: "", time: "", accuracy: "", laces: "", spiral: "" }));
       return [...prev, ...extra];
     });
   }, [entryCount]);
@@ -158,20 +159,19 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
     setSnapMarkers((prev) => prev.slice(0, -1));
   };
 
-  const filledRows = rows.filter((r) => r.time || r.accuracy || r.laces || r.spiral);
+  const filledRows = rows.filter((r) => r.snapper || r.time || r.accuracy || r.laces || r.spiral);
 
   const handleSaveToDraft = () => {
-    const allFilled = rows.map((r, i) => ({ ...r, idx: i })).filter((r) => r.time || r.accuracy || r.laces || r.spiral);
+    const allFilled = rows.map((r, i) => ({ ...r, idx: i })).filter((r) => r.snapper || r.time || r.accuracy || r.laces || r.spiral);
     if (allFilled.length === 0) return;
 
-    const snapAthlete = athlete || "Unknown";
     const draftSuffix = snapType === "PUNT" ? "punt" : "fg";
     const tid = getTeamId();
     const draftKey = tid ? `longsnap_manual_draft_${draftSuffix}_${tid}` : `longsnap_manual_draft_${draftSuffix}`;
 
     // Build all filled rows (overwrite draft entirely)
     const draftRows = allFilled.map((r) => ({
-      athlete: snapAthlete,
+      athlete: r.snapper || athlete || "Unknown",
       time: r.time,
       accuracy: r.accuracy,
       critical: false,
@@ -206,32 +206,14 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
         <div className="flex flex-col lg:flex-row">
           {/* Left: Table */}
           <div className="lg:w-[55%] p-4 space-y-3 border-b lg:border-b-0 lg:border-r border-border">
-            {/* Athlete selector */}
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Snapper</p>
-              <div className="flex flex-wrap gap-1.5">
-                {athleteNames.map((a) => (
-                  <button
-                    key={a}
-                    onClick={() => setAthlete(a)}
-                    className={clsx(
-                      "px-3 py-1.5 rounded-input text-xs font-medium transition-all",
-                      athlete === a ? "bg-accent text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border hover:bg-surface-2/80"
-                    )}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Snap table */}
             <div className="overflow-y-auto max-h-[300px]">
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="sticky top-0 z-10">
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
-                    {snapType === "PUNT" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>}
+                    <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">LS</th>
+                    {snapType === "PUNT" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Time</th>}
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-12 border-b border-border">Dist</th>}
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Pos</th>}
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
@@ -243,6 +225,26 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                   {rows.map((row, idx) => (
                     <tr key={idx} className="border-b border-border/30">
                       <td className="text-center text-muted py-1 px-1">{idx + 1}</td>
+                      <td className="py-1 px-0.5">
+                        <div className="flex gap-0.5 justify-center">
+                          {athleteNames.map((a) => {
+                            const initials = a.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+                            return (
+                              <button
+                                key={a}
+                                onClick={() => updateRow(idx, "snapper", a)}
+                                title={a}
+                                className={clsx(
+                                  "w-6 h-6 rounded-full text-[8px] font-bold transition-all",
+                                  row.snapper === a ? "bg-accent text-slate-900" : "bg-surface-2 text-muted border border-border/50 hover:text-white"
+                                )}
+                              >
+                                {initials}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </td>
                       {snapType === "FG" && kickInfos && (
                         <td className="text-center text-xs text-slate-400 py-1 px-1">{kickInfos[idx]?.dist || "—"}</td>
                       )}
