@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
+import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import type { LongSnapEntry, SnapBenchmark, Session } from "@/types";
 import clsx from "clsx";
 
@@ -146,6 +147,59 @@ export default function LongSnapHistoryPage() {
                 </div>
               )}
             </div>
+            {selected?.label?.startsWith("30 Point Game") ? (() => {
+              // 30 Point Game view — show diagram + laces/spiral/location table
+              const gameMarkers: ShortSnapMarker[] = snaps.map((s, i) => ({
+                x: 50 + (i % 5) * 8 - 16,
+                y: 50 + Math.floor(i / 5) * 15 - 7,
+                num: i + 1,
+                inZone: s.accuracy === "ON_TARGET",
+              }));
+              const totalPts = snaps.reduce((sum, s) => sum + (s.score || 0), 0);
+              return (
+                <div className="space-y-4">
+                  <div className="flex justify-center">
+                    <HolderStrikeZone markers={gameMarkers} />
+                  </div>
+                  <div className="card-2 text-center py-3">
+                    <p className="text-3xl font-black text-accent">{totalPts}</p>
+                    <p className="text-xs text-muted">out of {snaps.length * 3}</p>
+                  </div>
+                  <div className="card-2 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className="table-header text-left">#</th>
+                          <th className="table-header">Location</th>
+                          <th className="table-header">Laces</th>
+                          <th className="table-header">Spiral</th>
+                          <th className="table-header">Pts</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {snaps.map((s, i) => (
+                          <tr key={i} className="hover:bg-surface/30">
+                            <td className="table-cell text-left text-muted">{i + 1}</td>
+                            <td className="table-cell">
+                              <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
+                              </span>
+                            </td>
+                            <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>
+                              {s.laces === "Good" ? "Perfect" : s.laces || "—"}
+                            </td>
+                            <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : "text-miss")}>
+                              {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
+                            </td>
+                            <td className="table-cell text-accent font-bold">{s.score ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })() : (
             <div className="card-2 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -174,6 +228,7 @@ export default function LongSnapHistoryPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </>
         )}
       </div>
