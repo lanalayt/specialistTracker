@@ -98,7 +98,10 @@ export default function ThirtyPointGamePage() {
       spiral: r.spiral || undefined,
     }));
     commitPractice(snaps, `30 Point Game — ${totalPoints}/${MAX_POINTS}`);
+    setSaved(true);
   };
+
+  const [saved, setSaved] = useState(false);
 
   const handleNewGame = () => {
     setResults([]);
@@ -173,7 +176,11 @@ export default function ThirtyPointGamePage() {
             </table>
           </div>
           <div className="flex gap-3">
-            <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button>
+            {!saved ? (
+              <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button>
+            ) : (
+              <span className="flex-1 py-3 text-sm text-make font-bold text-center">✓ Saved!</span>
+            )}
             <button onClick={handleNewGame} className="btn-ghost flex-1 py-3 text-sm">New Game</button>
           </div>
         </div>

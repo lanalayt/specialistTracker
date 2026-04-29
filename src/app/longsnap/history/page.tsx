@@ -34,7 +34,7 @@ export default function LongSnapHistoryPage() {
     ? history.filter((s) => s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes"))
     : history.filter((s) => !s.label?.startsWith("30 Point Game") && !s.label?.startsWith("Balls & Strikes"));
 
-  const selected = filteredHistory.find((s) => s.id === selectedId) ?? (filteredHistory.length > 0 ? filteredHistory[filteredHistory.length - 1] : null);
+  const selected = selectedId ? filteredHistory.find((s) => s.id === selectedId) ?? null : null;
   const snaps = (selected?.entries ?? []) as LongSnapEntry[];
 
   return (

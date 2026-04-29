@@ -66,7 +66,10 @@ export default function BallsStrikesPage() {
       score: 0,
     }));
     commitPractice(entries, `Balls & Strikes — ${strikes}/${snaps.length} (${strikePct}%)`);
+    setSaved(true);
   };
+
+  const [saved, setSaved] = useState(false);
 
   const handleNewRound = () => {
     setSnaps([]);
@@ -156,7 +159,11 @@ export default function BallsStrikesPage() {
             </table>
           </div>
           <div className="flex gap-3">
-            <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button>
+            {!saved ? (
+              <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button>
+            ) : (
+              <span className="flex-1 py-3 text-sm text-make font-bold text-center">✓ Saved!</span>
+            )}
             <button onClick={handleNewRound} className="btn-ghost flex-1 py-3 text-sm">New Round</button>
           </div>
         </div>
