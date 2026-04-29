@@ -40,14 +40,14 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1 }: HolderSt
         ref={containerRef}
         onClick={handleClick}
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex items-end"
-        style={{ width: 320, height: 320, background: "#000000", padding: 5 }}
+        style={{ width: 360, height: 380, background: "#000000", padding: 0 }}
       >
-        {/* Holder image — left side */}
+        {/* Holder image — left side, fills container */}
         <img
-          src="/holder-silhouette.png?v=6"
+          src="/holder-silhouette.png?v=7"
           alt="Holder"
           className="pointer-events-none select-none"
-          style={{ height: 320, width: "auto", objectFit: "contain" }}
+          style={{ height: "95%", width: "auto", objectFit: "contain", marginBottom: 5 }}
           draggable={false}
         />
 
