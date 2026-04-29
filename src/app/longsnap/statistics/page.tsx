@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import clsx from "clsx";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { makePct, emptyLongSnapStats, processLongSnap } from "@/lib/stats";
 import { StatCard } from "@/components/ui/StatCard";
@@ -53,8 +54,44 @@ export default function LongSnapStatisticsPage() {
   const avgTime = totals.att > 0 ? (totals.totalTime / totals.att).toFixed(2) : "—";
   const onTargetPct = makePct(totals.att, totals.onTarget);
 
+  const [tab, setTab] = useState<"practice" | "charting">("practice");
+
+  // Charting sessions (30 Point Game + Balls & Strikes)
+  const chartingSessions = useMemo(() => {
+    return history.filter((s) => s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes"));
+  }, [history]);
+
+  const practiceSessions = useMemo(() => {
+    return history.filter((s) => !s.label?.startsWith("30 Point Game") && !s.label?.startsWith("Balls & Strikes"));
+  }, [history]);
+
   return (
     <main className="p-4 lg:p-6 space-y-6 max-w-4xl overflow-y-auto">
+      {/* Practice / Charting toggle */}
+      <div className="flex rounded-input border border-border overflow-hidden w-fit">
+        <button onClick={() => setTab("practice")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", tab === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Practice</button>
+        <button onClick={() => setTab("charting")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", tab === "charting" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Charting</button>
+      </div>
+
+      {tab === "charting" && (
+        <div className="space-y-4">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">Charting History</p>
+          {chartingSessions.length === 0 ? (
+            <p className="text-sm text-muted">No charting sessions yet. Play a 30 Point Game or Balls & Strikes round.</p>
+          ) : (
+            <div className="space-y-2">
+              {[...chartingSessions].reverse().map((s) => (
+                <div key={s.id} className="card-2 px-4 py-3">
+                  <p className="text-sm font-semibold text-slate-200">{s.label}</p>
+                  <p className="text-[10px] text-muted">{new Date(s.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "practice" && (<>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
         <button
@@ -141,6 +178,7 @@ export default function LongSnapStatisticsPage() {
           </table>
         )}
       </div>
+      </>)}
     </main>
   );
 }

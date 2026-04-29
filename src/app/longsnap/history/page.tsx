@@ -28,24 +28,33 @@ export default function LongSnapHistoryPage() {
     history[history.length - 1]?.id ?? null
   );
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"practice" | "charting">("practice");
 
-  const selected = history.find((s) => s.id === selectedId);
+  const filteredHistory = tab === "charting"
+    ? history.filter((s) => s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes"))
+    : history.filter((s) => !s.label?.startsWith("30 Point Game") && !s.label?.startsWith("Balls & Strikes"));
+
+  const selected = filteredHistory.find((s) => s.id === selectedId) ?? (filteredHistory.length > 0 ? filteredHistory[filteredHistory.length - 1] : null);
   const snaps = (selected?.entries ?? []) as LongSnapEntry[];
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
       {/* Session list — hidden on mobile when a session is selected */}
-      <div className={clsx("lg:w-64 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto shrink-0", selectedId && "hidden lg:block")}>
-        <div className="p-4 border-b border-border">
+      <div className={clsx("lg:w-64 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto shrink-0", selected && "hidden lg:block")}>
+        <div className="p-4 border-b border-border space-y-2">
+          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+            <button onClick={() => { setTab("practice"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", tab === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Practice</button>
+            <button onClick={() => { setTab("charting"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", tab === "charting" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Charting</button>
+          </div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-            Sessions ({history.length})
+            Sessions ({filteredHistory.length})
           </p>
         </div>
-        {history.length === 0 ? (
+        {filteredHistory.length === 0 ? (
           <p className="text-xs text-muted p-4">No sessions yet</p>
         ) : (
           <div className="divide-y divide-border/30">
-            {[...history].reverse().map((s: Session) => {
+            {[...filteredHistory].reverse().map((s: Session) => {
               const ss = (s.entries ?? []) as LongSnapEntry[];
               return (
                 <button

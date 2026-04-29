@@ -1,12 +1,244 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
+import { useLongSnap } from "@/lib/longSnapContext";
+import { useAuth } from "@/lib/auth";
+import type { LongSnapEntry, SnapAccuracy, SnapType } from "@/types";
+import clsx from "clsx";
+
 export default function BallsStrikesPage() {
-  return (
-    <div className="flex-1 p-6 max-w-5xl space-y-6">
-      <h2 className="text-lg font-bold text-slate-100">Balls & Strikes</h2>
-      <div className="card space-y-4">
-        <p className="text-sm text-muted">Coming soon.</p>
+  const { athletes, commitPractice } = useLongSnap();
+  const athleteNames = athletes.map((a) => a.name);
+
+  const [athlete, setAthlete] = useState("");
+  const [maxTime, setMaxTime] = useState("0.80");
+  const [started, setStarted] = useState(false);
+  const [finished, setFinished] = useState(false);
+
+  const [markers, setMarkers] = useState<ShortSnapMarker[]>([]);
+  const [snaps, setSnaps] = useState<{ time: string; accuracy: "Strike" | "Ball"; auto: boolean; marker?: ShortSnapMarker }[]>([]);
+  const [currentTime, setCurrentTime] = useState("");
+
+  useEffect(() => {
+    if (athleteNames.length > 0 && !athlete) setAthlete(athleteNames[0]);
+  }, [athleteNames, athlete]);
+
+  const formatAutoDecimal = (raw: string): string => {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    const padded = digits.padStart(3, "0");
+    const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
+    return `${whole}.${padded.slice(-2)}`;
+  };
+
+  const maxTimeNum = parseFloat(maxTime) || 0;
+
+  const handleSnapClick = (marker: ShortSnapMarker) => {
+    const timeVal = parseFloat(currentTime) || 0;
+    const exceededTime = maxTimeNum > 0 && timeVal > maxTimeNum;
+    const acc: "Strike" | "Ball" = exceededTime ? "Ball" : marker.inZone ? "Strike" : "Ball";
+    setMarkers((prev) => [...prev, { ...marker, inZone: acc === "Strike" }]);
+    setSnaps((prev) => [...prev, { time: currentTime, accuracy: acc, auto: exceededTime, marker }]);
+    setCurrentTime("");
+  };
+
+  const handleUndo = () => {
+    if (snaps.length === 0) return;
+    setSnaps((prev) => prev.slice(0, -1));
+    setMarkers((prev) => prev.slice(0, -1));
+  };
+
+  const strikes = snaps.filter((s) => s.accuracy === "Strike").length;
+  const balls = snaps.filter((s) => s.accuracy === "Ball").length;
+  const strikePct = snaps.length > 0 ? Math.round((strikes / snaps.length) * 100) : 0;
+
+  const handleFinish = () => setFinished(true);
+
+  const handleSave = () => {
+    if (snaps.length === 0) return;
+    const entries: LongSnapEntry[] = snaps.map((s) => ({
+      athleteId: athlete,
+      athlete,
+      snapType: "FG" as SnapType,
+      time: parseFloat(s.time) || 0,
+      accuracy: s.accuracy === "Strike" ? "ON_TARGET" as SnapAccuracy : "HIGH" as SnapAccuracy,
+      score: 0,
+    }));
+    commitPractice(entries, `Balls & Strikes — ${strikes}/${snaps.length} (${strikePct}%)`);
+  };
+
+  const handleNewRound = () => {
+    setSnaps([]);
+    setMarkers([]);
+    setCurrentTime("");
+    setStarted(false);
+    setFinished(false);
+  };
+
+  // Setup screen
+  if (!started) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="text-5xl mb-4">⚾</div>
+          <h2 className="text-xl font-bold text-slate-100">Balls & Strikes</h2>
+          <p className="text-sm text-muted">Chart accuracy with a max snap time. Exceeding the time = automatic Ball.</p>
+          {athleteNames.length > 0 && (
+            <div className="space-y-2">
+              <p className="label">Snapper</p>
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                {athleteNames.map((a) => (
+                  <button key={a} onClick={() => setAthlete(a)} className={clsx("px-3 py-1.5 rounded-input text-xs font-medium transition-all", athlete === a ? "bg-accent text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <p className="label">Max Snap Time (seconds)</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={maxTime}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                setMaxTime(digits ? formatAutoDecimal(digits) : "");
+              }}
+              className="input w-32 mx-auto text-center text-xl font-bold"
+              placeholder="0.80"
+            />
+            <p className="text-[10px] text-muted mt-1">Snaps over this time are automatic balls</p>
+          </div>
+          <button onClick={() => setStarted(true)} disabled={!athlete || !maxTime} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Round</button>
+        </div>
       </div>
-    </div>
+    );
+  }
+
+  // Finished screen
+  if (finished) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="text-center space-y-6 max-w-md">
+          <div className="text-5xl mb-2">{strikePct >= 80 ? "🏆" : strikePct >= 60 ? "💪" : "📋"}</div>
+          <h2 className="text-2xl font-extrabold text-slate-100">Round Complete</h2>
+          <div className="card-2 py-6">
+            <div className="flex justify-center gap-8">
+              <div>
+                <p className="text-4xl font-black text-make">{strikes}</p>
+                <p className="text-xs text-muted mt-1">Strikes</p>
+              </div>
+              <div>
+                <p className="text-4xl font-black text-miss">{balls}</p>
+                <p className="text-xs text-muted mt-1">Balls</p>
+              </div>
+            </div>
+            <p className="text-lg font-bold text-accent mt-3">{strikePct}%</p>
+            <p className="text-[10px] text-muted">{snaps.length} total snaps · Max time: {maxTime}s</p>
+          </div>
+          {/* Per-snap breakdown */}
+          <div className="card-2 text-left overflow-y-auto max-h-[200px]">
+            <table className="w-full text-xs">
+              <thead><tr>
+                <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
+                <th className="text-[10px] text-muted text-center py-1 px-1">Time</th>
+                <th className="text-[10px] text-muted text-center py-1 px-1">Result</th>
+              </tr></thead>
+              <tbody>
+                {snaps.map((s, i) => (
+                  <tr key={i} className="border-t border-border/30">
+                    <td className="text-muted py-1 px-1">{i + 1}</td>
+                    <td className={clsx("text-center py-1 px-1", s.auto ? "text-miss" : "")}>{s.time || "—"}{s.auto ? " (over)" : ""}</td>
+                    <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button>
+            <button onClick={handleNewRound} className="btn-ghost flex-1 py-3 text-sm">New Round</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // In progress
+  return (
+    <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+      {/* Left: Entry */}
+      <div className="lg:w-[55%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0 p-4 space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Snap #{snaps.length + 1}</p>
+            <p className="text-sm text-slate-300 mt-0.5">{athlete} · Max: {maxTime}s</p>
+          </div>
+          <div className="flex gap-4 text-center">
+            <div>
+              <p className="text-xl font-black text-make">{strikes}</p>
+              <p className="text-[10px] text-muted">Strikes</p>
+            </div>
+            <div>
+              <p className="text-xl font-black text-miss">{balls}</p>
+              <p className="text-[10px] text-muted">Balls</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Time input */}
+        <div>
+          <p className="label text-slate-100">Snap Time</p>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="0.74"
+              value={currentTime}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                setCurrentTime(digits ? formatAutoDecimal(digits) : "");
+              }}
+              className="input w-32 text-center text-xl font-bold"
+            />
+            {currentTime && parseFloat(currentTime) > maxTimeNum && maxTimeNum > 0 && (
+              <span className="text-xs text-miss font-semibold">Over max — auto Ball</span>
+            )}
+          </div>
+        </div>
+
+        <p className="text-xs text-muted">Enter time, then click the diagram to chart accuracy. If time exceeds {maxTime}s, it&apos;s an automatic Ball.</p>
+
+        {/* Undo + Finish */}
+        <div className="flex gap-2">
+          {snaps.length > 0 && (
+            <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>
+          )}
+          {snaps.length > 0 && (
+            <button onClick={handleFinish} className="btn-primary flex-1 py-2 text-sm font-bold">Finish Round ({snaps.length} snaps)</button>
+          )}
+        </div>
+
+        {/* Mini log */}
+        {snaps.length > 0 && (
+          <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[200px]">
+            {snaps.map((s, i) => (
+              <div key={i} className="flex items-center text-xs gap-2">
+                <span className="text-muted w-5">#{i + 1}</span>
+                <span className="w-14">{s.time || "—"}s</span>
+                <span className={clsx("font-semibold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}</span>
+                {s.auto && <span className="text-miss text-[10px]">(auto)</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Right: Holder diagram */}
+      <div className="lg:w-[45%] overflow-y-auto p-4 space-y-3">
+        <HolderStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={snaps.length + 1} />
+      </div>
+    </main>
   );
 }
