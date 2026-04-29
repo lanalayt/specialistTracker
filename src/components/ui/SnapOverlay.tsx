@@ -190,7 +190,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
       }
     }
 
-    try { localStorage.setItem(draftKey, JSON.stringify({ rows: merged, weather: "" })); } catch {}
+    try { localStorage.setItem(draftKey, JSON.stringify({ rows: merged, weather: "", snapMarkers })); } catch {}
 
     // Don't clear — keep data in overlay
     setCommitted(true);
