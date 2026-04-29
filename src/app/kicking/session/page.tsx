@@ -2269,6 +2269,7 @@ export default function KickingSessionPage() {
           snapType="FG"
           entryCount={filledCount}
           onClose={() => setShowSnapOverlay(false)}
+          kickInfos={filledRows.map(({ r }) => ({ dist: r.dist || "", pos: r.pos || "" }))}
         />
       )}
     </>

@@ -25,13 +25,15 @@ const LACES_OPTIONS = ["Good", "1/4 Out", "1/4 In", "Back"];
 
 interface LogRow {
   athlete: string;
+  dist: string;
+  pos: string;
   accuracy: string;
   laces: string;
   spiral: string;
   critical?: boolean;
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", accuracy: "", laces: "", spiral: "", critical: false });
+const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", accuracy: "", laces: "", spiral: "", critical: false });
 
 export default function LongSnapFGSessionPage() {
   const { athletes, stats, commitPractice } = useLongSnap();
@@ -116,11 +118,11 @@ export default function LongSnapFGSessionPage() {
     setRows((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const filledRows = rows.filter((r) => r.athlete || r.accuracy || r.laces);
+  const filledRows = rows.filter((r) => r.athlete || r.dist || r.accuracy || r.laces || r.spiral);
 
 
   const handleCommit = () => {
-    const filled = rows.filter((r) => r.athlete || r.accuracy || r.laces);
+    const filled = rows.filter((r) => r.athlete || r.dist || r.accuracy || r.laces || r.spiral);
     if (filled.length === 0) return;
 
     const snaps: LongSnapEntry[] = filled.map((r) => {
@@ -186,6 +188,8 @@ export default function LongSnapFGSessionPage() {
               <tr className="sticky top-0 z-10">
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center border-b border-border">Athlete</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-12 border-b border-border">Dist</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Pos</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Laces</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Spiral</th>
@@ -201,6 +205,19 @@ export default function LongSnapFGSessionPage() {
                     <select value={row.athlete} onChange={(e) => updateRow(idx, "athlete", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
                       <option value="">—</option>
                       {athleteNames.map((a) => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </td>
+                  <td className="py-1 px-1">
+                    <input type="text" inputMode="numeric" placeholder="yd" value={row.dist} onChange={(e) => updateRow(idx, "dist", e.target.value)} readOnly={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60" />
+                  </td>
+                  <td className="py-1 px-1">
+                    <select value={row.pos} onChange={(e) => updateRow(idx, "pos", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
+                      <option value="">—</option>
+                      <option value="LH">LH</option>
+                      <option value="LM">LM</option>
+                      <option value="M">M</option>
+                      <option value="RM">RM</option>
+                      <option value="RH">RH</option>
                     </select>
                   </td>
                   <td className="py-1 px-1 text-center">

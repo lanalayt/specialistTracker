@@ -7,10 +7,16 @@ import { getTeamId } from "@/lib/teamData";
 import type { SnapType } from "@/types";
 import clsx from "clsx";
 
+interface KickInfo {
+  dist: string;
+  pos: string;
+}
+
 interface SnapOverlayProps {
   snapType: SnapType; // "PUNT" or "FG"
   entryCount: number; // how many punts/kicks in the log
   onClose: () => void;
+  kickInfos?: KickInfo[]; // FG only — distance + position per kick
 }
 
 interface SnapRow {
@@ -43,7 +49,7 @@ function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simp
   return { chartMode: "simple", missMode: "simple" };
 }
 
-export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps) {
+export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOverlayProps) {
   // Load snapping athletes from localStorage (same source as longSnapContext)
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
 
@@ -186,7 +192,7 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
       time: r.time,
       accuracy: r.accuracy,
       critical: false,
-      ...(snapType === "FG" ? { snapType: "FG", laces: r.laces, spiral: r.spiral } : {}),
+      ...(snapType === "FG" ? { snapType: "FG", laces: r.laces, spiral: r.spiral, dist: kickInfos?.[r.idx]?.dist || "", pos: kickInfos?.[r.idx]?.pos || "" } : {}),
     }));
 
     // Only new markers (after lastSavedCount)
@@ -258,6 +264,8 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
                   <tr className="sticky top-0 z-10">
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
                     {snapType === "PUNT" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>}
+                    {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-12 border-b border-border">Dist</th>}
+                    {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Pos</th>}
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Laces</th>}
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Spiral</th>}
@@ -267,6 +275,12 @@ export function SnapOverlay({ snapType, entryCount, onClose }: SnapOverlayProps)
                   {rows.map((row, idx) => (
                     <tr key={idx} className="border-b border-border/30">
                       <td className="text-center text-muted py-1 px-1">{idx + 1}</td>
+                      {snapType === "FG" && kickInfos && (
+                        <td className="text-center text-xs text-slate-400 py-1 px-1">{kickInfos[idx]?.dist || "—"}</td>
+                      )}
+                      {snapType === "FG" && kickInfos && (
+                        <td className="text-center text-xs text-slate-400 py-1 px-1">{kickInfos[idx]?.pos || "—"}</td>
+                      )}
                       {snapType === "PUNT" && (
                       <td className="py-1 px-1">
                         <input
