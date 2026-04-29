@@ -314,7 +314,7 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                 disabled={filledRows.length === 0}
                 className={clsx("btn-primary text-xs py-1.5 px-4", committed && "bg-make/90")}
               >
-                {committed ? "✓ Saved!" : "Save to Snapping"}
+                {committed ? "✓ Saved!" : "Save to Snapping Log"}
               </button>
             </div>
           </div>
