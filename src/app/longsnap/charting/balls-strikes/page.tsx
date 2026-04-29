@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
+import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import type { LongSnapEntry, SnapAccuracy, SnapType } from "@/types";
@@ -16,8 +16,8 @@ export default function BallsStrikesPage() {
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
 
-  const [markers, setMarkers] = useState<ShortSnapMarker[]>([]);
-  const [snaps, setSnaps] = useState<{ time: string; accuracy: "Strike" | "Ball"; auto: boolean; marker?: ShortSnapMarker }[]>([]);
+  const [markers, setMarkers] = useState<SnapMarker[]>([]);
+  const [snaps, setSnaps] = useState<{ time: string; accuracy: "Strike" | "Ball"; auto: boolean; marker?: SnapMarker }[]>([]);
   const [currentTime, setCurrentTime] = useState("");
 
   useEffect(() => {
@@ -34,13 +34,15 @@ export default function BallsStrikesPage() {
 
   const maxTimeNum = parseFloat(maxTime) || 0;
 
-  const handleSnapClick = (marker: ShortSnapMarker) => {
+  const handleSnapClick = (marker: SnapMarker) => {
     const timeVal = parseFloat(currentTime) || 0;
     const exceededTime = maxTimeNum > 0 && timeVal > maxTimeNum;
     const acc: "Strike" | "Ball" = exceededTime ? "Ball" : marker.inZone ? "Strike" : "Ball";
     setMarkers((prev) => [...prev, { ...marker, inZone: acc === "Strike" }]);
-    setSnaps((prev) => [...prev, { time: currentTime, accuracy: acc, auto: exceededTime, marker }]);
+    const newSnaps = [...snaps, { time: currentTime, accuracy: acc, auto: exceededTime, marker }];
+    setSnaps(newSnaps);
     setCurrentTime("");
+    if (newSnaps.length >= 10) setFinished(true);
   };
 
   const handleUndo = () => {
@@ -60,7 +62,7 @@ export default function BallsStrikesPage() {
     const entries: LongSnapEntry[] = snaps.map((s) => ({
       athleteId: athlete,
       athlete,
-      snapType: "FG" as SnapType,
+      snapType: "PUNT" as SnapType,
       time: parseFloat(s.time) || 0,
       accuracy: s.accuracy === "Strike" ? "ON_TARGET" as SnapAccuracy : "HIGH" as SnapAccuracy,
       score: 0,
@@ -179,7 +181,7 @@ export default function BallsStrikesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Snap #{snaps.length + 1}</p>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Snap #{snaps.length + 1} of 10</p>
             <p className="text-sm text-slate-300 mt-0.5">{athlete} · Max: {maxTime}s</p>
           </div>
           <div className="flex gap-4 text-center">
@@ -223,7 +225,7 @@ export default function BallsStrikesPage() {
             <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>
           )}
           {snaps.length > 0 && (
-            <button onClick={handleFinish} className="btn-primary flex-1 py-2 text-sm font-bold">Finish Round ({snaps.length} snaps)</button>
+            <button onClick={handleFinish} className="btn-primary flex-1 py-2 text-sm font-bold">Finish Early ({snaps.length}/10)</button>
           )}
         </div>
 
@@ -244,7 +246,7 @@ export default function BallsStrikesPage() {
 
       {/* Right: Holder diagram */}
       <div className="lg:w-[45%] overflow-y-auto p-4 space-y-3">
-        <HolderStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={snaps.length + 1} />
+        <PunterStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={snaps.length + 1} />
       </div>
     </main>
   );
