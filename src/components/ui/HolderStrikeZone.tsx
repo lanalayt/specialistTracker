@@ -16,7 +16,7 @@ interface HolderStrikeZoneProps {
 }
 
 // Strike zone — small box at bottom-right near the holder's hands
-const ZONE = { top: 45, bottom: 78, left: 48, right: 82 };
+const ZONE = { top: 45, bottom: 78, left: 42, right: 76 };
 
 function isInZone(xPct: number, yPct: number): boolean {
   return xPct >= ZONE.left && xPct <= ZONE.right && yPct >= ZONE.top && yPct <= ZONE.bottom;
