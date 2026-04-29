@@ -126,7 +126,7 @@ export default function LongSnapFGSessionPage() {
     if (filled.length === 0) return;
 
     const snaps: LongSnapEntry[] = filled.map((r) => {
-      const accuracy = (r.accuracy || "ON_TARGET") as SnapAccuracy;
+      const accuracy: SnapAccuracy = r.accuracy === "Strike" || r.accuracy.startsWith("✓") ? "ON_TARGET" : r.accuracy === "Ball" || r.accuracy.startsWith("✗") ? "HIGH" : (r.accuracy || "ON_TARGET") as SnapAccuracy;
       return {
         athleteId: r.athlete,
         athlete: r.athlete,
@@ -305,7 +305,7 @@ export default function LongSnapFGSessionPage() {
       {/* Right: Stats */}
       <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
         <div className="grid grid-cols-2 gap-2">
-          <StatCard label="On-Target%" value={onTargetPct} accent glow />
+          <StatCard label="Strike %" value={onTargetPct} accent glow />
           <StatCard label="FG/PAT Snaps" value={totals.att || "—"} />
         </div>
         <HolderStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} />

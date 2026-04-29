@@ -66,7 +66,7 @@ export default function LongSnapStatisticsPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="On-Target%" value={onTargetPct} accent glow />
+        <StatCard label="Strike %" value={onTargetPct} accent glow />
         <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
         <StatCard label="Total Snaps" value={totals.att || "—"} />
       </div>
@@ -78,7 +78,7 @@ export default function LongSnapStatisticsPage() {
             <tr>
               <th className="table-header text-left">Type</th>
               <th className="table-header">Snaps</th>
-              <th className="table-header">On Target%</th>
+              <th className="table-header">Strike %</th>
               <th className="table-header">Avg Time</th>
               <th className="table-header">Crit</th>
             </tr>
@@ -96,7 +96,7 @@ export default function LongSnapStatisticsPage() {
                   <td className="table-cell">{att || "—"}</td>
                   <td className="table-cell make-pct">{makePct(att, onTarget)}</td>
                   <td className="table-cell text-muted">
-                    {att > 0 ? `${(totalTime / att).toFixed(3)}s` : "—"}
+                    {att > 0 ? `${(totalTime / att).toFixed(2)}s` : "—"}
                   </td>
                   <td className={`table-cell ${criticals > 0 ? "text-miss font-semibold" : ""}`}>{criticals || "—"}</td>
                 </tr>
@@ -116,7 +116,7 @@ export default function LongSnapStatisticsPage() {
               <tr>
                 <th className="table-header text-left">Athlete</th>
                 <th className="table-header">Snaps</th>
-                <th className="table-header">On Target%</th>
+                <th className="table-header">Strike %</th>
                 <th className="table-header">Avg Time</th>
                 <th className="table-header">Crit</th>
               </tr>
@@ -131,7 +131,7 @@ export default function LongSnapStatisticsPage() {
                     <td className="table-cell">{s.overall.att || "—"}</td>
                     <td className="table-cell make-pct">{makePct(s.overall.att, s.overall.onTarget)}</td>
                     <td className="table-cell text-muted">
-                      {s.overall.att > 0 ? `${(s.overall.totalTime / s.overall.att).toFixed(3)}s` : "—"}
+                      {s.overall.att > 0 ? `${(s.overall.totalTime / s.overall.att).toFixed(2)}s` : "—"}
                     </td>
                     <td className={`table-cell ${(s.overall.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{s.overall.criticals || "—"}</td>
                   </tr>

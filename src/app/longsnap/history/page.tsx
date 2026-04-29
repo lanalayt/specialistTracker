@@ -154,10 +154,10 @@ export default function LongSnapHistoryPage() {
                       <td className="table-cell text-left text-muted">{i + 1}</td>
                       <td className="table-name">{s.athlete}</td>
                       <td className="table-cell text-muted">{s.snapType}</td>
-                      <td className="table-cell font-bold">{s.time.toFixed(3)}s</td>
+                      <td className="table-cell font-bold">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
                       <td className="table-cell">
-                        <span className={clsx("text-xs", s.accuracy === "ON_TARGET" ? "text-make" : "text-warn")}>
-                          {ACC_LABEL[s.accuracy] ?? s.accuracy}
+                        <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                          {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
                         </span>
                       </td>
                     </tr>
