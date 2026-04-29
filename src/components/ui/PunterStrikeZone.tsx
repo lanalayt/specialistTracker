@@ -173,7 +173,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
             src="/punter-silhouette.png"
             alt="Punter"
             className="pointer-events-none select-none"
-            style={{ height: 360, width: "auto", objectFit: "contain", filter: "invert(1) brightness(0.9)" }}
+            style={{ height: 360, width: "auto", objectFit: "contain" }}
             draggable={false}
           />
 
