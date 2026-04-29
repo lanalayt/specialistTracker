@@ -14,6 +14,7 @@ import { POSITIONS, RESULTS } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { SnapOverlay } from "@/components/ui/SnapOverlay";
+import { LongSnapProvider } from "@/lib/longSnapContext";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
@@ -2264,11 +2265,13 @@ export default function KickingSessionPage() {
       )}
 
       {showSnapOverlay && (
-        <SnapOverlay
-          snapType="FG"
-          entryCount={filledCount}
-          onClose={() => setShowSnapOverlay(false)}
-        />
+        <LongSnapProvider>
+          <SnapOverlay
+            snapType="FG"
+            entryCount={filledCount}
+            onClose={() => setShowSnapOverlay(false)}
+          />
+        </LongSnapProvider>
       )}
     </>
   );

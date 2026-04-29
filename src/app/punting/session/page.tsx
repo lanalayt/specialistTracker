@@ -13,6 +13,7 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { SnapOverlay } from "@/components/ui/SnapOverlay";
+import { LongSnapProvider } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
@@ -2670,11 +2671,13 @@ export default function PuntingSessionPage() {
       )}
 
       {showSnapOverlay && (
-        <SnapOverlay
-          snapType="PUNT"
-          entryCount={filledCount}
-          onClose={() => setShowSnapOverlay(false)}
-        />
+        <LongSnapProvider>
+          <SnapOverlay
+            snapType="PUNT"
+            entryCount={filledCount}
+            onClose={() => setShowSnapOverlay(false)}
+          />
+        </LongSnapProvider>
       )}
     </>
   );
