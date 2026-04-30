@@ -225,20 +225,30 @@ export default function BallsStrikesPage() {
     <main className="flex-1 overflow-y-auto p-4">
       <div className="max-w-lg mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Snap {playerSnapCount} of {SNAPS_PER_PLAYER}</p>
-            {mode === "multi" && <p className="text-[10px] text-muted">Overall {currentSnapIdx + 1} of {totalSnaps} · Max: {maxTime}s</p>}
-            {mode === "single" && <p className="text-[10px] text-muted">Max: {maxTime}s</p>}
-          </div>
-          <div className="flex gap-3 text-center">
-            {players.map((p) => (
-              <div key={p} className={clsx("text-center", p === currentPlayer && mode === "multi" && "ring-2 ring-accent rounded px-2 py-0.5")}>
-                <p className="text-[10px] text-muted">{p}</p>
-                <p className="text-sm font-black"><span className="text-make">{getPlayerStrikes(p)}</span><span className="text-muted">/</span><span className="text-miss">{getPlayerSnaps(p).length - getPlayerStrikes(p)}</span></p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Snap {playerSnapCount} of {SNAPS_PER_PLAYER}</p>
+          {mode === "single" && (
+            <div className="flex gap-3 text-center">
+              <div><p className="text-xl font-black text-make">{getPlayerStrikes(currentPlayer)}</p><p className="text-[10px] text-muted">Strikes</p></div>
+              <div><p className="text-xl font-black text-miss">{getPlayerSnaps(currentPlayer).length - getPlayerStrikes(currentPlayer)}</p><p className="text-[10px] text-muted">Balls</p></div>
+            </div>
+          )}
+        </div>
+
+        {/* Multiplayer vs scoreboard */}
+        {mode === "multi" && (
+          <div className="flex items-center justify-center gap-3">
+            {players.map((p, i) => (
+              <div key={p} className="flex items-center gap-3">
+                {i > 0 && <span className="text-xs text-muted font-bold">vs</span>}
+                <div className={clsx("card-2 px-4 py-2 text-center", p === currentPlayer && "ring-2 ring-accent")}>
+                  <p className="text-xs font-bold text-slate-200">{p}</p>
+                  <p className="text-sm font-black"><span className="text-make">{getPlayerStrikes(p)}</span><span className="text-muted mx-0.5">-</span><span className="text-miss">{getPlayerSnaps(p).length - getPlayerStrikes(p)}</span></p>
+                  <p className="text-[10px] text-muted">Snap {getPlayerSnaps(p).length + (p === currentPlayer ? 1 : 0)}/{SNAPS_PER_PLAYER}</p>
+                </div>
               </div>
             ))}
           </div>
-        </div>
+        )}
 
         <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
           <div className="h-full bg-accent transition-all" style={{ width: `${(snaps.length / totalSnaps) * 100}%` }} />
