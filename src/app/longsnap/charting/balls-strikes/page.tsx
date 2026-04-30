@@ -12,7 +12,7 @@ export default function BallsStrikesPage() {
   const athleteNames = athletes.map((a) => a.name);
 
   const [athlete, setAthlete] = useState("");
-  const [maxTime, setMaxTime] = useState("0.80");
+  const [maxTime, setMaxTime] = useState("0.75");
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
 
@@ -120,7 +120,7 @@ export default function BallsStrikesPage() {
                 setMaxTime(digits ? formatAutoDecimal(digits) : "");
               }}
               className="input w-32 mx-auto text-center text-xl font-bold"
-              placeholder="0.80"
+              placeholder="0.75"
             />
             <p className="text-[10px] text-muted mt-1">Snaps over this time are automatic balls</p>
           </div>
