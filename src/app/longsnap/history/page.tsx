@@ -149,112 +149,100 @@ export default function LongSnapHistoryPage() {
               )}
             </div>
             {selected?.label?.startsWith("30 Point Game") ? (() => {
-              // 30 Point Game view — show diagram + laces/spiral/location table
-              const gameMarkers: ShortSnapMarker[] = snaps
-                .filter((s) => s.markerX != null && s.markerY != null)
-                .map((s, i) => ({
-                  x: s.markerX!,
-                  y: s.markerY!,
-                  num: i + 1,
-                  inZone: s.markerInZone ?? s.accuracy === "ON_TARGET",
-                }));
-              const totalPts = snaps.reduce((sum, s) => sum + (s.score || 0), 0);
+              // Split by athlete for multiplayer
+              const athleteList = [...new Set(snaps.map((s) => s.athlete))];
               return (
                 <div className="space-y-4">
-                  <div className="flex justify-center">
-                    <HolderStrikeZone markers={gameMarkers} />
-                  </div>
-                  <div className="card-2 text-center py-3">
-                    <p className="text-3xl font-black text-accent">{totalPts}</p>
-                    <p className="text-xs text-muted">out of {snaps.length * 3}</p>
-                  </div>
-                  <div className="card-2 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr>
-                          <th className="table-header text-left">#</th>
-                          <th className="table-header">Location</th>
-                          <th className="table-header">Laces</th>
-                          <th className="table-header">Spiral</th>
-                          <th className="table-header">Pts</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {snaps.map((s, i) => (
-                          <tr key={i} className="hover:bg-surface/30">
-                            <td className="table-cell text-left text-muted">{i + 1}</td>
-                            <td className="table-cell">
-                              <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
-                              </span>
-                            </td>
-                            <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>
-                              {s.laces === "Good" ? "Perfect" : s.laces || "—"}
-                            </td>
-                            <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : "text-miss")}>
-                              {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
-                            </td>
-                            <td className="table-cell text-accent font-bold">{s.score ?? "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${athleteList.length}, minmax(0, 1fr))` }}>
+                    {athleteList.map((a) => {
+                      const ps = snaps.filter((s) => s.athlete === a);
+                      const pm: ShortSnapMarker[] = ps.filter((s) => s.markerX != null).map((s, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? s.accuracy === "ON_TARGET" }));
+                      const pts = ps.reduce((sum, s) => sum + (s.score || 0), 0);
+                      return (
+                        <div key={a} className="space-y-3">
+                          <p className="text-sm font-bold text-slate-200 text-center">{a}</p>
+                          <HolderStrikeZone markers={pm} />
+                          <div className="card-2 text-center py-2">
+                            <p className="text-2xl font-black text-accent">{pts}</p>
+                            <p className="text-[10px] text-muted">/ {ps.length * 3}</p>
+                          </div>
+                          <div className="card-2 overflow-x-auto text-xs">
+                            <table className="w-full">
+                              <thead><tr>
+                                <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Loc</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Laces</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Spiral</th>
+                                <th className="text-[10px] text-muted text-right py-1 px-1">Pts</th>
+                              </tr></thead>
+                              <tbody>
+                                {ps.map((s, i) => (
+                                  <tr key={i} className="border-t border-border/30">
+                                    <td className="text-muted py-1 px-1">{i + 1}</td>
+                                    <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                                    <td className={clsx("text-center py-1 px-1", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
+                                    <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                                    <td className="text-right py-1 px-1 font-bold text-accent">{s.score ?? "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })() : selected?.label?.startsWith("Balls & Strikes") ? (() => {
-              // Balls & Strikes view — diagram + time/spiral/result table
-              const bsMarkers: SnapMarker[] = snaps
-                .filter((s) => s.markerX != null && s.markerY != null)
-                .map((s, i) => ({
-                  x: s.markerX!,
-                  y: s.markerY!,
-                  num: i + 1,
-                  inZone: s.markerInZone ?? s.accuracy === "ON_TARGET",
-                }));
-              const bsStrikes = snaps.filter((s) => s.accuracy === "ON_TARGET").length;
-              const bsBalls = snaps.length - bsStrikes;
-              const bsPct = snaps.length > 0 ? Math.round((bsStrikes / snaps.length) * 100) : 0;
-              const bsTimes = snaps.filter((s) => s.time > 0);
-              const bsAvgTime = bsTimes.length > 0 ? (bsTimes.reduce((sum, s) => sum + s.time, 0) / bsTimes.length).toFixed(2) : "—";
-              const snapperName = snaps[0]?.athlete ?? "—";
+              // Split by athlete for multiplayer
+              const athleteList = [...new Set(snaps.map((s) => s.athlete))];
               return (
                 <div className="space-y-4">
-                  <p className="text-xs text-muted text-center">{snapperName}</p>
-                  <div className="flex justify-center">
-                    <PunterStrikeZone markers={bsMarkers} />
-                  </div>
-                  <div className="card-2 text-center py-3">
-                    <div className="flex justify-center gap-6">
-                      <div><p className="text-2xl font-black text-make">{bsStrikes}</p><p className="text-[10px] text-muted">Strikes</p></div>
-                      <div><p className="text-2xl font-black text-miss">{bsBalls}</p><p className="text-[10px] text-muted">Balls</p></div>
-                    </div>
-                    <p className="text-lg font-bold text-accent mt-2">{bsPct}%</p>
-                    <p className="text-sm text-slate-300 mt-1">Avg Time: {bsAvgTime}s</p>
-                  </div>
-                  <div className="card-2 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead><tr>
-                        <th className="table-header text-left">#</th>
-                        <th className="table-header">Time</th>
-                        <th className="table-header">Spiral</th>
-                        <th className="table-header">Result</th>
-                      </tr></thead>
-                      <tbody>
-                        {snaps.map((s, i) => (
-                          <tr key={i} className="hover:bg-surface/30">
-                            <td className="table-cell text-left text-muted">{i + 1}</td>
-                            <td className="table-cell">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
-                            <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
-                            <td className="table-cell">
-                              <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${athleteList.length}, minmax(0, 1fr))` }}>
+                    {athleteList.map((a) => {
+                      const ps = snaps.filter((s) => s.athlete === a);
+                      const pm: SnapMarker[] = ps.filter((s) => s.markerX != null).map((s, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? s.accuracy === "ON_TARGET" }));
+                      const str = ps.filter((s) => s.accuracy === "ON_TARGET").length;
+                      const balls = ps.length - str;
+                      const pct = ps.length > 0 ? Math.round((str / ps.length) * 100) : 0;
+                      const times = ps.filter((s) => s.time > 0);
+                      const avgT = times.length > 0 ? (times.reduce((sum, s) => sum + s.time, 0) / times.length).toFixed(2) : "—";
+                      return (
+                        <div key={a} className="space-y-3">
+                          <p className="text-sm font-bold text-slate-200 text-center">{a}</p>
+                          <PunterStrikeZone markers={pm} />
+                          <div className="card-2 text-center py-2">
+                            <div className="flex justify-center gap-4">
+                              <div><p className="text-xl font-black text-make">{str}</p><p className="text-[10px] text-muted">Strikes</p></div>
+                              <div><p className="text-xl font-black text-miss">{balls}</p><p className="text-[10px] text-muted">Balls</p></div>
+                            </div>
+                            <p className="text-sm font-bold text-accent mt-1">{pct}%</p>
+                            <p className="text-[10px] text-slate-300">Avg: {avgT}s</p>
+                          </div>
+                          <div className="card-2 overflow-x-auto text-xs">
+                            <table className="w-full">
+                              <thead><tr>
+                                <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Time</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Spiral</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Result</th>
+                              </tr></thead>
+                              <tbody>
+                                {ps.map((s, i) => (
+                                  <tr key={i} className="border-t border-border/30">
+                                    <td className="text-muted py-1 px-1">{i + 1}</td>
+                                    <td className="text-center py-1 px-1">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
+                                    <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                                    <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
