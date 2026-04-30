@@ -17,7 +17,7 @@ export default function BallsStrikesPage() {
   const [finished, setFinished] = useState(false);
 
   const [markers, setMarkers] = useState<SnapMarker[]>([]);
-  const [snaps, setSnaps] = useState<{ time: string; accuracy: "Strike" | "Ball"; auto: boolean; marker?: SnapMarker }[]>([]);
+  const [snaps, setSnaps] = useState<{ time: string; accuracy: "Strike" | "Ball"; auto: boolean; marker?: SnapMarker; spiral?: string }[]>([]);
   const [currentTime, setCurrentTime] = useState("");
 
   useEffect(() => {
@@ -36,22 +36,26 @@ export default function BallsStrikesPage() {
 
   const [pendingMarker, setPendingMarker] = useState<SnapMarker | null>(null);
   const [promptTime, setPromptTime] = useState("");
+  const [promptSpiral, setPromptSpiral] = useState<"Good" | "Bad" | "">("");
 
   const handleSnapClick = (marker: SnapMarker) => {
     setPendingMarker(marker);
     setPromptTime("");
+    setPromptSpiral("");
   };
 
   const handleConfirmSnap = () => {
-    if (!pendingMarker) return;
+    if (!pendingMarker || !promptSpiral) return;
     const timeVal = parseFloat(promptTime) || 0;
     const exceededTime = maxTimeNum > 0 && timeVal > maxTimeNum;
-    const acc: "Strike" | "Ball" = exceededTime ? "Ball" : pendingMarker.inZone ? "Strike" : "Ball";
+    const badSpiral = promptSpiral === "Bad";
+    const acc: "Strike" | "Ball" = exceededTime || badSpiral ? "Ball" : pendingMarker.inZone ? "Strike" : "Ball";
     setMarkers((prev) => [...prev, { ...pendingMarker, inZone: acc === "Strike" }]);
-    const newSnaps = [...snaps, { time: promptTime, accuracy: acc, auto: exceededTime, marker: pendingMarker }];
+    const newSnaps = [...snaps, { time: promptTime, accuracy: acc, auto: exceededTime || badSpiral, marker: pendingMarker, spiral: promptSpiral }];
     setSnaps(newSnaps);
     setPendingMarker(null);
     setPromptTime("");
+    setPromptSpiral("");
     if (newSnaps.length >= 10) setFinished(true);
   };
 
@@ -149,6 +153,7 @@ export default function BallsStrikesPage() {
               </div>
             </div>
             <p className="text-lg font-bold text-accent mt-3">{strikePct}%</p>
+            <p className="text-sm text-slate-300 mt-1">Avg Time: {(() => { const times = snaps.filter((s) => parseFloat(s.time) > 0); return times.length > 0 ? (times.reduce((sum, s) => sum + parseFloat(s.time), 0) / times.length).toFixed(2) + "s" : "—"; })()}</p>
             <p className="text-[10px] text-muted">{snaps.length} total snaps · Max time: {maxTime}s</p>
           </div>
           {/* Per-snap breakdown */}
@@ -157,14 +162,16 @@ export default function BallsStrikesPage() {
               <thead><tr>
                 <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
                 <th className="text-[10px] text-muted text-center py-1 px-1">Time</th>
+                <th className="text-[10px] text-muted text-center py-1 px-1">Spiral</th>
                 <th className="text-[10px] text-muted text-center py-1 px-1">Result</th>
               </tr></thead>
               <tbody>
                 {snaps.map((s, i) => (
                   <tr key={i} className="border-t border-border/30">
                     <td className="text-muted py-1 px-1">{i + 1}</td>
-                    <td className={clsx("text-center py-1 px-1", s.auto ? "text-miss" : "")}>{s.time || "—"}{s.auto ? " (over)" : ""}</td>
-                    <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}</td>
+                    <td className={clsx("text-center py-1 px-1", s.auto ? "text-miss" : "")}>{s.time || "—"}</td>
+                    <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : "Open"}</td>
+                    <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}{s.auto ? (s.spiral === "Bad" ? " (spiral)" : " (time)") : ""}</td>
                   </tr>
                 ))}
               </tbody>
@@ -232,7 +239,8 @@ export default function BallsStrikesPage() {
                 <span className="text-muted w-5">#{i + 1}</span>
                 <span className="w-14">{s.time || "—"}s</span>
                 <span className={clsx("font-semibold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}</span>
-                {s.auto && <span className="text-miss text-[10px]">(auto)</span>}
+                <span className={clsx("w-10", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : "Open"}</span>
+                {s.auto && <span className="text-miss text-[10px]">({s.spiral === "Bad" ? "spiral" : "time"})</span>}
               </div>
             ))}
           </div>
@@ -243,26 +251,38 @@ export default function BallsStrikesPage() {
       {pendingMarker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-surface border border-border rounded-card p-6 w-72 space-y-4">
-            <p className="text-sm font-bold text-slate-100 text-center">Snap #{snaps.length + 1} — Enter Time</p>
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="0.74"
-              value={promptTime}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "");
-                setPromptTime(digits ? formatAutoDecimal(digits) : "");
-              }}
-              className="input w-full text-center text-2xl font-bold"
-              autoFocus
-              onKeyDown={(e) => { if (e.key === "Enter") handleConfirmSnap(); }}
-            />
-            {promptTime && parseFloat(promptTime) > maxTimeNum && maxTimeNum > 0 && (
-              <p className="text-xs text-miss font-semibold text-center">Over {maxTime}s — auto Ball</p>
-            )}
+            <p className="text-sm font-bold text-slate-100 text-center">Snap #{snaps.length + 1}</p>
+            <div>
+              <p className="label text-slate-100 text-center">Time</p>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="0.74"
+                value={promptTime}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "");
+                  setPromptTime(digits ? formatAutoDecimal(digits) : "");
+                }}
+                className="input w-full text-center text-2xl font-bold"
+                autoFocus
+              />
+              {promptTime && parseFloat(promptTime) > maxTimeNum && maxTimeNum > 0 && (
+                <p className="text-xs text-miss font-semibold text-center mt-1">Over {maxTime}s — auto Ball</p>
+              )}
+            </div>
+            <div>
+              <p className="label text-slate-100 text-center">Spiral</p>
+              <div className="flex gap-2">
+                <button onClick={() => setPromptSpiral("Good")} className={clsx("flex-1 py-2.5 rounded-input text-sm font-bold border transition-all", promptSpiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+                <button onClick={() => setPromptSpiral("Bad")} className={clsx("flex-1 py-2.5 rounded-input text-sm font-bold border transition-all", promptSpiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+              </div>
+              {promptSpiral === "Bad" && (
+                <p className="text-xs text-miss font-semibold text-center mt-1">Bad spiral — auto Ball</p>
+              )}
+            </div>
             <div className="flex gap-2">
-              <button onClick={() => setPendingMarker(null)} className="btn-ghost flex-1 py-2 text-sm">Cancel</button>
-              <button onClick={handleConfirmSnap} className="btn-primary flex-1 py-2 text-sm font-bold">Log Snap</button>
+              <button onClick={() => { setPendingMarker(null); setPromptSpiral(""); }} className="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+              <button onClick={handleConfirmSnap} disabled={!promptSpiral} className="btn-primary flex-1 py-2 text-sm font-bold disabled:opacity-40">Log Snap</button>
             </div>
           </div>
         </div>

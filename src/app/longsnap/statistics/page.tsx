@@ -38,21 +38,35 @@ export default function LongSnapStatisticsPage() {
     return computeFilteredSnapStats(athletes, filteredHistory);
   }, [dateFilter.mode, filteredHistory, stats, athletes]);
 
-  const totals = athletes.reduce(
+  const [snapTab, setSnapTab] = useState<"long" | "short">("long");
+
+  // Long snap (PUNT) totals
+  const longTotals = athletes.reduce(
     (acc, a) => {
-      const s = displayStats[a.name];
+      const s = displayStats[a.name]?.byType?.PUNT;
       if (!s) return acc;
-      return {
-        att: acc.att + s.overall.att,
-        onTarget: acc.onTarget + s.overall.onTarget,
-        totalTime: acc.totalTime + s.overall.totalTime,
-      };
+      return { att: acc.att + s.att, onTarget: acc.onTarget + s.onTarget, totalTime: acc.totalTime + s.totalTime, criticals: acc.criticals + (s.criticals || 0) };
     },
-    { att: 0, onTarget: 0, totalTime: 0 }
+    { att: 0, onTarget: 0, totalTime: 0, criticals: 0 }
   );
 
-  const avgTime = totals.att > 0 ? (totals.totalTime / totals.att).toFixed(2) : "—";
-  const onTargetPct = makePct(totals.att, totals.onTarget);
+  // Short snap (FG + PAT) totals
+  const shortTotals = athletes.reduce(
+    (acc, a) => {
+      const fg = displayStats[a.name]?.byType?.FG;
+      const pat = displayStats[a.name]?.byType?.PAT;
+      return {
+        att: acc.att + (fg?.att ?? 0) + (pat?.att ?? 0),
+        onTarget: acc.onTarget + (fg?.onTarget ?? 0) + (pat?.onTarget ?? 0),
+        criticals: acc.criticals + (fg?.criticals ?? 0) + (pat?.criticals ?? 0),
+      };
+    },
+    { att: 0, onTarget: 0, criticals: 0 }
+  );
+
+  const activeTotals = snapTab === "long" ? longTotals : shortTotals;
+  const avgTime = snapTab === "long" && longTotals.att > 0 ? (longTotals.totalTime / longTotals.att).toFixed(2) : "—";
+  const onTargetPct = makePct(activeTotals.att, activeTotals.onTarget);
 
   const [tab, setTab] = useState<"practice" | "charting">("practice");
 
@@ -102,49 +116,20 @@ export default function LongSnapStatisticsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      {/* Long / Short toggle */}
+      <div className="flex rounded-input border border-border overflow-hidden w-fit">
+        <button onClick={() => setSnapTab("long")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", snapTab === "long" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Long Snap</button>
+        <button onClick={() => setSnapTab("short")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", snapTab === "short" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Short Snap</button>
+      </div>
+
+      <div className={snapTab === "long" ? "grid grid-cols-3 gap-3" : "grid grid-cols-2 gap-3"}>
         <StatCard label="Strike %" value={onTargetPct} accent glow />
-        <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
-        <StatCard label="Total Snaps" value={totals.att || "—"} />
+        {snapTab === "long" && <StatCard label="Avg Time" value={longTotals.att > 0 ? `${avgTime}s` : "—"} />}
+        <StatCard label="Total Snaps" value={activeTotals.att || "—"} />
       </div>
 
       <div className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Season by Snap Type</p>
-        <table className="w-full text-sm">
-          <thead>
-            <tr>
-              <th className="table-header text-left">Type</th>
-              <th className="table-header">Snaps</th>
-              <th className="table-header">Strike %</th>
-              <th className="table-header">Avg Time</th>
-              <th className="table-header">Crit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {SNAP_TYPES.map((t) => {
-              let att = 0, onTarget = 0, totalTime = 0, criticals = 0;
-              athletes.forEach((a) => {
-                const s = displayStats[a.name]?.byType[t];
-                if (s) { att += s.att; onTarget += s.onTarget; totalTime += s.totalTime; criticals += (s.criticals || 0); }
-              });
-              return (
-                <tr key={t} className="hover:bg-surface/30">
-                  <td className="table-name">{t}</td>
-                  <td className="table-cell">{att || "—"}</td>
-                  <td className="table-cell make-pct">{makePct(att, onTarget)}</td>
-                  <td className="table-cell text-muted">
-                    {att > 0 ? `${(totalTime / att).toFixed(2)}s` : "—"}
-                  </td>
-                  <td className={`table-cell ${criticals > 0 ? "text-miss font-semibold" : ""}`}>{criticals || "—"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card-2">
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Season by Athlete</p>
+        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">By Athlete</p>
         {athletes.length === 0 ? (
           <p className="text-xs text-muted">No athletes added yet.</p>
         ) : (
@@ -154,7 +139,7 @@ export default function LongSnapStatisticsPage() {
                 <th className="table-header text-left">Athlete</th>
                 <th className="table-header">Snaps</th>
                 <th className="table-header">Strike %</th>
-                <th className="table-header">Avg Time</th>
+                {snapTab === "long" && <th className="table-header">Avg Time</th>}
                 <th className="table-header">Crit</th>
               </tr>
             </thead>
@@ -162,15 +147,30 @@ export default function LongSnapStatisticsPage() {
               {athletes.map((a) => {
                 const s = displayStats[a.name];
                 if (!s) return null;
+                // Get stats for the selected snap type
+                const bucket = snapTab === "long" ? s.byType?.PUNT : (() => {
+                  const fg = s.byType?.FG;
+                  const pat = s.byType?.PAT;
+                  if (!fg && !pat) return null;
+                  return {
+                    att: (fg?.att ?? 0) + (pat?.att ?? 0),
+                    onTarget: (fg?.onTarget ?? 0) + (pat?.onTarget ?? 0),
+                    totalTime: (fg?.totalTime ?? 0) + (pat?.totalTime ?? 0),
+                    criticals: (fg?.criticals ?? 0) + (pat?.criticals ?? 0),
+                  };
+                })();
+                if (!bucket || bucket.att === 0) return null;
                 return (
                   <tr key={a.id} className="hover:bg-surface/30">
                     <td className="table-name">{a.name}</td>
-                    <td className="table-cell">{s.overall.att || "—"}</td>
-                    <td className="table-cell make-pct">{makePct(s.overall.att, s.overall.onTarget)}</td>
+                    <td className="table-cell">{bucket.att || "—"}</td>
+                    <td className="table-cell make-pct">{makePct(bucket.att, bucket.onTarget)}</td>
+                    {snapTab === "long" && (
                     <td className="table-cell text-muted">
-                      {s.overall.att > 0 ? `${(s.overall.totalTime / s.overall.att).toFixed(2)}s` : "—"}
+                      {bucket.totalTime && bucket.att > 0 ? `${(bucket.totalTime / bucket.att).toFixed(2)}s` : "—"}
                     </td>
-                    <td className={`table-cell ${(s.overall.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{s.overall.criticals || "—"}</td>
+                    )}
+                    <td className={`table-cell ${(bucket.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{bucket.criticals || "—"}</td>
                   </tr>
                 );
               })}
