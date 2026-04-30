@@ -62,6 +62,7 @@ export default function ThirtyPointGamePage() {
   };
 
   const handleSnapClick = (marker: ShortSnapMarker) => {
+    if (accuracy) return; // Already clicked for this snap — must undo or log first
     const acc = marker.inZone ? "Strike" : "Ball";
     setAccuracy(acc);
     setMarkers((prev) => [...prev, marker]);
@@ -118,7 +119,8 @@ export default function ThirtyPointGamePage() {
         <div className="text-center space-y-4 max-w-sm">
           <div className="text-5xl mb-4">🎯</div>
           <h2 className="text-xl font-bold text-slate-100">30 Point Game</h2>
-          <p className="text-sm text-muted">10 snaps per player. 3 points max per snap.</p>
+          <p className="text-sm text-muted">10 snaps. 3 points max per snap. Score out of 30.</p>
+          <p className="text-xs text-muted">Strike (1) + Laces (1 or 0.5) + Spiral (1)</p>
           <div className="flex gap-3">
             <button onClick={() => setMode("single")} className="btn-primary flex-1 py-3 text-sm">Single Player</button>
             <button onClick={() => setMode("multi")} className="btn-ghost flex-1 py-3 text-sm">Multiplayer</button>
@@ -237,11 +239,14 @@ export default function ThirtyPointGamePage() {
 
         {/* Multiplayer scoreboard */}
         {mode === "multi" && (
-          <div className="flex gap-2 justify-center">
-            {players.map((p) => (
-              <div key={p} className={clsx("card-2 px-3 py-1.5 text-center text-xs", p === currentPlayer && "ring-2 ring-accent")}>
-                <p className="font-bold text-slate-200">{p}</p>
-                <p className="text-accent font-black">{getPlayerPoints(p)}</p>
+          <div className="flex items-center justify-center gap-3">
+            {players.map((p, i) => (
+              <div key={p} className="flex items-center gap-3">
+                {i > 0 && <span className="text-xs text-muted font-bold">vs</span>}
+                <div className={clsx("card-2 px-4 py-2 text-center", p === currentPlayer && "ring-2 ring-accent")}>
+                  <p className="text-xs font-bold text-slate-200">{p}</p>
+                  <p className="text-lg font-black text-accent">{getPlayerPoints(p)}<span className="text-[10px] text-muted font-normal">/{getPlayerResults(p).length * PTS_PER_SNAP}</span></p>
+                </div>
               </div>
             ))}
           </div>
@@ -256,7 +261,7 @@ export default function ThirtyPointGamePage() {
             <button onClick={() => setLaces("Back")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
           </div>
           <div className="flex-1 min-w-0">
-            <HolderStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={currentSnapIdx + 1} chartMode="simple" missMode="simple" editable />
+            <HolderStrikeZone markers={getPlayerMarkers(currentPlayer)} onSnap={handleSnapClick} nextNum={getPlayerResults(currentPlayer).length + 1} chartMode="simple" missMode="simple" editable />
           </div>
           <div className="flex flex-col gap-1.5 shrink-0">
             <p className="text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-1">Spiral</p>
@@ -282,9 +287,10 @@ export default function ThirtyPointGamePage() {
               <div key={i} className="flex items-center text-xs gap-2">
                 <span className="text-muted w-5">#{i + 1}</span>
                 <span className="text-slate-400 w-16 truncate">{r.athlete}</span>
-                <span className={clsx("font-semibold w-12", r.accuracy === "Strike" ? "text-make" : "text-miss")}>{r.accuracy}</span>
+                <span className={clsx("font-semibold", r.accuracy === "Strike" ? "text-make" : "text-miss")}>
+                  {r.accuracy}{r.accuracy === "Ball" && r.spiral === "Bad" ? " (Spiral)" : ""}{r.accuracy === "Ball" && r.laces === "Back" ? "" : ""}
+                </span>
                 <span className={clsx("w-14", r.laces === "Good" ? "text-make" : r.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{r.laces === "Good" ? "Perfect" : r.laces}</span>
-                <span className={clsx("w-10", r.spiral === "Good" ? "text-make" : "text-miss")}>{r.spiral === "Good" ? "Tight" : "Open"}</span>
                 <span className="text-accent font-bold ml-auto">{r.points}pt</span>
               </div>
             ))}
