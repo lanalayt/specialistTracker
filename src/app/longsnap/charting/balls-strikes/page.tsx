@@ -34,14 +34,24 @@ export default function BallsStrikesPage() {
 
   const maxTimeNum = parseFloat(maxTime) || 0;
 
+  const [pendingMarker, setPendingMarker] = useState<SnapMarker | null>(null);
+  const [promptTime, setPromptTime] = useState("");
+
   const handleSnapClick = (marker: SnapMarker) => {
-    const timeVal = parseFloat(currentTime) || 0;
+    setPendingMarker(marker);
+    setPromptTime("");
+  };
+
+  const handleConfirmSnap = () => {
+    if (!pendingMarker) return;
+    const timeVal = parseFloat(promptTime) || 0;
     const exceededTime = maxTimeNum > 0 && timeVal > maxTimeNum;
-    const acc: "Strike" | "Ball" = exceededTime ? "Ball" : marker.inZone ? "Strike" : "Ball";
-    setMarkers((prev) => [...prev, { ...marker, inZone: acc === "Strike" }]);
-    const newSnaps = [...snaps, { time: currentTime, accuracy: acc, auto: exceededTime, marker }];
+    const acc: "Strike" | "Ball" = exceededTime ? "Ball" : pendingMarker.inZone ? "Strike" : "Ball";
+    setMarkers((prev) => [...prev, { ...pendingMarker, inZone: acc === "Strike" }]);
+    const newSnaps = [...snaps, { time: promptTime, accuracy: acc, auto: exceededTime, marker: pendingMarker }];
     setSnaps(newSnaps);
-    setCurrentTime("");
+    setPendingMarker(null);
+    setPromptTime("");
     if (newSnaps.length >= 10) setFinished(true);
   };
 
@@ -175,9 +185,8 @@ export default function BallsStrikesPage() {
 
   // In progress
   return (
-    <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-      {/* Left: Entry */}
-      <div className="lg:w-[55%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0 p-4 space-y-4">
+    <main className="flex-1 overflow-y-auto p-4">
+      <div className="max-w-lg mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -196,28 +205,14 @@ export default function BallsStrikesPage() {
           </div>
         </div>
 
-        {/* Time input */}
-        <div>
-          <p className="label text-slate-100">Snap Time</p>
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="0.74"
-              value={currentTime}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "");
-                setCurrentTime(digits ? formatAutoDecimal(digits) : "");
-              }}
-              className="input w-32 text-center text-xl font-bold"
-            />
-            {currentTime && parseFloat(currentTime) > maxTimeNum && maxTimeNum > 0 && (
-              <span className="text-xs text-miss font-semibold">Over max — auto Ball</span>
-            )}
-          </div>
+        {/* Progress */}
+        <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+          <div className="h-full bg-accent transition-all" style={{ width: `${(snaps.length / 10) * 100}%` }} />
         </div>
 
-        <p className="text-xs text-muted">Enter time, then click the diagram to chart accuracy. If time exceeds {maxTime}s, it&apos;s an automatic Ball.</p>
+        {/* Diagram — front and center */}
+        <p className="text-xs text-muted text-center">Click the diagram to chart snap location</p>
+        <PunterStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={snaps.length + 1} editable />
 
         {/* Undo + Finish */}
         <div className="flex gap-2">
@@ -244,13 +239,34 @@ export default function BallsStrikesPage() {
         )}
       </div>
 
-      {/* Right: Holder diagram */}
-      <div className="lg:w-[45%] overflow-y-auto p-4 space-y-3">
-        <PunterStrikeZone markers={markers} onSnap={handleSnapClick} nextNum={snaps.length + 1} editable />
-        {snaps.length > 0 && (
-          <button onClick={handleUndo} className="w-full text-xs py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">Undo Snap #{snaps.length}</button>
-        )}
-      </div>
+      {/* Time prompt popup */}
+      {pendingMarker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-surface border border-border rounded-card p-6 w-72 space-y-4">
+            <p className="text-sm font-bold text-slate-100 text-center">Snap #{snaps.length + 1} — Enter Time</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="0.74"
+              value={promptTime}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                setPromptTime(digits ? formatAutoDecimal(digits) : "");
+              }}
+              className="input w-full text-center text-2xl font-bold"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") handleConfirmSnap(); }}
+            />
+            {promptTime && parseFloat(promptTime) > maxTimeNum && maxTimeNum > 0 && (
+              <p className="text-xs text-miss font-semibold text-center">Over {maxTime}s — auto Ball</p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setPendingMarker(null)} className="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+              <button onClick={handleConfirmSnap} className="btn-primary flex-1 py-2 text-sm font-bold">Log Snap</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
