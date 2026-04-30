@@ -80,6 +80,10 @@ export default function BallsStrikesPage() {
       time: parseFloat(s.time) || 0,
       accuracy: s.accuracy === "Strike" ? "ON_TARGET" as SnapAccuracy : "HIGH" as SnapAccuracy,
       score: 0,
+      spiral: s.spiral || undefined,
+      markerX: s.marker?.x,
+      markerY: s.marker?.y,
+      markerInZone: s.marker?.inZone,
     }));
     commitPractice(entries, `Balls & Strikes — ${strikes}/${snaps.length} (${strikePct}%)`);
     setSaved(true);

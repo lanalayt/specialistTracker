@@ -31,12 +31,17 @@ export default function LongSnapStatisticsPage() {
 
   const filteredHistory = useMemo(() => {
     return dateFilter.filterByDate(history as { date?: string; entries?: LongSnapEntry[] }[]);
-  }, [history, dateFilter.mode, dateFilter.range]) as { entries?: LongSnapEntry[] }[];
+  }, [history, dateFilter.mode, dateFilter.range]) as ({ entries?: LongSnapEntry[]; label?: string } & Record<string, unknown>)[];
+
+  // Practice-only history (exclude charting)
+  const practiceHistory = useMemo(() => {
+    return filteredHistory.filter((s) => !s.label?.startsWith("30 Point Game") && !s.label?.startsWith("Balls & Strikes"));
+  }, [filteredHistory]);
 
   const displayStats = useMemo(() => {
-    if (dateFilter.mode === "all") return stats;
-    return computeFilteredSnapStats(athletes, filteredHistory);
-  }, [dateFilter.mode, filteredHistory, stats, athletes]);
+    // Always compute from practice-only sessions
+    return computeFilteredSnapStats(athletes, practiceHistory);
+  }, [practiceHistory, athletes]);
 
   const [snapTab, setSnapTab] = useState<"long" | "short">("long");
 

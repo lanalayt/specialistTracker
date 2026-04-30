@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
+import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import type { LongSnapEntry, SnapBenchmark, Session } from "@/types";
 import clsx from "clsx";
 
@@ -194,6 +195,62 @@ export default function LongSnapHistoryPage() {
                               {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
                             </td>
                             <td className="table-cell text-accent font-bold">{s.score ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })() : selected?.label?.startsWith("Balls & Strikes") ? (() => {
+              // Balls & Strikes view — diagram + time/spiral/result table
+              const bsMarkers: SnapMarker[] = snaps
+                .filter((s) => s.markerX != null && s.markerY != null)
+                .map((s, i) => ({
+                  x: s.markerX!,
+                  y: s.markerY!,
+                  num: i + 1,
+                  inZone: s.markerInZone ?? s.accuracy === "ON_TARGET",
+                }));
+              const bsStrikes = snaps.filter((s) => s.accuracy === "ON_TARGET").length;
+              const bsBalls = snaps.length - bsStrikes;
+              const bsPct = snaps.length > 0 ? Math.round((bsStrikes / snaps.length) * 100) : 0;
+              const bsTimes = snaps.filter((s) => s.time > 0);
+              const bsAvgTime = bsTimes.length > 0 ? (bsTimes.reduce((sum, s) => sum + s.time, 0) / bsTimes.length).toFixed(2) : "—";
+              const snapperName = snaps[0]?.athlete ?? "—";
+              return (
+                <div className="space-y-4">
+                  <p className="text-xs text-muted text-center">{snapperName}</p>
+                  <div className="flex justify-center">
+                    <PunterStrikeZone markers={bsMarkers} />
+                  </div>
+                  <div className="card-2 text-center py-3">
+                    <div className="flex justify-center gap-6">
+                      <div><p className="text-2xl font-black text-make">{bsStrikes}</p><p className="text-[10px] text-muted">Strikes</p></div>
+                      <div><p className="text-2xl font-black text-miss">{bsBalls}</p><p className="text-[10px] text-muted">Balls</p></div>
+                    </div>
+                    <p className="text-lg font-bold text-accent mt-2">{bsPct}%</p>
+                    <p className="text-sm text-slate-300 mt-1">Avg Time: {bsAvgTime}s</p>
+                  </div>
+                  <div className="card-2 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr>
+                        <th className="table-header text-left">#</th>
+                        <th className="table-header">Time</th>
+                        <th className="table-header">Spiral</th>
+                        <th className="table-header">Result</th>
+                      </tr></thead>
+                      <tbody>
+                        {snaps.map((s, i) => (
+                          <tr key={i} className="hover:bg-surface/30">
+                            <td className="table-cell text-left text-muted">{i + 1}</td>
+                            <td className="table-cell">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
+                            <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                            <td className="table-cell">
+                              <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
+                              </span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
