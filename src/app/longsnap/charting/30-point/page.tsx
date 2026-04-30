@@ -281,7 +281,7 @@ export default function ThirtyPointGamePage() {
 
         {/* Log + Undo */}
         <div className="flex gap-2">
-          {results.length > 0 && <button onClick={handleUndo} className="text-xs px-3 py-3 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
+          {(results.length > 0 || pendingMarker) && <button onClick={handleUndo} className="text-xs px-3 py-3 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
           <button onClick={handleLogSnap} disabled={!accuracy || !laces || !spiral} className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40">
             Log Snap {accuracy && laces && spiral ? `(${calcPoints(accuracy, laces, spiral)} pts)` : ""}
           </button>

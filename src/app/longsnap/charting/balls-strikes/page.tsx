@@ -84,6 +84,12 @@ export default function BallsStrikesPage() {
   };
 
   const handleUndo = () => {
+    if (pendingMarker) {
+      setPendingMarker(null);
+      setPromptTime("");
+      setPromptSpiral("");
+      return;
+    }
     if (snaps.length === 0) return;
     setSnaps((prev) => prev.slice(0, -1));
     setMarkers((prev) => prev.slice(0, -1));
@@ -258,7 +264,7 @@ export default function BallsStrikesPage() {
         <PunterStrikeZone markers={getPlayerMarkers(currentPlayer)} onSnap={handleSnapClick} nextNum={getPlayerSnaps(currentPlayer).length + 1} editable />
 
         <div className="flex gap-2">
-          {snaps.length > 0 && <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
+          {(snaps.length > 0 || pendingMarker) && <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
           {snaps.length > 0 && <button onClick={() => setFinished(true)} className="btn-primary flex-1 py-2 text-sm font-bold">Finish Early ({snaps.length}/{totalSnaps})</button>}
         </div>
 
