@@ -187,6 +187,9 @@ export interface LongSnapEntry {
   critical?: boolean;
   laces?: string;
   spiral?: string;
+  markerX?: number;
+  markerY?: number;
+  markerInZone?: boolean;
 }
 
 // ─── Long Snap stats ─────────────────────────────────────────────────────────

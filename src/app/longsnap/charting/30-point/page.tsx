@@ -96,6 +96,9 @@ export default function ThirtyPointGamePage() {
       score: r.points,
       laces: r.laces || undefined,
       spiral: r.spiral || undefined,
+      markerX: r.marker?.x,
+      markerY: r.marker?.y,
+      markerInZone: r.marker?.inZone,
     }));
     commitPractice(snaps, `30 Point Game — ${totalPoints}/${MAX_POINTS}`);
     setSaved(true);

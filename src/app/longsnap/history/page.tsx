@@ -149,12 +149,14 @@ export default function LongSnapHistoryPage() {
             </div>
             {selected?.label?.startsWith("30 Point Game") ? (() => {
               // 30 Point Game view — show diagram + laces/spiral/location table
-              const gameMarkers: ShortSnapMarker[] = snaps.map((s, i) => ({
-                x: 50 + (i % 5) * 8 - 16,
-                y: 50 + Math.floor(i / 5) * 15 - 7,
-                num: i + 1,
-                inZone: s.accuracy === "ON_TARGET",
-              }));
+              const gameMarkers: ShortSnapMarker[] = snaps
+                .filter((s) => s.markerX != null && s.markerY != null)
+                .map((s, i) => ({
+                  x: s.markerX!,
+                  y: s.markerY!,
+                  num: i + 1,
+                  inZone: s.markerInZone ?? s.accuracy === "ON_TARGET",
+                }));
               const totalPts = snaps.reduce((sum, s) => sum + (s.score || 0), 0);
               return (
                 <div className="space-y-4">
