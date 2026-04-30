@@ -35,7 +35,7 @@ export default function LongSnapSessionChooser() {
             className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
           >
             <div className="text-4xl mb-3">📊</div>
-            <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Charting</h3>
+            <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Charting Games</h3>
             <p className="text-xs text-muted mt-1">30 Point Game &amp; Balls/Strikes</p>
           </Link>
         </div>
