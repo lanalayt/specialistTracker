@@ -43,6 +43,7 @@ export default function ThirtyPointGamePage() {
   const [results, setResults] = useState<SnapResult[]>([]);
   const [markers, setMarkers] = useState<ShortSnapMarker[]>([]);
   const [accuracy, setAccuracy] = useState<"Strike" | "Ball" | "">("");
+  const [pendingMarker, setPendingMarker] = useState<ShortSnapMarker | null>(null);
   const [laces, setLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
   const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
 
@@ -65,29 +66,36 @@ export default function ThirtyPointGamePage() {
     if (accuracy) return; // Already clicked for this snap — must undo or log first
     const acc = marker.inZone ? "Strike" : "Ball";
     setAccuracy(acc);
-    setMarkers((prev) => [...prev, marker]);
+    setPendingMarker(marker);
   };
 
   const handleLogSnap = () => {
-    if (!accuracy || !laces || !spiral) return;
+    if (!accuracy || !laces || !spiral || !pendingMarker) return;
     const points = calcPoints(accuracy, laces, spiral);
-    const result: SnapResult = { athlete: currentPlayer, accuracy, laces, spiral, points, marker: markers[markers.length - 1] };
+    const result: SnapResult = { athlete: currentPlayer, accuracy, laces, spiral, points, marker: pendingMarker };
     const newResults = [...results, result];
     setResults(newResults);
     if (newResults.length >= totalSnaps) setGameOver(true);
     setAccuracy("");
     setLaces("");
     setSpiral("");
+    setPendingMarker(null);
   };
 
   const handleUndo = () => {
+    if (pendingMarker) {
+      // Undo the pending click (haven't logged yet)
+      setPendingMarker(null);
+      setAccuracy("");
+      return;
+    }
     if (results.length === 0) return;
     setResults((prev) => prev.slice(0, -1));
-    setMarkers((prev) => prev.slice(0, -1));
     setGameOver(false);
     setAccuracy("");
     setLaces("");
     setSpiral("");
+    setPendingMarker(null);
   };
 
   const handleSave = () => {
@@ -107,7 +115,7 @@ export default function ThirtyPointGamePage() {
   };
 
   const handleNewGame = () => {
-    setResults([]); setMarkers([]); setGameStarted(false); setGameOver(false);
+    setResults([]); setGameStarted(false); setGameOver(false);
     setMode(null); setSelectedPlayers([]); setSaved(false);
     setAccuracy(""); setLaces(""); setSpiral("");
   };
@@ -222,14 +230,13 @@ export default function ThirtyPointGamePage() {
       <div className="max-w-lg mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Snap {playerSnapCount} of {SNAPS_PER_PLAYER}</p>
-            {mode === "multi" && <p className="text-[10px] text-muted">Overall snap {currentSnapIdx + 1} of {totalSnaps}</p>}
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-black text-accent">{runningTotal}</p>
-            <p className="text-[10px] text-muted">/ {runningMax || PTS_PER_SNAP * SNAPS_PER_PLAYER}</p>
-          </div>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Snap {playerSnapCount} of {SNAPS_PER_PLAYER}</p>
+          {mode === "single" && (
+            <div className="text-right">
+              <p className="text-2xl font-black text-accent">{runningTotal}</p>
+              <p className="text-[10px] text-muted">/ {runningMax || PTS_PER_SNAP * SNAPS_PER_PLAYER}</p>
+            </div>
+          )}
         </div>
 
         {/* Progress */}
@@ -261,7 +268,7 @@ export default function ThirtyPointGamePage() {
             <button onClick={() => setLaces("Back")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
           </div>
           <div className="flex-1 min-w-0">
-            <HolderStrikeZone markers={getPlayerMarkers(currentPlayer)} onSnap={handleSnapClick} nextNum={getPlayerResults(currentPlayer).length + 1} chartMode="simple" missMode="simple" editable />
+            <HolderStrikeZone markers={[...getPlayerMarkers(currentPlayer), ...(pendingMarker ? [{ ...pendingMarker, num: getPlayerResults(currentPlayer).length + 1 }] : [])]} onSnap={handleSnapClick} nextNum={getPlayerResults(currentPlayer).length + 1} chartMode="simple" missMode="simple" editable />
           </div>
           <div className="flex flex-col gap-1.5 shrink-0">
             <p className="text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-1">Spiral</p>
