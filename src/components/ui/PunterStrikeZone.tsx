@@ -165,15 +165,15 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
         <div
           ref={containerRef}
           onClick={handleClick}
-          className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex flex-col items-center"
-          style={{ width: 280, background: "#000000", paddingTop: 30, paddingBottom: 10 }}
+          className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex flex-col items-center w-full max-w-[280px]"
+          style={{ background: "#000000", paddingTop: 30, paddingBottom: 10 }}
         >
           {/* Player image */}
           <img
             src="/punter-silhouette.png"
             alt="Punter"
             className="pointer-events-none select-none"
-            style={{ height: 400, width: "auto", objectFit: "contain" }}
+            style={{ height: "auto", width: "75%", maxHeight: 400, objectFit: "contain" }}
             draggable={false}
           />
 

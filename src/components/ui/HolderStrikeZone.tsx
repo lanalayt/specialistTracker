@@ -96,15 +96,15 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
       <div
         ref={containerRef}
         onClick={handleClick}
-        className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex items-end"
-        style={{ width: 300, height: 260, background: "#000000", padding: 0 }}
+        className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex items-end w-full max-w-[300px]"
+        style={{ aspectRatio: "300/260", background: "#000000", padding: 0 }}
       >
         {/* Holder image — left side, scaled up */}
         <img
           src="/holder-silhouette.png?v=7"
           alt="Holder"
           className="pointer-events-none select-none"
-          style={{ height: "130%", width: "auto", objectFit: "contain", marginLeft: -20, position: "absolute", bottom: -60, left: 0 }}
+          style={{ height: "130%", width: "auto", objectFit: "contain", marginLeft: "-7%", position: "absolute", bottom: "-23%", left: 0 }}
           draggable={false}
         />
 

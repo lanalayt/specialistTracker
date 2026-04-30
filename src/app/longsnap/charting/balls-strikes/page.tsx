@@ -260,8 +260,10 @@ export default function BallsStrikesPage() {
           <div className="h-full bg-accent transition-all" style={{ width: `${(snaps.length / totalSnaps) * 100}%` }} />
         </div>
 
-        <p className="text-xs text-muted text-center">Click the diagram to chart snap location</p>
-        <PunterStrikeZone markers={getPlayerMarkers(currentPlayer)} onSnap={handleSnapClick} nextNum={getPlayerSnaps(currentPlayer).length + 1} editable />
+        <p className="text-[10px] sm:text-xs text-muted text-center">Click the diagram to chart snap location</p>
+        <div className="flex justify-center">
+          <PunterStrikeZone markers={getPlayerMarkers(currentPlayer)} onSnap={handleSnapClick} nextNum={getPlayerSnaps(currentPlayer).length + 1} editable />
+        </div>
 
         <div className="flex gap-2">
           {(snaps.length > 0 || pendingMarker) && <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}

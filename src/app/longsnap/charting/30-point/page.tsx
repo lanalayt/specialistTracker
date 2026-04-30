@@ -260,20 +260,20 @@ export default function ThirtyPointGamePage() {
         )}
 
         {/* Diagram with Laces left, Spiral right */}
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col gap-1.5 shrink-0">
-            <p className="text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-1">Laces</p>
-            <button onClick={() => setLaces("Good")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", laces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Perfect</button>
-            <button onClick={() => setLaces("1/4 Turn")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", laces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4 Turn</button>
-            <button onClick={() => setLaces("Back")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
+        <div className="flex items-center gap-1 sm:gap-3">
+          <div className="flex flex-col gap-1 sm:gap-1.5 shrink-0">
+            <p className="text-[8px] sm:text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Laces</p>
+            <button onClick={() => setLaces("Good")} className={clsx("px-2 sm:px-3 py-2 sm:py-2.5 rounded-input text-[10px] sm:text-xs font-bold border transition-all", laces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Perfect</button>
+            <button onClick={() => setLaces("1/4 Turn")} className={clsx("px-2 sm:px-3 py-2 sm:py-2.5 rounded-input text-[10px] sm:text-xs font-bold border transition-all", laces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4</button>
+            <button onClick={() => setLaces("Back")} className={clsx("px-2 sm:px-3 py-2 sm:py-2.5 rounded-input text-[10px] sm:text-xs font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
           </div>
           <div className="flex-1 min-w-0">
             <HolderStrikeZone markers={[...getPlayerMarkers(currentPlayer), ...(pendingMarker ? [{ ...pendingMarker, num: getPlayerResults(currentPlayer).length + 1 }] : [])]} onSnap={handleSnapClick} nextNum={getPlayerResults(currentPlayer).length + 1} chartMode="simple" missMode="simple" editable />
           </div>
-          <div className="flex flex-col gap-1.5 shrink-0">
-            <p className="text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-1">Spiral</p>
-            <button onClick={() => setSpiral("Good")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
-            <button onClick={() => setSpiral("Bad")} className={clsx("px-3 py-2.5 rounded-input text-xs font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+          <div className="flex flex-col gap-1 sm:gap-1.5 shrink-0">
+            <p className="text-[8px] sm:text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
+            <button onClick={() => setSpiral("Good")} className={clsx("px-2 sm:px-3 py-2 sm:py-2.5 rounded-input text-[10px] sm:text-xs font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+            <button onClick={() => setSpiral("Bad")} className={clsx("px-2 sm:px-3 py-2 sm:py-2.5 rounded-input text-[10px] sm:text-xs font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
           </div>
         </div>
 
