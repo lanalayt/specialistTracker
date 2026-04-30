@@ -92,7 +92,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
   }, [dragEdge, handleEdgeDrag]);
 
   return (
-    <div className="flex justify-center">
+    <div className="flex flex-col items-center">
       <div
         ref={containerRef}
         onClick={handleClick}
