@@ -259,7 +259,7 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                         </div>
                       </td>
                       {snapType === "FG" && kickInfos && (
-                        <td className="text-center text-xs text-slate-400 py-1 px-1">{kickInfos[idx]?.dist || "—"}</td>
+                        <td className={clsx("text-center text-xs py-1 px-1", kickInfos[idx]?.pos === "PAT" ? "bg-surface-2/50 text-muted/30" : "text-slate-400")}>{kickInfos[idx]?.pos === "PAT" ? "" : (kickInfos[idx]?.dist || "—")}</td>
                       )}
                       {snapType === "FG" && kickInfos && (
                         <td className="text-center text-xs text-slate-400 py-1 px-1">{kickInfos[idx]?.pos || "—"}</td>
