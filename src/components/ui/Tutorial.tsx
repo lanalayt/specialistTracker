@@ -177,8 +177,9 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Auto-show on first visit only
+  // Auto-show on first visit only, and only on dashboard (not login/signup)
   useEffect(() => {
+    if (pathname !== "/dashboard") return;
     try {
       if (!localStorage.getItem(STORAGE_KEY)) {
         // Mark as seen immediately so it never auto-shows again
@@ -190,7 +191,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
         return () => clearTimeout(t);
       }
     } catch {}
-  }, []);
+  }, [pathname]);
 
   const show = useCallback(() => {
     setStep(0);
