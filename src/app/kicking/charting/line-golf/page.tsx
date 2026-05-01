@@ -156,7 +156,6 @@ export default function LineGolfPage() {
                     <table className="w-full">
                       <thead><tr>
                         <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
-                        <th className="text-[10px] text-muted text-center py-1 px-1">Landed</th>
                         <th className="text-[10px] text-muted text-center py-1 px-1">Dir</th>
                         <th className="text-[10px] text-muted text-right py-1 px-1">Off</th>
                       </tr></thead>
@@ -164,9 +163,8 @@ export default function LineGolfPage() {
                         {pr.map((r, i) => (
                           <tr key={i} className="border-t border-border/30">
                             <td className="text-muted py-1 px-1">{i + 1}</td>
-                            <td className="text-center py-1 px-1">{r.landed}</td>
-                            <td className={clsx("text-center py-1 px-1", r.direction === "center" ? "text-make" : "text-slate-300")}>{r.direction === "center" ? "✓" : r.direction === "left" ? "←" : "→"}</td>
-                            <td className={clsx("text-right py-1 px-1 font-bold", r.score === 0 ? "text-make" : r.score <= 2 ? "text-accent" : "text-miss")}>{r.score}</td>
+                            <td className={clsx("text-center py-1 px-1", r.direction === "center" ? "text-make" : "text-slate-300")}>{r.direction === "center" ? "✓" : r.direction === "left" ? `← ${r.score}` : `${r.score} →`}</td>
+                            <td className={clsx("text-right py-1 px-1 font-bold", r.score === 0 ? "text-make" : r.score <= 2 ? "text-accent" : "text-miss")}>+{r.score}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -256,32 +254,27 @@ export default function LineGolfPage() {
           </div>
         </div>
 
-        {/* Input: Left | Target | Right */}
+        {/* Input: Left | 0 | Right */}
         <div className="flex items-center gap-2">
-          <div className="flex-1 space-y-1">
-            <p className="text-[10px] text-muted text-center uppercase tracking-wider">← Left</p>
-            <div className="flex gap-1">
-              <input type="text" inputMode="numeric" placeholder="YL" value={leftInput} onChange={(e) => setLeftInput(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => { if (e.key === "Enter") handleSubmitLeft(); }} className="input flex-1 text-center text-lg font-bold py-2" />
-              <button onClick={handleSubmitLeft} disabled={!leftInput} className="btn-primary px-3 py-2 text-xs disabled:opacity-40">Go</button>
-            </div>
+          <div className="flex-1">
+            <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">← Left</p>
+            <input type="text" inputMode="numeric" placeholder="" value={leftInput} onChange={(e) => { setLeftInput(e.target.value.replace(/\D/g, "")); if (e.target.value) setRightInput(""); }} className="input w-full text-center text-lg font-bold py-2" />
           </div>
 
-          <button onClick={handleSubmitCenter} className="px-4 py-6 rounded-input border-2 border-yellow-400/50 bg-yellow-400/10 text-yellow-400 font-black text-lg hover:bg-yellow-400/20 transition-all shrink-0">
+          <button onClick={handleSubmitCenter} className="px-4 py-4 rounded-input border-2 border-yellow-400/50 bg-yellow-400/10 text-yellow-400 font-black text-lg hover:bg-yellow-400/20 transition-all shrink-0 mt-4">
             0
           </button>
 
-          <div className="flex-1 space-y-1">
-            <p className="text-[10px] text-muted text-center uppercase tracking-wider">Right →</p>
-            <div className="flex gap-1">
-              <input type="text" inputMode="numeric" placeholder="YL" value={rightInput} onChange={(e) => setRightInput(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => { if (e.key === "Enter") handleSubmitRight(); }} className="input flex-1 text-center text-lg font-bold py-2" />
-              <button onClick={handleSubmitRight} disabled={!rightInput} className="btn-primary px-3 py-2 text-xs disabled:opacity-40">Go</button>
-            </div>
+          <div className="flex-1">
+            <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Right →</p>
+            <input type="text" inputMode="numeric" placeholder="" value={rightInput} onChange={(e) => { setRightInput(e.target.value.replace(/\D/g, "")); if (e.target.value) setLeftInput(""); }} className="input w-full text-center text-lg font-bold py-2" />
           </div>
         </div>
 
-        {/* Undo */}
+        {/* Go + Undo */}
         <div className="flex gap-2">
           {results.length > 0 && <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
+          <button onClick={() => { if (leftInput) handleSubmitLeft(); else if (rightInput) handleSubmitRight(); }} disabled={!leftInput && !rightInput} className="btn-primary flex-1 py-2 text-sm font-bold disabled:opacity-40">Go</button>
         </div>
 
         {/* Mini log */}
@@ -290,8 +283,7 @@ export default function LineGolfPage() {
             {results.map((r, i) => (
               <div key={i} className="flex items-center text-xs gap-2">
                 <span className="text-muted w-5">#{i + 1}</span>
-                <span className="text-slate-400 w-16 truncate">{r.athlete}</span>
-                <span className="w-8">{r.landed}</span>
+                {mode === "multi" && <span className="text-slate-400 w-16 truncate">{r.athlete}</span>}
                 <span className={clsx("w-6", r.direction === "center" ? "text-make" : "text-slate-300")}>{r.direction === "center" ? "✓" : r.direction === "left" ? "←" : "→"}</span>
                 <span className={clsx("font-bold ml-auto", r.score === 0 ? "text-make" : r.score <= 2 ? "text-accent" : "text-miss")}>+{r.score}</span>
               </div>
