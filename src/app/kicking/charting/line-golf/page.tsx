@@ -22,7 +22,7 @@ export default function LineGolfPage() {
 
   const [mode, setMode] = useState<"single" | "multi" | null>(null);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
-  const [targetYL, setTargetYL] = useState("50");
+  const [targetYL] = useState("50");
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -127,11 +127,7 @@ export default function LineGolfPage() {
             ))}
           </div>
           {mode === "multi" && selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
-          <div>
-            <p className="label">Target Yard Line</p>
-            <input type="text" inputMode="numeric" value={targetYL} onChange={(e) => setTargetYL(e.target.value.replace(/\D/g, ""))} className="input w-24 mx-auto text-center text-2xl font-bold" placeholder="50" />
-          </div>
-          <button onClick={() => setGameStarted(true)} disabled={!canStart || !targetYL} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
+          <button onClick={() => setGameStarted(true)} disabled={!canStart} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
           <button onClick={() => { setMode(null); setSelectedPlayers([]); }} className="text-xs text-muted hover:text-white transition-colors">← Back</button>
         </div>
       </div>
@@ -250,7 +246,7 @@ export default function LineGolfPage() {
               const offset = r.direction === "left" ? -r.score : r.direction === "right" ? r.score : 0;
               const pct = ((offset + 10) / 20) * 100;
               return (
-                <div key={i} className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%` }}>
+                <div key={i} className="absolute -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%`, top: "15%" }}>
                   <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", r.score === 0 ? "bg-green-500" : r.score <= 2 ? "bg-accent" : "bg-red-500")}>
                     {i + 1}
                   </div>
