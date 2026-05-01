@@ -64,10 +64,12 @@ export default function LineGolfPage() {
   };
 
   const handleTargetHangInput = (val: string) => {
-    const digits = val.replace(/\D/g, "");
+    const digits = val.replace(/[^\d]/g, "");
     setTargetHangInput(digits);
     setTargetHang(parseHangRaw(digits));
   };
+
+  const targetHangDisplay = targetHangInput ? parseHangRaw(targetHangInput).toFixed(2) : "";
 
   const HANG_PENALTY = 5;
 
@@ -178,12 +180,12 @@ export default function LineGolfPage() {
               <input
                 type="text"
                 inputMode="numeric"
-                placeholder=""
-                value={targetHangInput}
+                placeholder="0.00"
+                value={targetHangDisplay}
                 onChange={(e) => handleTargetHangInput(e.target.value)}
                 className="input w-24 text-center text-lg font-bold py-2"
               />
-              {targetHang > 0 && <span className="text-sm font-semibold text-accent">{targetHang.toFixed(2)}s</span>}
+              {targetHang > 0 && <span className="text-sm font-semibold text-muted">sec</span>}
             </div>
           </div>
           <button onClick={() => setGameStarted(true)} disabled={!canStart || targetHang <= 0} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
