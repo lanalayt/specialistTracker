@@ -280,19 +280,17 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                       </td>
                       )}
                       <td className="py-1 px-1 text-center">
-                        {row.accuracy === "Ball" || row.accuracy === "Strike" || row.accuracy.startsWith("✓") || row.accuracy.startsWith("✗") ? (
-                          <span className={clsx("text-xs font-bold", row.accuracy === "Ball" || row.accuracy.startsWith("✗") ? "text-miss" : "text-make")}>{row.accuracy}</span>
-                        ) : (
-                          <select
-                            value={row.accuracy}
-                            onChange={(e) => updateRow(idx, "accuracy", e.target.value)}
-                            className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60"
-                          >
-                            <option value="">—</option>
-                            <option value="Ball">Ball</option>
-                            <option value="Strike">Strike</option>
-                          </select>
-                        )}
+                        <select
+                          value={row.accuracy === "Ball" || row.accuracy.startsWith("✗") ? "Ball" : row.accuracy === "Strike" || row.accuracy.startsWith("✓") ? "Strike" : ""}
+                          onChange={(e) => updateRow(idx, "accuracy", e.target.value)}
+                          className={clsx("w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs font-bold focus:outline-none focus:border-accent/60",
+                            row.accuracy === "Strike" || row.accuracy.startsWith("✓") ? "text-make" : row.accuracy === "Ball" || row.accuracy.startsWith("✗") ? "text-miss" : "text-slate-200"
+                          )}
+                        >
+                          <option value="">—</option>
+                          <option value="Ball">Ball</option>
+                          <option value="Strike">Strike</option>
+                        </select>
                       </td>
                       {snapType === "FG" && (
                       <td className="py-1 px-1">
