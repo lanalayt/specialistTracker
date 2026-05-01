@@ -19,7 +19,7 @@ export default function KickingLayout({ children }: { children: React.ReactNode 
           {!isHub && (
             <SportSubNav
               basePath="/kicking"
-              extraTabs={[{ label: "FG Settings", slug: "settings" }]}
+              extraTabs={[{ label: "Charting Games", slug: "charting" }, { label: "FG Settings", slug: "settings" }]}
             />
           )}
           <AthleteViewOnly>{children}</AthleteViewOnly>

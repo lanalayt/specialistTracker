@@ -21,6 +21,7 @@ export default function LongSnapLayout({ children }: { children: React.ReactNode
             { label: "Statistics", slug: "statistics", coachOnly: false },
             { label: "History", slug: "history", coachOnly: false },
             { label: "Athletes", slug: "athletes", coachOnly: true },
+            { label: "Charting Games", slug: "charting", coachOnly: true },
             { label: "Settings", slug: "settings", coachOnly: true },
           ]} />}
           <AthleteViewOnly>{children}</AthleteViewOnly>

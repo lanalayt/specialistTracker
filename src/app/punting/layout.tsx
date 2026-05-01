@@ -19,7 +19,7 @@ export default function PuntingLayout({ children }: { children: React.ReactNode 
           {!isHub && (
             <SportSubNav
               basePath="/punting"
-              extraTabs={[{ label: "Punt Settings", slug: "settings" }]}
+              extraTabs={[{ label: "Charting Games", slug: "charting" }, { label: "Punt Settings", slug: "settings" }]}
             />
           )}
           <AthleteViewOnly>{children}</AthleteViewOnly>
