@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 import clsx from "clsx";
-import { teamGet, getTeamId } from "@/lib/teamData";
+import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 
 const DRAFT_SUFFIX = "fg";
 const INIT_ROWS = 12;
@@ -105,6 +105,17 @@ export default function LongSnapFGSessionPage() {
   useEffect(() => {
     try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers })); } catch {}
   }, [rows, weather, snapMarkers]);
+
+  const [draftSaved, setDraftSaved] = useState(false);
+  const handleSaveDraft = () => {
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") {
+      teamSet(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`, { rows, weather, snapMarkers });
+    }
+    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers })); } catch {}
+    setDraftSaved(true);
+    setTimeout(() => setDraftSaved(false), 2000);
+  };
 
   const updateRow = (idx: number, field: keyof LogRow, value: string | boolean) => {
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
@@ -285,10 +296,18 @@ export default function LongSnapFGSessionPage() {
               </span>
               {!viewOnly && filledRows.length > 0 && (
                 <button
-                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); } catch {} }}
+                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); const tid = getTeamId(); if (tid && tid !== "local-dev") teamSet(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`, null); } catch {} }}
                   className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
                 >
                   Clear Log
+                </button>
+              )}
+              {!viewOnly && filledRows.length > 0 && (
+                <button
+                  onClick={handleSaveDraft}
+                  className={clsx("text-xs px-3 py-2 rounded-input border font-semibold transition-all", draftSaved ? "border-make/50 text-make" : "border-accent/50 text-accent hover:bg-accent/10")}
+                >
+                  {draftSaved ? "✓ Draft Saved" : "Save Draft"}
                 </button>
               )}
               {!viewOnly && (
