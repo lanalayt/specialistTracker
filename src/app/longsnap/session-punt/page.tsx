@@ -52,6 +52,19 @@ export default function LongSnapPuntSessionPage() {
     return "simple";
   });
 
+  // Load from cloud on mount to ensure correct settings
+  useEffect(() => {
+    import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
+      loadSettingsFromCloud<{ chartMode?: string; missMode?: string }>("snapSettings").then((cloud) => {
+        if (cloud) {
+          if (cloud.chartMode === "detailed" || cloud.chartMode === "simple") setChartMode(cloud.chartMode);
+          if (cloud.missMode === "detailed" || cloud.missMode === "simple") setMissMode(cloud.missMode);
+          try { localStorage.setItem("snapSettings", JSON.stringify({ chartMode: cloud.chartMode, missMode: cloud.missMode })); } catch {}
+        }
+      });
+    });
+  }, []);
+
   // Re-read settings when changed
   useEffect(() => {
     const reload = () => {

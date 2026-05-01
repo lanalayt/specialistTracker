@@ -35,12 +35,14 @@ export default function SnapSettingsPage() {
   useEffect(() => {
     loadSettingsFromCloud<SnapSettings>(STORAGE_KEY).then((cloud) => {
       if (cloud) {
-        if (cloud.chartMode === "simple" || cloud.chartMode === "detailed") setChartMode(cloud.chartMode);
-        if (cloud.missMode === "simple" || cloud.missMode === "detailed") setMissMode(cloud.missMode);
-        setSavedSettings({
-          chartMode: cloud.chartMode === "detailed" ? "detailed" : "simple",
-          missMode: cloud.missMode === "detailed" ? "detailed" : "simple",
-        });
+        const cm = (cloud.chartMode === "detailed" ? "detailed" : "simple") as "simple" | "detailed";
+        const mm = (cloud.missMode === "detailed" ? "detailed" : "simple") as "simple" | "detailed";
+        setChartMode(cm);
+        setMissMode(mm);
+        const synced: SnapSettings = { chartMode: cm, missMode: mm };
+        setSavedSettings(synced);
+        // Sync cloud → localStorage so session pages pick it up
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(synced)); } catch {}
       }
     });
   }, []);

@@ -54,8 +54,21 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
   // Load snapping athletes from localStorage (same source as longSnapContext)
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
 
-  const [chartMode] = useState(() => loadSnapSettings().chartMode);
-  const [missMode] = useState(() => loadSnapSettings().missMode);
+  const [chartMode, setChartMode] = useState(() => loadSnapSettings().chartMode);
+  const [missMode, setMissMode] = useState(() => loadSnapSettings().missMode);
+
+  // Load from cloud to ensure correct settings
+  useEffect(() => {
+    import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
+      loadSettingsFromCloud<{ chartMode?: string; missMode?: string }>("snapSettings").then((cloud) => {
+        if (cloud) {
+          if (cloud.chartMode === "detailed" || cloud.chartMode === "simple") setChartMode(cloud.chartMode);
+          if (cloud.missMode === "detailed" || cloud.missMode === "simple") setMissMode(cloud.missMode);
+          try { localStorage.setItem("snapSettings", JSON.stringify({ chartMode: cloud.chartMode, missMode: cloud.missMode })); } catch {}
+        }
+      });
+    });
+  }, []);
 
   const storageKey = `${STORAGE_PREFIX}${snapType}`;
 
