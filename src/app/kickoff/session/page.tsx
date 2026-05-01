@@ -2107,14 +2107,9 @@ export default function KickoffSessionPage() {
               <KickoffFieldView kicks={sessionKicks.filter((k) => k.los != null && k.landingYL != null)} />
             </>
           ) : (
-            <>
-              <div className="grid grid-cols-3 gap-2">
-                <StatCard label="TB Rate" value={tbRate} accent glow />
-                <StatCard label="Avg Dist" value={avgDist ? `${avgDist} yd` : "—"} />
-                <StatCard label="Avg Hang" value={avgHang ? `${avgHang}s` : "—"} />
-              </div>
-              <ZoneBarChart data={zoneData} />
-            </>
+            <div className="flex items-center justify-center h-24 text-xs text-muted">
+              Session stats will appear here
+            </div>
           )}
         </div>
       </main>

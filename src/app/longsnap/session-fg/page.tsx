@@ -71,18 +71,10 @@ export default function LongSnapFGSessionPage() {
 
   const athleteNames = athletes.map((a) => a.name);
 
-  const totals = athletes.reduce(
-    (acc, a) => {
-      const fg = stats[a.name]?.byType?.FG;
-      const pat = stats[a.name]?.byType?.PAT;
-      return {
-        att: acc.att + (fg?.att ?? 0) + (pat?.att ?? 0),
-        onTarget: acc.onTarget + (fg?.onTarget ?? 0) + (pat?.onTarget ?? 0),
-      };
-    },
-    { att: 0, onTarget: 0 }
-  );
-  const onTargetPct = makePct(totals.att, totals.onTarget);
+  // Current session stats from the log rows
+  const filledForStats = rows.filter((r) => r.accuracy);
+  const sessionOnTarget = filledForStats.filter((r) => r.accuracy === "Strike" || r.accuracy === "ON_TARGET" || r.accuracy.startsWith("✓")).length;
+  const onTargetPct = makePct(filledForStats.length, sessionOnTarget);
 
   const draftKey = () => {
     const tid = getTeamId();
@@ -338,7 +330,7 @@ export default function LongSnapFGSessionPage() {
       <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <StatCard label="Strike %" value={onTargetPct} accent glow />
-          <StatCard label="FG/PAT Snaps" value={totals.att || "—"} />
+          <StatCard label="FG/PAT Snaps" value={filledForStats.length || "—"} />
         </div>
         <HolderStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} editable />
         {snapMarkers.length > 0 && (

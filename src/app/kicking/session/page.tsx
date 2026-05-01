@@ -2236,18 +2236,8 @@ export default function KickingSessionPage() {
               <FGFieldView kicks={sessionKicks} />
             </>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
-              <StatCard
-                label="Season %"
-                value={makePct(totals.att, totals.made)}
-                accent
-                glow
-              />
-              <StatCard label="Attempts" value={totals.att || "—"} />
-              <StatCard
-                label="Long FG"
-                value={totals.longFG > 0 ? `${totals.longFG} yd` : "—"}
-              />
+            <div className="flex items-center justify-center h-24 text-xs text-muted">
+              Session stats will appear here
             </div>
           )}
         </div>
