@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 
-const CARDS = [
+const BASE_CARDS = [
   { icon: "📋", label: "Session", desc: "Log kicks and commit practice", slug: "session" },
   { icon: "📊", label: "Statistics", desc: "Season charts and breakdowns", slug: "statistics" },
   { icon: "📁", label: "History", desc: "Browse past sessions", slug: "history" },
-  { icon: "👤", label: "Athletes", desc: "Manage athlete roster", slug: "athletes", coachOnly: true },
 ];
 
-export function SportHub({ basePath, sportName }: { basePath: string; sportName: string }) {
+const CHARTING_CARD = { icon: "🎯", label: "Charting Games", desc: "Fun competitive drills", slug: "charting" };
+
+const ATHLETES_CARD = { icon: "👤", label: "Athletes", desc: "Manage athlete roster", slug: "athletes", coachOnly: true as const };
+
+export function SportHub({ basePath, sportName, hasCharting = false }: { basePath: string; sportName: string; hasCharting?: boolean }) {
   const { isAthlete } = useAuth();
-  const visibleCards = isAthlete ? CARDS.filter((c) => !c.coachOnly) : CARDS;
+  const allCards = [...BASE_CARDS, ...(hasCharting ? [CHARTING_CARD] : []), ATHLETES_CARD];
+  const visibleCards = isAthlete ? allCards.filter((c) => !("coachOnly" in c && c.coachOnly)) : allCards;
 
   return (
     <main className="p-4 lg:p-8 max-w-2xl">

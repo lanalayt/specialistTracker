@@ -7,12 +7,14 @@ import { RoleGuard } from "@/components/auth/RoleGuard";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
+import { LongSnapProvider, useLongSnap } from "@/lib/longSnapContext";
 import clsx from "clsx";
 
 function AthletesContent() {
   const fg = useFG();
   const punt = usePunt();
   const kickoff = useKickoff();
+  const snap = useLongSnap();
   const [newName, setNewName] = useState("");
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
@@ -22,6 +24,7 @@ function AthletesContent() {
       ...fg.athletes.map((a) => a.name),
       ...punt.athletes.map((a) => a.name),
       ...kickoff.athletes.map((a) => a.name),
+      ...snap.athletes.map((a) => a.name),
     ])
   );
 
@@ -31,6 +34,7 @@ function AthletesContent() {
     fg.addAthletes([trimmed]);
     punt.addAthletes([trimmed]);
     kickoff.addAthletes([trimmed]);
+    snap.addAthletes([trimmed]);
     setNewName("");
   };
 
@@ -40,9 +44,11 @@ function AthletesContent() {
       const fgAthlete = fg.athletes.find((a) => a.name === name);
       const puntAthlete = punt.athletes.find((a) => a.name === name);
       const koAthlete = kickoff.athletes.find((a) => a.name === name);
+      const snapAthlete = snap.athletes.find((a) => a.name === name);
       if (fgAthlete) fg.removeAthlete(fgAthlete.id);
       if (puntAthlete) punt.removeAthlete(puntAthlete.id);
       if (koAthlete) kickoff.removeAthlete(koAthlete.id);
+      if (snapAthlete) snap.removeAthlete(snapAthlete.id);
       setConfirmRemove(null);
     } else {
       setConfirmRemove(name);
@@ -52,12 +58,14 @@ function AthletesContent() {
   const fgNames = new Set(fg.athletes.map((a) => a.name));
   const puntNames = new Set(punt.athletes.map((a) => a.name));
   const koNames = new Set(kickoff.athletes.map((a) => a.name));
+  const snapNames = new Set(snap.athletes.map((a) => a.name));
 
   const inSports = (name: string): string[] => {
     const sports: string[] = [];
     if (fgNames.has(name)) sports.push("FG");
     if (puntNames.has(name)) sports.push("Punt");
     if (koNames.has(name)) sports.push("KO");
+    if (snapNames.has(name)) sports.push("Snap");
     return sports;
   };
 
@@ -159,11 +167,13 @@ export default function AthletesPage() {
     <FGProvider>
       <PuntProvider>
         <KickoffProvider>
-          <div className="flex overflow-x-hidden max-w-[100vw]">
-            <Sidebar />
-            <AthletesContent />
-            <MobileNav />
-          </div>
+          <LongSnapProvider>
+            <div className="flex overflow-x-hidden max-w-[100vw]">
+              <Sidebar />
+              <AthletesContent />
+              <MobileNav />
+            </div>
+          </LongSnapProvider>
         </KickoffProvider>
       </PuntProvider>
     </FGProvider>

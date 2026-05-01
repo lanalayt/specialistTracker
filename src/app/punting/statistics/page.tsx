@@ -588,7 +588,7 @@ export default function PuntingStatisticsPage() {
   }, []);
 
   const modeHistory = useMemo(() => {
-    return history.filter((s) => gameMode === "game" ? s.mode === "game" : s.mode !== "game");
+    return history.filter((s) => !s.label?.startsWith("Line Golf") && (gameMode === "game" ? s.mode === "game" : s.mode !== "game"));
   }, [history, gameMode]);
 
   const filteredHistory = useMemo(() => {
