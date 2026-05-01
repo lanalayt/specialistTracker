@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     const { name, email, school, role } = await req.json();
 
     await resend.emails.send({
-      from: "Specialist Tracker <onboarding@resend.dev>",
+      from: "Specialist Tracker <noreply@specs-tracker.com>",
       to: "specialiststracker@gmail.com",
       subject: `New Signup: ${name} (${role})`,
       html: `
