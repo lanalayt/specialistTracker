@@ -76,9 +76,13 @@ function KickingHistoryContent() {
     }
     return "practice";
   });
-  const filteredHistory = history.filter((s) =>
-    modeFilter === "game" ? s.mode === "game" : s.mode !== "game"
-  );
+  const [historyTab, setHistoryTab] = useState<"sessions" | "charting">("sessions");
+
+  const isChartingSession = (s: Session) => s.label?.startsWith("Line Golf");
+
+  const filteredHistory = historyTab === "charting"
+    ? history.filter((s) => isChartingSession(s))
+    : history.filter((s) => !isChartingSession(s) && (modeFilter === "game" ? s.mode === "game" : s.mode !== "game"));
   const [selectedId, setSelectedId] = useState<string | null>(
     sessionParam && filteredHistory.some((s) => s.id === sessionParam)
       ? sessionParam
@@ -116,6 +120,27 @@ function KickingHistoryContent() {
         <div className="p-4 border-b border-border space-y-2">
           <div className="flex rounded-input border border-border overflow-hidden">
             <button
+              onClick={() => { setHistoryTab("sessions"); setSelectedId(null); }}
+              className={clsx(
+                "flex-1 px-2 py-1 text-[10px] font-semibold transition-colors",
+                historyTab === "sessions" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+              )}
+            >
+              Sessions
+            </button>
+            <button
+              onClick={() => { setHistoryTab("charting"); setSelectedId(null); }}
+              className={clsx(
+                "flex-1 px-2 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+                historyTab === "charting" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+              )}
+            >
+              Charting Games
+            </button>
+          </div>
+          {historyTab === "sessions" && (
+          <div className="flex rounded-input border border-border overflow-hidden">
+            <button
               onClick={() => { setModeFilter("practice"); setSelectedId(null); }}
               className={clsx(
                 "flex-1 px-2 py-1 text-[10px] font-semibold transition-colors",
@@ -134,6 +159,7 @@ function KickingHistoryContent() {
               GAME
             </button>
           </div>
+          )}
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">
             Sessions ({filteredHistory.length})
           </p>
