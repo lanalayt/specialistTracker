@@ -2609,8 +2609,16 @@ export default function PuntingSessionPage() {
               />
             </>
           ) : (() => {
-            const todayPunts = sessionPunts;
-            const athleteNames = [...new Set(todayPunts.map((p) => p.athlete))];
+            // Combine sessionPunts (from step-through) + table rows into stats
+            const filledRows = rows.filter((r) => r.athlete && (r.yards || r.hangTime || r.opTime || r.directionalAccuracy));
+            const allPunts = sessionPunts.length > 0 ? sessionPunts : filledRows.map((r) => ({
+              athlete: r.athlete,
+              yards: parseFloat(r.yards) || 0,
+              hangTime: parseFloat(r.hangTime) || 0,
+              opTime: parseFloat(r.opTime) || 0,
+              directionalAccuracy: r.directionalAccuracy ? (parseFloat(r.directionalAccuracy) || 0) : undefined,
+            }));
+            const athleteNames = [...new Set(allPunts.map((p) => p.athlete))];
 
             if (athleteNames.length === 0) {
               return (
@@ -2621,12 +2629,12 @@ export default function PuntingSessionPage() {
             }
 
             return athleteNames.map((name) => {
-              const ap = todayPunts.filter((p) => p.athlete === name);
+              const ap = allPunts.filter((p) => p.athlete === name);
               const count = ap.length;
               const ydsEntries = ap.filter((p) => p.yards > 0);
               const htEntries = ap.filter((p) => p.hangTime > 0);
               const otEntries = ap.filter((p) => p.opTime > 0);
-              const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number");
+              const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && !isNaN(p.directionalAccuracy as number));
               const totalYds = ydsEntries.reduce((s, p) => s + p.yards, 0);
               const totalHT = htEntries.reduce((s, p) => s + p.hangTime, 0);
               const totalOT = otEntries.reduce((s, p) => s + p.opTime, 0);
