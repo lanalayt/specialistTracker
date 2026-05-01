@@ -312,8 +312,13 @@ export default function LineGolfPage() {
               const baseOff = r.score - (r.hangTime < targetHang ? HANG_PENALTY : 0);
               const offset = r.direction === "left" ? -baseOff : r.direction === "right" ? baseOff : 0;
               const pct = ((offset + 10) / 20) * 100;
+              const samePosBefore = currentPlayerKicks.slice(0, i).filter((p) => {
+                const pBase = p.score - (p.hangTime < targetHang ? HANG_PENALTY : 0);
+                const po = p.direction === "left" ? -pBase : p.direction === "right" ? pBase : 0;
+                return po === offset;
+              }).length;
               return (
-                <div key={i} className="absolute -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%`, top: "15%" }}>
+                <div key={i} className="absolute -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%`, top: `${15 + samePosBefore * 24}%` }}>
                   <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", r.score === 0 ? "bg-green-500" : r.score <= 2 ? "bg-accent" : "bg-red-500")}>
                     {i + 1}
                   </div>
