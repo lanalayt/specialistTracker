@@ -219,7 +219,7 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Pos</th>}
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Laces</th>}
-                    {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">✓Spiral</th>}
+                    <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">✓Spiral</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -305,7 +305,6 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                         </select>
                       </td>
                       )}
-                      {snapType === "FG" && (
                       <td className="py-1 px-1 text-center">
                         <input
                           type="checkbox"
@@ -314,7 +313,6 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                           className="w-4 h-4 accent-accent cursor-pointer"
                         />
                       </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>
