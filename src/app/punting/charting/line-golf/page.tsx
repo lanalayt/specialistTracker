@@ -8,7 +8,6 @@ import clsx from "clsx";
 
 const KICK_OPTIONS = [3, 5, 10];
 const MAX_SCORE_PER_KICK = 10;
-const HANG_TARGETS = [3.5, 3.8, 4.0, 4.2, 4.5, 4.8, 5.0];
 
 interface KickResult {
   athlete: string;
@@ -26,7 +25,8 @@ export default function LineGolfPage() {
   const [mode, setMode] = useState<"single" | "multi" | null>(null);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [kicksPerPlayer, setKicksPerPlayer] = useState(10);
-  const [targetHang, setTargetHang] = useState(4.2);
+  const [targetHang, setTargetHang] = useState(0);
+  const [targetHangInput, setTargetHangInput] = useState("");
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -50,17 +50,34 @@ export default function LineGolfPage() {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
   };
 
-  const parseHang = (): number => {
-    const raw = hangInput.replace(/\D/g, "");
-    if (!raw) return 0;
-    return parseFloat(`${raw.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${raw.padStart(3, "0").slice(-2)}`);
+  const parseHangRaw = (raw: string): number => {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return 0;
+    return parseFloat(`${digits.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${digits.padStart(3, "0").slice(-2)}`);
   };
+
+  const parseHang = (): number => parseHangRaw(hangInput);
+
+  const formatHangDisplay = (raw: string): string => {
+    const val = parseHangRaw(raw);
+    return val > 0 ? val.toFixed(2) + "s" : "";
+  };
+
+  const handleTargetHangInput = (val: string) => {
+    const digits = val.replace(/\D/g, "");
+    setTargetHangInput(digits);
+    setTargetHang(parseHangRaw(digits));
+  };
+
+  const HANG_PENALTY = 5;
 
   const submitKick = (direction: "left" | "right" | "center", offAmount: number) => {
     const ht = parseHang();
     if (!ht) return;
-    const score = Math.min(offAmount, MAX_SCORE_PER_KICK);
-    const landed = direction === "left" ? target - score : direction === "right" ? target + score : target;
+    const baseScore = Math.min(offAmount, MAX_SCORE_PER_KICK);
+    const penalty = ht < targetHang ? HANG_PENALTY : 0;
+    const score = baseScore + penalty;
+    const landed = direction === "left" ? target - baseScore : direction === "right" ? target + baseScore : target;
     setResults((prev) => [...prev, { athlete: currentPlayer, target, landed, direction, score, hangTime: ht }]);
     setLeftInput(""); setRightInput(""); setHangInput("");
     if (results.length + 1 >= totalKicks) setGameOver(true);
@@ -121,6 +138,7 @@ export default function LineGolfPage() {
           <h2 className="text-xl font-bold text-slate-100">Line Golf</h2>
           <p className="text-sm text-muted">Hit the target yard line. Low score wins.</p>
           <p className="text-xs text-muted">Score = yards off the target. 0 is perfect.</p>
+          <p className="text-xs text-miss/80">Miss hang time target = +5 penalty yards.</p>
           <div className="flex gap-3">
             <button onClick={() => setMode("single")} className="btn-primary flex-1 py-3 text-sm">Single Player</button>
             <button onClick={() => setMode("multi")} className="btn-ghost flex-1 py-3 text-sm">Multiplayer</button>
@@ -156,13 +174,19 @@ export default function LineGolfPage() {
           </div>
           <div>
             <p className="label">Target Hang Time</p>
-            <div className="flex flex-wrap gap-1.5 justify-center">
-              {HANG_TARGETS.map((ht) => (
-                <button key={ht} onClick={() => setTargetHang(ht)} className={clsx("px-3 py-1.5 rounded-input text-xs font-bold border transition-all", targetHang === ht ? "bg-accent text-slate-900 border-accent" : "bg-surface-2 text-muted border-border")}>{ht.toFixed(1)}s</button>
-              ))}
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder=""
+                value={targetHangInput}
+                onChange={(e) => handleTargetHangInput(e.target.value)}
+                className="input w-24 text-center text-lg font-bold py-2"
+              />
+              {targetHang > 0 && <span className="text-sm font-semibold text-accent">{targetHang.toFixed(2)}s</span>}
             </div>
           </div>
-          <button onClick={() => setGameStarted(true)} disabled={!canStart} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
+          <button onClick={() => setGameStarted(true)} disabled={!canStart || targetHang <= 0} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
           <button onClick={() => { setMode(null); setSelectedPlayers([]); }} className="text-xs text-muted hover:text-white transition-colors">← Back</button>
         </div>
       </div>
@@ -198,14 +222,18 @@ export default function LineGolfPage() {
                         <th className="text-[10px] text-muted text-right py-1 px-1">Off</th>
                       </tr></thead>
                       <tbody>
-                        {pr.map((r, i) => (
+                        {pr.map((r, i) => {
+                          const penalty = r.hangTime < targetHang ? HANG_PENALTY : 0;
+                          const baseOff = r.score - penalty;
+                          return (
                           <tr key={i} className="border-t border-border/30">
                             <td className="text-muted py-1 px-1">{i + 1}</td>
-                            <td className={clsx("text-center py-1 px-1", r.direction === "center" ? "text-make" : "text-slate-300")}>{r.direction === "center" ? "✓" : r.direction === "left" ? `← ${r.score}` : `${r.score} →`}</td>
+                            <td className={clsx("text-center py-1 px-1", r.direction === "center" ? "text-make" : "text-slate-300")}>{r.direction === "center" ? "✓" : r.direction === "left" ? `← ${baseOff}` : `${baseOff} →`}</td>
                             <td className={clsx("text-center py-1 px-1", r.hangTime >= targetHang ? "text-make" : "text-miss")}>{r.hangTime.toFixed(2)}s</td>
-                            <td className={clsx("text-right py-1 px-1 font-bold", r.score === 0 ? "text-make" : r.score <= 2 ? "text-accent" : "text-miss")}>+{r.score}</td>
+                            <td className={clsx("text-right py-1 px-1 font-bold", r.score === 0 ? "text-make" : r.score <= 2 ? "text-accent" : "text-miss")}>+{r.score}{penalty > 0 ? <span className="text-miss text-[9px] ml-0.5">(+{penalty})</span> : ""}</td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -281,7 +309,8 @@ export default function LineGolfPage() {
               );
             })}
             {currentPlayerKicks.map((r, i) => {
-              const offset = r.direction === "left" ? -r.score : r.direction === "right" ? r.score : 0;
+              const baseOff = r.score - (r.hangTime < targetHang ? HANG_PENALTY : 0);
+              const offset = r.direction === "left" ? -baseOff : r.direction === "right" ? baseOff : 0;
               const pct = ((offset + 10) / 20) * 100;
               return (
                 <div key={i} className="absolute -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%`, top: "15%" }}>
@@ -334,15 +363,18 @@ export default function LineGolfPage() {
         {/* Mini log */}
         {results.length > 0 && (
           <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[150px]">
-            {results.map((r, i) => (
+            {results.map((r, i) => {
+              const penalty = r.hangTime < targetHang ? HANG_PENALTY : 0;
+              return (
               <div key={i} className="flex items-center text-xs gap-2">
                 <span className="text-muted w-5">#{i + 1}</span>
                 {mode === "multi" && <span className="text-slate-400 w-16 truncate">{r.athlete}</span>}
                 <span className={clsx("w-6", r.direction === "center" ? "text-make" : "text-slate-300")}>{r.direction === "center" ? "✓" : r.direction === "left" ? "←" : "→"}</span>
                 <span className={clsx("text-xs", r.hangTime >= targetHang ? "text-make" : "text-miss")}>{r.hangTime.toFixed(2)}s</span>
-                <span className={clsx("font-bold ml-auto", r.score === 0 ? "text-make" : r.score <= 2 ? "text-accent" : "text-miss")}>+{r.score}</span>
+                <span className={clsx("font-bold ml-auto", r.score === 0 ? "text-make" : r.score <= 2 ? "text-accent" : "text-miss")}>+{r.score}{penalty > 0 && <span className="text-miss text-[9px] ml-0.5">(+{penalty})</span>}</span>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
