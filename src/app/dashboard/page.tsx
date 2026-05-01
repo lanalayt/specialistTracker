@@ -156,11 +156,14 @@ function DashboardContent() {
   };
 
   // Merge all histories, tag with sport, sort by date descending
+  const isChartingSession = (s: { label?: string }) =>
+    s.label?.startsWith("Line Golf") || s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes");
+
   const allSessions = [
     ...fg.history.map((s) => ({ ...s, sport: "KICKING" as const })),
     ...punt.history.map((s) => ({ ...s, sport: "PUNTING" as const })),
     ...kickoff.history.map((s) => ({ ...s, sport: "KICKOFF" as const })),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  ].filter((s) => !isChartingSession(s)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
