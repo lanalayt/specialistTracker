@@ -213,7 +213,7 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                   <tr className="sticky top-0 z-10">
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-5 border-b border-border"></th>
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
-                    <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">LS</th>
+                    <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-8 border-b border-border">LS</th>
                     {snapType === "PUNT" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Time</th>}
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-12 border-b border-border">Dist</th>}
                     {snapType === "FG" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Pos</th>}
@@ -248,7 +248,7 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                                 onClick={() => updateRow(idx, "snapper", a)}
                                 title={a}
                                 className={clsx(
-                                  "w-6 h-6 rounded-full text-[8px] font-bold transition-all",
+                                  "w-5 h-5 rounded-full text-[7px] font-bold transition-all",
                                   row.snapper === a ? "bg-accent text-slate-900" : "bg-surface-2 text-muted border border-border/50 hover:text-white"
                                 )}
                               >
