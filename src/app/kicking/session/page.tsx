@@ -2235,11 +2235,32 @@ export default function KickingSessionPage() {
               })()}
               <FGFieldView kicks={sessionKicks} />
             </>
-          ) : (
-            <div className="flex items-center justify-center h-24 text-xs text-muted">
-              Session stats will appear here
-            </div>
-          )}
+          ) : (() => {
+            const kickRows = sessionKicks.length > 0 ? sessionKicks : filledRows.map(({ r }) => ({
+              dist: parseInt(r.dist) || 0,
+              result: r.result || "",
+              score: parseInt(r.score) || 0,
+              isPAT: r.pos === "PAT",
+            })).filter((k) => k.result);
+            const fgKicks = kickRows.filter((k) => !k.isPAT);
+            const att = fgKicks.length;
+            const made = fgKicks.filter((k) => k.result.startsWith("Y")).length;
+            const longFG = fgKicks.reduce((m, k) => k.result.startsWith("Y") ? Math.max(m, k.dist) : m, 0);
+            if (att === 0) {
+              return (
+                <div className="flex items-center justify-center h-24 text-xs text-muted">
+                  Session stats will appear here
+                </div>
+              );
+            }
+            return (
+              <div className="grid grid-cols-3 gap-2">
+                <StatCard label="Made" value={`${made}/${att}`} accent glow />
+                <StatCard label="%" value={makePct(att, made)} />
+                <StatCard label="Long" value={longFG > 0 ? `${longFG}` : "—"} />
+              </div>
+            );
+          })()}
         </div>
       </main>
 

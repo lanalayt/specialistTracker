@@ -2106,11 +2106,35 @@ export default function KickoffSessionPage() {
               })()}
               <KickoffFieldView kicks={sessionKicks.filter((k) => k.los != null && k.landingYL != null)} />
             </>
-          ) : (
-            <div className="flex items-center justify-center h-24 text-xs text-muted">
-              Session stats will appear here
-            </div>
-          )}
+          ) : (() => {
+            const kickRows = sessionKicks.length > 0 ? sessionKicks : filledRows.map(({ r }) => ({
+              distance: parseFloat(r.distance) || 0,
+              hangTime: parseFloat(r.hangTime) || 0,
+              endzone: r.endzone,
+              landingZone: r.endzone ? "TB" as const : undefined,
+            })).filter((k) => k.distance > 0 || k.hangTime > 0 || k.endzone);
+            const att = kickRows.length;
+            if (att === 0) {
+              return (
+                <div className="flex items-center justify-center h-24 text-xs text-muted">
+                  Session stats will appear here
+                </div>
+              );
+            }
+            const tbs = kickRows.filter((k) => k.endzone || k.landingZone === "TB").length;
+            const distKicks = kickRows.filter((k) => k.distance > 0);
+            const hangKicks = kickRows.filter((k) => k.hangTime > 0);
+            const sTBRate = `${Math.round((tbs / att) * 100)}%`;
+            const sAvgDist = distKicks.length > 0 ? (distKicks.reduce((s, k) => s + k.distance, 0) / distKicks.length).toFixed(1) : "—";
+            const sAvgHang = hangKicks.length > 0 ? (hangKicks.reduce((s, k) => s + k.hangTime, 0) / hangKicks.length).toFixed(2) : "—";
+            return (
+              <div className="grid grid-cols-3 gap-2">
+                <StatCard label="TB Rate" value={sTBRate} accent glow />
+                <StatCard label="Avg Dist" value={sAvgDist !== "—" ? `${sAvgDist} yd` : "—"} />
+                <StatCard label="Avg Hang" value={sAvgHang !== "—" ? `${sAvgHang}s` : "—"} />
+              </div>
+            );
+          })()}
         </div>
       </main>
 
