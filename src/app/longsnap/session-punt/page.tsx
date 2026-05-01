@@ -84,16 +84,12 @@ export default function LongSnapPuntSessionPage() {
 
   const athleteNames = athletes.map((a) => a.name);
 
-  const totals = athletes.reduce(
-    (acc, a) => {
-      const s = stats[a.name]?.byType?.[SNAP_TYPE];
-      if (!s) return acc;
-      return { att: acc.att + s.att, onTarget: acc.onTarget + s.onTarget, totalTime: acc.totalTime + s.totalTime };
-    },
-    { att: 0, onTarget: 0, totalTime: 0 }
-  );
-  const avgTime = totals.att > 0 ? (totals.totalTime / totals.att).toFixed(2) : "—";
-  const onTargetPct = makePct(totals.att, totals.onTarget);
+  // Current session stats from the log rows
+  const filledForStats = rows.filter((r) => r.accuracy);
+  const sessionOnTarget = filledForStats.filter((r) => r.accuracy === "Strike" || r.accuracy === "ON_TARGET" || r.accuracy.startsWith("✓")).length;
+  const sessionTimes = filledForStats.filter((r) => r.time && parseFloat(r.time) > 0);
+  const sessionAvgTime = sessionTimes.length > 0 ? (sessionTimes.reduce((s, r) => s + parseFloat(r.time), 0) / sessionTimes.length).toFixed(2) : "—";
+  const sessionPct = makePct(filledForStats.length, sessionOnTarget);
 
   const draftKey = () => {
     const tid = getTeamId();
@@ -400,9 +396,9 @@ export default function LongSnapPuntSessionPage() {
       {/* Right: Stats */}
       <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
         <div className="grid grid-cols-3 gap-2">
-          <StatCard label="Strike %" value={onTargetPct} accent glow />
-          <StatCard label="Avg Time" value={totals.att > 0 ? `${avgTime}s` : "—"} />
-          <StatCard label="Punt Snaps" value={totals.att || "—"} />
+          <StatCard label="Strike %" value={sessionPct} accent glow />
+          <StatCard label="Avg Time" value={sessionAvgTime !== "—" ? `${sessionAvgTime}s` : "—"} />
+          <StatCard label="Punt Snaps" value={filledForStats.length || "—"} />
         </div>
         <PunterStrikeZone markers={snapMarkers} onSnap={handleSnapClick} nextNum={nextSnapNum} chartMode={chartMode} missMode={missMode} editable />
         {snapMarkers.length > 0 && (
