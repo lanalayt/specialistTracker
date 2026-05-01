@@ -69,6 +69,12 @@ export default function LongSnapHistoryPage() {
                 >
                   <p className="text-sm font-semibold text-slate-200">{s.label}</p>
                   <p className="text-xs text-muted mt-0.5">
+                    {(() => {
+                      const hasLong = ss.some((e) => e.snapType === "PUNT");
+                      const hasShort = ss.some((e) => e.snapType === "FG" || e.snapType === "PAT");
+                      const typeLabel = hasLong && hasShort ? "Mixed" : hasShort ? "Short Snap" : "Long Snap";
+                      return <><span className="text-accent font-semibold">{typeLabel}</span> · </>;
+                    })()}
                     {ss.length} snap{ss.length !== 1 ? "s" : ""}
                   </p>
                 </button>
@@ -246,36 +252,87 @@ export default function LongSnapHistoryPage() {
                   </div>
                 </div>
               );
-            })() : (
-            <div className="card-2 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="table-header text-left">#</th>
-                    <th className="table-header text-left">Athlete</th>
-                    <th className="table-header">Type</th>
-                    <th className="table-header">Time</th>
-                    <th className="table-header">Accuracy</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {snaps.map((s, i) => (
-                    <tr key={i} className="hover:bg-surface/30">
-                      <td className="table-cell text-left text-muted">{i + 1}</td>
-                      <td className="table-name">{s.athlete}</td>
-                      <td className="table-cell text-muted">{s.snapType}</td>
-                      <td className="table-cell font-bold">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
-                      <td className="table-cell">
-                        <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                          {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            )}
+            })() : (() => {
+              const isShort = snaps.every((s) => s.snapType === "FG" || s.snapType === "PAT");
+              const isLong = snaps.every((s) => s.snapType === "PUNT");
+              if (isShort) {
+                const strikes = snaps.filter((s) => s.accuracy === "ON_TARGET").length;
+                const crits = snaps.filter((s) => s.critical).length;
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-accent uppercase tracking-wider">FG / Short Snap</span>
+                      <span className="text-xs text-muted">·</span>
+                      <span className="text-xs text-muted">{strikes}/{snaps.length} Strikes</span>
+                    </div>
+                    <div className="card-2 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr>
+                            <th className="table-header text-left">#</th>
+                            <th className="table-header text-left">Athlete</th>
+                            <th className="table-header">Acc</th>
+                            <th className="table-header">Laces</th>
+                            <th className="table-header">Spiral</th>
+                            <th className="table-header">Crit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {snaps.map((s, i) => (
+                            <tr key={i} className="hover:bg-surface/30">
+                              <td className="table-cell text-left text-muted">{i + 1}</td>
+                              <td className="table-name">{s.athlete}</td>
+                              <td className="table-cell">
+                                <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                  {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
+                                </span>
+                              </td>
+                              <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces || "—"}</td>
+                              <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Good" : s.spiral === "Bad" ? "Bad" : "—"}</td>
+                              <td className="table-cell">{s.critical ? <span className="text-miss font-bold">!</span> : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              }
+              // Long snap or mixed
+              return (
+                <div className="space-y-3">
+                  {isLong && <span className="text-xs font-bold text-accent uppercase tracking-wider">Punt / Long Snap</span>}
+                  <div className="card-2 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className="table-header text-left">#</th>
+                          <th className="table-header text-left">Athlete</th>
+                          {!isLong && <th className="table-header">Type</th>}
+                          <th className="table-header">Time</th>
+                          <th className="table-header">Accuracy</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {snaps.map((s, i) => (
+                          <tr key={i} className="hover:bg-surface/30">
+                            <td className="table-cell text-left text-muted">{i + 1}</td>
+                            <td className="table-name">{s.athlete}</td>
+                            {!isLong && <td className="table-cell text-muted">{s.snapType}</td>}
+                            <td className="table-cell font-bold">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
+                            <td className="table-cell">
+                              <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
