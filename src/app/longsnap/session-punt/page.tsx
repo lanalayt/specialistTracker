@@ -302,14 +302,16 @@ export default function LongSnapPuntSessionPage() {
                     />
                   </td>
                   <td className="py-1 px-1 text-center">
-                    {row.accuracy === "Ball" || row.accuracy === "Strike" || row.accuracy.startsWith("✓") || row.accuracy.startsWith("✗") ? (
-                      <span className={clsx("text-xs font-bold", row.accuracy === "Ball" || row.accuracy.startsWith("✗") ? "text-miss" : "text-make")}>{row.accuracy}</span>
+                    {row.accuracy.startsWith("✓") || row.accuracy.startsWith("✗") ? (
+                      <span className={clsx("text-xs font-bold", row.accuracy.startsWith("✗") ? "text-miss" : "text-make")}>{row.accuracy}</span>
                     ) : (
                       <select
                         value={row.accuracy}
                         onChange={(e) => updateRow(idx, "accuracy", e.target.value)}
                         disabled={viewOnly}
-                        className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
+                        className={clsx("w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs font-bold focus:outline-none focus:border-accent/60 disabled:opacity-60",
+                          row.accuracy === "Strike" ? "text-make" : row.accuracy === "Ball" ? "text-miss" : "text-slate-200"
+                        )}
                       >
                         <option value="">—</option>
                         <option value="Ball">Ball</option>
