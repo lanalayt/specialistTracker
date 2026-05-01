@@ -92,10 +92,10 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
     });
   }, []);
 
-  // Ensure rows match entry count
+  // Ensure rows grow to match entry count (never shrink — preserve saved data)
   useEffect(() => {
     setRows((prev) => {
-      if (prev.length >= entryCount) return prev.slice(0, entryCount);
+      if (prev.length >= entryCount) return prev;
       const extra = Array.from({ length: entryCount - prev.length }, () => ({ snapper: "", time: "", accuracy: "", laces: "", spiral: "" }));
       return [...prev, ...extra];
     });
