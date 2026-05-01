@@ -3,20 +3,16 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 
-const BASE_CARDS = [
+const GRID_CARDS = [
   { icon: "📋", label: "Session", desc: "Log kicks and commit practice", slug: "session" },
   { icon: "📊", label: "Statistics", desc: "Season charts and breakdowns", slug: "statistics" },
   { icon: "📁", label: "History", desc: "Browse past sessions", slug: "history" },
+  { icon: "👤", label: "Athletes", desc: "Manage athlete roster", slug: "athletes", coachOnly: true },
 ];
-
-const CHARTING_CARD = { icon: "🎯", label: "Charting Games", desc: "Fun competitive drills", slug: "charting" };
-
-const ATHLETES_CARD = { icon: "👤", label: "Athletes", desc: "Manage athlete roster", slug: "athletes", coachOnly: true as const };
 
 export function SportHub({ basePath, sportName, hasCharting = false }: { basePath: string; sportName: string; hasCharting?: boolean }) {
   const { isAthlete } = useAuth();
-  const allCards = [...BASE_CARDS, ...(hasCharting ? [CHARTING_CARD] : []), ATHLETES_CARD];
-  const visibleCards = isAthlete ? allCards.filter((c) => !("coachOnly" in c && c.coachOnly)) : allCards;
+  const visibleCards = isAthlete ? GRID_CARDS.filter((c) => !c.coachOnly) : GRID_CARDS;
 
   return (
     <main className="p-4 lg:p-8 max-w-2xl">
@@ -46,6 +42,20 @@ export function SportHub({ basePath, sportName, hasCharting = false }: { basePat
           </Link>
         ))}
       </div>
+      {hasCharting && (
+        <div className="mt-4 flex justify-center">
+          <Link
+            href={`${basePath}/charting`}
+            className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 w-[calc(50%+0.5rem)]"
+          >
+            <span className="text-4xl mb-3">🎯</span>
+            <h3 className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">
+              Charting Games
+            </h3>
+            <p className="text-xs text-muted mt-1">Fun competitive drills</p>
+          </Link>
+        </div>
+      )}
     </main>
   );
 }
