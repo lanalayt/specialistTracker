@@ -138,8 +138,11 @@ export default function LongSnapPuntSessionPage() {
 
   const filledRows = rows.filter((r) => r.athlete || r.time || r.accuracy);
 
-  // Find the next row that needs accuracy filled
-  const nextSnapNum = snapMarkers.length + 1;
+  // Find the next row that needs accuracy filled (skip manually filled rows)
+  const nextSnapNum = (() => {
+    const idx = rows.findIndex((r) => !r.accuracy);
+    return idx >= 0 ? idx + 1 : rows.length + 1;
+  })();
 
   const CELL_ARROWS: Record<string, string> = {
     TL: "✓↖", TC: "✓↑", TR: "✓↗",

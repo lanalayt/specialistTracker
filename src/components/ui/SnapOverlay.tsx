@@ -122,7 +122,10 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
   };
 
-  const nextSnapNum = snapMarkers.length + 1;
+  const nextSnapNum = (() => {
+    const idx = rows.findIndex((r) => !r.accuracy);
+    return idx >= 0 ? idx + 1 : rows.length + 1;
+  })();
 
   const CELL_ARROWS: Record<string, string> = {
     TL: "✓↖", TC: "✓↑", TR: "✓↗",

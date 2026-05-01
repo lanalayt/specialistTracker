@@ -46,7 +46,10 @@ export default function LongSnapFGSessionPage() {
   const [committed, setCommitted] = useState(false);
   const [snapMarkers, setSnapMarkers] = useState<ShortSnapMarker[]>([]);
 
-  const nextSnapNum = snapMarkers.length + 1;
+  const nextSnapNum = (() => {
+    const idx = rows.findIndex((r) => !r.accuracy);
+    return idx >= 0 ? idx + 1 : rows.length + 1;
+  })();
 
   const handleSnapClick = (marker: ShortSnapMarker) => {
     const rowIdx = marker.num - 1;
