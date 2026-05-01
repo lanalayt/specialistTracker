@@ -45,8 +45,8 @@ export default function SignupPage() {
     try {
       const role: UserRole = roleChoice === "athlete" ? "athlete" : "admin";
       await signUp(form.email, form.password, form.name, role, roleChoice === "athlete" ? teamCode.trim() : undefined);
-      // Notify about new signup (fire and forget)
-      fetch("/api/notify-signup", {
+      // Notify about new signup
+      await fetch("/api/notify-signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: form.name, email: form.email, school: form.school, role: roleChoice }),
