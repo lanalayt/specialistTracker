@@ -241,16 +241,22 @@ function PuntHistoryContent() {
                               })}
                               {ap.map((p, i) => {
                                 const dir = (p.landingZones?.[0] ?? "").toUpperCase();
-                                const off = dir === "LEFT" ? -p.yards : dir === "RIGHT" ? p.yards : 0;
+                                const penalty = hangTarget > 0 && p.hangTime > 0 && p.hangTime < hangTarget ? 5 : 0;
+                                const baseYards = p.yards - penalty;
+                                const off = dir === "LEFT" ? -baseYards : dir === "RIGHT" ? baseYards : 0;
                                 const pct = ((off + 10) / 20) * 100;
                                 const samePosBefore = ap.slice(0, i).filter((prev) => {
                                   const pd = (prev.landingZones?.[0] ?? "").toUpperCase();
-                                  const po = pd === "LEFT" ? -prev.yards : pd === "RIGHT" ? prev.yards : 0;
+                                  const prevPenalty = hangTarget > 0 && prev.hangTime > 0 && prev.hangTime < hangTarget ? 5 : 0;
+                                  const po = pd === "LEFT" ? -(prev.yards - prevPenalty) : pd === "RIGHT" ? (prev.yards - prevPenalty) : 0;
                                   return po === off;
                                 }).length;
                                 return (
                                   <div key={i} className="absolute -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%`, top: `${15 + samePosBefore * 24}%` }}>
-                                    <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", p.yards === 0 ? "bg-green-500" : p.yards <= 2 ? "bg-accent" : "bg-red-500")}>{i + 1}</div>
+                                    <div className="relative">
+                                      <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", p.yards === 0 ? "bg-green-500" : p.yards <= 2 ? "bg-accent" : "bg-red-500")}>{i + 1}</div>
+                                      {penalty > 0 && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-miss whitespace-nowrap">+{penalty}</span>}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -268,12 +274,14 @@ function PuntHistoryContent() {
                               <tbody>
                                 {ap.map((p, i) => {
                                   const dir = (p.landingZones?.[0] ?? "").toUpperCase();
+                                  const pen = hangTarget > 0 && p.hangTime > 0 && p.hangTime < hangTarget ? 5 : 0;
+                                  const base = p.yards - pen;
                                   return (
                                     <tr key={i} className="border-t border-border/30">
                                       <td className="text-muted py-1 px-1">{i + 1}</td>
-                                      <td className={clsx("text-center py-1 px-1", dir === "CENTER" ? "text-make" : "text-slate-300")}>{dir === "CENTER" ? "✓" : dir === "LEFT" ? `← ${p.yards}` : `${p.yards} →`}</td>
+                                      <td className={clsx("text-center py-1 px-1", dir === "CENTER" ? "text-make" : "text-slate-300")}>{dir === "CENTER" ? "✓" : dir === "LEFT" ? `← ${base}` : `${base} →`}</td>
                                       <td className={clsx("text-center py-1 px-1", hangTarget > 0 ? (p.hangTime >= hangTarget ? "text-make" : "text-miss") : "text-slate-300")}>{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
-                                      <td className={clsx("text-right py-1 px-1 font-bold", p.yards === 0 ? "text-make" : p.yards <= 2 ? "text-accent" : "text-miss")}>+{p.yards}</td>
+                                      <td className={clsx("text-right py-1 px-1 font-bold", p.yards === 0 ? "text-make" : p.yards <= 2 ? "text-accent" : "text-miss")}>+{p.yards}{pen > 0 ? <span className="text-miss text-[9px] ml-0.5">(+{pen})</span> : ""}</td>
                                     </tr>
                                   );
                                 })}
