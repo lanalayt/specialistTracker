@@ -46,19 +46,17 @@ export default function LineGolfPage() {
   };
 
   const handleSubmitLeft = () => {
-    const yl = parseInt(leftInput);
-    if (isNaN(yl)) return;
-    const score = Math.abs(target - yl);
-    setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: yl, direction: "left", score }]);
+    const off = parseInt(leftInput);
+    if (isNaN(off) || off <= 0) return;
+    setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target - off, direction: "left", score: off }]);
     setLeftInput("");
     if (results.length + 1 >= totalKicks) setGameOver(true);
   };
 
   const handleSubmitRight = () => {
-    const yl = parseInt(rightInput);
-    if (isNaN(yl)) return;
-    const score = Math.abs(target - yl);
-    setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: yl, direction: "right", score }]);
+    const off = parseInt(rightInput);
+    if (isNaN(off) || off <= 0) return;
+    setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target + off, direction: "right", score: off }]);
     setRightInput("");
     if (results.length + 1 >= totalKicks) setGameOver(true);
   };
@@ -94,11 +92,6 @@ export default function LineGolfPage() {
     setLeftInput(""); setRightInput("");
   };
 
-  // Field yard lines for display
-  const fieldLines = [];
-  for (let yl = Math.max(0, target - 15); yl <= Math.min(100, target + 15); yl += 5) {
-    fieldLines.push(yl);
-  }
 
   // Mode selection
   if (!mode) {
@@ -236,27 +229,26 @@ export default function LineGolfPage() {
           <div className="h-full bg-accent transition-all" style={{ width: `${(results.length / totalKicks) * 100}%` }} />
         </div>
 
-        {/* Field view */}
+        {/* Field view — 0 in center, counts up to 10 each side */}
         <div className="card-2 py-4">
           <div className="relative mx-auto" style={{ height: 120 }}>
             {/* Green field background */}
             <div className="absolute inset-0 rounded bg-green-900/40" />
-            {/* Yard lines */}
-            {fieldLines.map((yl) => {
-              const pct = ((yl - (target - 15)) / 30) * 100;
-              const isTarget = yl === target;
+            {/* Lines: -10 to +10, 0 in center */}
+            {Array.from({ length: 21 }, (_, i) => i - 10).map((offset) => {
+              const pct = ((offset + 10) / 20) * 100;
+              const isCenter = offset === 0;
               return (
-                <div key={yl} className="absolute top-0 bottom-0" style={{ left: `${Math.max(0, Math.min(100, pct))}%` }}>
-                  <div className={clsx("h-full w-px", isTarget ? "bg-yellow-400" : "bg-white/20")} />
-                  <span className={clsx("absolute -bottom-4 -translate-x-1/2 text-[8px]", isTarget ? "text-yellow-400 font-bold" : "text-white/40")}>{yl > 50 ? 100 - yl : yl}</span>
+                <div key={offset} className="absolute top-0 bottom-0" style={{ left: `${pct}%` }}>
+                  <div className={clsx("h-full w-px", isCenter ? "bg-yellow-400" : offset % 5 === 0 ? "bg-white/30" : "bg-white/10")} />
+                  {(offset % 2 === 0) && <span className={clsx("absolute -bottom-4 -translate-x-1/2 text-[8px]", isCenter ? "text-yellow-400 font-bold" : "text-white/40")}>{Math.abs(offset)}</span>}
                 </div>
               );
             })}
             {/* Kick markers for current player */}
             {currentPlayerKicks.map((r, i) => {
               const offset = r.direction === "left" ? -r.score : r.direction === "right" ? r.score : 0;
-              const yl = r.target + offset;
-              const pct = ((yl - (target - 15)) / 30) * 100;
+              const pct = ((offset + 10) / 20) * 100;
               return (
                 <div key={i} className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%` }}>
                   <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", r.score === 0 ? "bg-green-500" : r.score <= 2 ? "bg-accent" : "bg-red-500")}>
@@ -279,7 +271,7 @@ export default function LineGolfPage() {
           </div>
 
           <button onClick={handleSubmitCenter} className="px-4 py-6 rounded-input border-2 border-yellow-400/50 bg-yellow-400/10 text-yellow-400 font-black text-lg hover:bg-yellow-400/20 transition-all shrink-0">
-            {target}
+            0
           </button>
 
           <div className="flex-1 space-y-1">
