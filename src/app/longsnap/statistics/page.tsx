@@ -55,6 +55,34 @@ export default function LongSnapStatisticsPage() {
     { att: 0, onTarget: 0, totalTime: 0, criticals: 0 }
   );
 
+  // Laces scoring: Good=1, 1/4 Out=0.5, 1/4 In=0.5, Back=0
+  const lacesScore = (val?: string): number | null => {
+    if (!val) return null;
+    if (val === "Good") return 1;
+    if (val === "1/4 Out" || val === "1/4 In") return 0.5;
+    if (val === "Back") return 0;
+    return null;
+  };
+
+  // Compute per-athlete laces stats from practice history
+  const lacesStats = useMemo(() => {
+    const result: Record<string, { total: number; att: number }> = {};
+    practiceHistory.forEach((session) => {
+      const snaps = (session.entries ?? []) as LongSnapEntry[];
+      snaps.forEach((s) => {
+        if (s.snapType !== "FG" && s.snapType !== "PAT") return;
+        const score = lacesScore(s.laces);
+        if (score === null) return;
+        if (!result[s.athlete]) result[s.athlete] = { total: 0, att: 0 };
+        result[s.athlete].total += score;
+        result[s.athlete].att += 1;
+      });
+    });
+    return result;
+  }, [practiceHistory]);
+
+  const totalLaces = Object.values(lacesStats).reduce((acc, v) => ({ total: acc.total + v.total, att: acc.att + v.att }), { total: 0, att: 0 });
+
   // Short snap (FG + PAT) totals
   const shortTotals = athletes.reduce(
     (acc, a) => {
@@ -91,9 +119,10 @@ export default function LongSnapStatisticsPage() {
         <button onClick={() => setSnapTab("short")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", snapTab === "short" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Short Snap</button>
       </div>
 
-      <div className={snapTab === "long" ? "grid grid-cols-3 gap-3" : "grid grid-cols-2 gap-3"}>
+      <div className={snapTab === "long" ? "grid grid-cols-3 gap-3" : "grid grid-cols-3 gap-3"}>
         <StatCard label="Strike %" value={onTargetPct} accent glow />
         {snapTab === "long" && <StatCard label="Avg Time" value={longTotals.att > 0 ? `${avgTime}s` : "—"} />}
+        {snapTab === "short" && <StatCard label="Laces %" value={totalLaces.att > 0 ? `${Math.round((totalLaces.total / totalLaces.att) * 100)}%` : "—"} />}
         <StatCard label="Total Snaps" value={activeTotals.att || "—"} />
       </div>
 
@@ -109,6 +138,7 @@ export default function LongSnapStatisticsPage() {
                 <th className="table-header">Snaps</th>
                 <th className="table-header">Strike %</th>
                 {snapTab === "long" && <th className="table-header">Avg Time</th>}
+                {snapTab === "short" && <th className="table-header">Laces %</th>}
                 <th className="table-header">Crit</th>
               </tr>
             </thead>
@@ -139,6 +169,10 @@ export default function LongSnapStatisticsPage() {
                       {bucket.totalTime && bucket.att > 0 ? `${(bucket.totalTime / bucket.att).toFixed(2)}s` : "—"}
                     </td>
                     )}
+                    {snapTab === "short" && (() => {
+                      const ls = lacesStats[a.name];
+                      return <td className="table-cell">{ls && ls.att > 0 ? `${Math.round((ls.total / ls.att) * 100)}%` : "—"}</td>;
+                    })()}
                     <td className={`table-cell ${(bucket.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{bucket.criticals || "—"}</td>
                   </tr>
                 );
