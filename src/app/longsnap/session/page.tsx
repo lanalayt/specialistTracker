@@ -11,7 +11,7 @@ export default function LongSnapSessionChooser() {
           <p className="text-sm text-muted mt-1">Choose your session type.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Link
             href="/longsnap/session-punt"
             className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
@@ -28,15 +28,6 @@ export default function LongSnapSessionChooser() {
             <div className="text-4xl mb-3">🏈</div>
             <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Short Snap</h3>
             <p className="text-xs text-muted mt-1">FG &amp; PAT snapping session</p>
-          </Link>
-
-          <Link
-            href="/longsnap/charting"
-            className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
-          >
-            <div className="text-4xl mb-3">📊</div>
-            <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Charting Games</h3>
-            <p className="text-xs text-muted mt-1">30 Point Game &amp; Balls/Strikes</p>
           </Link>
         </div>
       </div>
