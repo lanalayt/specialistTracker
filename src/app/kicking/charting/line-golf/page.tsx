@@ -104,7 +104,7 @@ export default function LineGolfPage() {
         <div className="text-center space-y-4 max-w-sm">
           <div className="text-5xl mb-4">⛳</div>
           <h2 className="text-xl font-bold text-slate-100">Line Golf</h2>
-          <p className="text-sm text-muted">10 kicks. Hit the target yard line. Low score wins.</p>
+          <p className="text-sm text-muted">Kick across the field, down a yard line. Hit the target. Low score wins.</p>
           <p className="text-xs text-muted">Score = yards off the target. 0 is perfect.</p>
           <div className="flex gap-3">
             <button onClick={() => setMode("single")} className="btn-primary flex-1 py-3 text-sm">Single Player</button>

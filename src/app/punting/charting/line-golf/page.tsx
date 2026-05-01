@@ -138,7 +138,7 @@ export default function LineGolfPage() {
         <div className="text-center space-y-4 max-w-sm">
           <div className="text-5xl mb-4">⛳</div>
           <h2 className="text-xl font-bold text-slate-100">Line Golf</h2>
-          <p className="text-sm text-muted">Hit the target yard line. Low score wins.</p>
+          <p className="text-sm text-muted">Punt across the field, down a yard line. Hit the target. Low score wins.</p>
           <p className="text-xs text-muted">Score = yards off the target. 0 is perfect.</p>
           <p className="text-xs text-miss/80">Miss hang time target = +5 penalty yards.</p>
           <div className="flex gap-3">
