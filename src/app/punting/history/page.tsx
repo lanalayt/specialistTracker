@@ -183,6 +183,105 @@ function PuntHistoryContent() {
             >
               ← All Sessions
             </button>
+            {isChartingSession(selected) ? (() => {
+              // Line Golf history detail for punt
+              const byAthlete: Record<string, PuntEntry[]> = {};
+              punts.forEach((p) => { if (!byAthlete[p.athlete]) byAthlete[p.athlete] = []; byAthlete[p.athlete].push(p); });
+              const athleteNames = Object.keys(byAthlete);
+              const isMulti = athleteNames.length > 1;
+              // opTime stores the target hang time
+              const hangTarget = punts[0]?.opTime || 0;
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
+                      <p className="text-xs text-muted mt-0.5">{punts.length} punts{hangTarget > 0 ? ` · Hang target: ${hangTarget.toFixed(1)}s` : ""}</p>
+                    </div>
+                    {!viewOnly && (
+                      <button
+                        onClick={() => { if (window.confirm(`Delete "${selected.label}"? You can restore it within 7 days.`)) { deleteSession(selected.id); setSelectedId(null); } }}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
+                      >Delete</button>
+                    )}
+                  </div>
+                  <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                    {athleteNames.map((name) => {
+                      const ap = byAthlete[name];
+                      const totalScore = ap.reduce((s, p) => s + p.yards, 0);
+                      const hangEntries = ap.filter((p) => p.hangTime > 0);
+                      const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+                      const hangHits = hangTarget > 0 ? hangEntries.filter((p) => p.hangTime >= hangTarget).length : 0;
+                      return (
+                        <div key={name} className="space-y-3">
+                          {isMulti ? <p className="text-sm font-bold text-slate-200 text-center">{name}</p> : <p className="text-sm font-bold text-slate-200">{name}</p>}
+                          <div className="card-2 py-3 text-center">
+                            <p className="text-3xl font-black text-accent">{totalScore}</p>
+                            <p className="text-[10px] text-muted mt-1">Total yards off</p>
+                            {hangEntries.length > 0 && (
+                              <div className="mt-2 flex items-center justify-center gap-3 text-xs">
+                                <span className="text-muted">Avg Hang: <span className="text-slate-200 font-semibold">{avgHang}s</span></span>
+                                {hangTarget > 0 && <span className="text-muted">Hits: <span className="text-make font-semibold">{hangHits}/{hangEntries.length}</span></span>}
+                              </div>
+                            )}
+                          </div>
+                          {/* Field view */}
+                          <div className="card-2 py-4">
+                            <div className="relative mx-auto" style={{ height: 100 }}>
+                              <div className="absolute inset-0 rounded bg-green-900/40" />
+                              {Array.from({ length: 21 }, (_, i) => i - 10).map((offset) => {
+                                const pct = ((offset + 10) / 20) * 100;
+                                const isCtr = offset === 0;
+                                return (
+                                  <div key={offset} className="absolute top-0 bottom-0" style={{ left: `${pct}%` }}>
+                                    <div className={clsx("h-full w-px", isCtr ? "bg-yellow-400" : offset % 5 === 0 ? "bg-white/30" : "bg-white/10")} />
+                                    {offset % 2 === 0 && <span className={clsx("absolute -bottom-4 -translate-x-1/2 text-[8px]", isCtr ? "text-yellow-400 font-bold" : "text-white/40")}>{Math.abs(offset)}</span>}
+                                  </div>
+                                );
+                              })}
+                              {ap.map((p, i) => {
+                                const dir = (p.landingZones?.[0] ?? "").toUpperCase();
+                                const off = dir === "LEFT" ? -p.yards : dir === "RIGHT" ? p.yards : 0;
+                                const pct = ((off + 10) / 20) * 100;
+                                return (
+                                  <div key={i} className="absolute -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%`, top: "15%" }}>
+                                    <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", p.yards === 0 ? "bg-green-500" : p.yards <= 2 ? "bg-accent" : "bg-red-500")}>{i + 1}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {/* Kick table */}
+                          <div className="card-2 text-xs">
+                            <table className="w-full">
+                              <thead><tr>
+                                <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Dir</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Hang</th>
+                                <th className="text-[10px] text-muted text-right py-1 px-1">Off</th>
+                              </tr></thead>
+                              <tbody>
+                                {ap.map((p, i) => {
+                                  const dir = (p.landingZones?.[0] ?? "").toUpperCase();
+                                  return (
+                                    <tr key={i} className="border-t border-border/30">
+                                      <td className="text-muted py-1 px-1">{i + 1}</td>
+                                      <td className={clsx("text-center py-1 px-1", dir === "CENTER" ? "text-make" : "text-slate-300")}>{dir === "CENTER" ? "✓" : dir === "LEFT" ? `← ${p.yards}` : `${p.yards} →`}</td>
+                                      <td className={clsx("text-center py-1 px-1", hangTarget > 0 ? (p.hangTime >= hangTarget ? "text-make" : "text-miss") : "text-slate-300")}>{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
+                                      <td className={clsx("text-right py-1 px-1 font-bold", p.yards === 0 ? "text-make" : p.yards <= 2 ? "text-accent" : "text-miss")}>+{p.yards}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })() : (<>
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
               {!viewOnly && editingId === selected.id ? (
@@ -489,6 +588,7 @@ function PuntHistoryContent() {
                 </div>
               );
             })()}
+          </>)}
           </>
         )}
       </div>

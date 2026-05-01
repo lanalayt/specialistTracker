@@ -80,7 +80,7 @@ export default function LineGolfPage() {
     if (results.length === 0) return;
     const kicks: FGKick[] = results.map((r, i) => ({
       athleteId: r.athlete, athlete: r.athlete,
-      dist: r.score, pos: "M" as FGPosition, result: "YC" as FGResult,
+      dist: r.score, pos: "M" as FGPosition, result: (r.direction === "center" ? "YC" : r.direction === "left" ? "YL" : "YR") as FGResult,
       score: r.score, kickNum: i + 1,
     }));
     const label = mode === "multi"

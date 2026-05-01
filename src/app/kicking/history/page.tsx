@@ -212,6 +212,93 @@ function KickingHistoryContent() {
             >
               ← All Sessions
             </button>
+            {isChartingSession(selected) ? (() => {
+              // Line Golf history detail
+              const byAthlete: Record<string, FGKick[]> = {};
+              kicks.forEach((k) => { if (!byAthlete[k.athlete]) byAthlete[k.athlete] = []; byAthlete[k.athlete].push(k); });
+              const athleteNames = Object.keys(byAthlete);
+              const isMulti = athleteNames.length > 1;
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
+                      <p className="text-xs text-muted mt-0.5">{kicks.length} kicks</p>
+                    </div>
+                    {!viewOnly && (
+                      <button
+                        onClick={() => { if (window.confirm(`Delete "${selected.label}"? You can restore it within 7 days.`)) { deleteSession(selected.id); setSelectedId(null); } }}
+                        className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
+                      >Delete</button>
+                    )}
+                  </div>
+                  <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
+                    {athleteNames.map((name) => {
+                      const ak = byAthlete[name];
+                      const totalScore = ak.reduce((s, k) => s + k.score, 0);
+                      return (
+                        <div key={name} className="space-y-3">
+                          {isMulti && <p className="text-sm font-bold text-slate-200 text-center">{name}</p>}
+                          {!isMulti && <p className="text-sm font-bold text-slate-200">{name}</p>}
+                          <div className="card-2 py-3 text-center">
+                            <p className="text-3xl font-black text-accent">{totalScore}</p>
+                            <p className="text-[10px] text-muted mt-1">Total yards off</p>
+                          </div>
+                          {/* Field view */}
+                          <div className="card-2 py-4">
+                            <div className="relative mx-auto" style={{ height: 100 }}>
+                              <div className="absolute inset-0 rounded bg-green-900/40" />
+                              {Array.from({ length: 21 }, (_, i) => i - 10).map((offset) => {
+                                const pct = ((offset + 10) / 20) * 100;
+                                const isCtr = offset === 0;
+                                return (
+                                  <div key={offset} className="absolute top-0 bottom-0" style={{ left: `${pct}%` }}>
+                                    <div className={clsx("h-full w-px", isCtr ? "bg-yellow-400" : offset % 5 === 0 ? "bg-white/30" : "bg-white/10")} />
+                                    {offset % 2 === 0 && <span className={clsx("absolute -bottom-4 -translate-x-1/2 text-[8px]", isCtr ? "text-yellow-400 font-bold" : "text-white/40")}>{Math.abs(offset)}</span>}
+                                  </div>
+                                );
+                              })}
+                              {ak.map((k, i) => {
+                                const dir = k.result === "YL" ? "left" : k.result === "YR" ? "right" : "center";
+                                const off = dir === "left" ? -k.score : dir === "right" ? k.score : 0;
+                                const pct = ((off + 10) / 20) * 100;
+                                return (
+                                  <div key={i} className="absolute -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%`, top: "15%" }}>
+                                    <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", k.score === 0 ? "bg-green-500" : k.score <= 2 ? "bg-accent" : "bg-red-500")}>{i + 1}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {/* Kick table */}
+                          <div className="card-2 text-xs">
+                            <table className="w-full">
+                              <thead><tr>
+                                <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
+                                <th className="text-[10px] text-muted text-center py-1 px-1">Dir</th>
+                                <th className="text-[10px] text-muted text-right py-1 px-1">Off</th>
+                              </tr></thead>
+                              <tbody>
+                                {ak.map((k, i) => {
+                                  const dir = k.result === "YL" ? "left" : k.result === "YR" ? "right" : "center";
+                                  return (
+                                    <tr key={i} className="border-t border-border/30">
+                                      <td className="text-muted py-1 px-1">{i + 1}</td>
+                                      <td className={clsx("text-center py-1 px-1", dir === "center" ? "text-make" : "text-slate-300")}>{dir === "center" ? "✓" : dir === "left" ? `← ${k.score}` : `${k.score} →`}</td>
+                                      <td className={clsx("text-right py-1 px-1 font-bold", k.score === 0 ? "text-make" : k.score <= 2 ? "text-accent" : "text-miss")}>+{k.score}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })() : (<>
             <div className="flex items-center justify-between mb-4">
               <div className="flex-1">
                 {!viewOnly && editingId === selected.id ? (
@@ -481,6 +568,7 @@ function KickingHistoryContent() {
                 </tbody>
               </table>
             </div>
+          </>)}
           </>
         )}
       </div>
