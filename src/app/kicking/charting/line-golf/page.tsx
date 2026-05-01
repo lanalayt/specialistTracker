@@ -6,7 +6,8 @@ import Link from "next/link";
 import type { FGKick, FGPosition, FGResult } from "@/types";
 import clsx from "clsx";
 
-const KICKS_PER_PLAYER = 10;
+const KICK_OPTIONS = [3, 5, 10];
+const MAX_SCORE_PER_KICK = 10;
 
 interface KickResult {
   athlete: string;
@@ -23,6 +24,7 @@ export default function LineGolfPage() {
   const [mode, setMode] = useState<"single" | "multi" | null>(null);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [targetYL] = useState("50");
+  const [kicksPerPlayer, setKicksPerPlayer] = useState(10);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -32,7 +34,7 @@ export default function LineGolfPage() {
   const [rightInput, setRightInput] = useState("");
 
   const players = mode === "single" ? (selectedPlayers.length === 1 ? selectedPlayers : []) : selectedPlayers;
-  const totalKicks = players.length * KICKS_PER_PLAYER;
+  const totalKicks = players.length * kicksPerPlayer;
   const currentKickIdx = results.length;
   const currentPlayerIdx = players.length > 0 ? currentKickIdx % players.length : 0;
   const currentPlayer = players[currentPlayerIdx] ?? "";
@@ -48,7 +50,8 @@ export default function LineGolfPage() {
   const handleSubmitLeft = () => {
     const off = parseInt(leftInput);
     if (isNaN(off) || off <= 0) return;
-    setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target - off, direction: "left", score: off }]);
+    const score = Math.min(off, MAX_SCORE_PER_KICK);
+    setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target - score, direction: "left", score }]);
     setLeftInput("");
     if (results.length + 1 >= totalKicks) setGameOver(true);
   };
@@ -56,7 +59,8 @@ export default function LineGolfPage() {
   const handleSubmitRight = () => {
     const off = parseInt(rightInput);
     if (isNaN(off) || off <= 0) return;
-    setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target + off, direction: "right", score: off }]);
+    const score = Math.min(off, MAX_SCORE_PER_KICK);
+    setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target + score, direction: "right", score }]);
     setRightInput("");
     if (results.length + 1 >= totalKicks) setGameOver(true);
   };
@@ -127,6 +131,14 @@ export default function LineGolfPage() {
             ))}
           </div>
           {mode === "multi" && selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
+          <div>
+            <p className="label">Kicks Per Player</p>
+            <div className="flex gap-2 justify-center">
+              {KICK_OPTIONS.map((n) => (
+                <button key={n} onClick={() => setKicksPerPlayer(n)} className={clsx("px-4 py-2 rounded-input text-sm font-bold border transition-all", kicksPerPlayer === n ? "bg-accent text-slate-900 border-accent" : "bg-surface-2 text-muted border-border")}>{n}</button>
+              ))}
+            </div>
+          </div>
           <button onClick={() => setGameStarted(true)} disabled={!canStart} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
           <button onClick={() => { setMode(null); setSelectedPlayers([]); }} className="text-xs text-muted hover:text-white transition-colors">← Back</button>
         </div>
@@ -193,7 +205,7 @@ export default function LineGolfPage() {
       <div className="max-w-lg mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Kick {playerKickCount} of {KICKS_PER_PLAYER}</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Kick {playerKickCount} of {kicksPerPlayer}</p>
           {mode === "single" && (
             <div className="text-right">
               <p className="text-2xl font-black text-accent">{playerScore}</p>
@@ -211,7 +223,7 @@ export default function LineGolfPage() {
                 <div className={clsx("card-2 px-4 py-2 text-center", p === currentPlayer && "ring-2 ring-accent")}>
                   <p className="text-xs font-bold text-slate-200">{p}</p>
                   <p className="text-lg font-black text-accent">{getPlayerScore(p)}</p>
-                  <p className="text-[10px] text-muted">Kick {getPlayerResults(p).length + (p === currentPlayer ? 1 : 0)}/{KICKS_PER_PLAYER}</p>
+                  <p className="text-[10px] text-muted">Kick {getPlayerResults(p).length + (p === currentPlayer ? 1 : 0)}/{kicksPerPlayer}</p>
                 </div>
               </div>
             ))}
