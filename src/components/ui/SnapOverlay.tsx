@@ -211,6 +211,7 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="sticky top-0 z-10">
+                    <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-5 border-b border-border"></th>
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
                     <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">LS</th>
                     {snapType === "PUNT" && <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Time</th>}
@@ -224,6 +225,18 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
                 <tbody>
                   {rows.map((row, idx) => (
                     <tr key={idx} className="border-b border-border/30">
+                      <td className="text-center py-1 px-0">
+                        {(row.snapper || row.time || row.accuracy || row.laces || row.spiral) ? (
+                          <button
+                            onClick={() => {
+                              setRows((prev) => prev.map((r, i) => i === idx ? { snapper: "", time: "", accuracy: "", laces: "", spiral: "" } : r));
+                              setSnapMarkers((prev) => prev.filter((m) => m.num !== idx + 1));
+                            }}
+                            className="text-[9px] text-miss/50 hover:text-miss transition-colors"
+                            title="Clear row"
+                          >✕</button>
+                        ) : null}
+                      </td>
                       <td className="text-center text-muted py-1 px-1">{idx + 1}</td>
                       <td className="py-1 px-0.5">
                         <div className="flex gap-0.5 justify-center">
@@ -311,6 +324,17 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
             {/* Footer */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted flex-1">{filledRows.length} of {entryCount} snaps</span>
+              {filledRows.length > 0 && (
+                <button
+                  onClick={() => {
+                    setRows((prev) => prev.map(() => ({ snapper: "", time: "", accuracy: "", laces: "", spiral: "" })));
+                    setSnapMarkers([]);
+                  }}
+                  className="text-xs py-1.5 px-3 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 transition-all"
+                >
+                  Clear All
+                </button>
+              )}
               <button
                 onClick={handleSaveToDraft}
                 disabled={filledRows.length === 0}
