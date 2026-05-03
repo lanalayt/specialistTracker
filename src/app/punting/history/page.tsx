@@ -41,7 +41,7 @@ function PuntHistoryContent() {
   });
   const [historyTab, setHistoryTab] = useState<"sessions" | "charting">("sessions");
 
-  const isChartingSession = (s: Session) => s.label?.startsWith("Line Golf");
+  const isChartingSession = (s: Session) => s.label?.startsWith("Line Golf") || s.label?.startsWith("Punt Battle");
 
   const filteredHistory = historyTab === "charting"
     ? history.filter((s) => isChartingSession(s))

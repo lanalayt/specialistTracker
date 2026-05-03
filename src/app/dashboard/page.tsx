@@ -157,7 +157,7 @@ function DashboardContent() {
 
   // Merge all histories, tag with sport, sort by date descending
   const isChartingSession = (s: { label?: string }) =>
-    s.label?.startsWith("Line Golf") || s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes");
+    s.label?.startsWith("Line Golf") || s.label?.startsWith("Punt Battle") || s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes");
 
   const allSessions = [
     ...fg.history.map((s) => ({ ...s, sport: "KICKING" as const })),
