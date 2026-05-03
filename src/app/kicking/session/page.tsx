@@ -1721,26 +1721,9 @@ export default function KickingSessionPage() {
               sessionMode === "game" ? "bg-red-500/10 border-red-500/40" : "border-border"
             )}>
               <div className="flex items-center gap-3">
-                <div className="flex rounded-input border border-border overflow-hidden" data-tutorial="mode-toggle">
-                  <button
-                    onClick={() => switchMode("practice")}
-                    className={clsx(
-                      "px-3 py-1.5 text-xs font-semibold transition-colors",
-                      sessionMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
-                    )}
-                  >
-                    Practice
-                  </button>
-                  <button
-                    onClick={() => switchMode("game")}
-                    className={clsx(
-                      "px-3 py-1.5 text-xs font-semibold transition-colors border-l border-border",
-                      sessionMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
-                    )}
-                  >
-                    GAME
-                  </button>
-                </div>
+                <button onClick={() => setSessionMode(null)} className="text-xs text-muted hover:text-accent transition-colors font-semibold">← Back</button>
+                <span className={clsx("text-[10px] font-bold uppercase tracking-wider", sessionMode === "game" ? "text-red-400" : "text-accent")}>{sessionMode === "game" ? "Game Mode" : "Practice Mode"}</span>
+                <div className="flex-1" />
                 <div className="flex rounded-input border border-border overflow-hidden" data-tutorial="entry-mode-toggle">
                   <button
                     onClick={() => { if (sessionMode !== "game") setManualEntry(false); }}
