@@ -384,31 +384,37 @@ export default function PuntingSessionPage() {
     };
   }, []);
 
-  // Load punt types from cloud on fresh device
+  // Load punt types from cloud only if localStorage has no settings (fresh device)
   useEffect(() => {
-    loadSettingsFromCloud<{ puntTypes?: Record<string, unknown>[]; puntCategories?: PuntCategoryConfig[] }>("puntSettings").then((cloud) => {
-      if (cloud?.puntTypes && cloud.puntTypes.length > 0) {
-        const cats = cloud.puntCategories?.length ? cloud.puntCategories : DEFAULT_CATEGORIES;
-        const enabledCats = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
-        setPuntTypes(cloud.puntTypes.map((t) => {
-          const id = t.id as string;
-          const upper = id.toUpperCase();
-          let category = (t.category as string) ?? "DIRECTIONAL";
-          if (!t.category) {
-            if (upper.includes("POOCH")) category = "POOCH";
-            else if (upper.includes("BANANA")) category = "BANANA";
-            else if (upper.includes("RUGBY")) category = "RUGBY";
-          }
-          return {
-            id,
-            label: t.label as string,
-            category,
-            metric: (t.metric as "distance" | "yardline") ?? (upper.includes("POOCH") ? "yardline" : "distance"),
-            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
-          };
-        }).filter((t) => enabledCats.has(t.category)));
-      }
-    });
+    const hasLocal = !!localStorage.getItem("puntSettings");
+    if (!hasLocal) {
+      loadSettingsFromCloud<{ puntTypes?: Record<string, unknown>[]; puntCategories?: PuntCategoryConfig[] }>("puntSettings").then((cloud) => {
+        if (cloud?.puntTypes && cloud.puntTypes.length > 0) {
+          const cats = cloud.puntCategories?.length ? cloud.puntCategories : DEFAULT_CATEGORIES;
+          const enabledCats = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
+          const types = cloud.puntTypes.map((t) => {
+            const id = t.id as string;
+            const upper = id.toUpperCase();
+            let category = (t.category as string) ?? "DIRECTIONAL";
+            if (!t.category) {
+              if (upper.includes("POOCH")) category = "POOCH";
+              else if (upper.includes("BANANA")) category = "BANANA";
+              else if (upper.includes("RUGBY")) category = "RUGBY";
+            }
+            return {
+              id,
+              label: t.label as string,
+              category,
+              metric: (t.metric as "distance" | "yardline") ?? (upper.includes("POOCH") ? "yardline" : "distance"),
+              hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
+            };
+          }).filter((t) => enabledCats.has(t.category));
+          setPuntTypes(types);
+          // Sync cloud → localStorage so future loads are correct
+          try { localStorage.setItem("puntSettings", JSON.stringify({ puntTypes: cloud.puntTypes, puntCategories: cloud.puntCategories })); } catch {}
+        }
+      });
+    }
 
     // Load draft from cloud if local is empty
     const tid = getTeamId();

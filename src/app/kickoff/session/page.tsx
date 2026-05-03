@@ -246,25 +246,30 @@ export default function KickoffSessionPage() {
     };
   }, []);
 
+  // Load kickoff settings from cloud only if localStorage has no settings (fresh device)
   useEffect(() => {
-    import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
-      loadSettingsFromCloud<{ kickoffTypes?: Record<string, unknown>[]; kickoffCategories?: KOCategoryConfig[]; directionEnabled?: boolean; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
-        if (cloud?.kickoffTypes?.length) {
-          const cats: KOCategoryConfig[] = cloud.kickoffCategories?.length ? cloud.kickoffCategories : DEFAULT_KO_CATEGORIES;
-          const enabled = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
-          setKoTypes(cloud.kickoffTypes.map((t) => ({
-            id: t.id as string,
-            label: t.label as string,
-            category: (t.category as string) ?? "DEEP",
-            metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
-            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
-          })).filter((t) => enabled.has(t.category)));
-        }
-        if (typeof cloud?.directionEnabled === "boolean") setKoDirEnabled(cloud.directionEnabled);
-        if (cloud?.directionMetrics?.length) setKoDirs(cloud.directionMetrics);
+    const hasLocal = !!localStorage.getItem("kickoffSettings");
+    if (!hasLocal) {
+      import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
+        loadSettingsFromCloud<{ kickoffTypes?: Record<string, unknown>[]; kickoffCategories?: KOCategoryConfig[]; directionEnabled?: boolean; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
+          if (cloud?.kickoffTypes?.length) {
+            const cats: KOCategoryConfig[] = cloud.kickoffCategories?.length ? cloud.kickoffCategories : DEFAULT_KO_CATEGORIES;
+            const enabled = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
+            setKoTypes(cloud.kickoffTypes.map((t) => ({
+              id: t.id as string,
+              label: t.label as string,
+              category: (t.category as string) ?? "DEEP",
+              metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
+              hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+            })).filter((t) => enabled.has(t.category)));
+          }
+          if (typeof cloud?.directionEnabled === "boolean") setKoDirEnabled(cloud.directionEnabled);
+          if (cloud?.directionMetrics?.length) setKoDirs(cloud.directionMetrics);
+          // Sync to localStorage
+          if (cloud) try { localStorage.setItem("kickoffSettings", JSON.stringify(cloud)); } catch {}
+        });
       });
-    });
-
+    }
   }, []);
 
   // ── Initialize all state from localStorage ──────────────────
