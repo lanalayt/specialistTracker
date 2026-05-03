@@ -203,16 +203,25 @@ export default function KickingSessionPage() {
   const viewOnly = isAthlete && !canEdit;
 
   // ── Initialize all state from localStorage ──────────────────
-  const [initialMode] = useState<"practice" | "game">(() => {
+  const [initialMode] = useState<"practice" | "game" | null>(() => {
     // Check if game mode has active data
     const gameDraft = loadDraftForMode("game");
     if ((gameDraft?.sessionKicks?.length ?? 0) > 0 || gameDraft?.sessionActive || gameDraft?.committed) {
       return "game";
     }
-    return "practice";
+    // Check if practice mode has active data
+    const practiceDraft = loadDraftForMode("practice");
+    if ((practiceDraft?.sessionKicks?.length ?? 0) > 0 || practiceDraft?.sessionActive || practiceDraft?.committed) {
+      return "practice";
+    }
+    // Check if practice rows have data
+    if (practiceDraft?.rows?.some((r: LogRow) => r.athlete || r.dist || r.result)) {
+      return "practice";
+    }
+    return null;
   });
   const [draft] = useState<SessionDraft>(() => {
-    const saved = loadDraftForMode(initialMode);
+    const saved = initialMode ? loadDraftForMode(initialMode) : null;
     return saved ?? {
       rows: Array.from({ length: INIT_ROWS }, emptyRow),
       manualEntry: true,
@@ -244,7 +253,7 @@ export default function KickingSessionPage() {
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedKicks, setCommittedKicks] = useState<FGKick[]>(draft.committedKicks ?? []);
-  const [sessionMode, setSessionMode] = useState<"practice" | "game">(initialMode);
+  const [sessionMode, setSessionMode] = useState<"practice" | "game" | null>(initialMode);
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
   const [draftSaved, setDraftSaved] = useState(false);
@@ -307,7 +316,7 @@ export default function KickingSessionPage() {
 
     // Load draft from cloud if local is empty
     const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
+    if (tid && tid !== "local-dev" && sessionMode) {
       teamGet<SessionDraft>(tid, `fg_session_draft_${sessionMode}`).then((cloudDraft) => {
         if (cloudDraft && cloudDraft.rows) {
           const localDraft = loadDraftForMode(sessionMode);
@@ -331,6 +340,7 @@ export default function KickingSessionPage() {
 
   // Persist draft on every relevant state change
   useEffect(() => {
+    if (!sessionMode) return;
     // Merge current input fields into partialInputs for the active kick
     const mergedPartials = sessionActive && !isPlannedLogged(currentKickIdx)
       ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred } }
@@ -365,9 +375,9 @@ export default function KickingSessionPage() {
       currentKickIdx, sessionKicks, partialInputs: mergedPartials,
       committed, committedWeather: committed ? weather : undefined,
       committedKicks: committed ? committedKicks : undefined,
-      sessionMode, opponent, gameTime,
+      sessionMode: sessionMode ?? undefined, opponent, gameTime,
     };
-    saveDraftForMode(currentDraft, sessionMode);
+    if (sessionMode) saveDraftForMode(currentDraft, sessionMode);
     // Load new mode's draft
     const nd = loadDraftForMode(newMode);
     setRows(nd?.rows ?? Array.from({ length: INIT_ROWS }, emptyRow));
@@ -796,7 +806,7 @@ export default function KickingSessionPage() {
 
   const handleConfirmCommit = () => {
     if (!pendingKicks) return;
-    commitPractice(pendingKicks, undefined, weather, sessionMode, opponent, gameTime);
+    commitPractice(pendingKicks, undefined, weather, sessionMode ?? undefined, opponent, gameTime);
     setCommittedKicks(pendingKicks);
     setPendingKicks(null);
     setCommitted(true);
@@ -822,9 +832,10 @@ export default function KickingSessionPage() {
     setOpponent("");
     setGameTime("");
     // Clear the saved draft for the current mode
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && sessionMode) {
       try { localStorage.removeItem(draftKey(sessionMode)); } catch {}
     }
+    setSessionMode(null);
   };
 
   const saveDraftToCloud = () => {
@@ -838,7 +849,7 @@ export default function KickingSessionPage() {
         currentKickIdx, sessionKicks, partialInputs: mergedPartials,
         committed, committedWeather: committed ? weather : undefined,
         committedKicks: committed ? committedKicks : undefined,
-        sessionMode, opponent, gameTime,
+        sessionMode: sessionMode ?? undefined, opponent, gameTime,
       };
       teamSet(tid, `fg_session_draft_${sessionMode}`, draft);
       setDraftSaved(true);
@@ -870,6 +881,40 @@ export default function KickingSessionPage() {
     setPartialInputs(clearUndoData.partialInputs);
     setClearUndoData(null);
   };
+
+  // ════════════════════════════════════════════════════════════
+  //  MODE CHOOSER — shown when no active draft
+  // ════════════════════════════════════════════════════════════
+  if (sessionMode === null) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="space-y-6 w-full max-w-lg">
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-slate-100">FG Session</h2>
+            <p className="text-sm text-muted mt-1">Choose your session type.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              onClick={() => { setSessionMode("practice"); switchMode("practice"); }}
+              className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
+            >
+              <div className="text-4xl mb-3">📋</div>
+              <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Practice</h3>
+              <p className="text-xs text-muted mt-1">Log practice kicks</p>
+            </button>
+            <button
+              onClick={() => { setSessionMode("game"); switchMode("game"); }}
+              className="card hover:bg-surface-2 hover:border-red-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
+            >
+              <div className="text-4xl mb-3">🏟️</div>
+              <h3 className="text-lg font-bold text-slate-100 group-hover:text-red-400 transition-colors">Game</h3>
+              <p className="text-xs text-muted mt-1">Chart a live game</p>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ════════════════════════════════════════════════════════════
   //  SESSION MODE — step-through card view
