@@ -2734,6 +2734,7 @@ export default function PuntingSessionPage() {
           snapType="PUNT"
           entryCount={filledCount}
           onClose={() => setShowSnapOverlay(false)}
+          gameMode={sessionMode === "game"}
         />
       )}
     </>

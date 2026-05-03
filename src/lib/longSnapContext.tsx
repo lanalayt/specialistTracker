@@ -25,7 +25,7 @@ interface LongSnapContextValue {
   history: Session[];
   addAthletes: (names: string[]) => void;
   removeAthlete: (athleteId: string) => void;
-  commitPractice: (entries: LongSnapEntry[], label?: string, weather?: string) => Session;
+  commitPractice: (entries: LongSnapEntry[], label?: string, weather?: string, mode?: "practice" | "game", opponent?: string, gameTime?: string) => Session;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   deleteSession: (sessionId: string) => void;
 }
@@ -151,12 +151,13 @@ export function LongSnapProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const commitPractice = useCallback((entries: LongSnapEntry[], label?: string, weather?: string): Session => {
+  const commitPractice = useCallback((entries: LongSnapEntry[], label?: string, weather?: string, mode: "practice" | "game" = "practice", opponent?: string, gameTime?: string): Session => {
     const tid = getTeamId();
     const session: Session = {
       id: genId(), teamId: tid ?? "local", sport: "LONGSNAP",
       label: label ?? sessionLabel(), date: new Date().toISOString(),
       weather: weather || undefined, entries,
+      mode, opponent: opponent || undefined, gameTime: gameTime || undefined,
     };
     setSessions((prev) => [...prev, session]);
     if (tid && tid !== "local-dev") { stampSessionWrite(tid); insertSession(tid, session); }

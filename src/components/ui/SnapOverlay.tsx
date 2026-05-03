@@ -17,6 +17,7 @@ interface SnapOverlayProps {
   entryCount: number; // how many punts/kicks in the log
   onClose: () => void;
   kickInfos?: KickInfo[]; // FG only — distance + position per kick
+  gameMode?: boolean; // when true, saves to game-specific draft keys
 }
 
 interface SnapRow {
@@ -50,7 +51,7 @@ function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simp
   return { chartMode: "simple", missMode: "simple" };
 }
 
-export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOverlayProps) {
+export function SnapOverlay({ snapType, entryCount, onClose, kickInfos, gameMode }: SnapOverlayProps) {
   // Load snapping athletes from localStorage (same source as longSnapContext)
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
 
@@ -182,8 +183,9 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
     if (allFilled.length === 0) return;
 
     const draftSuffix = snapType === "PUNT" ? "punt" : "fg";
+    const modePrefix = gameMode ? "longsnap_game_draft" : "longsnap_manual_draft";
     const tid = getTeamId();
-    const draftKey = tid ? `longsnap_manual_draft_${draftSuffix}_${tid}` : `longsnap_manual_draft_${draftSuffix}`;
+    const draftKey = tid ? `${modePrefix}_${draftSuffix}_${tid}` : `${modePrefix}_${draftSuffix}`;
 
     // Build all filled rows (overwrite draft entirely)
     const draftRows = allFilled.map((r) => ({

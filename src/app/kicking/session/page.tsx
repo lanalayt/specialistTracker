@@ -2328,6 +2328,7 @@ export default function KickingSessionPage() {
           entryCount={filledCount}
           onClose={() => setShowSnapOverlay(false)}
           kickInfos={filledRows.map(({ r }) => ({ dist: r.dist || "", pos: r.pos || "" }))}
+          gameMode={sessionMode === "game"}
         />
       )}
     </>
