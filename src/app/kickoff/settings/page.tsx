@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
+import { useAuth } from "@/lib/auth";
 
 const STORAGE_KEY = "kickoffSettings";
 
@@ -102,6 +103,12 @@ function loadSettings(): KickoffSettings {
 }
 
 export default function KickoffSettingsPage() {
+  const { isAthlete } = useAuth();
+  if (isAthlete) return <main className="p-4 lg:p-6"><p className="text-sm text-muted">Settings are coach-only.</p></main>;
+  return <KickoffSettingsContent />;
+}
+
+function KickoffSettingsContent() {
   const [types, setTypes] = useState<KOTypeConfig[]>(DEFAULT_TYPES);
   const [categories, setCategories] = useState<KOCategory[]>(DEFAULT_CATEGORIES);
   const [dirEnabled, setDirEnabled] = useState(true);

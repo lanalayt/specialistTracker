@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { saveSettingsToCloud, loadSettingsFromCloud } from "@/lib/settingsSync";
+import { useAuth } from "@/lib/auth";
 
 const STORAGE_KEY = "snapSettings";
 
@@ -26,6 +27,12 @@ function loadSettings(): SnapSettings {
 }
 
 export default function SnapSettingsPage() {
+  const { isAthlete } = useAuth();
+  if (isAthlete) return <main className="p-4 lg:p-6"><p className="text-sm text-muted">Settings are coach-only.</p></main>;
+  return <SnapSettingsContent />;
+}
+
+function SnapSettingsContent() {
   const [chartMode, setChartMode] = useState<"simple" | "detailed">(() => loadSettings().chartMode);
   const [missMode, setMissMode] = useState<"simple" | "detailed">(() => loadSettings().missMode);
   const [saved, setSaved] = useState(false);

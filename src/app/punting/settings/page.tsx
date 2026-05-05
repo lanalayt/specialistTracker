@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
+import { useAuth } from "@/lib/auth";
 
 const STORAGE_KEY = "puntSettings";
 
@@ -118,6 +119,12 @@ function loadSettings(): PuntSettings {
 }
 
 export default function PuntSettingsPage() {
+  const { isAthlete } = useAuth();
+  if (isAthlete) return <main className="p-4 lg:p-6"><p className="text-sm text-muted">Settings are coach-only.</p></main>;
+  return <PuntSettingsContent />;
+}
+
+function PuntSettingsContent() {
   const [categories, setCategories] = useState<PuntCategory[]>(DEFAULT_CATEGORIES);
   const [types, setTypes] = useState<PuntTypeConfig[]>(DEFAULT_TYPES);
   const [newTypes, setNewTypes] = useState<Record<string, string>>({});

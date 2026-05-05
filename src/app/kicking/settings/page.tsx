@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { useAuth } from "@/lib/auth";
 
 const SNAP_DISTANCES = ["6", "7", "8"];
 const STORAGE_KEY = "fgSettings";
@@ -57,6 +58,12 @@ function loadSettingsLocal(): FGSettings {
 }
 
 export default function FGSettingsPage() {
+  const { isAthlete } = useAuth();
+  if (isAthlete) return <main className="p-4 lg:p-6"><p className="text-sm text-muted">Settings are coach-only.</p></main>;
+  return <FGSettingsContent />;
+}
+
+function FGSettingsContent() {
   const [snapDistance, setSnapDistance] = useState("7");
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">("detailed");
   const [missMode, setMissMode] = useState<"simple" | "detailed">("detailed");
