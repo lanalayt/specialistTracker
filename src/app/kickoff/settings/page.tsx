@@ -32,6 +32,7 @@ interface KickoffSettings {
   directionEnabled: boolean;
   directionMode: DirectionMode;
   directionMetrics: { id: string; label: string; score?: number }[];
+  returnYardsEnabled?: boolean;
 }
 
 const DEFAULT_CATEGORIES: KOCategory[] = [
@@ -116,6 +117,7 @@ function KickoffSettingsContent() {
   const [directions, setDirections] = useState<{ id: string; label: string; score?: number }[]>(NUMERIC_DIRECTIONS);
   const [newTypes, setNewTypes] = useState<Record<string, string>>({});
   const [newDir, setNewDir] = useState("");
+  const [returnYardsEnabled, setReturnYardsEnabled] = useState(true);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -135,6 +137,7 @@ function KickoffSettingsContent() {
     setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
     setDirections(s.directionMetrics);
+    if (typeof s.returnYardsEnabled === "boolean") setReturnYardsEnabled(s.returnYardsEnabled);
     setSavedSettings(s);
     setLoaded(true);
 
@@ -148,6 +151,7 @@ function KickoffSettingsContent() {
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionMetrics?.length > 0) setDirections(cloud.directionMetrics);
+        if (typeof cloud.returnYardsEnabled === "boolean") setReturnYardsEnabled(cloud.returnYardsEnabled);
         setSavedSettings({
           kickoffTypes: cloud.kickoffTypes?.length > 0
             ? (cloud.kickoffTypes as unknown as Record<string, unknown>[]).map(migrateType)
@@ -156,6 +160,7 @@ function KickoffSettingsContent() {
           directionEnabled: cloud.directionEnabled !== false,
           directionMode: cloud.directionMode || "numeric",
           directionMetrics: cloud.directionMetrics?.length > 0 ? cloud.directionMetrics : NUMERIC_DIRECTIONS,
+          returnYardsEnabled: cloud.returnYardsEnabled !== false,
         });
       }
     });
@@ -168,7 +173,8 @@ function KickoffSettingsContent() {
       JSON.stringify(categories) !== JSON.stringify(savedSettings.kickoffCategories) ||
       dirEnabled !== savedSettings.directionEnabled ||
       dirMode !== savedSettings.directionMode ||
-      JSON.stringify(directions) !== JSON.stringify(savedSettings.directionMetrics);
+      JSON.stringify(directions) !== JSON.stringify(savedSettings.directionMetrics) ||
+      returnYardsEnabled !== (savedSettings.returnYardsEnabled !== false);
     setDirty(changed);
     if (changed) setSaved(false);
   }, [types, categories, dirEnabled, dirMode, directions, savedSettings, loaded]);
@@ -202,7 +208,7 @@ function KickoffSettingsContent() {
   };
 
   const executeSave = (typesToSave: KOTypeConfig[]) => {
-    const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionEnabled: dirEnabled, directionMode: dirMode, directionMetrics: directions };
+    const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionEnabled: dirEnabled, directionMode: dirMode, directionMetrics: directions, returnYardsEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setTypes(typesToSave);
     setSavedSettings(settings);
@@ -473,6 +479,22 @@ function KickoffSettingsContent() {
         )}
       </div>
       </div>
+      </div>
+
+      {/* Return Yards toggle */}
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Return Yards</p>
+            <p className="text-[10px] text-muted mt-0.5">Show return yards input in game mode</p>
+          </div>
+          <button
+            onClick={() => setReturnYardsEnabled((v) => !v)}
+            className={clsx("px-3 py-1.5 rounded-input text-xs font-bold border transition-all", returnYardsEnabled ? "bg-accent text-slate-900 border-accent" : "bg-surface-2 text-muted border-border")}
+          >
+            {returnYardsEnabled ? "On" : "Off"}
+          </button>
+        </div>
       </div>
 
       <button

@@ -160,8 +160,8 @@ const DEFAULT_KO_CATEGORIES: KOCategoryConfig[] = [
   { id: "ONSIDE", label: "Onside", enabled: true },
 ];
 
-function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string; score?: number }[]; directionMode: "numeric" | "field"; directionEnabled: boolean } {
-  if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true };
+function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string; score?: number }[]; directionMode: "numeric" | "field"; directionEnabled: boolean; returnYardsEnabled: boolean } {
+  if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true, returnYardsEnabled: true };
   const defaultScores = [1, 0.5, 0, -1];
   try {
     const raw = localStorage.getItem("kickoffSettings");
@@ -190,10 +190,11 @@ function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: strin
         directions: dirs,
         directionMode: mode,
         directionEnabled: parsed.directionEnabled !== false,
+        returnYardsEnabled: parsed.returnYardsEnabled !== false,
       };
     }
   } catch {}
-  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true };
+  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true, returnYardsEnabled: true };
 }
 
 // Legacy labels for old data
@@ -224,6 +225,7 @@ export default function KickoffSessionPage() {
   const [koTypes, setKoTypes] = useState(() => koSettings.types);
   const [koDirs, setKoDirs] = useState(() => koSettings.directions);
   const [koDirEnabled, setKoDirEnabled] = useState(() => koSettings.directionEnabled);
+  const [koReturnYardsEnabled, setKoReturnYardsEnabled] = useState(() => koSettings.returnYardsEnabled);
   const koTypeLabels: Record<string, string> = {};
   koTypes.forEach((t) => { koTypeLabels[t.id] = t.label; });
   const koDirLabels: Record<string, string> = {};
@@ -1655,7 +1657,7 @@ export default function KickoffSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">HT</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Endzone">EZ</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Fair Catch">FC</th>
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>
+                      {koReturnYardsEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-12 border-b border-red-500/40 text-[10px]">Return</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-10 border-b border-red-500/40 text-[10px]" title="Touchback">TB</th>
                       {koDirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Dir</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
@@ -1822,7 +1824,7 @@ export default function KickoffSessionPage() {
                                 className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
-                            <td className="py-1 px-1">
+                            {koReturnYardsEnabled && <td className="py-1 px-1">
                               <input
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
                                 value={row.returnYards ?? ""}
@@ -1830,7 +1832,7 @@ export default function KickoffSessionPage() {
                                 readOnly={viewOnly || isSaved || !!row.touchback}
                                 className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : row.touchback ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
-                            </td>
+                            </td>}
                             <td className="py-1 px-1 text-center">
                               <input
                                 type="checkbox"
