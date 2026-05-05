@@ -3,16 +3,19 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 
-const GRID_CARDS = [
+const BASE_CARDS = [
   { icon: "📋", label: "Session", desc: "Log kicks and commit practice", slug: "session" },
   { icon: "📊", label: "Statistics", desc: "Season charts and breakdowns", slug: "statistics" },
   { icon: "📁", label: "History", desc: "Browse past sessions", slug: "history" },
-  { icon: "👤", label: "Athletes", desc: "Manage athlete roster", slug: "athletes", coachOnly: true },
 ];
 
 export function SportHub({ basePath, sportName, hasCharting = false }: { basePath: string; sportName: string; hasCharting?: boolean }) {
   const { isAthlete } = useAuth();
-  const visibleCards = isAthlete ? GRID_CARDS.filter((c) => !c.coachOnly) : GRID_CARDS;
+
+  const gridCards = [
+    ...BASE_CARDS,
+    ...(hasCharting ? [{ icon: "🎯", label: "Charting Games", desc: "Fun competitive drills", slug: "charting" }] : []),
+  ];
 
   return (
     <main className="p-4 lg:p-8 max-w-2xl">
@@ -28,7 +31,7 @@ export function SportHub({ basePath, sportName, hasCharting = false }: { basePat
         )}
       </div>
       <div className="grid grid-cols-2 gap-4">
-        {visibleCards.map((card) => (
+        {gridCards.map((card) => (
           <Link
             key={card.slug}
             href={`${basePath}/${card.slug}`}
@@ -42,17 +45,17 @@ export function SportHub({ basePath, sportName, hasCharting = false }: { basePat
           </Link>
         ))}
       </div>
-      {hasCharting && (
+      {!isAthlete && (
         <div className="mt-4 flex justify-center">
           <Link
-            href={`${basePath}/charting`}
+            href={`${basePath}/athletes`}
             className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 w-[calc(50%+0.5rem)]"
           >
-            <span className="text-4xl mb-3">🎯</span>
+            <span className="text-4xl mb-3">👤</span>
             <h3 className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">
-              Charting Games
+              Athletes
             </h3>
-            <p className="text-xs text-muted mt-1">Fun competitive drills</p>
+            <p className="text-xs text-muted mt-1">Manage athlete roster</p>
           </Link>
         </div>
       )}
