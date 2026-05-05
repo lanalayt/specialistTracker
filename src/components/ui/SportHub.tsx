@@ -12,10 +12,15 @@ const BASE_CARDS = [
 export function SportHub({ basePath, sportName, hasCharting = false }: { basePath: string; sportName: string; hasCharting?: boolean }) {
   const { isAthlete } = useAuth();
 
-  const gridCards = [
-    ...BASE_CARDS,
-    ...(hasCharting ? [{ icon: "🎯", label: "Charting Games", desc: "Fun competitive drills", slug: "charting" }] : []),
-  ];
+  const athleteCard = { icon: "👤", label: "Athletes", desc: "Manage athlete roster", slug: "athletes", coachOnly: true };
+  const chartingCard = { icon: "🎯", label: "Charting Games", desc: "Fun competitive drills", slug: "charting" };
+
+  // When charting exists: grid = base + charting, athletes below
+  // When no charting: grid = base + athletes (in grid)
+  const allGridCards = hasCharting
+    ? [...BASE_CARDS, chartingCard]
+    : [...BASE_CARDS, ...(isAthlete ? [] : [athleteCard])];
+  const showAthletesBelow = hasCharting && !isAthlete;
 
   return (
     <main className="p-4 lg:p-8 max-w-2xl">
@@ -31,7 +36,7 @@ export function SportHub({ basePath, sportName, hasCharting = false }: { basePat
         )}
       </div>
       <div className="grid grid-cols-2 gap-4">
-        {gridCards.map((card) => (
+        {allGridCards.map((card) => (
           <Link
             key={card.slug}
             href={`${basePath}/${card.slug}`}
@@ -45,7 +50,7 @@ export function SportHub({ basePath, sportName, hasCharting = false }: { basePat
           </Link>
         ))}
       </div>
-      {!isAthlete && (
+      {showAthletesBelow && (
         <div className="mt-4 flex justify-center">
           <Link
             href={`${basePath}/athletes`}
