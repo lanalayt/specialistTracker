@@ -29,6 +29,15 @@ export default function PuntChartingChooser() {
             <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Punt Battle</h3>
             <p className="text-xs text-muted mt-1">Hit targets for distance, hang time & direction.</p>
           </Link>
+
+          <Link
+            href="/punting/charting/big-ball-calc"
+            className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
+          >
+            <div className="text-4xl mb-3">🏈</div>
+            <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Big Ball Calculator</h3>
+            <p className="text-xs text-muted mt-1">Quick score: distance + hang time (x15) + direction.</p>
+          </Link>
         </div>
       </div>
     </div>

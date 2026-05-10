@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { PuntEntry, PuntHash } from "@/types";
 import clsx from "clsx";
 
-const KICK_OPTIONS = [3, 5, 10];
+// no fixed kick count — finish whenever ready
 const DIR_OPTIONS = ["Left", "Straight", "Right"];
 
 type ScoringMode = "point" | "bigball";
@@ -36,7 +36,6 @@ export default function PuntBattlePage() {
   const [mode, setMode] = useState<"single" | "multi" | null>(null);
   const [scoringMode, setScoringMode] = useState<ScoringMode>("point");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
-  const [puntsPerPlayer, setPuntsPerPlayer] = useState(10);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -54,7 +53,6 @@ export default function PuntBattlePage() {
   const [dirInput, setDirInput] = useState("Straight");
 
   const players = mode === "single" ? (selectedPlayers.length === 1 ? selectedPlayers : []) : selectedPlayers;
-  const totalPunts = players.length * puntsPerPlayer;
   const currentPuntIdx = results.length;
   const currentPlayerIdx = players.length > 0 ? currentPuntIdx % players.length : 0;
   const currentPlayer = players[currentPlayerIdx] ?? "";
@@ -123,7 +121,6 @@ export default function PuntBattlePage() {
     setHangInput("");
     setDirInput(target.direction);
 
-    if (results.length + 1 >= totalPunts) setGameOver(true);
   };
 
   const handleUndo = () => {
@@ -188,14 +185,6 @@ export default function PuntBattlePage() {
             ))}
           </div>
           {mode === "multi" && selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
-          <div>
-            <p className="label">Punts Per Player</p>
-            <div className="flex gap-2 justify-center">
-              {KICK_OPTIONS.map((n) => (
-                <button key={n} onClick={() => setPuntsPerPlayer(n)} className={clsx("px-4 py-2 rounded-input text-sm font-bold border transition-all", puntsPerPlayer === n ? "bg-accent text-slate-900 border-accent" : "bg-surface-2 text-muted border-border")}>{n}</button>
-              ))}
-            </div>
-          </div>
           <div>
             <p className="label">Scoring Mode</p>
             <div className="flex rounded-input border border-border overflow-hidden w-fit mx-auto">
@@ -278,7 +267,7 @@ export default function PuntBattlePage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Punt {playerKickCount} of {puntsPerPlayer}</p>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Punt {playerKickCount}</p>
             <p className="text-[10px] text-muted">{scoringMode === "point" ? "Point Mode" : "Big Ball Mode"}</p>
           </div>
           {mode === "single" && (
@@ -298,17 +287,17 @@ export default function PuntBattlePage() {
                 <div className={clsx("card-2 px-4 py-2 text-center", p === currentPlayer && "ring-2 ring-accent")}>
                   <p className="text-xs font-bold text-slate-200">{p}</p>
                   <p className="text-lg font-black text-accent">{getPlayerScore(p)}</p>
-                  <p className="text-[10px] text-muted">Punt {getPlayerResults(p).length + (p === currentPlayer ? 1 : 0)}/{puntsPerPlayer}</p>
+                  <p className="text-[10px] text-muted">{getPlayerResults(p).length} punts</p>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Progress */}
-        <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-          <div className="h-full bg-accent transition-all" style={{ width: `${(results.length / totalPunts) * 100}%` }} />
-        </div>
+        {/* Finish button */}
+        {results.length > 0 && (
+          <button onClick={() => setGameOver(true)} className="btn-ghost w-full py-2 text-xs font-bold border border-accent/40 text-accent">Finish Game</button>
+        )}
 
         {/* Target setter — shown for first player of each round */}
         {needsTarget && (
