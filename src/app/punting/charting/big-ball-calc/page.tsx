@@ -31,7 +31,7 @@ export default function BigBallCalcPage() {
     const hang = parseHangRaw(hangInput);
     if (isNaN(dist) || dist <= 0 || !hang) return;
 
-    const score = dist + Math.round(hang * 15) + (dirGood ? 0 : -10);
+    const score = parseFloat((dist + hang * 15 + (dirGood ? 0 : -10)).toFixed(2));
     const entry: CalcEntry = { distance: dist, hangTime: hang, directionGood: dirGood, score };
     setEntries((prev) => [entry, ...prev]);
     setLastScore(score);
@@ -57,7 +57,7 @@ export default function BigBallCalcPage() {
         {/* Score display */}
         {lastScore !== null && (
           <div className="card-2 py-4 text-center">
-            <p className="text-4xl font-black text-accent">{lastScore}</p>
+            <p className="text-4xl font-black text-accent">{lastScore.toFixed(2)}</p>
             <p className="text-xs text-muted mt-1">last score</p>
           </div>
         )}
@@ -81,12 +81,11 @@ export default function BigBallCalcPage() {
               <input
                 type="text"
                 inputMode="numeric"
-                value={hangInput}
+                value={hangInput ? parseHangRaw(hangInput).toFixed(2) : ""}
                 onChange={(e) => setHangInput(e.target.value.replace(/\D/g, ""))}
-                placeholder="450"
+                placeholder="4.50"
                 className="input w-full text-center text-lg font-bold py-2"
               />
-              {hangInput && <p className="text-[10px] text-accent text-center mt-0.5">{hangParsed.toFixed(2)}s</p>}
             </div>
           </div>
 
@@ -111,7 +110,7 @@ export default function BigBallCalcPage() {
           {/* Preview */}
           {distInput && hangInput && (
             <p className="text-xs text-muted text-center">
-              {distInput} + ({hangParsed.toFixed(2)} x 15){!dirGood && " - 10"} = <span className="text-accent font-bold">{(parseInt(distInput) || 0) + Math.round(hangParsed * 15) + (dirGood ? 0 : -10)}</span>
+              {distInput} + ({hangParsed.toFixed(2)} x 15){!dirGood && " - 10"} = <span className="text-accent font-bold">{((parseInt(distInput) || 0) + hangParsed * 15 + (dirGood ? 0 : -10)).toFixed(2)}</span>
             </p>
           )}
 
@@ -149,14 +148,14 @@ export default function BigBallCalcPage() {
                       <td className="text-slate-300 text-center py-1 px-2">{e.distance}</td>
                       <td className="text-slate-300 text-center py-1 px-2">{e.hangTime.toFixed(2)}s</td>
                       <td className={clsx("text-center py-1 px-2", e.directionGood ? "text-make" : "text-miss")}>{e.directionGood ? "Good" : "Bad"}</td>
-                      <td className="text-accent text-right py-1 px-2 font-bold">{e.score}</td>
+                      <td className="text-accent text-right py-1 px-2 font-bold">{e.score.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <p className="text-xs text-muted text-center">
-              Avg: <span className="text-accent font-bold">{Math.round(entries.reduce((s, e) => s + e.score, 0) / entries.length)}</span>
+              Avg: <span className="text-accent font-bold">{(entries.reduce((s, e) => s + e.score, 0) / entries.length).toFixed(2)}</span>
             </p>
           </div>
         )}
