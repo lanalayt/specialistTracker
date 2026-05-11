@@ -9,9 +9,11 @@ import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
+import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import Link from "next/link";
 import React from "react";
+import clsx from "clsx";
 
 const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string; disabled?: boolean }[] = [
   { href: "/kicking", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
@@ -88,15 +90,37 @@ const SPORT_LABELS: Record<string, { label: string; iconEl: React.ReactNode; bas
   LONGSNAP: { label: "Snap", iconEl: <span className="text-lg leading-none">📏</span>, basePath: "/longsnap/history" },
 };
 
+const SCOUT_SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string }[] = [
+  { href: "/scout/fg", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
+  { href: "/scout/punt", iconEl: <PuntFootIcon size={36} />, label: "Punting" },
+  { href: "/scout/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
+  { href: "/scout/snap", icon: "📏", label: "Snapping" },
+];
+
 function DashboardContent() {
   const fg = useFG();
   const punt = usePunt();
   const kickoff = useKickoff();
+  const { isCoach } = useAuth();
 
+  const [appMode, setAppMode] = useState<"coach" | "scout">("coach");
   const [schoolName, setSchoolName] = useState("Special Teams");
   const [dashTitle, setDashTitle] = useState("Special Teams Dashboard");
   const [editingTitle, setEditingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // Load persisted mode
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("st_app_mode");
+      if (saved === "scout" && isCoach) setAppMode("scout");
+    } catch {}
+  }, [isCoach]);
+
+  const handleModeChange = (mode: "coach" | "scout") => {
+    setAppMode(mode);
+    localStorage.setItem("st_app_mode", mode);
+  };
 
   useEffect(() => {
     try {
@@ -170,6 +194,34 @@ function DashboardContent() {
       <Header title={schoolName} />
 
       <main className="p-4 lg:p-6 space-y-6 max-w-6xl">
+        {/* Coach / Scout toggle — coach only */}
+        {isCoach && (
+          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+            <button
+              onClick={() => handleModeChange("coach")}
+              className={clsx(
+                "px-5 py-1.5 text-xs font-semibold transition-colors",
+                appMode === "coach"
+                  ? "bg-accent text-slate-900"
+                  : "text-muted hover:text-white"
+              )}
+            >
+              Coach
+            </button>
+            <button
+              onClick={() => handleModeChange("scout")}
+              className={clsx(
+                "px-5 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+                appMode === "scout"
+                  ? "bg-amber-500 text-slate-900"
+                  : "text-muted hover:text-white"
+              )}
+            >
+              Scout
+            </button>
+          </div>
+        )}
+
         {/* Welcome — double-click to edit */}
         <div>
           {editingTitle ? (
@@ -194,143 +246,181 @@ function DashboardContent() {
           )}
         </div>
 
-        {/* Sport cards — icon only */}
-        <div>
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-            Sport Modules
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {SPORT_CARDS.map((card) =>
-              card.disabled ? (
-                <div
-                  key={card.label}
-                  className="card opacity-40 cursor-not-allowed flex flex-col items-center text-center py-6 relative"
-                >
-                  <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
-                  <h3 className="text-xs font-bold text-slate-100 line-through">{card.label}</h3>
-                  <span className="absolute top-2 right-2 text-[8px] font-bold text-warn uppercase">Under Construction</span>
-                </div>
-              ) : (
-                <Link
-                  key={card.href}
-                  href={card.href}
-                  className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
-                >
-                  <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
-                  <h3 className="text-xs font-bold text-slate-100 group-hover:text-accent transition-colors">
-                    {card.label}
-                  </h3>
-                </Link>
-              )
-            )}
-          </div>
-        </div>
-
-        {/* Season Highlights */}
-        <div>
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-            Season Highlights
-          </h2>
-          <SeasonHighlights />
-        </div>
-
-        {/* Recent sessions — all phases merged */}
-        {allSessions.length > 0 && (
-          <div>
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-              Recent Sessions
-            </h2>
-            <div className="card-2 divide-y divide-border/50">
-              {allSessions.slice(0, 8).map((session) => {
-                const sportInfo = SPORT_LABELS[session.sport] ?? { label: session.sport, iconEl: <span>📋</span>, basePath: "#" };
-                const isGame = session.mode === "game";
-                const href = `${sportInfo.basePath}?session=${session.id}`;
-
-                // Sport-specific recap
-                let recap = "";
-                let badge: React.ReactNode = null;
-                if (session.sport === "KICKING") {
-                  const kicks = ((session.entries ?? []) as unknown as { result: string; isPAT?: boolean }[]).filter(k => !k.isPAT);
-                  const makes = kicks.filter((k) => k.result?.startsWith("Y")).length;
-                  const att = kicks.length;
-                  recap = `${makes}/${att} FG · ${makePct(att, makes)}`;
-                  badge = (
-                    <span className={makes / Math.max(att, 1) >= 0.7 ? "badge-make" : "badge-warn"}>
-                      {makePct(att, makes)}
-                    </span>
-                  );
-                } else if (session.sport === "PUNTING") {
-                  const punts = (session.entries ?? []) as unknown as { yards: number; hangTime: number }[];
-                  const att = punts.length;
-                  const ydsEntries = punts.filter((p) => p.yards > 0);
-                  const avgDist = ydsEntries.length > 0 ? (ydsEntries.reduce((s, p) => s + p.yards, 0) / ydsEntries.length).toFixed(1) : "—";
-                  const htEntries = punts.filter((p) => p.hangTime > 0);
-                  const avgHang = htEntries.length > 0 ? (htEntries.reduce((s, p) => s + p.hangTime, 0) / htEntries.length).toFixed(2) : "—";
-                  recap = `${att} punt${att !== 1 ? "s" : ""} · ${avgDist} avg · ${avgHang}s hang`;
-                } else if (session.sport === "KICKOFF") {
-                  const kicks = (session.entries ?? []) as unknown as { distance: number; hangTime: number }[];
-                  const att = kicks.length;
-                  const distEntries = kicks.filter((k) => k.distance > 0);
-                  const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : "—";
-                  const htEntries = kicks.filter((k) => k.hangTime > 0);
-                  const avgHang = htEntries.length > 0 ? (htEntries.reduce((s, k) => s + k.hangTime, 0) / htEntries.length).toFixed(2) : "—";
-                  recap = `${att} KO${att !== 1 ? "s" : ""} · ${avgDist} avg · ${avgHang}s hang`;
-                }
-
-                return (
-                  <Link
-                    key={session.id}
-                    href={href}
-                    className="flex items-center justify-between py-3 px-1.5 first:pt-0 last:pb-0 hover:bg-surface/30 transition-colors rounded"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {sportInfo.iconEl}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-sm font-semibold text-slate-200 truncate">{session.label}</p>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border text-muted font-semibold shrink-0">
-                            {sportInfo.label}
-                          </span>
-                          {isGame && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-400 font-bold shrink-0">
-                              GAME
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted mt-0.5">{recap}</p>
-                      </div>
+        {appMode === "coach" ? (
+          <>
+            {/* Sport cards — icon only */}
+            <div>
+              <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+                Sport Modules
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {SPORT_CARDS.map((card) =>
+                  card.disabled ? (
+                    <div
+                      key={card.label}
+                      className="card opacity-40 cursor-not-allowed flex flex-col items-center text-center py-6 relative"
+                    >
+                      <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
+                      <h3 className="text-xs font-bold text-slate-100 line-through">{card.label}</h3>
+                      <span className="absolute top-2 right-2 text-[8px] font-bold text-warn uppercase">Under Construction</span>
                     </div>
-                    {badge}
-                  </Link>
-                );
-              })}
+                  ) : (
+                    <Link
+                      key={card.href}
+                      href={card.href}
+                      className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
+                    >
+                      <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
+                      <h3 className="text-xs font-bold text-slate-100 group-hover:text-accent transition-colors">
+                        {card.label}
+                      </h3>
+                    </Link>
+                  )
+                )}
+              </div>
             </div>
-          </div>
+
+            {/* Season Highlights */}
+            <div>
+              <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+                Season Highlights
+              </h2>
+              <SeasonHighlights />
+            </div>
+
+            {/* Recent sessions — all phases merged */}
+            {allSessions.length > 0 && (
+              <div>
+                <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+                  Recent Sessions
+                </h2>
+                <div className="card-2 divide-y divide-border/50">
+                  {allSessions.slice(0, 8).map((session) => {
+                    const sportInfo = SPORT_LABELS[session.sport] ?? { label: session.sport, iconEl: <span>📋</span>, basePath: "#" };
+                    const isGame = session.mode === "game";
+                    const href = `${sportInfo.basePath}?session=${session.id}`;
+
+                    // Sport-specific recap
+                    let recap = "";
+                    let badge: React.ReactNode = null;
+                    if (session.sport === "KICKING") {
+                      const kicks = ((session.entries ?? []) as unknown as { result: string; isPAT?: boolean }[]).filter(k => !k.isPAT);
+                      const makes = kicks.filter((k) => k.result?.startsWith("Y")).length;
+                      const att = kicks.length;
+                      recap = `${makes}/${att} FG · ${makePct(att, makes)}`;
+                      badge = (
+                        <span className={makes / Math.max(att, 1) >= 0.7 ? "badge-make" : "badge-warn"}>
+                          {makePct(att, makes)}
+                        </span>
+                      );
+                    } else if (session.sport === "PUNTING") {
+                      const punts = (session.entries ?? []) as unknown as { yards: number; hangTime: number }[];
+                      const att = punts.length;
+                      const ydsEntries = punts.filter((p) => p.yards > 0);
+                      const avgDist = ydsEntries.length > 0 ? (ydsEntries.reduce((s, p) => s + p.yards, 0) / ydsEntries.length).toFixed(1) : "—";
+                      const htEntries = punts.filter((p) => p.hangTime > 0);
+                      const avgHang = htEntries.length > 0 ? (htEntries.reduce((s, p) => s + p.hangTime, 0) / htEntries.length).toFixed(2) : "—";
+                      recap = `${att} punt${att !== 1 ? "s" : ""} · ${avgDist} avg · ${avgHang}s hang`;
+                    } else if (session.sport === "KICKOFF") {
+                      const kicks = (session.entries ?? []) as unknown as { distance: number; hangTime: number }[];
+                      const att = kicks.length;
+                      const distEntries = kicks.filter((k) => k.distance > 0);
+                      const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : "—";
+                      const htEntries = kicks.filter((k) => k.hangTime > 0);
+                      const avgHang = htEntries.length > 0 ? (htEntries.reduce((s, k) => s + k.hangTime, 0) / htEntries.length).toFixed(2) : "—";
+                      recap = `${att} KO${att !== 1 ? "s" : ""} · ${avgDist} avg · ${avgHang}s hang`;
+                    }
+
+                    return (
+                      <Link
+                        key={session.id}
+                        href={href}
+                        className="flex items-center justify-between py-3 px-1.5 first:pt-0 last:pb-0 hover:bg-surface/30 transition-colors rounded"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {sportInfo.iconEl}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-semibold text-slate-200 truncate">{session.label}</p>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border text-muted font-semibold shrink-0">
+                                {sportInfo.label}
+                              </span>
+                              {isGame && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-400 font-bold shrink-0">
+                                  GAME
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted mt-0.5">{recap}</p>
+                          </div>
+                        </div>
+                        {badge}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Quick links — Analytics, Archives, Athletes, Settings */}
+            <div>
+              <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+                Quick Links
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Link href="/analytics" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+                  <span className="text-xl">📊</span>
+                  <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Analytics</span>
+                </Link>
+                <Link href="/archives" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+                  <span className="text-xl">🗄</span>
+                  <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Archived Stats</span>
+                </Link>
+                <Link href="/athletes" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+                  <span className="text-xl">👥</span>
+                  <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Athletes</span>
+                </Link>
+                <Link href="/settings" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+                  <span className="text-xl">⚙️</span>
+                  <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Settings</span>
+                </Link>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Scout Mode Content */}
+            <div>
+              <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+                Scout Evaluation
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {SCOUT_SPORT_CARDS.map((card) => (
+                  <Link
+                    key={card.href}
+                    href={card.href}
+                    className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
+                  >
+                    <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
+                    <h3 className="text-xs font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
+                      {card.label}
+                    </h3>
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+                Quick Links
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                <Link href="/scout/archives" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
+                  <span className="text-xl">🗄</span>
+                  <span className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Scout Archives</span>
+                </Link>
+              </div>
+            </div>
+          </>
         )}
-        {/* Quick links — Analytics, Archives, Athletes, Settings */}
-        <div>
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-            Quick Links
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Link href="/analytics" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
-              <span className="text-xl">📊</span>
-              <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Analytics</span>
-            </Link>
-            <Link href="/archives" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
-              <span className="text-xl">🗄</span>
-              <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Archived Stats</span>
-            </Link>
-            <Link href="/athletes" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
-              <span className="text-xl">👥</span>
-              <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Athletes</span>
-            </Link>
-            <Link href="/settings" className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
-              <span className="text-xl">⚙️</span>
-              <span className="text-sm font-bold text-slate-100 group-hover:text-accent transition-colors">Settings</span>
-            </Link>
-          </div>
-        </div>
       </main>
     </div>
   );
