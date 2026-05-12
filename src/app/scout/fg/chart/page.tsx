@@ -49,37 +49,64 @@ function ScoutFGChartInner() {
   // Per-athlete kick overrides (for preset mode)
   const [athleteKicks, setAthleteKicks] = useState<Record<string, PresetKick[]>>({});
 
-  // Manual mode
+  // Manual mode — extra kicks added on the fly
+  const [manualKicks, setManualKicks] = useState<PresetKick[]>([]);
   const [manualDist, setManualDist] = useState("30");
   const [manualHash, setManualHash] = useState("M");
   const [manualPoints, setManualPoints] = useState("1");
 
-  // Live charting
-  const [results, setResults] = useState<FGResult[]>([]);
+  // Grid-based results: resultMap[athlete][kickIdx] = "make" | "miss"
+  const [resultMap, setResultMap] = useState<Record<string, Record<number, "make" | "miss">>>({});
+  // Which cell is selected: { athlete, kickIdx }
+  const [activeCell, setActiveCell] = useState<{ athlete: string; kickIdx: number } | null>(null);
 
-  // Total kicks for live mode
-  const kicks: PresetKick[] = chartMode === "preset" ? presetKicks : [];
-  const totalKicks = chartMode === "preset"
-    ? selectedPlayers.length * kicks.length
-    : 0; // manual mode has no fixed total
+  // Flattened results for saving
+  const kicks: PresetKick[] = chartMode === "preset" ? presetKicks : manualKicks;
 
-  const currentIdx = results.length;
-  const currentPlayerIdx = selectedPlayers.length > 0 ? currentIdx % selectedPlayers.length : 0;
-  const currentPlayer = selectedPlayers[currentPlayerIdx] ?? "";
-  const currentKickNum = selectedPlayers.length > 0 ? Math.floor(currentIdx / selectedPlayers.length) : 0;
-
-  // Get the kick for current player + round (with overrides)
-  const getCurrentKick = (): PresetKick | null => {
-    if (chartMode === "preset") {
-      const overrides = athleteKicks[currentPlayer];
-      if (overrides && overrides[currentKickNum]) return overrides[currentKickNum];
-      return kicks[currentKickNum] ?? null;
-    }
-    return null;
+  const getKickForAthlete = (athlete: string, kickIdx: number): PresetKick => {
+    const overrides = athleteKicks[athlete];
+    if (overrides && overrides[kickIdx]) return overrides[kickIdx];
+    return kicks[kickIdx] ?? { distance: 0, hash: "M", pointValue: 1 };
   };
 
-  const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
-  const getPlayerScore = (name: string) => getPlayerResults(name).reduce((s, r) => s + r.score, 0);
+  const getPlayerScore = (name: string) => {
+    const map = resultMap[name] ?? {};
+    return Object.entries(map).reduce((s, [idx, res]) => {
+      if (res === "make") {
+        const kick = getKickForAthlete(name, parseInt(idx));
+        return s + kick.pointValue;
+      }
+      return s;
+    }, 0);
+  };
+
+  const getResultCount = () => {
+    return Object.values(resultMap).reduce((s, m) => s + Object.keys(m).length, 0);
+  };
+
+  const getTotalKicks = () => selectedPlayers.length * kicks.length;
+
+  const buildResults = (): FGResult[] => {
+    const out: FGResult[] = [];
+    for (const athlete of selectedPlayers) {
+      const map = resultMap[athlete] ?? {};
+      for (let i = 0; i < kicks.length; i++) {
+        const res = map[i];
+        if (!res) continue;
+        const kick = getKickForAthlete(athlete, i);
+        out.push({
+          athlete,
+          kickNum: i + 1,
+          distance: kick.distance,
+          hash: kick.hash,
+          pointValue: kick.pointValue,
+          result: res,
+          score: res === "make" ? kick.pointValue : 0,
+        });
+      }
+    }
+    return out;
+  };
 
   useEffect(() => {
     let active = true;
@@ -124,7 +151,6 @@ function ScoutFGChartInner() {
   };
 
   const startChart = () => {
-    // Initialize per-athlete kicks from preset
     if (chartMode === "preset") {
       const akicks: Record<string, PresetKick[]> = {};
       for (const p of selectedPlayers) {
@@ -132,57 +158,61 @@ function ScoutFGChartInner() {
       }
       setAthleteKicks(akicks);
     }
+    setResultMap({});
+    setActiveCell(null);
     setPhase("live");
   };
 
   const handleResult = (result: "make" | "miss") => {
-    if (chartMode === "preset") {
-      const kick = getCurrentKick();
-      if (!kick) return;
-      const score = result === "make" ? kick.pointValue : 0;
-      setResults((prev) => [...prev, {
-        athlete: currentPlayer,
-        kickNum: currentKickNum + 1,
-        distance: kick.distance,
-        hash: kick.hash,
-        pointValue: kick.pointValue,
-        result,
-        score,
-      }]);
-      if (results.length + 1 >= totalKicks) setPhase("results");
-    } else {
-      // Manual mode
-      const d = parseInt(manualDist) || 0;
-      const p = parseInt(manualPoints) || 1;
-      const score = result === "make" ? p : 0;
-      const kickNum = getPlayerResults(currentPlayer).length + 1;
-      setResults((prev) => [...prev, {
-        athlete: currentPlayer,
-        kickNum,
-        distance: d,
-        hash: manualHash,
-        pointValue: p,
-        result,
-        score,
-      }]);
+    if (!activeCell) return;
+    const { athlete, kickIdx } = activeCell;
+    setResultMap((prev) => ({
+      ...prev,
+      [athlete]: { ...(prev[athlete] ?? {}), [kickIdx]: result },
+    }));
+    // Auto-advance to next unkicked cell
+    const nextCell = findNextEmpty(athlete, kickIdx);
+    setActiveCell(nextCell);
+  };
+
+  const findNextEmpty = (fromAthlete: string, fromIdx: number): { athlete: string; kickIdx: number } | null => {
+    // Try next kick for same athlete
+    for (let i = fromIdx + 1; i < kicks.length; i++) {
+      if (!resultMap[fromAthlete]?.[i]) return { athlete: fromAthlete, kickIdx: i };
     }
+    // Try next athletes
+    const startPlayerIdx = selectedPlayers.indexOf(fromAthlete);
+    for (let p = 1; p <= selectedPlayers.length; p++) {
+      const playerIdx = (startPlayerIdx + p) % selectedPlayers.length;
+      const player = selectedPlayers[playerIdx];
+      for (let i = 0; i < kicks.length; i++) {
+        if (!resultMap[player]?.[i]) return { athlete: player, kickIdx: i };
+      }
+    }
+    return null;
   };
 
-  const handleUndo = () => {
-    if (results.length === 0) return;
-    setResults((prev) => prev.slice(0, -1));
-    if (phase === "results") setPhase("live");
+  const handleClearCell = () => {
+    if (!activeCell) return;
+    const { athlete, kickIdx } = activeCell;
+    setResultMap((prev) => {
+      const next = { ...prev };
+      const athleteMap = { ...(next[athlete] ?? {}) };
+      delete athleteMap[kickIdx];
+      next[athlete] = athleteMap;
+      return next;
+    });
   };
 
-  const handleFinishManual = () => {
-    if (results.length > 0) setPhase("results");
+  const handleFinish = () => {
+    if (getResultCount() > 0) setPhase("results");
   };
 
   const handleSave = async () => {
     const tid = getTeamId();
+    const results = buildResults();
     if (!tid || results.length === 0) return;
-    const athletes = [...new Set(results.map((r) => r.athlete))];
-    const label = `FG Scout — ${athletes.map((a) => `${a}: ${getPlayerScore(a)}`).join(", ")}`;
+    const label = `FG Scout — ${selectedPlayers.map((a) => `${a}: ${getPlayerScore(a)}`).join(", ")}`;
     await insertScoutSession(tid, {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "SCOUT_FG",
@@ -194,38 +224,47 @@ function ScoutFGChartInner() {
   };
 
   const handleNewChart = () => {
-    setResults([]);
+    setResultMap({});
+    setActiveCell(null);
     setSelectedPlayers([]);
     setSaved(false);
+    setManualKicks([]);
     setPhase(chartMode === "preset" ? "preset-edit" : "manual-setup");
   };
 
-  // Edit a kick for current athlete in preset mode
-  const [editingKick, setEditingKick] = useState(false);
+  // Edit a kick for a specific athlete
+  const [editingKick, setEditingKick] = useState<{ athlete: string; kickIdx: number } | null>(null);
   const [editDist, setEditDist] = useState("");
   const [editHash, setEditHash] = useState("M");
   const [editPoints, setEditPoints] = useState("");
 
-  const startEditKick = () => {
-    const kick = getCurrentKick();
-    if (!kick) return;
+  const startEditKick = (athlete: string, kickIdx: number) => {
+    const kick = getKickForAthlete(athlete, kickIdx);
     setEditDist(String(kick.distance));
     setEditHash(kick.hash);
     setEditPoints(String(kick.pointValue));
-    setEditingKick(true);
+    setEditingKick({ athlete, kickIdx });
   };
 
   const saveEditKick = () => {
+    if (!editingKick) return;
     const d = parseInt(editDist) || 30;
     const p = parseInt(editPoints) || 1;
+    const { athlete, kickIdx } = editingKick;
     setAthleteKicks((prev) => {
       const next = { ...prev };
-      const arr = [...(next[currentPlayer] ?? presetKicks)];
-      arr[currentKickNum] = { distance: d, hash: editHash, pointValue: p };
-      next[currentPlayer] = arr;
+      const arr = [...(next[athlete] ?? [...kicks])];
+      arr[kickIdx] = { distance: d, hash: editHash, pointValue: p };
+      next[athlete] = arr;
       return next;
     });
-    setEditingKick(false);
+    setEditingKick(null);
+  };
+
+  const addManualKick = () => {
+    const d = parseInt(manualDist) || 30;
+    const p = parseInt(manualPoints) || 1;
+    setManualKicks((prev) => [...prev, { distance: d, hash: manualHash, pointValue: p }]);
   };
 
   const addAthlete = async (name: string) => {
@@ -352,13 +391,9 @@ function ScoutFGChartInner() {
 
   // ── Results ──
   if (phase === "results") {
-    const allAthletes = [...new Set(results.map((r) => r.athlete))];
-    const allKicks = [...new Set(results.map((r) => r.kickNum))].sort((a, b) => a - b);
-    const kickInfo = allKicks.map((k) => {
-      const e = results.find((en) => en.kickNum === k);
-      return { num: k, distance: e?.distance ?? 0, hash: e?.hash ?? "", pointValue: e?.pointValue ?? 0 };
-    });
-    const ranked = allAthletes
+    const results = buildResults();
+    const kickInfo = kicks.map((k, i) => ({ num: i + 1, distance: k.distance, hash: k.hash, pointValue: k.pointValue }));
+    const ranked = selectedPlayers
       .map((name) => ({
         name,
         entries: results.filter((r) => r.athlete === name),
@@ -391,10 +426,10 @@ function ScoutFGChartInner() {
                     <td className="py-1.5 px-2 font-semibold text-slate-200 text-left">
                       <span className="text-muted mr-1">{i + 1}.</span>{r.name}
                     </td>
-                    {allKicks.map((k) => {
-                      const e = r.entries.find((en) => en.kickNum === k);
+                    {kickInfo.map((k) => {
+                      const e = r.entries.find((en) => en.kickNum === k.num);
                       return (
-                        <td key={k} className={clsx("text-center py-1.5 px-2 font-bold", e?.result === "make" ? "text-make" : "text-miss")}>
+                        <td key={k.num} className={clsx("text-center py-1.5 px-2 font-bold", e?.result === "make" ? "text-make" : "text-miss")}>
                           {e ? e.score : "—"}
                         </td>
                       );
@@ -418,64 +453,74 @@ function ScoutFGChartInner() {
     );
   }
 
-  // ── Live Charting ──
-  const currentKick = chartMode === "preset" ? getCurrentKick() : null;
-  const playerKickCount = getPlayerResults(currentPlayer).length + 1;
+  // ── Live Charting — Grid View ──
+  const activeKick = activeCell ? getKickForAthlete(activeCell.athlete, activeCell.kickIdx) : null;
 
   return (
     <>
       <Header title="FG Scout" />
-      <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
-        {/* Header info */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-              {currentPlayer} — Kick {playerKickCount}
-              {chartMode === "preset" && kicks.length > 0 && <span> of {kicks.length}</span>}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-black text-amber-400">{getPlayerScore(currentPlayer)}</p>
-            <p className="text-[10px] text-muted">score</p>
-          </div>
+      <main className="p-4 lg:p-6 max-w-3xl mx-auto space-y-4">
+        {/* Grid header — kick labels */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr>
+                <th className="text-[10px] text-muted text-left py-1 px-1 sticky left-0 bg-bg min-w-[80px]">Athlete</th>
+                {kicks.map((k, i) => (
+                  <th key={i} className="text-[10px] text-muted text-center py-1 px-1 min-w-[44px]">
+                    <span className="block">{k.distance}</span>
+                    <span className="block text-[8px]">{k.hash}</span>
+                  </th>
+                ))}
+                <th className="text-[10px] text-muted text-right py-1 px-1 min-w-[40px]">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedPlayers.map((athlete) => (
+                <tr key={athlete} className="border-t border-border/30">
+                  <td className="py-2 px-1 font-semibold text-slate-200 sticky left-0 bg-bg text-xs">{athlete}</td>
+                  {kicks.map((_, kickIdx) => {
+                    const res = resultMap[athlete]?.[kickIdx];
+                    const isActive = activeCell?.athlete === athlete && activeCell?.kickIdx === kickIdx;
+                    return (
+                      <td key={kickIdx} className="text-center py-2 px-1">
+                        <button
+                          onClick={() => setActiveCell({ athlete, kickIdx })}
+                          className={clsx(
+                            "w-8 h-8 rounded-full border-2 transition-all mx-auto flex items-center justify-center text-[10px] font-bold",
+                            isActive && "ring-2 ring-amber-400 ring-offset-1 ring-offset-bg",
+                            res === "make" && "bg-make/30 border-make text-make",
+                            res === "miss" && "bg-miss/30 border-miss text-miss",
+                            !res && "border-border bg-surface-2 text-muted hover:border-slate-400"
+                          )}
+                        >
+                          {res === "make" ? getKickForAthlete(athlete, kickIdx).pointValue : res === "miss" ? "0" : ""}
+                        </button>
+                      </td>
+                    );
+                  })}
+                  <td className="text-right py-2 px-1 font-black text-amber-400 text-sm">{getPlayerScore(athlete)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
-        {/* Multiplayer scoreboard */}
-        {selectedPlayers.length > 1 && (
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            {selectedPlayers.map((p, i) => (
-              <div key={p} className="flex items-center gap-3">
-                {i > 0 && <span className="text-xs text-muted font-bold">vs</span>}
-                <div className={clsx("card-2 px-3 py-2 text-center", p === currentPlayer && "ring-2 ring-amber-500")}>
-                  <p className="text-xs font-bold text-slate-200">{p}</p>
-                  <p className="text-lg font-black text-amber-400">{getPlayerScore(p)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Progress bar for preset */}
-        {chartMode === "preset" && totalKicks > 0 && (
-          <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-            <div className="h-full bg-amber-500 transition-all" style={{ width: `${(results.length / totalKicks) * 100}%` }} />
-          </div>
-        )}
-
-        {/* Kick info */}
-        {chartMode === "preset" && currentKick && !editingKick && (
-          <div className="card-2 py-3 px-4 text-center">
-            <p className="text-2xl font-black text-slate-100">{currentKick.distance}yd</p>
-            <p className="text-sm text-slate-300">{currentKick.hash} Hash</p>
-            {currentKick.pointValue > 0 && <p className="text-xs text-amber-400 font-bold mt-1">{currentKick.pointValue} point{currentKick.pointValue !== 1 ? "s" : ""}</p>}
-            <button onClick={startEditKick} className="text-[10px] text-muted hover:text-amber-400 mt-2 transition-colors">Change for {currentPlayer}</button>
+        {/* Selected cell info + actions */}
+        {activeCell && activeKick && !editingKick && (
+          <div className="card-2 py-3 px-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-slate-100">{activeCell.athlete}</p>
+              <p className="text-xs text-slate-300">{activeKick.distance}yd {activeKick.hash} — {activeKick.pointValue}pt</p>
+            </div>
+            <button onClick={() => startEditKick(activeCell.athlete, activeCell.kickIdx)} className="text-[10px] text-muted hover:text-amber-400 transition-colors">Change Kick</button>
           </div>
         )}
 
         {/* Edit kick overlay */}
-        {chartMode === "preset" && editingKick && (
+        {editingKick && (
           <div className="card space-y-3">
-            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Edit Kick for {currentPlayer}</p>
+            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Edit Kick for {editingKick.athlete}</p>
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <p className="text-[10px] text-muted text-center mb-1">Distance</p>
@@ -496,67 +541,53 @@ function ScoutFGChartInner() {
           </div>
         )}
 
-        {/* Manual mode inputs */}
-        {chartMode === "manual" && (
-          <div className="card space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <p className="text-[10px] text-muted text-center mb-1">Distance</p>
-                <input type="text" inputMode="numeric" value={manualDist} onChange={(e) => setManualDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
-              </div>
-              <div>
-                <p className="text-[10px] text-muted text-center mb-1">Hash</p>
-                <select value={manualHash} onChange={(e) => setManualHash(e.target.value)} className="input w-full text-center text-lg font-bold py-2">
-                  {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted text-center mb-1">Points</p>
-                <input type="text" inputMode="numeric" value={manualPoints} onChange={(e) => setManualPoints(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Make / Miss buttons */}
-        {(!editingKick) && (
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => handleResult("make")} className="py-6 rounded-input text-lg font-black bg-make/20 text-make border-2 border-make/40 hover:bg-make/30 transition-all">
+        {/* Make / Miss / Clear buttons */}
+        {activeCell && !editingKick && (
+          <div className="flex gap-3">
+            <button onClick={() => handleResult("make")} className="flex-1 py-5 rounded-input text-lg font-black bg-make/20 text-make border-2 border-make/40 hover:bg-make/30 transition-all">
               MAKE
             </button>
-            <button onClick={() => handleResult("miss")} className="py-6 rounded-input text-lg font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all">
+            <button onClick={() => handleResult("miss")} className="flex-1 py-5 rounded-input text-lg font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all">
               MISS
             </button>
           </div>
         )}
 
-        {/* Undo + Finish */}
+        {/* Clear + Finish buttons */}
         <div className="flex gap-2">
-          {results.length > 0 && (
-            <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">
-              Undo
+          {activeCell && resultMap[activeCell.athlete]?.[activeCell.kickIdx] && (
+            <button onClick={handleClearCell} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">
+              Clear
             </button>
           )}
-          {chartMode === "manual" && results.length > 0 && (
-            <button onClick={handleFinishManual} className="btn-ghost flex-1 py-2 text-xs font-bold border border-amber-500/40 text-amber-400">
+          {getResultCount() > 0 && (
+            <button onClick={handleFinish} className="btn-ghost flex-1 py-2 text-xs font-bold border border-amber-500/40 text-amber-400">
               Finish Chart
             </button>
           )}
         </div>
 
-        {/* Mini log */}
-        {results.length > 0 && (
-          <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[150px]">
-            {results.map((r, i) => (
-              <div key={i} className="flex items-center text-xs gap-2">
-                <span className="text-muted w-5">#{i + 1}</span>
-                <span className="text-slate-400 w-16 truncate">{r.athlete}</span>
-                <span className="text-slate-300">{r.distance}yd {r.hash}</span>
-                <span className={clsx("font-bold ml-auto", r.result === "make" ? "text-make" : "text-miss")}>
-                  {r.result === "make" ? `+${r.score}` : "0"}
-                </span>
+        {/* Manual mode — add kick */}
+        {chartMode === "manual" && (
+          <div className="card space-y-3">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Add Kick Column</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+                <input type="text" inputMode="numeric" value={manualDist} onChange={(e) => setManualDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
               </div>
-            ))}
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Hash</p>
+                <select value={manualHash} onChange={(e) => setManualHash(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5">
+                  {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Points</p>
+                <input type="text" inputMode="numeric" value={manualPoints} onChange={(e) => setManualPoints(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+              </div>
+            </div>
+            <button onClick={addManualKick} disabled={!manualDist} className="btn-primary w-full py-2 text-xs font-bold disabled:opacity-40">Add Kick</button>
           </div>
         )}
       </main>
