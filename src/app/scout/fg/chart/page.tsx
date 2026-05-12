@@ -3,8 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadAthletes, type StoredAthlete } from "@/lib/athleteStore";
-import { loadScoutPreset, saveScoutPreset, insertScoutSession } from "@/lib/scoutStore";
+import { loadScoutPreset, saveScoutPreset, insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -35,7 +34,8 @@ function ScoutFGChartInner() {
   const chartMode = searchParams.get("mode") === "manual" ? "manual" : "preset";
 
   const [phase, setPhase] = useState<Phase>(chartMode === "preset" ? "preset-edit" : "manual-setup");
-  const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
+  const [athleteNames, setAthleteNames] = useState<string[]>([]);
+  const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
 
@@ -90,14 +90,11 @@ function ScoutFGChartInner() {
         tid = getTeamId();
       }
       if (!tid || !active) return;
-      const ath = await loadAthletes(tid, "KICKING");
+      const names = await loadScoutAthletes(tid, "fg");
       if (!active) return;
-      setAthletes(ath);
-      // Load preset
+      setAthleteNames(names);
       const preset = await loadScoutPreset<PresetKick[]>(tid, PRESET_KEY);
-      if (preset && active) {
-        setPresetKicks(preset);
-      }
+      if (preset && active) setPresetKicks(preset);
       setPresetLoaded(true);
     }
     load();
@@ -231,7 +228,23 @@ function ScoutFGChartInner() {
     setEditingKick(false);
   };
 
-  const athleteNames = athletes.map((a) => a.name);
+  const addAthlete = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || athleteNames.includes(trimmed)) return;
+    const updated = [...athleteNames, trimmed];
+    setAthleteNames(updated);
+    setNewAthleteName("");
+    const tid = getTeamId();
+    if (tid) await saveScoutAthletes(tid, "fg", updated);
+  };
+
+  const removeAthlete = async (name: string) => {
+    const updated = athleteNames.filter((n) => n !== name);
+    setAthleteNames(updated);
+    setSelectedPlayers((prev) => prev.filter((n) => n !== name));
+    const tid = getTeamId();
+    if (tid) await saveScoutAthletes(tid, "fg", updated);
+  };
 
   // ── Preset Editor ──
   if (phase === "preset-edit") {
@@ -298,13 +311,20 @@ function ScoutFGChartInner() {
         <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
           <Link href="/scout/fg" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
           <h2 className="text-lg font-bold text-slate-100">Select Athletes</h2>
-          <p className="text-xs text-muted">Select kickers to evaluate.</p>
+          <p className="text-xs text-muted">Select or add kickers to evaluate.</p>
           <div className="flex flex-wrap gap-1.5">
             {athleteNames.map((a) => (
-              <button key={a} onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>
-                {a}
-              </button>
+              <div key={a} className="flex items-center gap-0.5">
+                <button onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-l-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>
+                  {a}
+                </button>
+                <button onClick={() => removeAthlete(a)} className="px-1.5 py-1.5 rounded-r-input text-[10px] bg-surface-2 text-muted border border-border border-l-0 hover:text-miss transition-colors">&times;</button>
+              </div>
             ))}
+          </div>
+          <div className="flex gap-2">
+            <input type="text" value={newAthleteName} onChange={(e) => setNewAthleteName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAthlete(newAthleteName); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
+            <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
           </div>
           {selectedPlayers.length > 0 && (
             <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>

@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth";
 import { getTeamId } from "@/lib/teamData";
-import { loadAthletes, type StoredAthlete } from "@/lib/athleteStore";
 import { loadScoutSessions, type ScoutSession } from "@/lib/scoutStore";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -20,9 +18,7 @@ interface FGEntry {
 }
 
 export default function ScoutFGPage() {
-  const { isCoach } = useAuth();
   const [tab, setTab] = useState<"chart" | "rankings">("chart");
-  const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,12 +31,8 @@ export default function ScoutFGPage() {
         tid = getTeamId();
       }
       if (!tid || !active) return;
-      const [ath, sess] = await Promise.all([
-        loadAthletes(tid, "KICKING"),
-        loadScoutSessions(tid, "SCOUT_FG"),
-      ]);
+      const sess = await loadScoutSessions(tid, "SCOUT_FG");
       if (!active) return;
-      setAthletes(ath);
       setSessions(sess);
       setLoading(false);
     }

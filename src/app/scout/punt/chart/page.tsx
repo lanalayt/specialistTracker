@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadAthletes, type StoredAthlete } from "@/lib/athleteStore";
-import { insertScoutSession } from "@/lib/scoutStore";
+import { insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -22,7 +21,8 @@ const DIR_OPTIONS = ["Good", "Bad"];
 
 export default function ScoutPuntChartPage() {
   const [phase, setPhase] = useState<"setup" | "live" | "results">("setup");
-  const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
+  const [athleteNames, setAthleteNames] = useState<string[]>([]);
+  const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [puntsPerPlayer, setPuntsPerPlayer] = useState("5");
   const [saved, setSaved] = useState(false);
@@ -51,13 +51,10 @@ export default function ScoutPuntChartPage() {
     let active = true;
     async function load() {
       let tid = getTeamId();
-      for (let i = 0; i < 15 && !tid; i++) {
-        await new Promise((r) => setTimeout(r, 100));
-        tid = getTeamId();
-      }
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid || !active) return;
-      const ath = await loadAthletes(tid, "PUNTING");
-      if (active) setAthletes(ath);
+      const names = await loadScoutAthletes(tid, "punt");
+      if (active) setAthleteNames(names);
     }
     load();
     return () => { active = false; };
@@ -65,6 +62,24 @@ export default function ScoutPuntChartPage() {
 
   const togglePlayer = (name: string) => {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  };
+
+  const addAthlete = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || athleteNames.includes(trimmed)) return;
+    const updated = [...athleteNames, trimmed];
+    setAthleteNames(updated);
+    setNewAthleteName("");
+    const tid = getTeamId();
+    if (tid) await saveScoutAthletes(tid, "punt", updated);
+  };
+
+  const removeAthlete = async (name: string) => {
+    const updated = athleteNames.filter((n) => n !== name);
+    setAthleteNames(updated);
+    setSelectedPlayers((prev) => prev.filter((n) => n !== name));
+    const tid = getTeamId();
+    if (tid) await saveScoutAthletes(tid, "punt", updated);
   };
 
   const handleLog = () => {
@@ -103,8 +118,6 @@ export default function ScoutPuntChartPage() {
     setSaved(true);
   };
 
-  const athleteNames = athletes.map((a) => a.name);
-
   // ── Setup ──
   if (phase === "setup") {
     return (
@@ -113,11 +126,18 @@ export default function ScoutPuntChartPage() {
         <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
           <Link href="/scout/punt" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
           <h2 className="text-lg font-bold text-slate-100">Punt Chart Setup</h2>
-          <p className="text-xs text-muted">Select punters and set number of punts each.</p>
+          <p className="text-xs text-muted">Select or add punters, then set number of punts.</p>
           <div className="flex flex-wrap gap-1.5">
             {athleteNames.map((a) => (
-              <button key={a} onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+              <div key={a} className="flex items-center gap-0.5">
+                <button onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-l-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                <button onClick={() => removeAthlete(a)} className="px-1.5 py-1.5 rounded-r-input text-[10px] bg-surface-2 text-muted border border-border border-l-0 hover:text-miss transition-colors">&times;</button>
+              </div>
             ))}
+          </div>
+          <div className="flex gap-2">
+            <input type="text" value={newAthleteName} onChange={(e) => setNewAthleteName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAthlete(newAthleteName); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
+            <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
           </div>
           {selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
           <div>

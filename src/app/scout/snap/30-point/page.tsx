@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { getTeamId } from "@/lib/teamData";
-import { loadAthletes, type StoredAthlete } from "@/lib/athleteStore";
-import { insertScoutSession } from "@/lib/scoutStore";
+import { insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -31,7 +30,8 @@ function calcPoints(acc: string, laces: string, spiral: string): number {
 }
 
 export default function Scout30PointPage() {
-  const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
+  const [athleteNames, setAthleteNames] = useState<string[]>([]);
+  const [newAthleteName, setNewAthleteName] = useState("");
   const [mode, setMode] = useState<"single" | "multi" | null>(null);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
@@ -59,8 +59,8 @@ export default function Scout30PointPage() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid || !active) return;
-      const ath = await loadAthletes(tid, "LONGSNAP");
-      if (active) setAthletes(ath);
+      const names = await loadScoutAthletes(tid, "snap");
+      if (active) setAthleteNames(names);
     }
     load();
     return () => { active = false; };
@@ -68,6 +68,24 @@ export default function Scout30PointPage() {
 
   const togglePlayer = (name: string) => {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  };
+
+  const addAthlete = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || athleteNames.includes(trimmed)) return;
+    const updated = [...athleteNames, trimmed];
+    setAthleteNames(updated);
+    setNewAthleteName("");
+    const tid = getTeamId();
+    if (tid) await saveScoutAthletes(tid, "snap", updated);
+  };
+
+  const removeAthlete = async (name: string) => {
+    const updated = athleteNames.filter((n) => n !== name);
+    setAthleteNames(updated);
+    setSelectedPlayers((prev) => prev.filter((n) => n !== name));
+    const tid = getTeamId();
+    if (tid) await saveScoutAthletes(tid, "snap", updated);
   };
 
   const handleSnapClick = (marker: ShortSnapMarker) => {
@@ -120,8 +138,6 @@ export default function Scout30PointPage() {
     setAccuracy(""); setLaces(""); setSpiral("");
   };
 
-  const athleteNames = athletes.map((a) => a.name);
-
   if (!mode) {
     return (
       <>
@@ -153,8 +169,15 @@ export default function Scout30PointPage() {
             <p className="text-sm text-muted">{mode === "single" ? "Select your snapper" : "Select 2+ snappers"}</p>
             <div className="flex flex-wrap gap-1.5 justify-center">
               {athleteNames.map((a) => (
-                <button key={a} onClick={() => mode === "single" ? setSelectedPlayers([a]) : togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                <div key={a} className="flex items-center gap-0.5">
+                  <button onClick={() => mode === "single" ? setSelectedPlayers([a]) : togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-l-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                  <button onClick={() => removeAthlete(a)} className="px-1.5 py-1.5 rounded-r-input text-[10px] bg-surface-2 text-muted border border-border border-l-0 hover:text-miss transition-colors">&times;</button>
+                </div>
               ))}
+            </div>
+            <div className="flex gap-2 max-w-xs mx-auto">
+              <input type="text" value={newAthleteName} onChange={(e) => setNewAthleteName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAthlete(newAthleteName); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
+              <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
             </div>
             <button onClick={() => setGameStarted(true)} disabled={!canStart} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
             <button onClick={() => { setMode(null); setSelectedPlayers([]); }} className="text-xs text-muted hover:text-white transition-colors">&larr; Back</button>
