@@ -44,6 +44,7 @@ export default function ScoutSnapPage() {
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState<RankedRow | null>(null);
+  const [rankingTab, setRankingTab] = useState<"short" | "long">("short");
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -71,6 +72,9 @@ export default function ScoutSnapPage() {
     }
   }
   ranked.sort((a, b) => b.pct - a.pct);
+  const shortRanked = ranked.filter((r) => r.is30Point);
+  const longRanked = ranked.filter((r) => !r.is30Point);
+  const activeRanked = rankingTab === "short" ? shortRanked : longRanked;
 
   const handleDeleteRow = async (name: string, sessionId: string) => {
     if (!window.confirm(`Are you sure you want to delete this chart for ${name}? This cannot be undone.`)) return;
@@ -118,7 +122,12 @@ export default function ScoutSnapPage() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
-            {!loading && ranked.length > 0 && (
+            {/* Short / Long sub-tabs */}
+            <div className="flex gap-1 rounded-input border border-border overflow-hidden w-fit">
+              <button onClick={() => setRankingTab("short")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", rankingTab === "short" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Short Snaps</button>
+              <button onClick={() => setRankingTab("long")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", rankingTab === "long" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Long Snaps</button>
+            </div>
+            {!loading && activeRanked.length > 0 && (
               <div className="flex gap-2">
                 <button onClick={() => exportSnapScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
                 <button onClick={() => exportSnapScoutPDF(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export PDF</button>
@@ -126,8 +135,8 @@ export default function ScoutSnapPage() {
             )}
             {loading ? (
               <p className="text-sm text-muted py-8 text-center">Loading...</p>
-            ) : ranked.length === 0 ? (
-              <p className="text-sm text-muted py-8 text-center">No scout data yet.</p>
+            ) : activeRanked.length === 0 ? (
+              <p className="text-sm text-muted py-8 text-center">No {rankingTab === "short" ? "short snap" : "long snap"} data yet.</p>
             ) : (
               <div className="card space-y-3">
                 <div className="overflow-x-auto">
@@ -143,7 +152,7 @@ export default function ScoutSnapPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {ranked.map((r, i) => (
+                      {activeRanked.map((r, i) => (
                         <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
                           <td className="py-1 px-2 font-semibold text-slate-200">
                             <span className="text-muted mr-1">{i + 1}.</span>
