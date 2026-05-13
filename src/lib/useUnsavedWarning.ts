@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 
 /**
  * Warns the user before navigating away when there is unsaved data.
- * Handles browser close/refresh (beforeunload) and in-app link clicks.
+ * Handles browser close/refresh (beforeunload), in-app link clicks,
+ * and browser back/forward buttons (popstate).
  */
 export function useUnsavedWarning(hasUnsaved: boolean) {
   const unsavedRef = useRef(hasUnsaved);
@@ -49,11 +50,31 @@ export function useUnsavedWarning(hasUnsaved: boolean) {
       }
     };
 
+    // Browser back/forward button
+    // Push a dummy state so we can catch the popstate
+    history.pushState(null, "", window.location.href);
+
+    const onPopState = () => {
+      if (!unsavedRef.current) return;
+      const leave = window.confirm(
+        "Are you sure you want to leave this page? All data will be lost."
+      );
+      if (leave) {
+        unsavedRef.current = false;
+        history.back();
+      } else {
+        // Stay on page — re-push state so back button can be caught again
+        history.pushState(null, "", window.location.href);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+
     // Use capture phase to intercept before Next.js router handles it
     document.addEventListener("click", onClick, true);
 
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("popstate", onPopState);
       document.removeEventListener("click", onClick, true);
     };
   }, [hasUnsaved]);
