@@ -30,18 +30,19 @@ export default function ScoutFGPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  // Merge all entries across sessions
-  const allEntries = sessions.flatMap((s) => s.entries as unknown as FGEntry[]);
-  const athleteNames = [...new Set(allEntries.map((e) => e.athlete))];
-
-  // Build a unified kick list — re-number across sessions
-  const athleteData = athleteNames.map((name) => {
-    const entries = allEntries.filter((e) => e.athlete === name);
-    const total = entries.reduce((s, e) => s + e.score, 0);
-    const makes = entries.filter((e) => e.result === "make").length;
-    return { name, entries, total, makes, att: entries.length };
-  }).sort((a, b) => b.total - a.total);
-
+  // Build per-session-per-athlete rows
+  const athleteData: { name: string; sessionId: string; date: string; entries: FGEntry[]; total: number; makes: number; att: number }[] = [];
+  for (const s of sessions) {
+    const entries = s.entries as unknown as FGEntry[];
+    const athletes = [...new Set(entries.map((e) => e.athlete))];
+    for (const name of athletes) {
+      const ae = entries.filter((e) => e.athlete === name);
+      const total = ae.reduce((sum, e) => sum + e.score, 0);
+      const makes = ae.filter((e) => e.result === "make").length;
+      athleteData.push({ name, sessionId: s.id, date: s.date, entries: ae, total, makes, att: ae.length });
+    }
+  }
+  athleteData.sort((a, b) => b.total - a.total);
   const maxKicks = athleteData.length > 0 ? Math.max(...athleteData.map((a) => a.entries.length)) : 0;
 
   const handleDeleteAthlete = async (name: string) => {
@@ -116,7 +117,7 @@ export default function ScoutFGPage() {
                     </thead>
                     <tbody>
                       {athleteData.map((r, i) => (
-                        <tr key={r.name} className="border-t border-border/30">
+                        <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
                           <td className="py-1 px-2 font-semibold text-slate-200">
                             <span className="text-muted mr-1">{i + 1}.</span>
                             <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>

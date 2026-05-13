@@ -28,15 +28,18 @@ export default function ScoutSnapPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  const allEntries = sessions.flatMap((s) => s.entries as unknown as { athlete: string; points?: number; score?: number; accuracy?: string }[]);
-  const athleteNames = [...new Set(allEntries.map((e) => e.athlete))];
-  const ranked = athleteNames
-    .map((name) => {
-      const ae = allEntries.filter((e) => e.athlete === name);
-      const total = ae.reduce((s, e) => s + (e.points ?? e.score ?? 0), 0);
-      return { name, count: ae.length, total };
-    })
-    .sort((a, b) => b.total - a.total);
+  // Build per-session-per-athlete rows
+  const ranked: { name: string; sessionId: string; date: string; count: number; total: number }[] = [];
+  for (const s of sessions) {
+    const entries = s.entries as unknown as { athlete: string; points?: number; score?: number }[];
+    const athletes = [...new Set(entries.map((e) => e.athlete))];
+    for (const name of athletes) {
+      const ae = entries.filter((e) => e.athlete === name);
+      const total = ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0);
+      ranked.push({ name, sessionId: s.id, date: s.date, count: ae.length, total });
+    }
+  }
+  ranked.sort((a, b) => b.total - a.total);
 
   const handleDeleteAthlete = async (name: string) => {
     if (!window.confirm(`Are you sure you want to delete all data for ${name}? This cannot be undone.`)) return;
@@ -108,7 +111,7 @@ export default function ScoutSnapPage() {
                     </thead>
                     <tbody>
                       {ranked.map((r, i) => (
-                        <tr key={r.name} className="border-t border-border/30">
+                        <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
                           <td className="py-1 px-2 font-semibold text-slate-200">
                             <span className="text-muted mr-1">{i + 1}.</span>
                             <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>

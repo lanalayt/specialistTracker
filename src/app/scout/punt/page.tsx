@@ -39,17 +39,20 @@ export default function ScoutPuntPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  const allEntries = sessions.flatMap((s) => s.entries as unknown as PuntEntry[]);
-  const dropWorst = allEntries[0]?.dropWorst ?? false;
-  const athleteNames = [...new Set(allEntries.map((e) => e.athlete))];
-  const ranked = athleteNames
-    .map((name) => {
-      const entries = allEntries.filter((e) => e.athlete === name);
-      const scores = entries.map((e) => e.score);
-      const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
-      return { name, entries, avg: calcAvg(scores, dropWorst), worst };
-    })
-    .sort((a, b) => b.avg - a.avg);
+  // Build per-session-per-athlete rows
+  const ranked: { name: string; sessionId: string; date: string; entries: PuntEntry[]; avg: number; worst: number | null }[] = [];
+  for (const s of sessions) {
+    const entries = s.entries as unknown as PuntEntry[];
+    const dw = entries[0]?.dropWorst ?? false;
+    const athletes = [...new Set(entries.map((e) => e.athlete))];
+    for (const name of athletes) {
+      const ae = entries.filter((e) => e.athlete === name);
+      const scores = ae.map((e) => e.score);
+      const worst = dw && scores.length > 1 ? Math.min(...scores) : null;
+      ranked.push({ name, sessionId: s.id, date: s.date, entries: ae, avg: calcAvg(scores, dw), worst });
+    }
+  }
+  ranked.sort((a, b) => b.avg - a.avg);
   const maxKicks = ranked.length > 0 ? Math.max(...ranked.map((r) => r.entries.length)) : 0;
 
   const handleDeleteAthlete = async (name: string) => {
@@ -119,7 +122,7 @@ export default function ScoutPuntPage() {
                     </thead>
                     <tbody>
                       {ranked.map((r, i) => (
-                        <tr key={r.name} className="border-t border-border/30">
+                        <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
                           <td className="py-1 px-2 font-semibold text-slate-200">
                             <span className="text-muted mr-1">{i + 1}.</span>
                             <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
