@@ -20,12 +20,12 @@ function calcKickScore(dist: number, hang: number, dirGood: boolean): number {
   return parseFloat((dist + hang * 10 + (dirGood ? 0 : -10)).toFixed(2));
 }
 
-/** Average of all kicks minus the worst one. If only 1 kick, use that score. */
-function calcAvgDropWorst(scores: number[]): number {
+function calcAvg(scores: number[], dropWorst: boolean): number {
   if (scores.length === 0) return 0;
   if (scores.length === 1) return scores[0];
+  if (!dropWorst) return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
   const sorted = [...scores].sort((a, b) => a - b);
-  const best = sorted.slice(1); // drop lowest
+  const best = sorted.slice(1);
   return parseFloat((best.reduce((s, v) => s + v, 0) / best.length).toFixed(2));
 }
 
@@ -35,6 +35,7 @@ export default function ScoutKOChartPage() {
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [kicksPerPlayer, setKicksPerPlayer] = useState("5");
+  const [dropWorst, setDropWorst] = useState(true);
   const [saved, setSaved] = useState(false);
 
   const [results, setResults] = useState<KOResult[]>([]);
@@ -51,7 +52,7 @@ export default function ScoutKOChartPage() {
 
   const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
   const getPlayerScores = (name: string) => getPlayerResults(name).map((r) => r.score);
-  const getPlayerAvg = (name: string) => calcAvgDropWorst(getPlayerScores(name));
+  const getPlayerAvg = (name: string) => calcAvg(getPlayerScores(name), dropWorst);
 
   useEffect(() => {
     let active = true;
@@ -154,10 +155,22 @@ export default function ScoutKOChartPage() {
             <p className="text-xs text-muted mb-1">Kicks per player</p>
             <input type="text" inputMode="numeric" value={kicksPerPlayer} onChange={(e) => setKicksPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
           </div>
+          <div className="flex items-center justify-between card-2 px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-200">Drop Worst Kick</p>
+              <p className="text-[10px] text-muted">Exclude lowest score from average</p>
+            </div>
+            <button
+              onClick={() => setDropWorst(!dropWorst)}
+              className={clsx("w-10 h-5 rounded-full transition-colors relative", dropWorst ? "bg-amber-500" : "bg-surface-2 border border-border")}
+            >
+              <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", dropWorst ? "left-5" : "left-0.5")} />
+            </button>
+          </div>
           <div className="card-2 p-3 text-xs text-muted space-y-1">
             <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Scoring</p>
             <p>Kick score = Distance + (Hang Time x 10). Bad direction = -10.</p>
-            <p>Final score = average of all kicks, dropping the worst one.</p>
+            <p>Final = average of all kicks{dropWorst ? ", dropping the worst one" : ""}.</p>
           </div>
           <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || !parseInt(kicksPerPlayer)} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
         </main>
@@ -173,7 +186,7 @@ export default function ScoutKOChartPage() {
       .map((name) => {
         const entries = getPlayerResults(name);
         const scores = entries.map((e) => e.score);
-        const worst = scores.length > 1 ? Math.min(...scores) : null;
+        const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
         return { name, entries, avg: getPlayerAvg(name), worst };
       })
       .sort((a, b) => b.avg - a.avg);
@@ -183,7 +196,7 @@ export default function ScoutKOChartPage() {
         <Header title="KO Scout Results" />
         <main className="p-4 lg:p-6 max-w-3xl mx-auto space-y-6 text-center">
           <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
-          <p className="text-xs text-muted">Score = avg of all kicks, worst kick dropped. Kick = Dist + (Hang x 10), bad dir = -10.</p>
+          <p className="text-xs text-muted">Score = avg of all kicks{dropWorst ? ", worst dropped" : ""}. Kick = Dist + (Hang x 10), bad dir = -10.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -259,7 +272,7 @@ export default function ScoutKOChartPage() {
         </div>
 
         <p className="text-[10px] text-muted text-center">
-          Kick score = Dist + (Hang x 10), bad dir = -10. Final = avg dropping worst.
+          Kick score = Dist + (Hang x 10), bad dir = -10. Final = avg{dropWorst ? ", drop worst" : ""}.
         </p>
 
         {/* Active player header */}

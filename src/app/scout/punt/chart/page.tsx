@@ -17,7 +17,14 @@ interface PuntResult {
   score: number;
 }
 
-const DIR_OPTIONS = ["Good", "Bad"];
+function calcAvg(scores: number[], dropWorst: boolean): number {
+  if (scores.length === 0) return 0;
+  if (scores.length === 1) return scores[0];
+  if (!dropWorst) return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
+  const sorted = [...scores].sort((a, b) => a - b);
+  const best = sorted.slice(1);
+  return parseFloat((best.reduce((s, v) => s + v, 0) / best.length).toFixed(2));
+}
 
 export default function ScoutPuntChartPage() {
   const [phase, setPhase] = useState<"setup" | "live" | "results">("setup");
@@ -25,9 +32,11 @@ export default function ScoutPuntChartPage() {
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [puntsPerPlayer, setPuntsPerPlayer] = useState("5");
+  const [dropWorst, setDropWorst] = useState(true);
   const [saved, setSaved] = useState(false);
 
   const [results, setResults] = useState<PuntResult[]>([]);
+  const [activePlayer, setActivePlayer] = useState("");
   const [distInput, setDistInput] = useState("");
   const [hangInput, setHangInput] = useState("");
   const [opInput, setOpInput] = useState("");
@@ -39,13 +48,9 @@ export default function ScoutPuntChartPage() {
     return parseFloat(`${digits.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${digits.padStart(3, "0").slice(-2)}`);
   };
 
-  const totalPunts = selectedPlayers.length * (parseInt(puntsPerPlayer) || 0);
-  const currentIdx = results.length;
-  const currentPlayerIdx = selectedPlayers.length > 0 ? currentIdx % selectedPlayers.length : 0;
-  const currentPlayer = selectedPlayers[currentPlayerIdx] ?? "";
-
   const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
-  const getPlayerScore = (name: string) => getPlayerResults(name).reduce((s, r) => s + r.score, 0);
+  const getPlayerScores = (name: string) => getPlayerResults(name).map((r) => r.score);
+  const getPlayerAvg = (name: string) => calcAvg(getPlayerScores(name), dropWorst);
 
   useEffect(() => {
     let active = true;
@@ -86,34 +91,42 @@ export default function ScoutPuntChartPage() {
     const dist = parseInt(distInput);
     const hang = parseHangRaw(hangInput);
     const op = parseHangRaw(opInput);
-    if (isNaN(dist) || dist <= 0 || !hang) return;
+    if (isNaN(dist) || dist <= 0 || !hang || !activePlayer) return;
     const score = parseFloat((dist + hang * 15 + (dirGood ? 0 : -10)).toFixed(2));
-    const kickNum = getPlayerResults(currentPlayer).length + 1;
-    setResults((prev) => [...prev, { athlete: currentPlayer, kickNum, distance: dist, hangTime: hang, opTime: op, directionGood: dirGood, score }]);
+    const kickNum = getPlayerResults(activePlayer).length + 1;
+    setResults((prev) => [...prev, { athlete: activePlayer, kickNum, distance: dist, hangTime: hang, opTime: op, directionGood: dirGood, score }]);
     setDistInput("");
     setHangInput("");
     setOpInput("");
     setDirGood(true);
-    if (results.length + 1 >= totalPunts) setPhase("results");
+    // Auto-rotate to next player
+    const idx = selectedPlayers.indexOf(activePlayer);
+    const next = selectedPlayers[(idx + 1) % selectedPlayers.length];
+    setActivePlayer(next);
   };
 
   const handleUndo = () => {
     if (results.length === 0) return;
+    const last = results[results.length - 1];
     setResults((prev) => prev.slice(0, -1));
-    if (phase === "results") setPhase("live");
+    setActivePlayer(last.athlete);
+  };
+
+  const handleFinish = () => {
+    if (results.length > 0) setPhase("results");
   };
 
   const handleSave = async () => {
     const tid = getTeamId();
     if (!tid || results.length === 0) return;
     const athletes = [...new Set(results.map((r) => r.athlete))];
-    const label = `Punt Scout — ${athletes.map((a) => `${a}: ${getPlayerScore(a).toFixed(2)}`).join(", ")}`;
+    const label = `Punt Scout — ${athletes.map((a) => `${a}: ${getPlayerAvg(a).toFixed(2)}`).join(", ")}`;
     await insertScoutSession(tid, {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "SCOUT_PUNT",
       label,
       date: new Date().toISOString(),
-      entries: results as unknown as Record<string, unknown>[],
+      entries: [...results.map((r) => ({ ...r, dropWorst })) ] as unknown as Record<string, unknown>[],
     });
     setSaved(true);
   };
@@ -144,7 +157,24 @@ export default function ScoutPuntChartPage() {
             <p className="text-xs text-muted mb-1">Punts per player</p>
             <input type="text" inputMode="numeric" value={puntsPerPlayer} onChange={(e) => setPuntsPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
           </div>
-          <button onClick={() => setPhase("live")} disabled={selectedPlayers.length === 0 || !parseInt(puntsPerPlayer)} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
+          <div className="flex items-center justify-between card-2 px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-200">Drop Worst Kick</p>
+              <p className="text-[10px] text-muted">Exclude lowest score from average</p>
+            </div>
+            <button
+              onClick={() => setDropWorst(!dropWorst)}
+              className={clsx("w-10 h-5 rounded-full transition-colors relative", dropWorst ? "bg-amber-500" : "bg-surface-2 border border-border")}
+            >
+              <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", dropWorst ? "left-5" : "left-0.5")} />
+            </button>
+          </div>
+          <div className="card-2 p-3 text-xs text-muted space-y-1">
+            <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Scoring</p>
+            <p>Punt score = Distance + (Hang Time x 15). Bad direction = -10.</p>
+            <p>Final = average of all punts{dropWorst ? ", dropping the worst one" : ""}.</p>
+          </div>
+          <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || !parseInt(puntsPerPlayer)} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
         </main>
       </>
     );
@@ -155,14 +185,20 @@ export default function ScoutPuntChartPage() {
     const allAthletes = [...new Set(results.map((r) => r.athlete))];
     const maxKicks = Math.max(...allAthletes.map((n) => getPlayerResults(n).length));
     const ranked = allAthletes
-      .map((name) => ({ name, entries: getPlayerResults(name), total: getPlayerScore(name) }))
-      .sort((a, b) => b.total - a.total);
+      .map((name) => {
+        const entries = getPlayerResults(name);
+        const scores = entries.map((e) => e.score);
+        const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
+        return { name, entries, avg: getPlayerAvg(name), worst };
+      })
+      .sort((a, b) => b.avg - a.avg);
 
     return (
       <>
         <Header title="Punt Scout Results" />
         <main className="p-4 lg:p-6 max-w-3xl mx-auto space-y-6 text-center">
           <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
+          <p className="text-xs text-muted">Score = avg of all punts{dropWorst ? ", worst dropped" : ""}. Punt = Dist + (Hang x 15), bad dir = -10.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -171,23 +207,27 @@ export default function ScoutPuntChartPage() {
                   {Array.from({ length: maxKicks }, (_, i) => (
                     <th key={i} className="text-[10px] text-muted text-center py-1 px-2">P{i + 1}</th>
                   ))}
-                  <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
+                  <th className="text-[10px] text-muted text-right py-1 px-2">Avg</th>
                 </tr>
               </thead>
               <tbody>
                 {ranked.map((r, i) => (
                   <tr key={r.name} className="border-t border-border/30">
                     <td className="py-1 px-2 font-semibold text-slate-200 text-left"><span className="text-muted mr-1">{i + 1}.</span>{r.name}</td>
-                    {r.entries.map((e, j) => (
-                      <td key={j} className={clsx("text-center py-1 px-2", e.directionGood ? "text-make" : "text-miss")}>
-                        <span className="font-bold">{e.distance}</span>
-                        <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
-                      </td>
-                    ))}
+                    {r.entries.map((e, j) => {
+                      const isDropped = r.worst !== null && e.score === r.worst && j === r.entries.findIndex((x) => x.score === r.worst);
+                      return (
+                        <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "", e.directionGood ? "text-make" : "text-miss")}>
+                          <span className="font-bold">{e.distance}</span>
+                          <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
+                          <span className="text-[8px] block text-muted">{e.score.toFixed(1)}</span>
+                        </td>
+                      );
+                    })}
                     {Array.from({ length: maxKicks - r.entries.length }, (_, j) => (
                       <td key={`e-${j}`} className="text-center py-1 px-2 text-muted">—</td>
                     ))}
-                    <td className="text-right py-1 px-2 font-black text-amber-400">{r.total.toFixed(2)}</td>
+                    <td className="text-right py-1 px-2 font-black text-amber-400">{r.avg.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -203,37 +243,41 @@ export default function ScoutPuntChartPage() {
   }
 
   // ── Live ──
-  const playerKickCount = getPlayerResults(currentPlayer).length + 1;
-  const ppp = parseInt(puntsPerPlayer) || 0;
+  const kpp = parseInt(puntsPerPlayer) || 0;
+  const playerKickCount = getPlayerResults(activePlayer).length;
 
   return (
     <>
       <Header title="Punt Scout" />
       <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{currentPlayer} — Punt {playerKickCount} of {ppp}</p>
-          <div className="text-right">
-            <p className="text-2xl font-black text-amber-400">{getPlayerScore(currentPlayer).toFixed(2)}</p>
-            <p className="text-[10px] text-muted">score</p>
-          </div>
+        {/* Athlete selector — tap to switch */}
+        <div className="flex flex-wrap gap-2 justify-center">
+          {selectedPlayers.map((p) => {
+            const count = getPlayerResults(p).length;
+            const avg = getPlayerAvg(p);
+            return (
+              <button
+                key={p}
+                onClick={() => setActivePlayer(p)}
+                className={clsx(
+                  "card-2 px-3 py-2 text-center transition-all min-w-[80px]",
+                  p === activePlayer ? "ring-2 ring-amber-500" : "opacity-60 hover:opacity-100"
+                )}
+              >
+                <p className="text-xs font-bold text-slate-200">{p}</p>
+                <p className="text-lg font-black text-amber-400">{count > 0 ? avg.toFixed(2) : "—"}</p>
+                <p className="text-[10px] text-muted">{count}/{kpp} punts</p>
+              </button>
+            );
+          })}
         </div>
 
-        {selectedPlayers.length > 1 && (
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            {selectedPlayers.map((p, i) => (
-              <div key={p} className="flex items-center gap-3">
-                {i > 0 && <span className="text-xs text-muted font-bold">vs</span>}
-                <div className={clsx("card-2 px-3 py-2 text-center", p === currentPlayer && "ring-2 ring-amber-500")}>
-                  <p className="text-xs font-bold text-slate-200">{p}</p>
-                  <p className="text-lg font-black text-amber-400">{getPlayerScore(p).toFixed(2)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-[10px] text-muted text-center">
+          Punt score = Dist + (Hang x 15), bad dir = -10. Final = avg{dropWorst ? ", drop worst" : ""}.
+        </p>
 
-        <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-          <div className="h-full bg-amber-500 transition-all" style={{ width: `${(results.length / totalPunts) * 100}%` }} />
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{activePlayer} — Punt {playerKickCount + 1} of {kpp}</p>
         </div>
 
         <div className="card space-y-3">
@@ -262,15 +306,18 @@ export default function ScoutPuntChartPage() {
 
         <div className="flex gap-2">
           {results.length > 0 && <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
-          <button onClick={handleLog} disabled={!distInput || !hangInput} className="btn-primary flex-1 py-2 text-sm font-bold disabled:opacity-40">Log Punt</button>
+          <button onClick={handleLog} disabled={!distInput || !hangInput || !activePlayer} className="btn-primary flex-1 py-2 text-sm font-bold disabled:opacity-40">Log Punt</button>
         </div>
+        {results.length > 0 && (
+          <button onClick={handleFinish} className="btn-ghost w-full py-2 text-xs font-bold border border-amber-500/40 text-amber-400">Finish Chart</button>
+        )}
 
         {results.length > 0 && (
-          <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[150px]">
-            {results.map((r, i) => (
-              <div key={i} className="flex items-center text-xs gap-2">
-                <span className="text-muted w-5">#{i + 1}</span>
-                <span className="text-slate-400 w-16 truncate">{r.athlete}</span>
+          <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[200px]">
+            {[...results].reverse().map((r, i) => (
+              <div key={results.length - 1 - i} className="flex items-center text-xs gap-2">
+                <span className="text-muted w-5">#{results.length - i}</span>
+                <span className="text-slate-400 w-20 truncate">{r.athlete}</span>
                 <span className={clsx(r.directionGood ? "text-make" : "text-miss")}>{r.distance}yd</span>
                 <span className={clsx(r.directionGood ? "text-make" : "text-miss")}>{r.hangTime.toFixed(2)}s</span>
                 <span className="text-amber-400 font-bold ml-auto">{r.score.toFixed(2)}</span>
