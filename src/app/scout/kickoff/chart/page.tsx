@@ -127,7 +127,7 @@ export default function ScoutKOChartPage() {
       sport: "SCOUT_KO",
       label,
       date: new Date().toISOString(),
-      entries: results as unknown as Record<string, unknown>[],
+      entries: results.map((r) => ({ ...r, dropWorst })) as unknown as Record<string, unknown>[],
     });
     setSaved(true);
   };
