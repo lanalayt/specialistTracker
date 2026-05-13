@@ -33,7 +33,7 @@ export default function ScoutLongSnapsPage() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [snapsPerPlayer, setSnapsPerPlayer] = useState("10");
   const [maxTime, setMaxTime] = useState("0.75");
-  const [dropWorst, setDropWorst] = useState(true);
+  const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const [snaps, setSnaps] = useState<BsSnap[]>([]);

@@ -44,7 +44,7 @@ export default function ScoutShortSnapsPage() {
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [snapsPerPlayer, setSnapsPerPlayer] = useState("10");
-  const [dropWorst, setDropWorst] = useState(true);
+  const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const [results, setResults] = useState<SnapResult[]>([]);
