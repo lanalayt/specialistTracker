@@ -73,10 +73,12 @@ export function PuntProvider({ children }: { children: React.ReactNode }) {
 
   const stats = useMemo(() => {
     const names = athletes.map((a) => a.name);
+    const isChartingSession = (s: { label?: string }) =>
+      s.label?.startsWith("Line Golf") || s.label?.startsWith("Punt Battle") || s.label?.startsWith("30 Point") || s.label?.startsWith("Balls & Strikes");
     return recomputePuntStats(
       names,
       sessions
-        .filter((s) => s.mode !== "game")
+        .filter((s) => s.mode !== "game" && !isChartingSession(s))
         .map((s) => ({ punts: (s.entries as PuntEntry[]) ?? [] })),
       typeConfigs
     );

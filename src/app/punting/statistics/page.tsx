@@ -189,9 +189,10 @@ function computeFilteredPuntStats(
 ): Record<string, PuntAthleteStats> {
   let statsMap: Record<string, PuntAthleteStats> = {};
   athletes.forEach((a) => { statsMap[a.name] = emptyPuntStats(); });
+  const GAME_TYPES = new Set(["LINE_GOLF", "PUNT_BATTLE"]);
   history.forEach((session) => {
     const punts = (session.entries ?? []) as PuntEntry[];
-    punts.filter(filter).forEach((p) => {
+    punts.filter((p) => !GAME_TYPES.has(p.type) && filter(p)).forEach((p) => {
       statsMap = processPunt(p, statsMap);
     });
   });
