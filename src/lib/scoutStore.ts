@@ -115,6 +115,7 @@ export interface ScoutProfile {
   height?: string;
   weight?: string;
   majorPreference?: string;
+  notes?: string;
 }
 
 const SCOUT_PROFILES_KEY = "scout_profiles";

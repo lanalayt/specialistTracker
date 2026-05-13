@@ -54,6 +54,16 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
               />
             </div>
           ))}
+          <div>
+            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Notes</p>
+            <textarea
+              value={form.notes ?? ""}
+              onChange={(e) => update("notes", e.target.value)}
+              placeholder="Add notes about this athlete..."
+              className="input w-full text-sm py-1.5 min-h-[80px] resize-y"
+              rows={3}
+            />
+          </div>
         </div>
 
         <button
