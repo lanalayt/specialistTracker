@@ -100,12 +100,12 @@ export default function ScoutSnapPage() {
             <div className="grid grid-cols-2 gap-3 max-w-md">
               <Link href="/scout/snap/30-point" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">🎯</p>
-                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">30 Point Game</h3>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Short Snaps</h3>
                 <p className="text-[10px] text-muted mt-1">Strike + Laces + Spiral</p>
               </Link>
               <Link href="/scout/snap/balls-strikes" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">⚾</p>
-                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Balls & Strikes</h3>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Long Snaps</h3>
                 <p className="text-[10px] text-muted mt-1">Accuracy + Time + Spiral</p>
               </Link>
             </div>
@@ -177,7 +177,7 @@ export default function ScoutSnapPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-slate-100">{detailOpen.name}</h3>
-                <p className="text-[10px] text-muted">{detailOpen.is30Point ? "30 Point Game" : "Balls & Strikes"} — {new Date(detailOpen.date).toLocaleDateString()}</p>
+                <p className="text-[10px] text-muted">{detailOpen.is30Point ? "Short Snaps" : "Long Snaps"} — {new Date(detailOpen.date).toLocaleDateString()}</p>
               </div>
               <button onClick={() => setDetailOpen(null)} className="text-muted hover:text-white text-xs transition-colors">Close</button>
             </div>
