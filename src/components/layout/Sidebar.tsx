@@ -26,6 +26,7 @@ const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.
 ];
 
 const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+  { href: "/scout", label: "Scout Home", icon: "⚡" },
   { href: "/scout/fg", label: "FG Scouting", iconEl: <GoalpostIcon size={20} /> },
   { href: "/scout/punt", label: "Punt Scouting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/scout/kickoff", label: "KO Scouting", iconEl: <KickoffTeeIcon size={20} /> },
@@ -43,7 +44,7 @@ export function Sidebar() {
   const isScoutRoute = pathname.startsWith("/scout");
 
   const isActive = (href: string) =>
-    href === "/dashboard"
+    href === "/dashboard" || href === "/scout"
       ? pathname === href
       : pathname === href || pathname.startsWith(href + "/");
 

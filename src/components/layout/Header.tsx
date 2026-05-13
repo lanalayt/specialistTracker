@@ -30,6 +30,7 @@ const ALWAYS_ITEMS: { href: string; label: string; icon?: string; iconEl?: React
 ];
 
 const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+  { href: "/scout", label: "Scout Home", icon: "⚡" },
   { href: "/scout/fg", label: "FG Scouting", iconEl: <GoalpostIcon size={20} /> },
   { href: "/scout/punt", label: "Punt Scouting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/scout/kickoff", label: "KO Scouting", iconEl: <KickoffTeeIcon size={20} /> },
@@ -56,7 +57,7 @@ export function Header({ title }: { title?: string }) {
   const handleModeChange = (mode: "coach" | "scout") => {
     setAppMode(mode);
     localStorage.setItem("st_app_mode", mode);
-    if (mode === "scout" && !isScoutRoute) router.push("/scout/fg");
+    if (mode === "scout" && !isScoutRoute) router.push("/scout");
     if (mode === "coach" && isScoutRoute) router.push("/dashboard");
   };
 
@@ -304,11 +305,11 @@ export function Header({ title }: { title?: string }) {
 // ─── Mobile bottom navigation ────────────────────────────────────────────────
 
 const SCOUT_MOBILE_NAV = [
+  { href: "/scout", label: "Home", icon: "⚡" },
   { href: "/scout/fg", label: "FG", iconEl: <GoalpostIcon size={20} /> },
   { href: "/scout/punt", label: "Punt", iconEl: <PuntFootIcon size={20} /> },
   { href: "/scout/kickoff", label: "KO", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/scout/snap", label: "Snap", icon: "📏" },
-  { href: "/scout/archives", label: "Archives", icon: "🗄" },
 ];
 
 export function MobileNav() {
