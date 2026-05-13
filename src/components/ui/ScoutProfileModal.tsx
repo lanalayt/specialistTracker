@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import type { ScoutProfile } from "@/lib/scoutStore";
+import clsx from "clsx";
+
+const POSITION_OPTIONS = ["Kicker", "Punter", "Snapper"];
 
 interface Props {
   profile: ScoutProfile;
@@ -20,12 +23,19 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const selectedPositions = (form.position ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const togglePosition = (pos: string) => {
+    const next = selectedPositions.includes(pos)
+      ? selectedPositions.filter((p) => p !== pos)
+      : [...selectedPositions, pos];
+    update("position", next.join(", "));
+  };
+
   const fields: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
     { key: "name", label: "Name", placeholder: "Full name" },
     { key: "dob", label: "DOB", placeholder: "MM/DD/YYYY" },
     { key: "school", label: "School", placeholder: "School name" },
     { key: "schoolYear", label: "School Year", placeholder: "e.g. Junior, 2026" },
-    { key: "position", label: "Position", placeholder: "e.g. K, P, LS" },
     { key: "height", label: "Height", placeholder: "e.g. 6'2\"" },
     { key: "weight", label: "Weight", placeholder: "e.g. 195 lbs" },
     { key: "majorPreference", label: "Major Preference", placeholder: "e.g. Business" },
@@ -54,6 +64,26 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
               />
             </div>
           ))}
+          <div>
+            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Position</p>
+            <div className="flex gap-1.5">
+              {POSITION_OPTIONS.map((pos) => (
+                <button
+                  key={pos}
+                  type="button"
+                  onClick={() => togglePosition(pos)}
+                  className={clsx(
+                    "px-3 py-1.5 rounded-input text-xs font-semibold transition-all",
+                    selectedPositions.includes(pos)
+                      ? "bg-amber-500 text-slate-900"
+                      : "bg-surface-2 text-muted border border-border hover:text-white"
+                  )}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+          </div>
           <div>
             <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Notes</p>
             <textarea
