@@ -97,9 +97,9 @@ export default function ScoutSnapPage() {
     <>
       <Header title="Snap Scouting" />
       <main className="p-4 lg:p-6 max-w-4xl space-y-6">
-        <div className="flex gap-1 rounded-input border border-border overflow-hidden w-fit">
+        <div className="flex rounded-input border border-border overflow-hidden w-fit">
           <button onClick={() => setTab("chart")} className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors", tab === "chart" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Chart</button>
-          <button onClick={() => setTab("rankings")} className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors", tab === "rankings" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white border-l border-border")}>Rankings</button>
+          <button onClick={() => setTab("rankings")} className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors border-l border-border", tab === "rankings" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Rankings</button>
         </div>
 
         {tab === "chart" && (
@@ -123,7 +123,7 @@ export default function ScoutSnapPage() {
         {tab === "rankings" && (
           <div className="space-y-4">
             {/* Short / Long sub-tabs */}
-            <div className="flex gap-1 rounded-input border border-border overflow-hidden w-fit">
+            <div className="flex rounded-input border border-border overflow-hidden w-fit">
               <button onClick={() => setRankingTab("short")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", rankingTab === "short" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Short Snaps</button>
               <button onClick={() => setRankingTab("long")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", rankingTab === "long" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Long Snaps</button>
             </div>

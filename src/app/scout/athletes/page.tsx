@@ -148,7 +148,7 @@ export default function ScoutAthletesPage() {
           return (
             <>
               <div className="space-y-2">
-                <div className="flex gap-1 rounded-input border border-border overflow-hidden w-fit">
+                <div className="flex rounded-input border border-border overflow-hidden w-fit">
                   <button onClick={() => { setFilterType("all"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", filterType === "all" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>All</button>
                   <button onClick={() => { setFilterType("year"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", filterType === "year" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Year</button>
                   <button onClick={() => { setFilterType("position"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", filterType === "position" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Position</button>
