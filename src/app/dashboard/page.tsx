@@ -9,11 +9,9 @@ import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
-import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import Link from "next/link";
 import React from "react";
-import clsx from "clsx";
 
 const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string; disabled?: boolean }[] = [
   { href: "/kicking", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
@@ -90,37 +88,15 @@ const SPORT_LABELS: Record<string, { label: string; iconEl: React.ReactNode; bas
   LONGSNAP: { label: "Snap", iconEl: <span className="text-lg leading-none">📏</span>, basePath: "/longsnap/history" },
 };
 
-const SCOUT_SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string }[] = [
-  { href: "/scout/fg", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
-  { href: "/scout/punt", iconEl: <PuntFootIcon size={36} />, label: "Punting" },
-  { href: "/scout/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
-  { href: "/scout/snap", icon: "📏", label: "Snapping" },
-];
-
 function DashboardContent() {
   const fg = useFG();
   const punt = usePunt();
   const kickoff = useKickoff();
-  const { isCoach } = useAuth();
 
-  const [appMode, setAppMode] = useState<"coach" | "scout">("coach");
   const [schoolName, setSchoolName] = useState("Special Teams");
   const [dashTitle, setDashTitle] = useState("Special Teams Dashboard");
   const [editingTitle, setEditingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
-
-  // Load persisted mode
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("st_app_mode");
-      if (saved === "scout" && isCoach) setAppMode("scout");
-    } catch {}
-  }, [isCoach]);
-
-  const handleModeChange = (mode: "coach" | "scout") => {
-    setAppMode(mode);
-    localStorage.setItem("st_app_mode", mode);
-  };
 
   useEffect(() => {
     try {
@@ -194,34 +170,6 @@ function DashboardContent() {
       <Header title={schoolName} />
 
       <main className="p-4 lg:p-6 space-y-6 max-w-6xl">
-        {/* Coach / Scout toggle — coach only */}
-        {isCoach && (
-          <div className="flex rounded-input border border-border overflow-hidden w-fit">
-            <button
-              onClick={() => handleModeChange("coach")}
-              className={clsx(
-                "px-5 py-1.5 text-xs font-semibold transition-colors",
-                appMode === "coach"
-                  ? "bg-accent text-slate-900"
-                  : "text-muted hover:text-white"
-              )}
-            >
-              Coach
-            </button>
-            <button
-              onClick={() => handleModeChange("scout")}
-              className={clsx(
-                "px-5 py-1.5 text-xs font-semibold transition-colors border-l border-border",
-                appMode === "scout"
-                  ? "bg-amber-500 text-slate-900"
-                  : "text-muted hover:text-white"
-              )}
-            >
-              Scout
-            </button>
-          </div>
-        )}
-
         {/* Welcome — double-click to edit */}
         <div>
           {editingTitle ? (
@@ -246,9 +194,7 @@ function DashboardContent() {
           )}
         </div>
 
-        {appMode === "coach" ? (
-          <>
-            {/* Sport cards — icon only */}
+        {/* Sport cards — icon only */}
             <div>
               <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
                 Sport Modules
@@ -385,42 +331,6 @@ function DashboardContent() {
                 </Link>
               </div>
             </div>
-          </>
-        ) : (
-          <>
-            {/* Scout Mode Content */}
-            <div>
-              <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-                Scout Evaluation
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {SCOUT_SPORT_CARDS.map((card) => (
-                  <Link
-                    key={card.href}
-                    href={card.href}
-                    className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
-                  >
-                    <div className="text-4xl mb-2">{card.iconEl ?? card.icon}</div>
-                    <h3 className="text-xs font-bold text-slate-100 group-hover:text-amber-400 transition-colors">
-                      {card.label}
-                    </h3>
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-                Quick Links
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
-                <Link href="/scout/archives" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex items-center gap-3 py-3 px-4">
-                  <span className="text-xl">🗄</span>
-                  <span className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Scout Archives</span>
-                </Link>
-              </div>
-            </div>
-          </>
-        )}
       </main>
     </div>
   );

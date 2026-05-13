@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTeamLogo } from "@/lib/useTeamLogo";
 import { useTutorial } from "@/components/ui/Tutorial";
@@ -31,11 +31,26 @@ const ALWAYS_ITEMS: { href: string; label: string; icon?: string; iconEl?: React
 
 export function Header({ title }: { title?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, isCoach, signOut } = useAuth();
   const { logo, uploadLogo } = useTeamLogo();
   const { show: showTutorial } = useTutorial();
   const fileRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const isScoutRoute = pathname.startsWith("/scout");
+  const [appMode, setAppMode] = useState<"coach" | "scout">(isScoutRoute ? "scout" : "coach");
+
+  useEffect(() => {
+    setAppMode(isScoutRoute ? "scout" : "coach");
+  }, [isScoutRoute]);
+
+  const handleModeChange = (mode: "coach" | "scout") => {
+    setAppMode(mode);
+    localStorage.setItem("st_app_mode", mode);
+    if (mode === "scout" && !isScoutRoute) router.push("/scout/fg");
+    if (mode === "coach" && isScoutRoute) router.push("/dashboard");
+  };
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
@@ -82,6 +97,34 @@ export function Header({ title }: { title?: string }) {
         </span>
 
         <div className="flex-1" />
+
+        {/* Coach / Scout toggle */}
+        {isCoach && (
+          <div className="flex rounded-full border border-border overflow-hidden flex-shrink-0">
+            <button
+              onClick={() => handleModeChange("coach")}
+              className={clsx(
+                "px-2.5 py-1 text-[10px] font-semibold transition-colors",
+                appMode === "coach"
+                  ? "bg-accent text-slate-900"
+                  : "text-muted hover:text-white"
+              )}
+            >
+              Coach
+            </button>
+            <button
+              onClick={() => handleModeChange("scout")}
+              className={clsx(
+                "px-2.5 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+                appMode === "scout"
+                  ? "bg-amber-500 text-slate-900"
+                  : "text-muted hover:text-white"
+              )}
+            >
+              Scout
+            </button>
+          </div>
+        )}
 
         {/* User */}
         <div className="flex items-center gap-2">
