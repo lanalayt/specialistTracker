@@ -5,9 +5,35 @@ import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { exportSnapScoutExcel, exportSnapScoutPDF } from "@/lib/scoutExport";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
+import { HolderStrikeZone } from "@/components/ui/HolderStrikeZone";
+import { PunterStrikeZone } from "@/components/ui/PunterStrikeZone";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
+
+interface SnapEntry {
+  athlete: string;
+  points?: number;
+  score?: number;
+  accuracy?: string;
+  laces?: string;
+  spiral?: string;
+  time?: string;
+  markerX?: number;
+  markerY?: number;
+  markerInZone?: boolean;
+}
+
+interface RankedRow {
+  name: string;
+  sessionId: string;
+  sessionLabel: string;
+  date: string;
+  count: number;
+  total: number;
+  entries: SnapEntry[];
+  is30Point: boolean;
+}
 
 export default function ScoutSnapPage() {
   const [tab, setTab] = useState<"chart" | "rankings">("chart");
@@ -15,6 +41,7 @@ export default function ScoutSnapPage() {
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState<RankedRow | null>(null);
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -28,15 +55,15 @@ export default function ScoutSnapPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  // Build per-session-per-athlete rows
-  const ranked: { name: string; sessionId: string; date: string; count: number; total: number }[] = [];
+  const ranked: RankedRow[] = [];
   for (const s of sessions) {
-    const entries = s.entries as unknown as { athlete: string; points?: number; score?: number }[];
+    const entries = s.entries as unknown as SnapEntry[];
+    const is30Point = s.label.startsWith("30 Point");
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     for (const name of athletes) {
       const ae = entries.filter((e) => e.athlete === name);
       const total = ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0);
-      ranked.push({ name, sessionId: s.id, date: s.date, count: ae.length, total });
+      ranked.push({ name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: ae.length, total, entries: ae, is30Point });
     }
   }
   ranked.sort((a, b) => b.total - a.total);
@@ -117,7 +144,9 @@ export default function ScoutSnapPage() {
                             <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
                           </td>
                           <td className="text-center py-1 px-2 text-slate-300">{r.count}</td>
-                          <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
+                          <td className="text-right py-1 px-2">
+                            <button onClick={() => setDetailOpen(r)} className="font-black text-amber-400 hover:underline">{r.total}</button>
+                          </td>
                           <td className="text-center py-1 px-1">
                             <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                           </td>
@@ -138,6 +167,81 @@ export default function ScoutSnapPage() {
           onSave={handleSaveProfile}
           onClose={() => setProfileOpen(null)}
         />
+      )}
+
+      {/* Detail modal — strike zone + snap summary */}
+      {detailOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDetailOpen(null)} />
+          <div className="relative bg-surface border border-border rounded-xl w-full max-w-md mx-4 p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">{detailOpen.name}</h3>
+                <p className="text-[10px] text-muted">{detailOpen.is30Point ? "30 Point Game" : "Balls & Strikes"} — {new Date(detailOpen.date).toLocaleDateString()}</p>
+              </div>
+              <button onClick={() => setDetailOpen(null)} className="text-muted hover:text-white text-xs transition-colors">Close</button>
+            </div>
+
+            {/* Score */}
+            <div className="text-center">
+              <p className="text-3xl font-black text-amber-400">{detailOpen.total}</p>
+              <p className="text-xs text-muted">{detailOpen.is30Point ? `/ ${detailOpen.count * 3}` : `${detailOpen.total} / ${detailOpen.count} strikes`}</p>
+            </div>
+
+            {/* Strike zone diagram */}
+            <div className="max-w-[250px] mx-auto">
+              {detailOpen.is30Point ? (
+                <HolderStrikeZone
+                  markers={detailOpen.entries
+                    .filter((e) => e.markerX != null && e.markerY != null)
+                    .map((e, i) => ({ x: e.markerX!, y: e.markerY!, inZone: e.markerInZone ?? false, num: i + 1 }))}
+                />
+              ) : (
+                <PunterStrikeZone
+                  markers={detailOpen.entries
+                    .filter((e) => e.markerX != null && e.markerY != null)
+                    .map((e, i) => ({ x: e.markerX!, y: e.markerY!, inZone: e.accuracy === "Strike", num: i + 1 }))}
+                />
+              )}
+            </div>
+
+            {/* Snap-by-snap table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-1">{detailOpen.is30Point ? "Loc" : "Call"}</th>
+                    {detailOpen.is30Point && <th className="text-[10px] text-muted text-center py-1 px-1">Laces</th>}
+                    {!detailOpen.is30Point && <th className="text-[10px] text-muted text-center py-1 px-1">Time</th>}
+                    <th className="text-[10px] text-muted text-center py-1 px-1">Spiral</th>
+                    <th className="text-[10px] text-muted text-right py-1 px-1">Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detailOpen.entries.map((e, i) => (
+                    <tr key={i} className="border-t border-border/30">
+                      <td className="text-muted py-1 px-1">{i + 1}</td>
+                      <td className={clsx("text-center py-1 px-1 font-semibold", e.accuracy === "Strike" ? "text-make" : "text-miss")}>{e.accuracy}</td>
+                      {detailOpen.is30Point && (
+                        <td className={clsx("text-center py-1 px-1", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>
+                          {e.laces === "Good" ? "Perfect" : e.laces}
+                        </td>
+                      )}
+                      {!detailOpen.is30Point && (
+                        <td className="text-center py-1 px-1 text-slate-300">{e.time || "—"}</td>
+                      )}
+                      <td className={clsx("text-center py-1 px-1", e.spiral === "Good" ? "text-make" : "text-miss")}>
+                        {e.spiral === "Good" ? "Tight" : "Open"}
+                      </td>
+                      <td className="text-right py-1 px-1 font-bold text-amber-400">{e.points ?? e.score ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
