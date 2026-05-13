@@ -31,6 +31,7 @@ const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: Re
   { href: "/scout/punt", label: "Punt Scouting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/scout/kickoff", label: "KO Scouting", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/scout/snap", label: "Snap Scouting", icon: "📏" },
+  { href: "/scout/athletes", label: "Athlete Profiles", icon: "👥" },
   { href: "/scout/archives", label: "Scout Archives", icon: "🗄" },
 ];
 
