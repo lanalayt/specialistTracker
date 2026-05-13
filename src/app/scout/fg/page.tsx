@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, type ScoutSession } from "@/lib/scoutStore";
+import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -86,6 +87,12 @@ export default function ScoutFGPage() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
+            {!loading && sessions.length > 0 && (
+              <div className="flex gap-2">
+                <button onClick={() => exportFGScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
+                <button onClick={() => exportFGScoutPDF(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export PDF</button>
+              </div>
+            )}
             {loading ? (
               <p className="text-sm text-muted py-8 text-center">Loading...</p>
             ) : sessions.length === 0 ? (
