@@ -107,12 +107,10 @@ export default function ScoutSnapPage() {
             <p className="text-sm text-muted">Start a new snapping evaluation.</p>
             <div className="grid grid-cols-2 gap-3 max-w-md">
               <Link href="/scout/snap/30-point" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
-                <p className="text-2xl mb-2">🎯</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Short Snaps</h3>
                 <p className="text-[10px] text-muted mt-1">Strike + Laces + Spiral</p>
               </Link>
               <Link href="/scout/snap/balls-strikes" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
-                <p className="text-2xl mb-2">⚾</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Long Snaps</h3>
                 <p className="text-[10px] text-muted mt-1">Accuracy + Time + Spiral</p>
               </Link>

@@ -216,8 +216,8 @@ export default function ScoutLongSnapsPage() {
                   <p className="text-sm font-bold text-slate-200">{r.name}</p>
                   <PunterStrikeZone markers={r.markers} />
                   <div className="card-2 py-3">
-                    <p className="text-3xl font-black text-amber-400">{r.avg.toFixed(2)}</p>
-                    <p className="text-xs text-muted">{r.strikes}/{r.snaps.length} strikes</p>
+                    <p className="text-3xl font-black text-amber-400">{r.strikes}/{r.snaps.length}</p>
+                    <p className="text-xs text-muted">strikes</p>
                   </div>
                   <div className="card-2 text-left text-xs max-h-[200px] overflow-y-auto">
                     <table className="w-full">
@@ -270,8 +270,8 @@ export default function ScoutLongSnapsPage() {
               return (
                 <button key={p} onClick={() => setActivePlayer(p)} className={clsx("card-2 px-3 py-2 text-center transition-all min-w-[80px]", p === activePlayer ? "ring-2 ring-amber-500" : "opacity-60 hover:opacity-100")}>
                   <p className="text-xs font-bold text-slate-200">{p}</p>
-                  <p className="text-lg font-black text-amber-400">{count > 0 ? getPlayerAvg(p).toFixed(2) : "—"}</p>
-                  <p className="text-[10px] text-muted">{count}/{spp}</p>
+                  <p className="text-lg font-black text-amber-400">{count > 0 ? `${getPlayerStrikes(p)}/${count}` : "—"}</p>
+                  <p className="text-[10px] text-muted">{count}/{spp} snaps</p>
                 </button>
               );
             })}
@@ -309,6 +309,20 @@ export default function ScoutLongSnapsPage() {
           </div>
           {snaps.length > 0 && (
             <button onClick={handleFinish} className="btn-ghost w-full py-2 text-xs font-bold border border-amber-500/40 text-amber-400">Finish</button>
+          )}
+
+          {snaps.length > 0 && (
+            <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[200px]">
+              {[...snaps].reverse().map((s, i) => (
+                <div key={snaps.length - 1 - i} className="flex items-center text-xs gap-2">
+                  <span className="text-muted w-5">#{snaps.length - i}</span>
+                  <span className="text-slate-400 w-20 truncate">{s.athlete}</span>
+                  <span className={clsx("font-semibold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}</span>
+                  <span className="text-slate-300">{s.time || "—"}s</span>
+                  <span className={clsx("ml-auto", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : "Open"}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </main>
