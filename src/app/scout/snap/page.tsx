@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, type ScoutSession } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSessions, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { exportSnapScoutExcel, exportSnapScoutPDF } from "@/lib/scoutExport";
+import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -11,20 +12,48 @@ import clsx from "clsx";
 export default function ScoutSnapPage() {
   const [tab, setTab] = useState<"chart" | "rankings">("chart");
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
+  const [profileOpen, setProfileOpen] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      let tid = getTeamId();
-      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
-      if (!tid || !active) return;
-      const sess = await loadScoutSessions(tid, "SCOUT_SNAP");
-      if (active) { setSessions(sess); setLoading(false); }
-    }
-    load();
-    return () => { active = false; };
-  }, []);
+  const loadData = async () => {
+    let tid = getTeamId();
+    for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+    if (!tid) return;
+    const [sess, prof] = await Promise.all([loadScoutSessions(tid, "SCOUT_SNAP"), loadScoutProfiles(tid)]);
+    setSessions(sess);
+    setProfiles(prof);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  const allEntries = sessions.flatMap((s) => s.entries as unknown as { athlete: string; points?: number; score?: number; accuracy?: string }[]);
+  const athleteNames = [...new Set(allEntries.map((e) => e.athlete))];
+  const ranked = athleteNames
+    .map((name) => {
+      const ae = allEntries.filter((e) => e.athlete === name);
+      const total = ae.reduce((s, e) => s + (e.points ?? e.score ?? 0), 0);
+      return { name, count: ae.length, total };
+    })
+    .sort((a, b) => b.total - a.total);
+
+  const handleDeleteAthlete = async (name: string) => {
+    if (!window.confirm(`Are you sure you want to delete all data for ${name}? This cannot be undone.`)) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    await deleteAthleteFromSessions(tid, "SCOUT_SNAP", name);
+    await loadData();
+  };
+
+  const handleSaveProfile = async (profile: ScoutProfile) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    const updated = { ...profiles, [profile.name]: profile };
+    setProfiles(updated);
+    await saveScoutProfiles(tid, updated);
+    setProfileOpen(null);
+  };
 
   return (
     <>
@@ -55,7 +84,7 @@ export default function ScoutSnapPage() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
-            {!loading && sessions.length > 0 && (
+            {!loading && ranked.length > 0 && (
               <div className="flex gap-2">
                 <button onClick={() => exportSnapScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
                 <button onClick={() => exportSnapScoutPDF(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export PDF</button>
@@ -63,53 +92,50 @@ export default function ScoutSnapPage() {
             )}
             {loading ? (
               <p className="text-sm text-muted py-8 text-center">Loading...</p>
-            ) : sessions.length === 0 ? (
-              <p className="text-sm text-muted py-8 text-center">No scout sessions yet.</p>
+            ) : ranked.length === 0 ? (
+              <p className="text-sm text-muted py-8 text-center">No scout data yet.</p>
             ) : (
-              sessions.map((session) => {
-                const entries = session.entries as unknown as { athlete: string; points?: number; score?: number; accuracy?: string }[];
-                const athleteNames = [...new Set(entries.map((e) => e.athlete))];
-                const ranked = athleteNames
-                  .map((name) => {
-                    const ae = entries.filter((e) => e.athlete === name);
-                    const total = ae.reduce((s, e) => s + (e.points ?? e.score ?? 0), 0);
-                    return { name, count: ae.length, total };
-                  })
-                  .sort((a, b) => b.total - a.total);
-
-                return (
-                  <div key={session.id} className="card space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-slate-100">{session.label}</p>
-                      <p className="text-[10px] text-muted">{new Date(session.date).toLocaleDateString()}</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr>
-                            <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
-                            <th className="text-[10px] text-muted text-center py-1 px-2">Snaps</th>
-                            <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ranked.map((r, i) => (
-                            <tr key={r.name} className="border-t border-border/30">
-                              <td className="py-1 px-2 font-semibold text-slate-200"><span className="text-muted mr-1">{i + 1}.</span>{r.name}</td>
-                              <td className="text-center py-1 px-2 text-slate-300">{r.count}</td>
-                              <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })
+              <div className="card space-y-3">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
+                        <th className="text-[10px] text-muted text-center py-1 px-2">Snaps</th>
+                        <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
+                        <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ranked.map((r, i) => (
+                        <tr key={r.name} className="border-t border-border/30">
+                          <td className="py-1 px-2 font-semibold text-slate-200">
+                            <span className="text-muted mr-1">{i + 1}.</span>
+                            <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
+                          </td>
+                          <td className="text-center py-1 px-2 text-slate-300">{r.count}</td>
+                          <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
+                          <td className="text-center py-1 px-1">
+                            <button onClick={() => handleDeleteAthlete(r.name)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
         )}
       </main>
+
+      {profileOpen && (
+        <ScoutProfileModal
+          profile={profiles[profileOpen] ?? { name: profileOpen }}
+          onSave={handleSaveProfile}
+          onClose={() => setProfileOpen(null)}
+        />
+      )}
     </>
   );
 }

@@ -2,43 +2,72 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadAthletes, type StoredAthlete } from "@/lib/athleteStore";
-import { loadScoutSessions, type ScoutSession } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSessions, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { exportPuntScoutExcel, exportPuntScoutPDF } from "@/lib/scoutExport";
+import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
 
-interface PuntEntry {
-  athlete: string;
-  kickNum: number;
-  distance: number;
-  hangTime: number;
-  opTime: number;
-  directionGood: boolean;
-  score: number;
+interface PuntEntry { athlete: string; kickNum: number; distance: number; hangTime: number; opTime: number; directionGood: boolean; score: number; dropWorst?: boolean }
+
+function calcAvg(scores: number[], dropWorst: boolean): number {
+  if (scores.length === 0) return 0;
+  if (scores.length === 1) return scores[0];
+  if (!dropWorst) return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
+  const sorted = [...scores].sort((a, b) => a - b);
+  const best = sorted.slice(1);
+  return parseFloat((best.reduce((s, v) => s + v, 0) / best.length).toFixed(2));
 }
 
 export default function ScoutPuntPage() {
   const [tab, setTab] = useState<"chart" | "rankings">("chart");
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
+  const [profileOpen, setProfileOpen] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      let tid = getTeamId();
-      for (let i = 0; i < 15 && !tid; i++) {
-        await new Promise((r) => setTimeout(r, 100));
-        tid = getTeamId();
-      }
-      if (!tid || !active) return;
-      const sess = await loadScoutSessions(tid, "SCOUT_PUNT");
-      if (active) { setSessions(sess); setLoading(false); }
-    }
-    load();
-    return () => { active = false; };
-  }, []);
+  const loadData = async () => {
+    let tid = getTeamId();
+    for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+    if (!tid) return;
+    const [sess, prof] = await Promise.all([loadScoutSessions(tid, "SCOUT_PUNT"), loadScoutProfiles(tid)]);
+    setSessions(sess);
+    setProfiles(prof);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  const allEntries = sessions.flatMap((s) => s.entries as unknown as PuntEntry[]);
+  const dropWorst = allEntries[0]?.dropWorst ?? false;
+  const athleteNames = [...new Set(allEntries.map((e) => e.athlete))];
+  const ranked = athleteNames
+    .map((name) => {
+      const entries = allEntries.filter((e) => e.athlete === name);
+      const scores = entries.map((e) => e.score);
+      const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
+      return { name, entries, avg: calcAvg(scores, dropWorst), worst };
+    })
+    .sort((a, b) => b.avg - a.avg);
+  const maxKicks = ranked.length > 0 ? Math.max(...ranked.map((r) => r.entries.length)) : 0;
+
+  const handleDeleteAthlete = async (name: string) => {
+    if (!window.confirm(`Are you sure you want to delete all data for ${name}? This cannot be undone.`)) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    await deleteAthleteFromSessions(tid, "SCOUT_PUNT", name);
+    await loadData();
+  };
+
+  const handleSaveProfile = async (profile: ScoutProfile) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    const updated = { ...profiles, [profile.name]: profile };
+    setProfiles(updated);
+    await saveScoutProfiles(tid, updated);
+    setProfileOpen(null);
+  };
 
   return (
     <>
@@ -64,7 +93,7 @@ export default function ScoutPuntPage() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
-            {!loading && sessions.length > 0 && (
+            {!loading && ranked.length > 0 && (
               <div className="flex gap-2">
                 <button onClick={() => exportPuntScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
                 <button onClick={() => exportPuntScoutPDF(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export PDF</button>
@@ -72,60 +101,63 @@ export default function ScoutPuntPage() {
             )}
             {loading ? (
               <p className="text-sm text-muted py-8 text-center">Loading...</p>
-            ) : sessions.length === 0 ? (
-              <p className="text-sm text-muted py-8 text-center">No scout sessions yet.</p>
+            ) : ranked.length === 0 ? (
+              <p className="text-sm text-muted py-8 text-center">No scout data yet.</p>
             ) : (
-              sessions.map((session) => {
-                const entries = session.entries as unknown as PuntEntry[];
-                const athleteNames = [...new Set(entries.map((e) => e.athlete))];
-                const maxKicks = Math.max(...athleteNames.map((n) => entries.filter((e) => e.athlete === n).length));
-                const ranked = athleteNames
-                  .map((name) => ({ name, entries: entries.filter((e) => e.athlete === name), total: entries.filter((e) => e.athlete === name).reduce((s, e) => s + e.score, 0) }))
-                  .sort((a, b) => b.total - a.total);
-
-                return (
-                  <div key={session.id} className="card space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-slate-100">{session.label}</p>
-                      <p className="text-[10px] text-muted">{new Date(session.date).toLocaleDateString()}</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr>
-                            <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
-                            {Array.from({ length: maxKicks }, (_, i) => (
-                              <th key={i} className="text-[10px] text-muted text-center py-1 px-2">P{i + 1}</th>
-                            ))}
-                            <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ranked.map((r, i) => (
-                            <tr key={r.name} className="border-t border-border/30">
-                              <td className="py-1 px-2 font-semibold text-slate-200"><span className="text-muted mr-1">{i + 1}.</span>{r.name}</td>
-                              {r.entries.map((e, j) => (
-                                <td key={j} className={clsx("text-center py-1 px-2", e.directionGood ? "text-make" : "text-miss")}>
-                                  <span className="font-bold">{e.distance}</span>
-                                  <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
-                                </td>
-                              ))}
-                              {Array.from({ length: maxKicks - r.entries.length }, (_, j) => (
-                                <td key={`empty-${j}`} className="text-center py-1 px-2 text-muted">—</td>
-                              ))}
-                              <td className="text-right py-1 px-2 font-black text-amber-400">{r.total.toFixed(2)}</td>
-                            </tr>
+              <div className="card space-y-3">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
+                        {Array.from({ length: maxKicks }, (_, i) => (
+                          <th key={i} className="text-[10px] text-muted text-center py-1 px-2">P{i + 1}</th>
+                        ))}
+                        <th className="text-[10px] text-muted text-right py-1 px-2">Avg</th>
+                        <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ranked.map((r, i) => (
+                        <tr key={r.name} className="border-t border-border/30">
+                          <td className="py-1 px-2 font-semibold text-slate-200">
+                            <span className="text-muted mr-1">{i + 1}.</span>
+                            <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
+                          </td>
+                          {r.entries.map((e, j) => {
+                            const isDropped = r.worst !== null && e.score === r.worst && j === r.entries.findIndex((x) => x.score === r.worst);
+                            return (
+                              <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "", e.directionGood ? "text-make" : "text-miss")}>
+                                <span className="font-bold">{e.distance}</span>
+                                <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
+                              </td>
+                            );
+                          })}
+                          {Array.from({ length: maxKicks - r.entries.length }, (_, j) => (
+                            <td key={`e-${j}`} className="text-center py-1 px-2 text-muted">—</td>
                           ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })
+                          <td className="text-right py-1 px-2 font-black text-amber-400">{r.avg.toFixed(2)}</td>
+                          <td className="text-center py-1 px-1">
+                            <button onClick={() => handleDeleteAthlete(r.name)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
         )}
       </main>
+
+      {profileOpen && (
+        <ScoutProfileModal
+          profile={profiles[profileOpen] ?? { name: profileOpen }}
+          onSave={handleSaveProfile}
+          onClose={() => setProfileOpen(null)}
+        />
+      )}
     </>
   );
 }

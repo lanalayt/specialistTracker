@@ -84,6 +84,73 @@ export async function deleteAllScoutSessions(teamId: string, sport: string): Pro
   }
 }
 
+export async function deleteAthleteFromSessions(teamId: string, sport: string, athleteName: string): Promise<boolean> {
+  if (!teamId || teamId === "local-dev") return false;
+  try {
+    const sessions = await loadScoutSessions(teamId, sport);
+    const supabase = createClient();
+    for (const s of sessions) {
+      const filtered = s.entries.filter((e) => (e as { athlete?: string }).athlete !== athleteName);
+      if (filtered.length === 0) {
+        await supabase.from("sessions").delete().eq("team_id", teamId).eq("id", s.id);
+      } else {
+        await supabase.from("sessions").update({ entries: filtered, updated_at: new Date().toISOString() }).eq("team_id", teamId).eq("id", s.id);
+      }
+    }
+    return true;
+  } catch (err) {
+    console.warn("[ScoutStore] deleteAthleteFromSessions failed:", err);
+    return false;
+  }
+}
+
+// ── Scout Profiles (stored in team_data) ────────────────────────────────────
+
+export interface ScoutProfile {
+  name: string;
+  dob?: string;
+  school?: string;
+  schoolYear?: string;
+  position?: string;
+  height?: string;
+  weight?: string;
+  majorPreference?: string;
+}
+
+const SCOUT_PROFILES_KEY = "scout_profiles";
+
+export async function loadScoutProfiles(teamId: string): Promise<Record<string, ScoutProfile>> {
+  try {
+    const raw = localStorage.getItem(SCOUT_PROFILES_KEY);
+    if (raw) return JSON.parse(raw) as Record<string, ScoutProfile>;
+  } catch {}
+  if (!teamId || teamId === "local-dev") return {};
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("team_data").select("data").eq("team_id", teamId).eq("data_key", SCOUT_PROFILES_KEY).single();
+    if (error || !data) return {};
+    const profiles = data.data as unknown as Record<string, ScoutProfile>;
+    if (profiles && typeof profiles === "object") {
+      localStorage.setItem(SCOUT_PROFILES_KEY, JSON.stringify(profiles));
+      return profiles;
+    }
+    return {};
+  } catch { return {}; }
+}
+
+export async function saveScoutProfiles(teamId: string, profiles: Record<string, ScoutProfile>): Promise<void> {
+  localStorage.setItem(SCOUT_PROFILES_KEY, JSON.stringify(profiles));
+  if (!teamId || teamId === "local-dev") return;
+  try {
+    const supabase = createClient();
+    await supabase.from("team_data").upsert(
+      { team_id: teamId, data_key: SCOUT_PROFILES_KEY, data: profiles as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
+      { onConflict: "team_id,data_key" }
+    );
+  } catch {}
+}
+
 // ── Presets (stored in team_data) ───────────────────────────────────────────
 
 export async function loadScoutPreset<T>(teamId: string, key: string): Promise<T | null> {

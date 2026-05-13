@@ -1,0 +1,68 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import type { ScoutProfile } from "@/lib/scoutStore";
+
+interface Props {
+  profile: ScoutProfile;
+  onSave: (profile: ScoutProfile) => void;
+  onClose: () => void;
+}
+
+export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
+  const [form, setForm] = useState<ScoutProfile>({ ...profile });
+
+  useEffect(() => {
+    setForm({ ...profile });
+  }, [profile.name]);
+
+  const update = (key: keyof ScoutProfile, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const fields: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
+    { key: "name", label: "Name", placeholder: "Full name" },
+    { key: "dob", label: "DOB", placeholder: "MM/DD/YYYY" },
+    { key: "school", label: "School", placeholder: "School name" },
+    { key: "schoolYear", label: "School Year", placeholder: "e.g. Junior, 2026" },
+    { key: "position", label: "Position", placeholder: "e.g. K, P, LS" },
+    { key: "height", label: "Height", placeholder: "e.g. 6'2\"" },
+    { key: "weight", label: "Weight", placeholder: "e.g. 195 lbs" },
+    { key: "majorPreference", label: "Major Preference", placeholder: "e.g. Business" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-surface border border-border rounded-xl w-full max-w-sm mx-4 p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-100">Player Profile</h3>
+          <button onClick={onClose} className="text-muted hover:text-white text-xs transition-colors">Close</button>
+        </div>
+
+        <div className="space-y-3">
+          {fields.map((f) => (
+            <div key={f.key}>
+              <p className="text-[10px] text-muted uppercase tracking-wider mb-1">{f.label}</p>
+              <input
+                type="text"
+                value={form[f.key] ?? ""}
+                onChange={(e) => update(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                className="input w-full text-sm py-1.5"
+                readOnly={f.key === "name"}
+              />
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={() => onSave(form)}
+          className="btn-primary w-full py-2.5 text-sm font-bold"
+        >
+          Save Profile
+        </button>
+      </div>
+    </div>
+  );
+}

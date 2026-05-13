@@ -2,81 +2,84 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, type ScoutSession } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSessions, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
+import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
 
-interface FGEntry {
-  athlete: string;
-  kickNum: number;
-  distance: number;
-  hash: string;
-  pointValue: number;
-  result: "make" | "miss";
-  score: number;
-}
+interface FGEntry { athlete: string; kickNum: number; distance: number; hash: string; pointValue: number; result: "make" | "miss"; score: number }
 
 export default function ScoutFGPage() {
   const [tab, setTab] = useState<"chart" | "rankings">("chart");
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
+  const [profileOpen, setProfileOpen] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      let tid = getTeamId();
-      for (let i = 0; i < 15 && !tid; i++) {
-        await new Promise((r) => setTimeout(r, 100));
-        tid = getTeamId();
-      }
-      if (!tid || !active) return;
-      const sess = await loadScoutSessions(tid, "SCOUT_FG");
-      if (!active) return;
-      setSessions(sess);
-      setLoading(false);
-    }
-    load();
-    return () => { active = false; };
-  }, []);
+  const loadData = async () => {
+    let tid = getTeamId();
+    for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+    if (!tid) return;
+    const [sess, prof] = await Promise.all([loadScoutSessions(tid, "SCOUT_FG"), loadScoutProfiles(tid)]);
+    setSessions(sess);
+    setProfiles(prof);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  // Merge all entries across sessions
+  const allEntries = sessions.flatMap((s) => s.entries as unknown as FGEntry[]);
+  const athleteNames = [...new Set(allEntries.map((e) => e.athlete))];
+
+  // Build a unified kick list — re-number across sessions
+  const athleteData = athleteNames.map((name) => {
+    const entries = allEntries.filter((e) => e.athlete === name);
+    const total = entries.reduce((s, e) => s + e.score, 0);
+    const makes = entries.filter((e) => e.result === "make").length;
+    return { name, entries, total, makes, att: entries.length };
+  }).sort((a, b) => b.total - a.total);
+
+  const maxKicks = athleteData.length > 0 ? Math.max(...athleteData.map((a) => a.entries.length)) : 0;
+
+  const handleDeleteAthlete = async (name: string) => {
+    if (!window.confirm(`Are you sure you want to delete all data for ${name}? This cannot be undone.`)) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    await deleteAthleteFromSessions(tid, "SCOUT_FG", name);
+    await loadData();
+  };
+
+  const handleSaveProfile = async (profile: ScoutProfile) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    const updated = { ...profiles, [profile.name]: profile };
+    setProfiles(updated);
+    await saveScoutProfiles(tid, updated);
+    setProfileOpen(null);
+  };
 
   return (
     <>
       <Header title="FG Scouting" />
       <main className="p-4 lg:p-6 max-w-4xl space-y-6">
-        {/* Tabs */}
         <div className="flex gap-1 rounded-input border border-border overflow-hidden w-fit">
-          <button
-            onClick={() => setTab("chart")}
-            className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors", tab === "chart" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}
-          >
-            Chart
-          </button>
-          <button
-            onClick={() => setTab("rankings")}
-            className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors border-l border-border", tab === "rankings" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}
-          >
-            Rankings
-          </button>
+          <button onClick={() => setTab("chart")} className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors", tab === "chart" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Chart</button>
+          <button onClick={() => setTab("rankings")} className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors border-l border-border", tab === "rankings" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Rankings</button>
         </div>
 
         {tab === "chart" && (
           <div className="space-y-4">
             <p className="text-sm text-muted">Start a new FG evaluation chart.</p>
             <div className="grid grid-cols-2 gap-3 max-w-md">
-              <Link
-                href="/scout/fg/chart?mode=preset"
-                className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
-              >
+              <Link href="/scout/fg/chart?mode=preset" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">📋</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Preset Chart</h3>
                 <p className="text-[10px] text-muted mt-1">Use saved kick chart</p>
               </Link>
-              <Link
-                href="/scout/fg/chart?mode=manual"
-                className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6"
-              >
+              <Link href="/scout/fg/chart?mode=manual" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">✏️</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Manual Chart</h3>
                 <p className="text-[10px] text-muted mt-1">Enter kicks on the fly</p>
@@ -87,7 +90,7 @@ export default function ScoutFGPage() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
-            {!loading && sessions.length > 0 && (
+            {!loading && athleteData.length > 0 && (
               <div className="flex gap-2">
                 <button onClick={() => exportFGScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
                 <button onClick={() => exportFGScoutPDF(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export PDF</button>
@@ -95,73 +98,59 @@ export default function ScoutFGPage() {
             )}
             {loading ? (
               <p className="text-sm text-muted py-8 text-center">Loading...</p>
-            ) : sessions.length === 0 ? (
+            ) : athleteData.length === 0 ? (
               <p className="text-sm text-muted py-8 text-center">No scout sessions yet. Start a chart to begin.</p>
             ) : (
-              sessions.map((session) => {
-                const entries = session.entries as unknown as FGEntry[];
-                const athleteNames = [...new Set(entries.map((e) => e.athlete))];
-                const kicks = [...new Set(entries.map((e) => e.kickNum))].sort((a, b) => a - b);
-                const kickInfo = kicks.map((k) => {
-                  const e = entries.find((en) => en.kickNum === k);
-                  return { num: k, distance: e?.distance ?? 0, hash: e?.hash ?? "", pointValue: e?.pointValue ?? 0 };
-                });
-
-                const ranked = athleteNames
-                  .map((name) => {
-                    const ae = entries.filter((e) => e.athlete === name);
-                    return { name, entries: ae, total: ae.reduce((s, e) => s + e.score, 0) };
-                  })
-                  .sort((a, b) => b.total - a.total);
-
-                return (
-                  <div key={session.id} className="card space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-slate-100">{session.label}</p>
-                      <p className="text-[10px] text-muted">{new Date(session.date).toLocaleDateString()}</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr>
-                            <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
-                            {kickInfo.map((k) => (
-                              <th key={k.num} className="text-[10px] text-muted text-center py-1 px-2">
-                                {k.distance}yd {k.hash}
-                                {k.pointValue > 1 && <span className="block text-[8px]">({k.pointValue}pt)</span>}
-                              </th>
-                            ))}
-                            <th className="text-[10px] text-muted text-right py-1 px-2">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ranked.map((r, i) => (
-                            <tr key={r.name} className="border-t border-border/30">
-                              <td className="py-1 px-2 font-semibold text-slate-200">
-                                <span className="text-muted mr-1">{i + 1}.</span>
-                                {r.name}
-                              </td>
-                              {kicks.map((k) => {
-                                const e = r.entries.find((en) => en.kickNum === k);
-                                return (
-                                  <td key={k} className={clsx("text-center py-1 px-2 font-bold", e?.result === "make" ? "text-make" : "text-miss")}>
-                                    {e ? e.score : "—"}
-                                  </td>
-                                );
-                              })}
-                              <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
-                            </tr>
+              <div className="card space-y-3">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
+                        {Array.from({ length: maxKicks }, (_, i) => (
+                          <th key={i} className="text-[10px] text-muted text-center py-1 px-2">K{i + 1}</th>
+                        ))}
+                        <th className="text-[10px] text-muted text-right py-1 px-2">Total</th>
+                        <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {athleteData.map((r, i) => (
+                        <tr key={r.name} className="border-t border-border/30">
+                          <td className="py-1 px-2 font-semibold text-slate-200">
+                            <span className="text-muted mr-1">{i + 1}.</span>
+                            <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
+                          </td>
+                          {r.entries.map((e, j) => (
+                            <td key={j} className={clsx("text-center py-1 px-2 font-bold", e.result === "make" ? "text-make" : "text-miss")}>
+                              {e.score}
+                            </td>
                           ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })
+                          {Array.from({ length: maxKicks - r.entries.length }, (_, j) => (
+                            <td key={`e-${j}`} className="text-center py-1 px-2 text-muted">—</td>
+                          ))}
+                          <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
+                          <td className="text-center py-1 px-1">
+                            <button onClick={() => handleDeleteAthlete(r.name)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
         )}
       </main>
+
+      {profileOpen && (
+        <ScoutProfileModal
+          profile={profiles[profileOpen] ?? { name: profileOpen }}
+          onSave={handleSaveProfile}
+          onClose={() => setProfileOpen(null)}
+        />
+      )}
     </>
   );
 }
