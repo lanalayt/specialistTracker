@@ -32,7 +32,7 @@ export default function ScoutLongSnapsPage() {
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [snapsPerPlayer, setSnapsPerPlayer] = useState("10");
-  const [maxTime, setMaxTime] = useState("0.75");
+  const [maxTime] = useState("");
   const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -166,15 +166,9 @@ export default function ScoutLongSnapsPage() {
             <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
           </div>
           {selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-xs text-muted mb-1">Snaps per player</p>
-              <input type="text" inputMode="numeric" value={snapsPerPlayer} onChange={(e) => setSnapsPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
-            </div>
-            <div>
-              <p className="text-xs text-muted mb-1">Max time (sec, 0 = no limit)</p>
-              <input type="text" inputMode="decimal" value={maxTime} onChange={(e) => setMaxTime(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5" />
-            </div>
+          <div>
+            <p className="text-xs text-muted mb-1">Snaps per player</p>
+            <input type="text" inputMode="numeric" value={snapsPerPlayer} onChange={(e) => setSnapsPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
           </div>
           <div className="flex items-center justify-between card-2 px-4 py-3">
             <div>
@@ -187,7 +181,7 @@ export default function ScoutLongSnapsPage() {
           </div>
           <div className="card-2 p-3 text-xs text-muted space-y-1">
             <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Scoring</p>
-            <p>Strike = 1 point. Ball = 0. A snap is a Ball if it misses the zone, exceeds max time, or has a bad spiral.</p>
+            <p>Strike = 1 point. Ball = 0. A snap is a Ball if it misses the zone or has a bad spiral.</p>
             <p>Final = average{dropWorst ? ", dropping the worst one" : ""}.</p>
           </div>
           <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || !spp} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
