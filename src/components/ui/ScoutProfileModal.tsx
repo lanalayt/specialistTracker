@@ -31,8 +31,10 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
     update("position", next.join(", "));
   };
 
-  const fields: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
+  const fieldsBeforePos: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
     { key: "name", label: "Name", placeholder: "Full name" },
+  ];
+  const fieldsAfterPos: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
     { key: "dob", label: "DOB", placeholder: "MM/DD/YYYY" },
     { key: "school", label: "School", placeholder: "School name" },
     { key: "schoolYear", label: "School Year", placeholder: "e.g. Junior, 2026" },
@@ -51,7 +53,7 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
         </div>
 
         <div className="space-y-3">
-          {fields.map((f) => (
+          {fieldsBeforePos.map((f) => (
             <div key={f.key}>
               <p className="text-[10px] text-muted uppercase tracking-wider mb-1">{f.label}</p>
               <input
@@ -84,6 +86,18 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
               ))}
             </div>
           </div>
+          {fieldsAfterPos.map((f) => (
+            <div key={f.key}>
+              <p className="text-[10px] text-muted uppercase tracking-wider mb-1">{f.label}</p>
+              <input
+                type="text"
+                value={form[f.key] ?? ""}
+                onChange={(e) => update(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                className="input w-full text-sm py-1.5"
+              />
+            </div>
+          ))}
           <div>
             <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Notes</p>
             <textarea
