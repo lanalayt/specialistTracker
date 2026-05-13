@@ -192,11 +192,9 @@ export default function ScoutAthletesPage() {
                             {name}
                           </button>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {profile?.position && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border text-muted font-semibold">{profile.position}</span>}
                             {profile?.school && <span className="text-[10px] text-muted">{profile.school}</span>}
                             {profile?.schoolYear && <span className="text-[10px] text-muted">{profile.schoolYear}</span>}
-                            {inSports.length > 0 && (
-                              <span className="text-[10px] text-amber-400/70">{inSports.join(", ")}</span>
-                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
