@@ -34,6 +34,7 @@ export default function ScoutLongSnapsPage() {
   const [snapsPerPlayer, setSnapsPerPlayer] = useState("10");
   const [maxTime] = useState("");
   const [dropWorst, setDropWorst] = useState(false);
+  const [openSpiralIsBall, setOpenSpiralIsBall] = useState(true);
   const [saved, setSaved] = useState(false);
 
   const [snaps, setSnaps] = useState<BsSnap[]>([]);
@@ -98,7 +99,7 @@ export default function ScoutLongSnapsPage() {
     if (!pendingMarker || !promptSpiral || !activePlayer) return;
     const timeNum = parseFloat(promptTime) || 0;
     const isTimeBall = maxTimeNum > 0 && timeNum > maxTimeNum;
-    const isSpiralBall = promptSpiral === "Bad";
+    const isSpiralBall = openSpiralIsBall && promptSpiral === "Bad";
     const inZone = pendingMarker.inZone !== false;
     const accuracy: "Strike" | "Ball" = inZone && !isTimeBall && !isSpiralBall ? "Strike" : "Ball";
 
@@ -179,9 +180,18 @@ export default function ScoutLongSnapsPage() {
               <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", dropWorst ? "left-5" : "left-0.5")} />
             </button>
           </div>
+          <div className="flex items-center justify-between card-2 px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-200">Open Spiral = Ball</p>
+              <p className="text-[10px] text-muted">Bad spiral automatically counts as a Ball</p>
+            </div>
+            <button onClick={() => setOpenSpiralIsBall(!openSpiralIsBall)} className={clsx("w-10 h-5 rounded-full transition-colors relative", openSpiralIsBall ? "bg-amber-500" : "bg-surface-2 border border-border")}>
+              <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", openSpiralIsBall ? "left-5" : "left-0.5")} />
+            </button>
+          </div>
           <div className="card-2 p-3 text-xs text-muted space-y-1">
             <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Scoring</p>
-            <p>Strike = 1 point. Ball = 0. A snap is a Ball if it misses the zone or has a bad spiral.</p>
+            <p>Strike = 1 point. Ball = 0. A snap is a Ball if it misses the zone{openSpiralIsBall ? " or has a bad spiral" : ""}.</p>
             <p>Final = average{dropWorst ? ", dropping the worst one" : ""}.</p>
           </div>
           <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || !spp} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>

@@ -10,6 +10,7 @@ const STORAGE_KEY = "snapSettings";
 interface SnapSettings {
   chartMode: "simple" | "detailed";
   missMode: "simple" | "detailed";
+  openSpiralIsBall: boolean;
 }
 
 function loadSettings(): SnapSettings {
@@ -20,10 +21,11 @@ function loadSettings(): SnapSettings {
       return {
         chartMode: parsed.chartMode === "detailed" ? "detailed" : "simple",
         missMode: parsed.missMode === "detailed" ? "detailed" : "simple",
+        openSpiralIsBall: parsed.openSpiralIsBall !== false,
       };
     }
   } catch {}
-  return { chartMode: "simple", missMode: "simple" };
+  return { chartMode: "simple", missMode: "simple", openSpiralIsBall: true };
 }
 
 export default function SnapSettingsPage() {
@@ -35,6 +37,7 @@ export default function SnapSettingsPage() {
 function SnapSettingsContent() {
   const [chartMode, setChartMode] = useState<"simple" | "detailed">(() => loadSettings().chartMode);
   const [missMode, setMissMode] = useState<"simple" | "detailed">(() => loadSettings().missMode);
+  const [openSpiralIsBall, setOpenSpiralIsBall] = useState(() => loadSettings().openSpiralIsBall);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [savedSettings, setSavedSettings] = useState<SnapSettings>(() => loadSettings());
@@ -44,9 +47,11 @@ function SnapSettingsContent() {
       if (cloud) {
         const cm = (cloud.chartMode === "detailed" ? "detailed" : "simple") as "simple" | "detailed";
         const mm = (cloud.missMode === "detailed" ? "detailed" : "simple") as "simple" | "detailed";
+        const osb = cloud.openSpiralIsBall !== false;
         setChartMode(cm);
         setMissMode(mm);
-        const synced: SnapSettings = { chartMode: cm, missMode: mm };
+        setOpenSpiralIsBall(osb);
+        const synced: SnapSettings = { chartMode: cm, missMode: mm, openSpiralIsBall: osb };
         setSavedSettings(synced);
         // Sync cloud → localStorage so session pages pick it up
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(synced)); } catch {}
@@ -55,13 +60,13 @@ function SnapSettingsContent() {
   }, []);
 
   useEffect(() => {
-    const changed = chartMode !== savedSettings.chartMode || missMode !== savedSettings.missMode;
+    const changed = chartMode !== savedSettings.chartMode || missMode !== savedSettings.missMode || openSpiralIsBall !== savedSettings.openSpiralIsBall;
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [chartMode, missMode, savedSettings]);
+  }, [chartMode, missMode, openSpiralIsBall, savedSettings]);
 
   const handleSave = () => {
-    const settings: SnapSettings = { chartMode, missMode };
+    const settings: SnapSettings = { chartMode, missMode, openSpiralIsBall };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -92,6 +97,22 @@ function SnapSettingsContent() {
         <div className="flex rounded-input border border-border overflow-hidden w-fit">
           <button onClick={() => setMissMode("simple")} className={clsx("px-4 py-2 text-xs font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
           <button onClick={() => setMissMode("detailed")} className={clsx("px-4 py-2 text-xs font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+        </div>
+      </div>
+
+      <div className="card space-y-4">
+        <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Open Spiral</p>
+        <p className="text-xs text-muted">
+          When enabled, an open (bad) spiral automatically counts as a Ball. When disabled, spiral does not affect the Strike/Ball call.
+        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-slate-200">Open Spiral = Ball</p>
+          <button
+            onClick={() => setOpenSpiralIsBall(!openSpiralIsBall)}
+            className={clsx("w-10 h-5 rounded-full transition-colors relative", openSpiralIsBall ? "bg-accent" : "bg-surface-2 border border-border")}
+          >
+            <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", openSpiralIsBall ? "left-5" : "left-0.5")} />
+          </button>
         </div>
       </div>
 
