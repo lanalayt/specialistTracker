@@ -29,6 +29,14 @@ const ALWAYS_ITEMS: { href: string; label: string; icon?: string; iconEl?: React
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
+const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+  { href: "/scout/fg", label: "FG Scouting", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/scout/punt", label: "Punt Scouting", iconEl: <PuntFootIcon size={20} /> },
+  { href: "/scout/kickoff", label: "KO Scouting", iconEl: <KickoffTeeIcon size={20} /> },
+  { href: "/scout/snap", label: "Snap Scouting", icon: "📏" },
+  { href: "/scout/archives", label: "Scout Archives", icon: "🗄" },
+];
+
 export function Header({ title }: { title?: string }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -179,36 +187,74 @@ export function Header({ title }: { title?: string }) {
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-              <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 py-1.5">Sports</p>
-              {NAV_ITEMS.map((item) =>
-                item.disabled ? (
-                  <div
-                    key={item.label}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium opacity-40 cursor-not-allowed"
-                  >
-                    {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
-                    <span className="line-through">{item.label}</span>
-                    <span className="ml-auto text-[8px] font-bold text-warn uppercase">Under Construction</span>
-                  </div>
-                ) : (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMenuOpen(false)}
-                    className={clsx(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium transition-colors",
-                      isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
-                    )}
-                  >
-                    {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
-                    {item.label}
-                  </Link>
-                )
-              )}
-              {isCoach && (
+              {isScoutRoute ? (
                 <>
-                  <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 pt-4 pb-1.5">Management</p>
-                  {COACH_ITEMS.map((item) => (
+                  <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest px-3 py-1.5">Scout Mode</p>
+                  {SCOUT_NAV_ITEMS.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={clsx(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium transition-colors",
+                        isActive(item.href) ? "bg-amber-500/15 text-amber-400 border border-amber-500/30" : "text-slate-200 hover:bg-surface-2"
+                      )}
+                    >
+                      {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+                      {item.label}
+                    </Link>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 py-1.5">Sports</p>
+                  {NAV_ITEMS.map((item) =>
+                    item.disabled ? (
+                      <div
+                        key={item.label}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium opacity-40 cursor-not-allowed"
+                      >
+                        {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+                        <span className="line-through">{item.label}</span>
+                        <span className="ml-auto text-[8px] font-bold text-warn uppercase">Under Construction</span>
+                      </div>
+                    ) : (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={clsx(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium transition-colors",
+                          isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
+                        )}
+                      >
+                        {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+                        {item.label}
+                      </Link>
+                    )
+                  )}
+                  {isCoach && (
+                    <>
+                      <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 pt-4 pb-1.5">Management</p>
+                      {COACH_ITEMS.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMenuOpen(false)}
+                          className={clsx(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium transition-colors",
+                            isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
+                          )}
+                        >
+                          {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+                          {item.label}
+                        </Link>
+                      ))}
+                    </>
+                  )}
+                  {/* Settings — always visible */}
+                  <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 pt-4 pb-1.5">Settings</p>
+                  {ALWAYS_ITEMS.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
@@ -222,31 +268,15 @@ export function Header({ title }: { title?: string }) {
                       {item.label}
                     </Link>
                   ))}
+                  <button
+                    onClick={() => { setMenuOpen(false); showTutorial(); }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium text-slate-200 hover:bg-surface-2 transition-colors w-full text-left"
+                  >
+                    <span className="text-lg leading-none">&#x1F393;</span>
+                    Tutorial
+                  </button>
                 </>
               )}
-              {/* Settings — always visible */}
-              <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 pt-4 pb-1.5">Settings</p>
-              {ALWAYS_ITEMS.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMenuOpen(false)}
-                  className={clsx(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium transition-colors",
-                    isActive(item.href) ? "bg-accent/15 text-accent border border-accent/30" : "text-slate-200 hover:bg-surface-2"
-                  )}
-                >
-                  {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
-                  {item.label}
-                </Link>
-              ))}
-              <button
-                onClick={() => { setMenuOpen(false); showTutorial(); }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-input text-sm font-medium text-slate-200 hover:bg-surface-2 transition-colors w-full text-left"
-              >
-                <span className="text-lg leading-none">&#x1F393;</span>
-                Tutorial
-              </button>
             </nav>
             <div className="border-t border-border p-3 flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center text-accent text-sm font-bold">
@@ -273,17 +303,28 @@ export function Header({ title }: { title?: string }) {
 
 // ─── Mobile bottom navigation ────────────────────────────────────────────────
 
+const SCOUT_MOBILE_NAV = [
+  { href: "/scout/fg", label: "FG", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/scout/punt", label: "Punt", iconEl: <PuntFootIcon size={20} /> },
+  { href: "/scout/kickoff", label: "KO", iconEl: <KickoffTeeIcon size={20} /> },
+  { href: "/scout/snap", label: "Snap", icon: "📏" },
+  { href: "/scout/archives", label: "Archives", icon: "🗄" },
+];
+
 export function MobileNav() {
   const pathname = usePathname();
+  const isScout = pathname.startsWith("/scout");
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
+  const items = isScout ? SCOUT_MOBILE_NAV : NAV_ITEMS.slice(0, 5);
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border lg:hidden z-40">
       <div className="flex">
-        {NAV_ITEMS.slice(0, 5).map((item) =>
-          item.disabled ? (
+        {items.map((item) =>
+          "disabled" in item && item.disabled ? (
             <div
               key={item.label}
               className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 opacity-30 cursor-not-allowed"
@@ -297,7 +338,7 @@ export function MobileNav() {
               href={item.href}
               className={clsx(
                 "flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors",
-                isActive(item.href) ? "text-accent" : "text-muted"
+                isActive(item.href) ? (isScout ? "text-amber-400" : "text-accent") : "text-muted"
               )}
             >
               {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}

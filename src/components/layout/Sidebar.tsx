@@ -25,6 +25,14 @@ const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
+const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+  { href: "/scout/fg", label: "FG Scouting", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/scout/punt", label: "Punt Scouting", iconEl: <PuntFootIcon size={20} /> },
+  { href: "/scout/kickoff", label: "KO Scouting", iconEl: <KickoffTeeIcon size={20} /> },
+  { href: "/scout/snap", label: "Snap Scouting", icon: "📏" },
+  { href: "/scout/archives", label: "Scout Archives", icon: "🗄" },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user, isCoach, signOut, setDemoRole } = useAuth();
@@ -32,8 +40,12 @@ export function Sidebar() {
   const { show: showTutorial } = useTutorial();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const isScoutRoute = pathname.startsWith("/scout");
+
   const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+    href === "/dashboard"
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
 
   const handleLogoClick = () => {
     if (isCoach) fileRef.current?.click();
@@ -71,48 +83,20 @@ export function Sidebar() {
             )}
           </button>
           <div>
-            <p className="text-sm font-bold text-slate-100 leading-none">Specialist</p>
-            <p className="text-xs text-muted leading-none mt-0.5">Tracker</p>
+            <p className="text-sm font-bold text-slate-100 leading-none">{isScoutRoute ? "Scout" : "Specialist"}</p>
+            <p className={clsx("text-xs leading-none mt-0.5", isScoutRoute ? "text-amber-400" : "text-muted")}>{isScoutRoute ? "Mode" : "Tracker"}</p>
           </div>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 py-1.5">
-          Sports
-        </p>
-        {NAV_ITEMS.map((item) =>
-          item.disabled ? (
-            <div
-              key={item.label}
-              className="nav-link opacity-40 cursor-not-allowed relative"
-            >
-              {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
-              <span className="line-through">{item.label}</span>
-              <span className="absolute right-2 text-[8px] font-bold text-warn uppercase tracking-wider">Under Construction</span>
-            </div>
-          ) : (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={clsx(
-                isActive(item.href) ? "nav-link-active" : "nav-link"
-              )}
-              {...(item.tutorialId ? { "data-tutorial": item.tutorialId } : {})}
-            >
-              {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
-              {item.label}
-            </Link>
-          )
-        )}
-
-        {isCoach && (
+        {isScoutRoute ? (
           <>
-            <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 pt-4 pb-1.5">
-              Management
+            <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest px-3 py-1.5">
+              Scout Mode
             </p>
-            {COACH_ITEMS.map((item) => (
+            {SCOUT_NAV_ITEMS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -125,19 +109,71 @@ export function Sidebar() {
               </Link>
             ))}
           </>
+        ) : (
+          <>
+            <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 py-1.5">
+              Sports
+            </p>
+            {NAV_ITEMS.map((item) =>
+              item.disabled ? (
+                <div
+                  key={item.label}
+                  className="nav-link opacity-40 cursor-not-allowed relative"
+                >
+                  {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
+                  <span className="line-through">{item.label}</span>
+                  <span className="absolute right-2 text-[8px] font-bold text-warn uppercase tracking-wider">Under Construction</span>
+                </div>
+              ) : (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={clsx(
+                    isActive(item.href) ? "nav-link-active" : "nav-link"
+                  )}
+                  {...(item.tutorialId ? { "data-tutorial": item.tutorialId } : {})}
+                >
+                  {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
+                  {item.label}
+                </Link>
+              )
+            )}
+
+            {isCoach && (
+              <>
+                <p className="text-[10px] font-semibold text-muted uppercase tracking-widest px-3 pt-4 pb-1.5">
+                  Management
+                </p>
+                {COACH_ITEMS.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={clsx(
+                      isActive(item.href) ? "nav-link-active" : "nav-link"
+                    )}
+                  >
+                    {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
+                    {item.label}
+                  </Link>
+                ))}
+              </>
+            )}
+          </>
         )}
       </nav>
 
       {/* Tutorial */}
-      <div className="px-3 pb-1">
-        <button
-          onClick={showTutorial}
-          className="nav-link w-full text-left"
-        >
-          <span className="text-base leading-none">&#x1F393;</span>
-          Tutorial
-        </button>
-      </div>
+      {!isScoutRoute && (
+        <div className="px-3 pb-1">
+          <button
+            onClick={showTutorial}
+            className="nav-link w-full text-left"
+          >
+            <span className="text-base leading-none">&#x1F393;</span>
+            Tutorial
+          </button>
+        </div>
+      )}
 
       {/* User info */}
       <div className="p-3 border-t border-border space-y-2">
