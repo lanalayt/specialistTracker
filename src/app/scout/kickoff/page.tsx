@@ -68,8 +68,19 @@ export default function ScoutKOPage() {
                 const athleteNames = [...new Set(entries.map((e) => e.athlete))];
                 const maxKicks = Math.max(...athleteNames.map((n) => entries.filter((e) => e.athlete === n).length));
                 const ranked = athleteNames
-                  .map((name) => ({ name, entries: entries.filter((e) => e.athlete === name), total: entries.filter((e) => e.athlete === name).reduce((s, e) => s + e.score, 0) }))
-                  .sort((a, b) => b.total - a.total);
+                  .map((name) => {
+                    const ae = entries.filter((e) => e.athlete === name);
+                    const scores = ae.map((e) => e.score);
+                    let avg = 0;
+                    if (scores.length === 1) avg = scores[0];
+                    else if (scores.length > 1) {
+                      const sorted = [...scores].sort((a, b) => a - b);
+                      const best = sorted.slice(1);
+                      avg = best.reduce((s, v) => s + v, 0) / best.length;
+                    }
+                    return { name, entries: ae, avg: parseFloat(avg.toFixed(2)) };
+                  })
+                  .sort((a, b) => b.avg - a.avg);
 
                 return (
                   <div key={session.id} className="card space-y-3">
@@ -85,7 +96,7 @@ export default function ScoutKOPage() {
                             {Array.from({ length: maxKicks }, (_, i) => (
                               <th key={i} className="text-[10px] text-muted text-center py-1 px-2">K{i + 1}</th>
                             ))}
-                            <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
+                            <th className="text-[10px] text-muted text-right py-1 px-2">Avg</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -101,7 +112,7 @@ export default function ScoutKOPage() {
                               {Array.from({ length: maxKicks - r.entries.length }, (_, j) => (
                                 <td key={`e-${j}`} className="text-center py-1 px-2 text-muted">—</td>
                               ))}
-                              <td className="text-right py-1 px-2 font-black text-amber-400">{r.total.toFixed(2)}</td>
+                              <td className="text-right py-1 px-2 font-black text-amber-400">{r.avg.toFixed(2)}</td>
                             </tr>
                           ))}
                         </tbody>
