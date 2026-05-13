@@ -84,6 +84,25 @@ export async function deleteAllScoutSessions(teamId: string, sport: string): Pro
   }
 }
 
+export async function deleteAthleteFromSession(teamId: string, sessionId: string, athleteName: string): Promise<boolean> {
+  if (!teamId || teamId === "local-dev") return false;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.from("sessions").select("entries").eq("team_id", teamId).eq("id", sessionId).single();
+    if (!data) return false;
+    const entries = (data.entries as Record<string, unknown>[]).filter((e) => (e as { athlete?: string }).athlete !== athleteName);
+    if (entries.length === 0) {
+      await supabase.from("sessions").delete().eq("team_id", teamId).eq("id", sessionId);
+    } else {
+      await supabase.from("sessions").update({ entries, updated_at: new Date().toISOString() }).eq("team_id", teamId).eq("id", sessionId);
+    }
+    return true;
+  } catch (err) {
+    console.warn("[ScoutStore] deleteAthleteFromSession failed:", err);
+    return false;
+  }
+}
+
 export async function deleteAthleteFromSessions(teamId: string, sport: string, athleteName: string): Promise<boolean> {
   if (!teamId || teamId === "local-dev") return false;
   try {

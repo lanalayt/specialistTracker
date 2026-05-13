@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSessions, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { exportPuntScoutExcel, exportPuntScoutPDF } from "@/lib/scoutExport";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
@@ -55,11 +55,11 @@ export default function ScoutPuntPage() {
   ranked.sort((a, b) => b.avg - a.avg);
   const maxKicks = ranked.length > 0 ? Math.max(...ranked.map((r) => r.entries.length)) : 0;
 
-  const handleDeleteAthlete = async (name: string) => {
-    if (!window.confirm(`Are you sure you want to delete all data for ${name}? This cannot be undone.`)) return;
+  const handleDeleteRow = async (name: string, sessionId: string) => {
+    if (!window.confirm(`Are you sure you want to delete this chart for ${name}? This cannot be undone.`)) return;
     const tid = getTeamId();
     if (!tid) return;
-    await deleteAthleteFromSessions(tid, "SCOUT_PUNT", name);
+    await deleteAthleteFromSession(tid, sessionId, name);
     await loadData();
   };
 
@@ -141,7 +141,7 @@ export default function ScoutPuntPage() {
                           ))}
                           <td className="text-right py-1 px-2 font-black text-amber-400">{r.avg.toFixed(2)}</td>
                           <td className="text-center py-1 px-1">
-                            <button onClick={() => handleDeleteAthlete(r.name)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                            <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                           </td>
                         </tr>
                       ))}
