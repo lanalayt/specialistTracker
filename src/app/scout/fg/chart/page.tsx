@@ -464,12 +464,12 @@ function ScoutFGChartInner() {
     <>
       <Header title="FG Scout" />
       <main className="p-4 lg:p-6 max-w-3xl mx-auto space-y-4">
-        {/* Grid header — kick labels */}
-        <div className="overflow-x-auto">
+        {/* Desktop: table grid */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr>
-                <th className="text-[10px] text-muted text-left py-1 px-1 sticky left-0 bg-bg min-w-[80px]">Athlete</th>
+                <th className="text-[10px] text-muted text-left py-1 px-1 min-w-[80px]">Athlete</th>
                 {kicks.map((k, i) => (
                   <th key={i} className="text-[10px] text-muted text-center py-1 px-1 min-w-[44px]">
                     <span className="block">{k.distance}</span>
@@ -482,7 +482,7 @@ function ScoutFGChartInner() {
             <tbody>
               {selectedPlayers.map((athlete) => (
                 <tr key={athlete} className="border-t border-border/30">
-                  <td className="py-2 px-1 font-semibold text-slate-200 sticky left-0 bg-bg text-xs">{athlete}</td>
+                  <td className="py-2 px-1 font-semibold text-slate-200 text-xs">{athlete}</td>
                   {kicks.map((_, kickIdx) => {
                     const res = resultMap[athlete]?.[kickIdx];
                     const isActive = activeCell?.athlete === athlete && activeCell?.kickIdx === kickIdx;
@@ -508,6 +508,41 @@ function ScoutFGChartInner() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile: wrapped grid with 5 kicks per row */}
+        <div className="lg:hidden space-y-3">
+          {selectedPlayers.map((athlete) => (
+            <div key={athlete} className="card-2 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-200">{athlete}</p>
+                <p className="text-sm font-black text-amber-400">{getPlayerScore(athlete)}</p>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {kicks.map((k, kickIdx) => {
+                  const res = resultMap[athlete]?.[kickIdx];
+                  const isActive = activeCell?.athlete === athlete && activeCell?.kickIdx === kickIdx;
+                  return (
+                    <div key={kickIdx} className="flex flex-col items-center gap-0.5">
+                      <p className="text-[8px] text-muted leading-none">{k.distance}{k.hash}</p>
+                      <button
+                        onClick={() => setActiveCell({ athlete, kickIdx })}
+                        className={clsx(
+                          "w-9 h-9 rounded-full border-2 transition-all flex items-center justify-center text-[10px] font-bold",
+                          isActive && "ring-2 ring-amber-400 ring-offset-1 ring-offset-bg",
+                          res === "make" && "bg-make/30 border-make text-make",
+                          res === "miss" && "bg-miss/30 border-miss text-miss",
+                          !res && "border-border bg-surface-2 text-muted hover:border-slate-400"
+                        )}
+                      >
+                        {res === "make" ? getKickForAthlete(athlete, kickIdx).pointValue : res === "miss" ? "0" : ""}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Selected cell info + actions */}
