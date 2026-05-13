@@ -31,6 +31,8 @@ interface RankedRow {
   date: string;
   count: number;
   total: number;
+  maxScore: number;
+  pct: number;
   entries: SnapEntry[];
   is30Point: boolean;
 }
@@ -58,15 +60,17 @@ export default function ScoutSnapPage() {
   const ranked: RankedRow[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as SnapEntry[];
-    const is30Point = s.label.startsWith("30 Point");
+    const is30Point = s.label.startsWith("30 Point") || s.label.startsWith("Short Snap");
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     for (const name of athletes) {
       const ae = entries.filter((e) => e.athlete === name);
       const total = ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0);
-      ranked.push({ name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: ae.length, total, entries: ae, is30Point });
+      const maxScore = is30Point ? ae.length * 3 : ae.length;
+      const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
+      ranked.push({ name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: ae.length, total, entries: ae, is30Point, maxScore, pct });
     }
   }
-  ranked.sort((a, b) => b.total - a.total);
+  ranked.sort((a, b) => b.pct - a.pct);
 
   const handleDeleteRow = async (name: string, sessionId: string) => {
     if (!window.confirm(`Are you sure you want to delete this chart for ${name}? This cannot be undone.`)) return;
@@ -132,7 +136,9 @@ export default function ScoutSnapPage() {
                       <tr>
                         <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
                         <th className="text-[10px] text-muted text-center py-1 px-2">Snaps</th>
-                        <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
+                        <th className="text-[10px] text-muted text-center py-1 px-2"></th>
+                        <th className="text-[10px] text-muted text-center py-1 px-2">Score</th>
+                        <th className="text-[10px] text-muted text-right py-1 px-2">%</th>
                         <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
                       </tr>
                     </thead>
@@ -144,9 +150,11 @@ export default function ScoutSnapPage() {
                             <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
                           </td>
                           <td className="text-center py-1 px-2 text-slate-300">{r.count}</td>
-                          <td className="text-right py-1 px-2">
-                            <button onClick={() => setDetailOpen(r)} className="font-black text-amber-400 hover:underline">{r.total}</button>
+                          <td className="text-center py-1 px-2">
+                            <button onClick={() => setDetailOpen(r)} className="text-[10px] px-2 py-0.5 rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors font-semibold">See Chart</button>
                           </td>
+                          <td className="text-center py-1 px-2 font-bold text-slate-200">{r.total}/{r.maxScore}</td>
+                          <td className="text-right py-1 px-2 font-black text-amber-400">{r.pct}%</td>
                           <td className="text-center py-1 px-1">
                             <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                           </td>
