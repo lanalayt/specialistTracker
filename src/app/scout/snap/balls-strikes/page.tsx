@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { getTeamId } from "@/lib/teamData";
 import { insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
+import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -59,6 +60,8 @@ export default function ScoutBallsStrikesPage() {
     load();
     return () => { active = false; };
   }, []);
+
+  useUnsavedWarning(snaps.length > 0 && !saved);
 
   const togglePlayer = (name: string) => {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);

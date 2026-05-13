@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
 import { insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
+import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -88,6 +89,8 @@ export default function ScoutKOChartPage() {
     const tid = getTeamId();
     if (tid) await saveScoutAthletes(tid, "kickoff", updated);
   };
+
+  useUnsavedWarning(results.length > 0 && !saved);
 
   const handleLog = () => {
     const dist = parseInt(distInput);

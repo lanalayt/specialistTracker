@@ -41,7 +41,7 @@ export function useUnsavedWarning(hasUnsaved: boolean) {
       e.stopPropagation();
 
       const leave = window.confirm(
-        "You have unsaved session data. Are you sure you want to leave?"
+        "Are you sure you want to leave this page? All data will be lost."
       );
       if (leave) {
         unsavedRef.current = false;

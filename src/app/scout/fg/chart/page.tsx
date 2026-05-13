@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutPreset, saveScoutPreset, insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
+import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -266,6 +267,9 @@ function ScoutFGChartInner() {
     const p = parseInt(manualPoints) || 1;
     setManualKicks((prev) => [...prev, { distance: d, hash: manualHash, pointValue: p }]);
   };
+
+  // Warn before leaving if there's unsaved data
+  useUnsavedWarning(getResultCount() > 0 && !saved);
 
   const addAthlete = async (name: string) => {
     const trimmed = name.trim();
