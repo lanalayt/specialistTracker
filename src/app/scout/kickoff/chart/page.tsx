@@ -98,6 +98,10 @@ export default function ScoutKOChartPage() {
     setDistInput("");
     setHangInput("");
     setDirGood(true);
+    // Auto-rotate to next player
+    const idx = selectedPlayers.indexOf(activePlayer);
+    const next = selectedPlayers[(idx + 1) % selectedPlayers.length];
+    setActivePlayer(next);
   };
 
   const handleUndo = () => {
