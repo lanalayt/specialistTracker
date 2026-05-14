@@ -105,7 +105,7 @@ export default function ScoutAthletesPage() {
   };
 
   return (
-    <>
+    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
       <Header title="Athlete Profiles" />
       <main className="p-4 lg:p-6 max-w-2xl space-y-6">
         <div>
@@ -228,6 +228,6 @@ export default function ScoutAthletesPage() {
           onClose={() => setProfileOpen(null)}
         />
       )}
-    </>
+    </div>
   );
 }
