@@ -14,7 +14,7 @@ const SCOUT_SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode
 
 export default function ScoutDashboardPage() {
   return (
-    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
+    <>
       <Header title="Scout Mode" />
       <main className="p-4 lg:p-6 space-y-6 max-w-6xl">
         <h1 className="text-2xl font-extrabold text-slate-100">Scout Evaluation</h1>
@@ -51,6 +51,6 @@ export default function ScoutDashboardPage() {
           </div>
         </div>
       </main>
-    </div>
+    </>
   );
 }

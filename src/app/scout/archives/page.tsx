@@ -116,7 +116,7 @@ export default function ScoutArchivesPage() {
   const totalCurrentSessions = Object.values(currentCounts).reduce((s, c) => s + c, 0);
 
   return (
-    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
+    <>
       <Header title="Scout Archives" />
       <main className="p-4 lg:p-6 max-w-4xl space-y-6">
         {message && (
@@ -221,6 +221,6 @@ export default function ScoutArchivesPage() {
           </div>
         )}
       </main>
-    </div>
+    </>
   );
 }

@@ -63,7 +63,7 @@ export default function ScoutFGPage() {
   };
 
   return (
-    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
+    <>
       <Header title="FG Scouting" />
       <main className="p-4 lg:p-6 max-w-4xl space-y-6">
         <div className="flex rounded-input border border-border overflow-hidden w-fit">
@@ -152,6 +152,6 @@ export default function ScoutFGPage() {
           onClose={() => setProfileOpen(null)}
         />
       )}
-    </div>
+    </>
   );
 }
