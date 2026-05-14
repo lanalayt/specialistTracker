@@ -25,6 +25,15 @@ const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
+const ATHLETE_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
+  { href: "/athlete", label: "Athlete Home", icon: "⚡" },
+  { href: "/athlete/kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/athlete/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
+  { href: "/athlete/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
+  { href: "/athlete/longsnap", label: "Snapping", icon: "📏" },
+  { href: "/athlete/archives", label: "Archives", icon: "🗄" },
+];
+
 const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/scout", label: "Scout Home", icon: "⚡" },
   { href: "/scout/fg", label: "FG Scouting", iconEl: <GoalpostIcon size={20} /> },
@@ -43,9 +52,10 @@ export function Sidebar() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isScoutRoute = pathname.startsWith("/scout");
+  const isAthleteRoute = pathname.startsWith("/athlete");
 
   const isActive = (href: string) =>
-    href === "/dashboard" || href === "/scout"
+    href === "/dashboard" || href === "/scout" || href === "/athlete"
       ? pathname === href
       : pathname === href || pathname.startsWith(href + "/");
 
@@ -85,8 +95,8 @@ export function Sidebar() {
             )}
           </button>
           <div>
-            <p className="text-sm font-bold text-slate-100 leading-none">{isScoutRoute ? "Scout" : "Specialist"}</p>
-            <p className={clsx("text-xs leading-none mt-0.5", isScoutRoute ? "text-amber-400" : "text-muted")}>{isScoutRoute ? "Mode" : "Tracker"}</p>
+            <p className="text-sm font-bold text-slate-100 leading-none">{isScoutRoute ? "Scout" : isAthleteRoute ? "Athlete" : "Specialist"}</p>
+            <p className={clsx("text-xs leading-none mt-0.5", isScoutRoute ? "text-amber-400" : isAthleteRoute ? "text-sky-400" : "text-muted")}>{isScoutRoute ? "Mode" : isAthleteRoute ? "Mode" : "Tracker"}</p>
           </div>
         </div>
       </div>
@@ -95,17 +105,19 @@ export function Sidebar() {
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {isScoutRoute ? (
           <>
-            <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest px-3 py-1.5">
-              Scout Mode
-            </p>
+            <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest px-3 py-1.5">Scout Mode</p>
             {SCOUT_NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  isActive(item.href) ? "nav-link-active" : "nav-link"
-                )}
-              >
+              <Link key={item.href} href={item.href} className={clsx(isActive(item.href) ? "nav-link-active" : "nav-link")}>
+                {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
+                {item.label}
+              </Link>
+            ))}
+          </>
+        ) : isAthleteRoute ? (
+          <>
+            <p className="text-[10px] font-semibold text-sky-400 uppercase tracking-widest px-3 py-1.5">Athlete Mode</p>
+            {ATHLETE_NAV_ITEMS.map((item) => (
+              <Link key={item.href} href={item.href} className={clsx(isActive(item.href) ? "nav-link-active" : "nav-link")}>
                 {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
                 {item.label}
               </Link>
@@ -165,7 +177,7 @@ export function Sidebar() {
       </nav>
 
       {/* Tutorial */}
-      {!isScoutRoute && (
+      {!isScoutRoute && !isAthleteRoute && (
         <div className="px-3 pb-1">
           <button
             onClick={showTutorial}
