@@ -37,7 +37,7 @@ interface KickoffContextValue {
 
 const KickoffContext = createContext<KickoffContextValue | null>(null);
 
-export function KickoffProvider({ children }: { children: React.ReactNode }) {
+export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: React.ReactNode; sportKey?: string }) {
   const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const { user } = useAuth();
@@ -88,12 +88,12 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (tid && tid !== "local-dev") {
-        const dbAthletes = await loadAthletes(tid, "KICKOFF");
+        const dbAthletes = await loadAthletes(tid, sportKey);
         if (dbAthletes.length > 0) setAthletes(dbAthletes);
       }
 
       if (tid && tid !== "local-dev") {
-        const dbSessions = await loadSessions(tid, "KICKOFF");
+        const dbSessions = await loadSessions(tid, sportKey);
         if (dbSessions.length > 0) { setSessions(dbSessions); return; }
       }
 
@@ -119,19 +119,19 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
 
         const athleteNames = source.athletes ?? [];
         if (tid && tid !== "local-dev" && athleteNames.length > 0) {
-          const existing = await loadAthletes(tid, "KICKOFF");
+          const existing = await loadAthletes(tid, sportKey);
           const existingNames = new Set(existing.map((a) => a.name));
           const inserted: StoredAthlete[] = [...existing];
           for (const name of athleteNames.filter((n) => !existingNames.has(n))) {
-            const result = await insertAthlete(tid, "KICKOFF", name);
+            const result = await insertAthlete(tid, sportKey, name);
             if (result) inserted.push(result);
           }
           setAthletes(inserted);
         }
 
         if (tid && tid !== "local-dev" && allSessions.length > 0) {
-          for (const s of allSessions) await insertSession(tid, { ...s, sport: "KICKOFF", teamId: tid });
-          setSessions(await loadSessions(tid, "KICKOFF"));
+          for (const s of allSessions) await insertSession(tid, { ...s, sport: sportKey as Session["sport"], teamId: tid });
+          setSessions(await loadSessions(tid, sportKey));
         } else {
           setSessions(allSessions);
         }
@@ -142,14 +142,14 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tid = getTeamId();
-  useSessionSync(tid, "KICKOFF", {
+  useSessionSync(tid, sportKey, {
     onInsert: (s) => setSessions((prev) => prev.some((x) => x.id === s.id) ? prev : [...prev, s].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())),
     onUpdate: (s) => setSessions((prev) => prev.map((x) => x.id === s.id ? s : x)),
     onDelete: (id) => setSessions((prev) => prev.filter((x) => x.id !== id)),
     onRestore: (s) => setSessions((prev) => prev.some((x) => x.id === s.id) ? prev : [...prev, s].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())),
   });
 
-  useAthleteSync(tid, "KICKOFF", (dbAthletes) => setAthletes(dbAthletes));
+  useAthleteSync(tid, sportKey, (dbAthletes) => setAthletes(dbAthletes));
 
   const addAthletes = useCallback((names: string[]) => {
     const tid = getTeamId();
@@ -158,7 +158,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
     if (toAdd.length === 0) return;
     if (tid && tid !== "local-dev") {
       stampAthleteWrite(tid);
-      Promise.all(toAdd.map((n) => insertAthlete(tid, "KICKOFF", n))).then((results) => {
+      Promise.all(toAdd.map((n) => insertAthlete(tid, sportKey, n))).then((results) => {
         setAthletes((prev) => [...prev, ...results.filter(Boolean) as StoredAthlete[]]);
       });
     } else {
@@ -175,7 +175,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
   const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string, mode: SessionMode = "practice", opponent?: string, gameTime?: string): Session => {
     const tid = getTeamId();
     const session: Session = {
-      id: genId(), teamId: tid ?? "local", sport: "KICKOFF",
+      id: genId(), teamId: tid ?? "local", sport: sportKey as Session["sport"],
       label: label ?? sessionLabel(), date: new Date().toISOString(),
       weather: weather || undefined, mode,
       opponent: opponent || undefined, gameTime: gameTime || undefined, entries,
@@ -221,7 +221,7 @@ export function KickoffProvider({ children }: { children: React.ReactNode }) {
       return [...prev, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     });
     const tid = getTeamId();
-    if (tid && tid !== "local-dev") { stampSessionWrite(tid); insertSession(tid, { ...session, sport: "KICKOFF", teamId: tid }); }
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); insertSession(tid, { ...session, sport: sportKey as Session["sport"], teamId: tid }); }
   }, []);
 
   const resetStatsKeepAthletes = useCallback(() => {

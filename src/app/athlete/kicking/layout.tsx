@@ -1,0 +1,21 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+import { FGProvider } from "@/lib/fgContext";
+import { SportSubNav } from "@/components/ui/SportSubNav";
+
+export default function AthleteKickingLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isHub = pathname === "/athlete/kicking";
+  return (
+    <FGProvider sportKey="ATHLETE_KICKING">
+      {!isHub && (
+        <SportSubNav
+          basePath="/athlete/kicking"
+          extraTabs={[{ label: "Charting Games", slug: "charting" }, { label: "FG Settings", slug: "settings" }]}
+        />
+      )}
+      {children}
+    </FGProvider>
+  );
+}

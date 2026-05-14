@@ -47,7 +47,7 @@ interface FGContextValue {
 
 const FGContext = createContext<FGContextValue | null>(null);
 
-export function FGProvider({ children }: { children: React.ReactNode }) {
+export function FGProvider({ children, sportKey = "KICKING" }: { children: React.ReactNode; sportKey?: string }) {
   const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [migrated, setMigrated] = useState(false);
@@ -84,7 +84,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
 
       // Load athletes from athletes table
       if (tid && tid !== "local-dev") {
-        const dbAthletes = await loadAthletes(tid, "KICKING");
+        const dbAthletes = await loadAthletes(tid, sportKey);
         if (dbAthletes.length > 0) {
           setAthletes(dbAthletes);
         }
@@ -92,7 +92,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
 
       // Load sessions from sessions table
       if (tid && tid !== "local-dev") {
-        const dbSessions = await loadSessions(tid, "KICKING");
+        const dbSessions = await loadSessions(tid, sportKey);
         if (dbSessions.length > 0) {
           setSessions(dbSessions);
           setMigrated(true);
@@ -136,12 +136,12 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         // Migrate athletes to athletes table
         const athleteNames = source.athletes ?? [];
         if (tid && tid !== "local-dev" && athleteNames.length > 0) {
-          const existing = await loadAthletes(tid, "KICKING");
+          const existing = await loadAthletes(tid, sportKey);
           const existingNames = new Set(existing.map((a) => a.name));
           const toInsert = athleteNames.filter((n) => !existingNames.has(n));
           const inserted: StoredAthlete[] = [...existing];
           for (const name of toInsert) {
-            const result = await insertAthlete(tid, "KICKING", name);
+            const result = await insertAthlete(tid, sportKey, name);
             if (result) inserted.push(result);
           }
           setAthletes(inserted);
@@ -150,10 +150,10 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
         // Migrate sessions to sessions table
         if (tid && tid !== "local-dev" && allSessions.length > 0) {
           for (const s of allSessions) {
-            await insertSession(tid, { ...s, sport: "KICKING", teamId: tid });
+            await insertSession(tid, { ...s, sport: sportKey as Session["sport"], teamId: tid });
           }
           // Re-load from DB to get consistent data
-          const dbSessions = await loadSessions(tid, "KICKING");
+          const dbSessions = await loadSessions(tid, sportKey);
           setSessions(dbSessions);
         } else {
           setSessions(allSessions);
@@ -168,7 +168,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Realtime sync for sessions ─────────────────────────────────
   const tid = getTeamId();
-  useSessionSync(tid, "KICKING", {
+  useSessionSync(tid, sportKey, {
     onInsert: (session) => {
       setSessions((prev) => {
         if (prev.some((s) => s.id === session.id)) return prev;
@@ -190,7 +190,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
   });
 
   // ─── Realtime sync for athletes ─────────────────────────────────
-  useAthleteSync(tid, "KICKING", (dbAthletes) => {
+  useAthleteSync(tid, sportKey, (dbAthletes) => {
     setAthletes(dbAthletes);
   });
 
@@ -236,7 +236,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
       const session: Session = {
         id: genId(),
         teamId: tid ?? "local",
-        sport: "KICKING",
+        sport: sportKey as Session["sport"],
         label: label ?? sessionLabel(),
         date: new Date().toISOString(),
         weather: weather || undefined,
@@ -329,7 +329,7 @@ export function FGProvider({ children }: { children: React.ReactNode }) {
     if (tid && tid !== "local-dev") {
       stampSessionWrite(tid);
       // Insert in case it was hard-deleted, otherwise the row already exists
-      insertSession(tid, { ...session, sport: "KICKING", teamId: tid });
+      insertSession(tid, { ...session, sport: sportKey as Session["sport"], teamId: tid });
     }
   }, []);
 
