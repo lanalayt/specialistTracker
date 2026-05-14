@@ -7,7 +7,7 @@ export default function ScoutLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex overflow-x-hidden max-w-[100vw]">
       <Sidebar />
-      <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
+      <div className="lg:pl-56 min-h-screen min-w-0 w-full pb-20 lg:pb-0">
         {children}
       </div>
       <MobileNav />
