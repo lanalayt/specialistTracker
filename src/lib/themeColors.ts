@@ -96,10 +96,29 @@ export function loadCustomThemes(): SavedTheme[] {
 export function saveCustomThemes(themes: SavedTheme[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));
-  saveSettingsToCloud(CUSTOM_THEMES_KEY, { themes });
+  // Save per-team so other teams don't see these
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") {
+    import("@/lib/teamData").then(({ teamSet }) => {
+      teamSet(tid, CUSTOM_THEMES_KEY, { themes });
+    });
+  }
 }
 
 export async function loadCustomThemesFromCloud(): Promise<SavedTheme[]> {
+  // Load per-team first
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") {
+    try {
+      const { teamGet } = await import("@/lib/teamData");
+      const teamData = await teamGet<{ themes: SavedTheme[] }>(tid, CUSTOM_THEMES_KEY);
+      if (teamData?.themes?.length) {
+        localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(teamData.themes));
+        return teamData.themes;
+      }
+    } catch {}
+  }
+  // Fall back to legacy user_data
   const cloud = await loadSettingsFromCloud<{ themes: SavedTheme[] }>(CUSTOM_THEMES_KEY);
   if (cloud?.themes?.length) {
     localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(cloud.themes));
