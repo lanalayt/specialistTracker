@@ -31,9 +31,8 @@ export default function AthleteDashboardPage() {
     load();
   }, []);
 
-  // Filter charts assigned to current user that aren't completed yet
-  const myName = user?.name ?? "";
-  const myCharts = charts.filter((c) => c.athletes.includes(myName) && !c.completedBy[myName]);
+  // Show all charts that have at least one athlete who hasn't completed it
+  const activeCharts = charts.filter((c) => c.athletes.some((a) => !c.completedBy[a]));
 
   return (
     <>
@@ -66,32 +65,48 @@ export default function AthleteDashboardPage() {
           <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
             Assigned Charts
           </h2>
-          {myCharts.length === 0 ? (
+          {activeCharts.length === 0 ? (
             <p className="text-xs text-muted">No assigned charts right now.</p>
           ) : (
             <div className="space-y-2">
-              {myCharts.map((chart) => {
+              {activeCharts.map((chart) => {
                 const isOverdue = new Date(chart.dueDate) < new Date(new Date().toDateString());
+                const pending = chart.athletes.filter((a) => !chart.completedBy[a]);
+                const completed = chart.athletes.filter((a) => !!chart.completedBy[a]);
                 return (
-                  <Link
-                    key={chart.id}
-                    href={`/athlete/kicking/off-sticks/athlete-chart?assigned=${chart.id}`}
-                    className="card hover:bg-surface-2 hover:border-sky-500/30 transition-all flex items-center justify-between py-3 px-4"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-100">
-                        FG Chart — {chart.kicks.length} kick{chart.kicks.length !== 1 ? "s" : ""}
-                      </p>
-                      <p className="text-[10px] text-muted">
-                        From {chart.createdBy} — {chart.kicks.map((k) => `${k.distance}${k.hash}`).join(", ")}
-                      </p>
+                  <div key={chart.id} className="card py-3 px-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-100">
+                          FG Chart — {chart.kicks.length} kick{chart.kicks.length !== 1 ? "s" : ""}
+                        </p>
+                        <p className="text-[10px] text-muted">
+                          From {chart.createdBy} — {chart.kicks.map((k) => `${k.distance}${k.hash}`).join(", ")}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <p className={`text-xs font-bold ${isOverdue ? "text-miss" : "text-sky-400"}`}>
+                          {isOverdue ? "Overdue" : `Due ${new Date(chart.dueDate).toLocaleDateString()}`}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right shrink-0 ml-3">
-                      <p className={`text-xs font-bold ${isOverdue ? "text-miss" : "text-sky-400"}`}>
-                        {isOverdue ? "Overdue" : `Due ${new Date(chart.dueDate).toLocaleDateString()}`}
-                      </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {pending.map((name) => (
+                        <Link
+                          key={name}
+                          href={`/athlete/kicking/off-sticks/athlete-chart?assigned=${chart.id}`}
+                          className="text-[10px] px-2 py-0.5 rounded-input border border-miss/40 text-miss font-semibold hover:bg-miss/10 transition-colors"
+                        >
+                          {name} — incomplete
+                        </Link>
+                      ))}
+                      {completed.map((name) => (
+                        <span key={name} className="text-[10px] px-2 py-0.5 rounded-input border border-make/40 text-make font-semibold">
+                          {name} — done
+                        </span>
+                      ))}
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
