@@ -195,80 +195,87 @@ export default function CoachesChartPage() {
         </>
       )}
 
-      {/* Recent Charts */}
-      {charts.length > 0 && (
-        <div className="pt-4 border-t border-border space-y-3">
-          <h3 className="text-sm font-bold text-slate-100">Recent Charts</h3>
-          {charts.map((chart) => {
-            const isExpanded = expandedId === chart.id;
-            const isReassigning = reassignId === chart.id;
-            const pending = chart.athletes.filter((a) => !chart.completedBy[a]);
-            const completed = chart.athletes.filter((a) => !!chart.completedBy[a]);
-
-            return (
-              <div key={chart.id} className="card-2 space-y-2">
-                <button onClick={() => setExpandedId(isExpanded ? null : chart.id)} className="w-full text-left flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-200">{chart.kicks.length} kick{chart.kicks.length !== 1 ? "s" : ""} — Due {new Date(chart.dueDate).toLocaleDateString()}</p>
-                    <p className="text-[10px] text-muted">{new Date(chart.createdAt).toLocaleDateString()} — {chart.athletes.join(", ")}</p>
-                  </div>
-                  <span className="text-xs text-muted">{isExpanded ? "▼" : "▶"}</span>
-                </button>
-
-                {isExpanded && (
-                  <div className="space-y-2 pt-1">
-                    {/* Kick list */}
-                    <div className="space-y-0.5">
-                      {chart.kicks.map((k, i) => (
-                        <div key={i} className="flex items-center gap-3 text-xs text-slate-300">
-                          <span className="text-muted w-4">{i + 1}.</span>
-                          <span className="font-semibold text-slate-200">{k.distance}yd</span>
-                          <span>{k.hash}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Status per athlete */}
-                    <div className="flex flex-wrap gap-1">
-                      {pending.map((a) => (
-                        <span key={a} className="text-[10px] px-2 py-0.5 rounded-input border border-miss/40 text-miss font-semibold">{a} — incomplete</span>
-                      ))}
-                      {completed.map((a) => (
-                        <span key={a} className="text-[10px] px-2 py-0.5 rounded-input border border-make/40 text-make font-semibold">{a} — done</span>
-                      ))}
-                    </div>
-
-                    {/* Re-assign button */}
-                    {!isReassigning && (
-                      <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign this chart</button>
-                    )}
-
-                    {/* Re-assign form */}
-                    {isReassigning && (
-                      <div className="card space-y-3">
-                        <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Re-assign</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {athleteNames.map((a) => (
-                            <button key={a} onClick={() => toggleReassignPlayer(a)} className={clsx("px-3 py-1.5 rounded-input text-xs font-medium transition-all", reassignPlayers.includes(a) ? "bg-sky-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
-                          ))}
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-muted mb-1">Due Date</p>
-                          <input type="date" value={reassignDate} onChange={(e) => setReassignDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => setReassignId(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
-                          <button onClick={() => handleReassign(chart.id)} disabled={reassignPlayers.length === 0 || !reassignDate} className="btn-primary flex-1 py-2 text-xs font-bold disabled:opacity-40">Assign</button>
-                        </div>
+      {/* Active & Recent Charts */}
+      {charts.length > 0 && (() => {
+        const activeCharts = charts.filter((c) => c.athletes.some((a) => !c.completedBy[a]));
+        const completedCharts = charts.filter((c) => c.athletes.every((a) => !!c.completedBy[a]));
+        const renderChart = (chart: AssignedChart) => {
+          const isExpanded = expandedId === chart.id;
+          const isReassigning = reassignId === chart.id;
+          const pending = chart.athletes.filter((a) => !chart.completedBy[a]);
+          const completed = chart.athletes.filter((a) => !!chart.completedBy[a]);
+          return (
+            <div key={chart.id} className="card-2 space-y-2">
+              <button onClick={() => setExpandedId(isExpanded ? null : chart.id)} className="w-full text-left flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-200">{chart.kicks.length} kick{chart.kicks.length !== 1 ? "s" : ""} — Due {new Date(chart.dueDate).toLocaleDateString()}</p>
+                  <p className="text-[10px] text-muted">{new Date(chart.createdAt).toLocaleDateString()} — {chart.athletes.join(", ")}</p>
+                </div>
+                <span className="text-xs text-muted">{isExpanded ? "▼" : "▶"}</span>
+              </button>
+              {isExpanded && (
+                <div className="space-y-2 pt-1">
+                  <div className="space-y-0.5">
+                    {chart.kicks.map((k, i) => (
+                      <div key={i} className="flex items-center gap-3 text-xs text-slate-300">
+                        <span className="text-muted w-4">{i + 1}.</span>
+                        <span className="font-semibold text-slate-200">{k.distance}yd</span>
+                        <span>{k.hash}</span>
                       </div>
-                    )}
+                    ))}
                   </div>
-                )}
+                  <div className="flex flex-wrap gap-1">
+                    {pending.map((a) => (
+                      <span key={a} className="text-[10px] px-2 py-0.5 rounded-input border border-miss/40 text-miss font-semibold">{a} — incomplete</span>
+                    ))}
+                    {completed.map((a) => (
+                      <span key={a} className="text-[10px] px-2 py-0.5 rounded-input border border-make/40 text-make font-semibold">{a} — done</span>
+                    ))}
+                  </div>
+                  {!isReassigning && (
+                    <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign this chart</button>
+                  )}
+                  {isReassigning && (
+                    <div className="card space-y-3">
+                      <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Re-assign</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {athleteNames.map((a) => (
+                          <button key={a} onClick={() => toggleReassignPlayer(a)} className={clsx("px-3 py-1.5 rounded-input text-xs font-medium transition-all", reassignPlayers.includes(a) ? "bg-sky-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                        ))}
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted mb-1">Due Date</p>
+                        <input type="date" value={reassignDate} onChange={(e) => setReassignDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setReassignId(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
+                        <button onClick={() => handleReassign(chart.id)} disabled={reassignPlayers.length === 0 || !reassignDate} className="btn-primary flex-1 py-2 text-xs font-bold disabled:opacity-40">Assign</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="pt-4 border-t border-border space-y-6">
+            {activeCharts.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-slate-100">Active Charts</h3>
+                {activeCharts.map(renderChart)}
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
+            {completedCharts.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-slate-100">Completed Charts</h3>
+                {completedCharts.map(renderChart)}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </main>
   );
 }
