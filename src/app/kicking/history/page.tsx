@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import { useFG } from "@/lib/fgContext";
 import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
@@ -44,6 +44,8 @@ export default function KickingHistoryPage() {
 }
 
 function KickingHistoryContent() {
+  const pathname = usePathname();
+  const hideScore = pathname.startsWith("/athlete");
   const { history, updateSessionDate, updateSessionWeather, updateSessionOpponent, updateSessionEntries, deleteSession } = useFG();
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() => {
     if (typeof window === "undefined") return "detailed";
@@ -236,13 +238,13 @@ function KickingHistoryContent() {
                   <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
                     {athleteNames.map((name) => {
                       const ak = byAthlete[name];
-                      const totalScore = ak.reduce((s, k) => s + k.score, 0);
+                      const totalScore = hideScore ? 0 : ak.reduce((s, k) => s + k.score, 0);
                       return (
                         <div key={name} className="space-y-3">
                           {isMulti && <p className="text-sm font-bold text-slate-200 text-center">{name}</p>}
                           {!isMulti && <p className="text-sm font-bold text-slate-200">{name}</p>}
                           <div className="card-2 py-3 text-center">
-                            <p className="text-3xl font-black text-accent">{totalScore}</p>
+                            {!hideScore && <p className="text-3xl font-black text-accent">{totalScore}</p>}
                             <p className="text-[10px] text-muted mt-1">Total yards off</p>
                           </div>
                           {/* Field view */}
@@ -290,8 +292,8 @@ function KickingHistoryContent() {
                                   return (
                                     <tr key={i} className="border-t border-border/30">
                                       <td className="text-muted py-1 px-1">{i + 1}</td>
-                                      <td className={clsx("text-center py-1 px-1", dir === "center" ? "text-make" : "text-slate-300")}>{dir === "center" ? "✓" : dir === "left" ? `← ${k.score}` : `${k.score} →`}</td>
-                                      <td className={clsx("text-right py-1 px-1 font-bold", k.score === 0 ? "text-make" : k.score <= 2 ? "text-accent" : "text-miss")}>+{k.score}</td>
+                                      <td className={clsx("text-center py-1 px-1", dir === "center" ? "text-make" : "text-slate-300")}>{dir === "center" ? "✓" : dir === "left" ? (hideScore ? "←" : `← ${k.score}`) : (hideScore ? "→" : `${k.score} →`)}</td>
+                                      {!hideScore && <td className={clsx("text-right py-1 px-1 font-bold", k.score === 0 ? "text-make" : k.score <= 2 ? "text-accent" : "text-miss")}>+{k.score}</td>}
                                     </tr>
                                   );
                                 })}
@@ -502,7 +504,7 @@ function KickingHistoryContent() {
                           <div><span className="text-muted">Made</span> <span className="text-make font-medium ml-1">{fgMade}</span></div>
                           <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{fgAtt}</span></div>
                           <div><span className="text-muted">Pct</span> <span className="text-accent font-medium ml-1">{fgPct}</span></div>
-                          <div><span className="text-muted">Score</span> <span className="text-slate-200 font-medium ml-1">{fgAvgSc}</span></div>
+                          {!hideScore && <div><span className="text-muted">Score</span> <span className="text-slate-200 font-medium ml-1">{fgAvgSc}</span></div>}
                           <div><span className="text-muted">Long</span> <span className="text-slate-200 font-medium ml-1">{long > 0 ? `${long}` : "—"}</span></div>
                           {avgOT && <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}s</span></div>}
                         </div>
@@ -531,7 +533,7 @@ function KickingHistoryContent() {
                     <th className="table-header">Dist</th>
                     <th className="table-header">Pos</th>
                     <th className="table-header">Result</th>
-                    <th className="table-header">Score</th>
+                    {!hideScore && <th className="table-header">Score</th>}
                     <th className="table-header">OT</th>
                   </tr>
                 </thead>
@@ -553,7 +555,7 @@ function KickingHistoryContent() {
                               {["YL","YC","YR","XL","XS","XR","X"].map((r) => <option key={r} value={r}>{r}</option>)}
                             </select>
                           </td>
-                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          {!hideScore && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}
                           <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.opTime || ""} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); updateEntry(i, "opTime", d ? parseFloat(`${d.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${d.padStart(3, "0").slice(-2)}`) : 0); }} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                         </>
                       ) : (
@@ -565,7 +567,7 @@ function KickingHistoryContent() {
                               {formatResult(k.result, makeMode)}
                             </span>
                           </td>
-                          <td className="table-cell">{k.score}</td>
+                          {!hideScore && <td className="table-cell">{k.score}</td>}
                           <td className="table-cell text-muted">{k.opTime && k.opTime > 0 ? `${k.opTime.toFixed(2)}s` : "—"}</td>
                         </>
                       )}

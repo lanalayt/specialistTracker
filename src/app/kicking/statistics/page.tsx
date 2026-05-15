@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { useFG } from "@/lib/fgContext";
 import { makePct, avgScore, processKick, emptyAthleteStats } from "@/lib/stats";
 import { POSITIONS, DIST_RANGES } from "@/types";
@@ -124,11 +125,13 @@ function FGStatsView({
   statsMap,
   label,
   makeMode = "detailed",
+  hideScore = false,
 }: {
   athletes: { id: string; name: string }[];
   statsMap: Record<string, AthleteStats>;
   label: string;
   makeMode?: "simple" | "detailed";
+  hideScore?: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -142,7 +145,7 @@ function FGStatsView({
               <th className="table-header">Made</th>
               <th className="table-header">Att</th>
               <th className="table-header">%</th>
-              <th className="table-header whitespace-nowrap"><span className="hidden sm:inline">Kick Score</span><span className="sm:hidden">KS</span><br/><span className="text-[9px] font-normal text-muted hidden sm:inline">Out of 3</span><span className="text-[8px] font-normal text-muted sm:hidden">/3</span></th>
+              {!hideScore && <th className="table-header whitespace-nowrap"><span className="hidden sm:inline">Kick Score</span><span className="sm:hidden">KS</span><br/><span className="text-[9px] font-normal text-muted hidden sm:inline">Out of 3</span><span className="text-[8px] font-normal text-muted sm:hidden">/3</span></th>}
               <th className="table-header"><span className="hidden sm:inline">Long FG</span><span className="sm:hidden">Long</span></th>
               <th className="table-header"><span className="hidden sm:inline">Avg OT</span><span className="sm:hidden">OT</span></th>
             </tr>
@@ -159,7 +162,7 @@ function FGStatsView({
                   <td className="table-cell">{o.made || "—"}</td>
                   <td className="table-cell">{o.att || "—"}</td>
                   <td className="table-cell make-pct">{makePct(o.att, o.made)}</td>
-                  <td className="table-cell">{avgScore(o.att, o.score)}</td>
+                  {!hideScore && <td className="table-cell">{avgScore(o.att, o.score)}</td>}
                   <td className="table-cell">{o.longFG > 0 ? `${o.longFG} yd` : "—"}</td>
                   <td className="table-cell">{avgOT !== "—" ? `${avgOT}s` : "—"}</td>
                 </tr>
@@ -281,7 +284,7 @@ function FGStatsView({
             {(["LH", "RH"] as FGPosition[]).map((pos) => (
               <div key={pos} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[pos]}</p>
-                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} />
+                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} showScore={!hideScore} />
               </div>
             ))}
           </div>
@@ -289,7 +292,7 @@ function FGStatsView({
             {(["LM", "M", "RM"] as FGPosition[]).map((pos) => (
               <div key={pos} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[pos]}</p>
-                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} />
+                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} showScore={!hideScore} />
               </div>
             ))}
           </div>
@@ -304,7 +307,7 @@ function FGStatsView({
             return (
               <div key={range} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{DIST_LABELS[range]}</p>
-                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.distance[range]} maxScore={maxScore} />
+                <StatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.distance[range]} maxScore={maxScore} showScore={!hideScore} />
               </div>
             );
           })}
@@ -322,6 +325,8 @@ function FGStatsView({
 }
 
 export default function KickingStatisticsPage() {
+  const pathname = usePathname();
+  const hideScore = pathname.startsWith("/athlete");
   const { athletes, stats, history } = useFG();
   const [tab, setTab] = useState<"all" | "starred">("all");
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
@@ -480,11 +485,11 @@ export default function KickingStatisticsPage() {
       )}
 
       {tab === "all" && (
-        <FGStatsView athletes={athletes} statsMap={displayStats} label="FG" makeMode={makeMode} />
+        <FGStatsView athletes={athletes} statsMap={displayStats} label="FG" makeMode={makeMode} hideScore={hideScore} />
       )}
 
       {tab === "starred" && starredStats && (
-        <FGStatsView athletes={athletes} statsMap={starredStats} label="Live Reps" makeMode={makeMode} />
+        <FGStatsView athletes={athletes} statsMap={starredStats} label="Live Reps" makeMode={makeMode} hideScore={hideScore} />
       )}
     </main>
   );
