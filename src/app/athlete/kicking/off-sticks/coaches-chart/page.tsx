@@ -182,7 +182,7 @@ export default function CoachesChartPage() {
 
           <div>
             <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Due Date</p>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input w-full text-sm py-1.5" />
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
           </div>
 
           <button
@@ -254,7 +254,7 @@ export default function CoachesChartPage() {
                         </div>
                         <div>
                           <p className="text-[10px] text-muted mb-1">Due Date</p>
-                          <input type="date" value={reassignDate} onChange={(e) => setReassignDate(e.target.value)} className="input w-full text-sm py-1.5" />
+                          <input type="date" value={reassignDate} onChange={(e) => setReassignDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => setReassignId(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
