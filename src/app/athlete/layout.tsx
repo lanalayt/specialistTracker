@@ -5,7 +5,7 @@ import { MobileNav } from "@/components/layout/Header";
 
 function AthleteContent({ children }: { children: React.ReactNode }) {
   return (
-    <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
+    <div className="lg:pl-56 flex-1 flex flex-col min-h-screen min-w-0 pb-20 lg:pb-0">
       {children}
     </div>
   );
