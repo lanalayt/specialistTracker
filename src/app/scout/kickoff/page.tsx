@@ -26,6 +26,7 @@ export default function ScoutKOPage() {
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
+  const [dropWorst, setDropWorst] = useState(true);
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -43,13 +44,12 @@ export default function ScoutKOPage() {
   const ranked: { name: string; sessionId: string; date: string; entries: KOEntry[]; avg: number; worst: number | null }[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as KOEntry[];
-    const dw = entries[0]?.dropWorst ?? false;
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     for (const name of athletes) {
       const ae = entries.filter((e) => e.athlete === name);
       const scores = ae.map((e) => e.score);
-      const worst = dw && scores.length > 1 ? Math.min(...scores) : null;
-      ranked.push({ name, sessionId: s.id, date: s.date, entries: ae, avg: calcAvg(scores, dw), worst });
+      const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
+      ranked.push({ name, sessionId: s.id, date: s.date, entries: ae, avg: calcAvg(scores, dropWorst), worst });
     }
   }
   ranked.sort((a, b) => b.avg - a.avg);
@@ -96,6 +96,15 @@ export default function ScoutKOPage() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
+            <div className="flex items-center justify-between card-2 px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-200">Drop Worst Kick</p>
+                <p className="text-[10px] text-muted">Exclude lowest score from average</p>
+              </div>
+              <button onClick={() => setDropWorst(!dropWorst)} className={clsx("w-10 h-5 rounded-full transition-colors relative", dropWorst ? "bg-amber-500" : "bg-surface-2 border border-border")}>
+                <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", dropWorst ? "left-5" : "left-0.5")} />
+              </button>
+            </div>
             {!loading && ranked.length > 0 && (
               <div className="flex gap-2">
                 <button onClick={() => exportKOScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
