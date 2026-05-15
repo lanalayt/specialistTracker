@@ -34,6 +34,8 @@ function AthleteChartInner() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [assignedChart, setAssignedChart] = useState<AssignedChart | null>(null);
+  const [kickMode, setKickMode] = useState<"sticks" | "live">("sticks");
+  const [opTimeInput, setOpTimeInput] = useState("");
 
   // Live charting state — rotate through athletes per kick
   const [currentKickIdx, setCurrentKickIdx] = useState(0);
@@ -75,20 +77,35 @@ function AthleteChartInner() {
     setKicks((prev) => [...prev, { distance: d, hash: newHash, pointValue: p }]);
   };
 
+  const formatOpTime = (raw: string): string => {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    if (digits.length <= 1) return digits;
+    if (digits.length === 2) return digits[0] + "." + digits[1];
+    return digits.slice(0, -2) + "." + digits.slice(-2);
+  };
+
+  const parseOpTime = (val: string): number => {
+    const n = parseFloat(val);
+    return isNaN(n) ? 0 : n;
+  };
+
   const handleResult = (result: FGResult) => {
     if (currentKickIdx >= kicks.length) return;
     const kick = kicks[currentKickIdx];
     const pos = HASH_TO_POS[kick.hash] ?? "M";
+    const opTime = kickMode === "live" && opTimeInput ? parseOpTime(formatOpTime(opTimeInput)) : undefined;
     const entry: FGKick = {
       athleteId: currentPlayer,
       athlete: currentPlayer,
       dist: kick.distance,
       pos,
       result,
-      score: result.startsWith("Y") ? 1 : 0,
+      score: 0,
+      opTime: opTime || undefined,
       kickNum: currentKickIdx + 1,
     };
     setResults((prev) => [...prev, entry]);
+    setOpTimeInput("");
 
     // Rotate: next player on same kick, or next kick when all players done
     const nextPlayerIdx = currentPlayerIdx + 1;
@@ -287,18 +304,25 @@ function AthleteChartInner() {
 
         {/* Per-athlete scores */}
         <div className="flex flex-wrap gap-3 justify-center">
-          {selectedPlayers.map((p) => (
-            <div key={p} className="card-2 px-4 py-3 text-center">
-              <p className="text-sm font-bold text-slate-200">{p}</p>
-              <p className="text-3xl font-black text-sky-400">{getPlayerMakes(p)}/{kicks.length}</p>
-              <p className="text-[10px] text-muted">FG Made</p>
-            </div>
-          ))}
+          {selectedPlayers.map((p) => {
+            const pr = getPlayerResults(p);
+            const opTimes = pr.filter((r) => r.opTime && r.opTime > 0).map((r) => r.opTime!);
+            const avgOp = opTimes.length > 0 ? (opTimes.reduce((s, v) => s + v, 0) / opTimes.length).toFixed(2) : null;
+            return (
+              <div key={p} className="card-2 px-4 py-3 text-center">
+                <p className="text-sm font-bold text-slate-200">{p}</p>
+                <p className="text-3xl font-black text-sky-400">{getPlayerMakes(p)}/{kicks.length}</p>
+                <p className="text-[10px] text-muted">FG Made</p>
+                {avgOp && <p className="text-[10px] text-sky-400 mt-1">Avg Op: {avgOp}s</p>}
+              </div>
+            );
+          })}
         </div>
 
         {/* Per-athlete breakdown */}
         {selectedPlayers.map((p) => {
           const pr = getPlayerResults(p);
+          const hasOpTime = pr.some((r) => r.opTime && r.opTime > 0);
           return (
             <div key={p} className="card-2 text-left text-xs">
               <p className="text-xs font-bold text-slate-200 mb-2">{p}</p>
@@ -308,6 +332,7 @@ function AthleteChartInner() {
                     <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
                     <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
                     <th className="text-[10px] text-muted text-center py-1 px-2">Hash</th>
+                    {hasOpTime && <th className="text-[10px] text-muted text-center py-1 px-2">Op</th>}
                     <th className="text-[10px] text-muted text-right py-1 px-2">Result</th>
                   </tr>
                 </thead>
@@ -317,6 +342,7 @@ function AthleteChartInner() {
                       <td className="text-muted py-1 px-2">{r.kickNum}</td>
                       <td className="text-center py-1 px-2 text-slate-200">{r.dist}yd</td>
                       <td className="text-center py-1 px-2 text-slate-300">{r.pos}</td>
+                      {hasOpTime && <td className="text-center py-1 px-2 text-slate-300">{r.opTime ? r.opTime.toFixed(2) : "—"}</td>}
                       <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[r.result] ?? r.result}</td>
                     </tr>
                   ))}
@@ -369,11 +395,32 @@ function AthleteChartInner() {
           <div className="h-full bg-sky-500 transition-all" style={{ width: `${(results.length / kicks.length) * 100}%` }} />
         </div>
 
+        {/* Sticks / Live toggle */}
+        <div className="flex rounded-input border border-border overflow-hidden w-fit">
+          <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
+          <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
+        </div>
+
         {/* Current kick info */}
         <div className="card-2 py-4 text-center">
           <p className="text-3xl font-black text-slate-100">{currentKick?.distance}yd</p>
           <p className="text-sm text-slate-300">{currentKick?.hash} Hash</p>
         </div>
+
+        {/* Op time input — live mode only */}
+        {kickMode === "live" && (
+          <div className="card-2 py-3 px-4">
+            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Op Time (optional)</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={opTimeInput ? formatOpTime(opTimeInput) : ""}
+              onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))}
+              placeholder="1.32"
+              className="input w-32 text-center text-sm font-bold py-1.5"
+            />
+          </div>
+        )}
 
         {/* Result buttons */}
         <button
@@ -417,6 +464,7 @@ function AthleteChartInner() {
                   <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
                   <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
                   <th className="text-[10px] text-muted text-center py-1 px-2">Hash</th>
+                  {kickMode === "live" && <th className="text-[10px] text-muted text-center py-1 px-2">Op</th>}
                   <th className="text-[10px] text-muted text-right py-1 px-2">Result</th>
                 </tr>
               </thead>
@@ -428,6 +476,7 @@ function AthleteChartInner() {
                       <td className="text-muted py-1 px-2">{kickIdx + 1}</td>
                       <td className="text-center py-1 px-2 text-slate-200">{r.dist}yd</td>
                       <td className="text-center py-1 px-2 text-slate-300">{kicks[kickIdx]?.hash ?? r.pos}</td>
+                      {kickMode === "live" && <td className="text-center py-1 px-2 text-slate-300">{r.opTime ? r.opTime.toFixed(2) : "—"}</td>}
                       <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[r.result] ?? r.result}</td>
                     </tr>
                   );
