@@ -258,6 +258,53 @@ export async function saveScoutAthletes(teamId: string, sport: string, names: st
   } catch {}
 }
 
+// ── Assigned Charts (stored in team_data) ────────────────────────────────────
+
+export interface AssignedChart {
+  id: string;
+  sport: string;
+  createdBy: string; // coach name or id
+  createdAt: string;
+  dueDate: string;
+  athletes: string[]; // assigned athlete names
+  kicks: { distance: number; hash: string; pointValue: number }[];
+  completedBy: Record<string, string>; // athleteName → completedDate ISO
+}
+
+const ASSIGNED_CHARTS_KEY = "assigned_charts";
+
+export async function loadAssignedCharts(teamId: string): Promise<AssignedChart[]> {
+  try {
+    const raw = localStorage.getItem(ASSIGNED_CHARTS_KEY);
+    if (raw) return JSON.parse(raw) as AssignedChart[];
+  } catch {}
+  if (!teamId || teamId === "local-dev") return [];
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("team_data").select("data").eq("team_id", teamId).eq("data_key", ASSIGNED_CHARTS_KEY).single();
+    if (error || !data) return [];
+    const charts = data.data as unknown as AssignedChart[];
+    if (Array.isArray(charts)) {
+      localStorage.setItem(ASSIGNED_CHARTS_KEY, JSON.stringify(charts));
+      return charts;
+    }
+    return [];
+  } catch { return []; }
+}
+
+export async function saveAssignedCharts(teamId: string, charts: AssignedChart[]): Promise<void> {
+  localStorage.setItem(ASSIGNED_CHARTS_KEY, JSON.stringify(charts));
+  if (!teamId || teamId === "local-dev") return;
+  try {
+    const supabase = createClient();
+    await supabase.from("team_data").upsert(
+      { team_id: teamId, data_key: ASSIGNED_CHARTS_KEY, data: charts as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
+      { onConflict: "team_id,data_key" }
+    );
+  } catch {}
+}
+
 // ── Scout Archives (stored in team_data) ────────────────────────────────────
 
 export interface ScoutArchive {
