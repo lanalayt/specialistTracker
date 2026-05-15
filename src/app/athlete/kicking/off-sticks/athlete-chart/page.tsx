@@ -138,13 +138,31 @@ function AthleteChartInner() {
     setSaved(true);
   };
 
-  const handleDeleteChart = async () => {
-    if (!assignedChart) return;
-    if (!window.confirm("Are you sure you want to delete this assigned chart? This cannot be undone.")) return;
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [deleteSelection, setDeleteSelection] = useState<string[]>([]);
+
+  const toggleDeleteSelection = (name: string) => {
+    setDeleteSelection((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!assignedChart || deleteSelection.length === 0) return;
+    const remaining = assignedChart.athletes.filter((a) => !deleteSelection.includes(a));
+    const msg = remaining.length === 0
+      ? "This will delete the entire chart. Are you sure?"
+      : `Remove ${deleteSelection.join(", ")} from this chart?`;
+    if (!window.confirm(msg)) return;
     const tid = getTeamId();
     if (!tid) return;
     const charts = await loadAssignedCharts(tid);
-    const updated = charts.filter((c) => c.id !== assignedChart.id);
+    let updated: typeof charts;
+    if (remaining.length === 0) {
+      updated = charts.filter((c) => c.id !== assignedChart.id);
+    } else {
+      const newCompleted = { ...assignedChart.completedBy };
+      deleteSelection.forEach((n) => delete newCompleted[n]);
+      updated = charts.map((c) => c.id === assignedChart.id ? { ...c, athletes: remaining, completedBy: newCompleted } : c);
+    }
     await saveAssignedCharts(tid, updated);
     router.push("/athlete");
   };
@@ -237,8 +255,24 @@ function AthleteChartInner() {
 
         <button onClick={() => { setPhase("live"); setCurrentKickIdx(0); setCurrentPlayerIdx(0); setResults([]); }} disabled={selectedPlayers.length === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Chart</button>
 
-        {assignedChart && (
-          <button onClick={handleDeleteChart} className="w-full text-xs text-muted hover:text-miss transition-colors py-2">Delete Chart</button>
+        {assignedChart && !deleteMode && (
+          <button onClick={() => setDeleteMode(true)} className="w-full text-xs text-muted hover:text-miss transition-colors py-2">Delete Chart</button>
+        )}
+        {assignedChart && deleteMode && (
+          <div className="card space-y-3">
+            <p className="text-xs font-semibold text-miss uppercase tracking-wider">Select athletes to remove</p>
+            <div className="flex flex-wrap gap-1.5">
+              {assignedChart.athletes.map((a) => (
+                <button key={a} onClick={() => toggleDeleteSelection(a)} className={clsx("px-3 py-1.5 rounded-input text-xs font-medium transition-all", deleteSelection.includes(a) ? "bg-miss/20 text-miss border border-miss/50 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setDeleteMode(false); setDeleteSelection([]); }} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
+              <button onClick={handleDeleteSelected} disabled={deleteSelection.length === 0} className="btn-danger flex-1 py-2 text-xs font-bold disabled:opacity-40">
+                {deleteSelection.length === assignedChart.athletes.length ? "Delete Entire Chart" : `Remove ${deleteSelection.length} Athlete${deleteSelection.length !== 1 ? "s" : ""}`}
+              </button>
+            </div>
+          </div>
         )}
       </main>
     );
