@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useFG } from "@/lib/fgContext";
 import { getTeamId } from "@/lib/teamData";
@@ -20,6 +20,7 @@ interface PresetKick { distance: number; hash: string; pointValue: number }
 
 function AthleteChartInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const assignedId = searchParams.get("assigned");
   const { user } = useAuth();
   const { athletes, commitPractice } = useFG();
@@ -112,6 +113,17 @@ function AthleteChartInner() {
     setSaved(true);
   };
 
+  const handleDeleteChart = async () => {
+    if (!assignedChart) return;
+    if (!window.confirm("Are you sure you want to delete this assigned chart? This cannot be undone.")) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const charts = await loadAssignedCharts(tid);
+    const updated = charts.filter((c) => c.id !== assignedChart.id);
+    await saveAssignedCharts(tid, updated);
+    router.push("/athlete");
+  };
+
   // ── Setup (self-service) ──
   if (phase === "setup") {
     return (
@@ -200,6 +212,10 @@ function AthleteChartInner() {
         </div>
 
         <button onClick={() => { setPhase("live"); setCurrentKickIdx(0); setResults([]); }} disabled={!selectedPlayer} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Chart</button>
+
+        {assignedChart && (
+          <button onClick={handleDeleteChart} className="w-full text-xs text-muted hover:text-miss transition-colors py-2">Delete Chart</button>
+        )}
       </main>
     );
   }
