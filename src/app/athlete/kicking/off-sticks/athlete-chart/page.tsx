@@ -15,6 +15,7 @@ import { POSITIONS, RESULTS } from "@/types";
 
 const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
 const HASH_TO_POS: Record<string, FGPosition> = { "Left": "LH", "LM": "LM", "M": "M", "RM": "RM", "Right": "RH" };
+const RESULT_LABEL: Record<string, string> = { YL: "GOOD", YC: "GOOD", YR: "GOOD", XL: "MISS LEFT", XR: "MISS RIGHT", XS: "MISS SHORT", X: "MISS" };
 
 interface PresetKick { distance: number; hash: string; pointValue: number }
 
@@ -316,7 +317,7 @@ function AthleteChartInner() {
                       <td className="text-muted py-1 px-2">{r.kickNum}</td>
                       <td className="text-center py-1 px-2 text-slate-200">{r.dist}yd</td>
                       <td className="text-center py-1 px-2 text-slate-300">{r.pos}</td>
-                      <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{r.result.startsWith("Y") ? "GOOD" : "MISS"}</td>
+                      <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[r.result] ?? r.result}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -374,19 +375,31 @@ function AthleteChartInner() {
           <p className="text-sm text-slate-300">{currentKick?.hash} Hash</p>
         </div>
 
-        {/* Make / Miss buttons — styled like team mode */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Result buttons */}
+        <button
+          onClick={() => handleResult("YC")}
+          className="w-full py-6 rounded-card text-xl font-black bg-make/20 text-make border-2 border-make/40 hover:bg-make/30 transition-all active:scale-95"
+        >
+          GOOD
+        </button>
+        <div className="grid grid-cols-3 gap-2">
           <button
-            onClick={() => handleResult("YC")}
-            className="py-8 rounded-card text-xl font-black bg-make/20 text-make border-2 border-make/40 hover:bg-make/30 transition-all active:scale-95"
+            onClick={() => handleResult("XL")}
+            className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95"
           >
-            GOOD
+            MISS LEFT
           </button>
           <button
-            onClick={() => handleResult("X")}
-            className="py-8 rounded-card text-xl font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95"
+            onClick={() => handleResult("XS")}
+            className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95"
           >
-            MISS
+            MISS SHORT
+          </button>
+          <button
+            onClick={() => handleResult("XR")}
+            className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95"
+          >
+            MISS RIGHT
           </button>
         </div>
 
@@ -415,7 +428,7 @@ function AthleteChartInner() {
                       <td className="text-muted py-1 px-2">{kickIdx + 1}</td>
                       <td className="text-center py-1 px-2 text-slate-200">{r.dist}yd</td>
                       <td className="text-center py-1 px-2 text-slate-300">{kicks[kickIdx]?.hash ?? r.pos}</td>
-                      <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{r.result.startsWith("Y") ? "GOOD" : "MISS"}</td>
+                      <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[r.result] ?? r.result}</td>
                     </tr>
                   );
                 })}
