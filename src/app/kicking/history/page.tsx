@@ -83,10 +83,11 @@ function KickingHistoryContent() {
   const filteredHistory = historyTab === "charting"
     ? history.filter((s) => isChartingSession(s))
     : history.filter((s) => !isChartingSession(s) && (modeFilter === "game" ? s.mode === "game" : s.mode !== "game"));
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
   const [selectedId, setSelectedId] = useState<string | null>(
     sessionParam && filteredHistory.some((s) => s.id === sessionParam)
       ? sessionParam
-      : filteredHistory[filteredHistory.length - 1]?.id ?? null
+      : isMobile ? null : (filteredHistory[filteredHistory.length - 1]?.id ?? null)
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
