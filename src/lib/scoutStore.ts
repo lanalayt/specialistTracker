@@ -274,23 +274,30 @@ export interface AssignedChart {
 const ASSIGNED_CHARTS_KEY = "assigned_charts";
 
 export async function loadAssignedCharts(teamId: string): Promise<AssignedChart[]> {
-  try {
-    const raw = localStorage.getItem(ASSIGNED_CHARTS_KEY);
-    if (raw) return JSON.parse(raw) as AssignedChart[];
-  } catch {}
-  if (!teamId || teamId === "local-dev") return [];
+  if (!teamId || teamId === "local-dev") {
+    try {
+      const raw = localStorage.getItem(ASSIGNED_CHARTS_KEY);
+      return raw ? JSON.parse(raw) as AssignedChart[] : [];
+    } catch { return []; }
+  }
+  // Always check cloud for assigned charts (they may be assigned from another device)
   try {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("team_data").select("data").eq("team_id", teamId).eq("data_key", ASSIGNED_CHARTS_KEY).single();
-    if (error || !data) return [];
+    if (error || !data) {
+      // Fall back to localStorage if cloud fails
+      try { const raw = localStorage.getItem(ASSIGNED_CHARTS_KEY); return raw ? JSON.parse(raw) as AssignedChart[] : []; } catch { return []; }
+    }
     const charts = data.data as unknown as AssignedChart[];
     if (Array.isArray(charts)) {
       localStorage.setItem(ASSIGNED_CHARTS_KEY, JSON.stringify(charts));
       return charts;
     }
     return [];
-  } catch { return []; }
+  } catch {
+    try { const raw = localStorage.getItem(ASSIGNED_CHARTS_KEY); return raw ? JSON.parse(raw) as AssignedChart[] : []; } catch { return []; }
+  }
 }
 
 export async function saveAssignedCharts(teamId: string, charts: AssignedChart[]): Promise<void> {

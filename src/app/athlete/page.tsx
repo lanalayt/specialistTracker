@@ -23,13 +23,14 @@ export default function AthleteDashboardPage() {
   useEffect(() => {
     async function load() {
       let tid = getTeamId();
-      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      for (let i = 0; i < 20 && !tid; i++) { await new Promise((r) => setTimeout(r, 200)); tid = getTeamId(); }
       if (!tid) return;
+      // Try cloud first, then fall back to localStorage
       const all = await loadAssignedCharts(tid);
       setCharts(all);
     }
     load();
-  }, []);
+  }, [user?.id]);
 
   // Show all charts that have at least one athlete who hasn't completed it
   const activeCharts = charts.filter((c) => c.athletes.some((a) => !c.completedBy[a]));
