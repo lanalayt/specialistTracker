@@ -182,7 +182,16 @@ function AthleteChartInner() {
       updated = charts.map((c) => c.id === assignedChart.id ? { ...c, athletes: remaining, completedBy: newCompleted } : c);
     }
     await saveAssignedCharts(tid, updated);
-    router.push("/athlete");
+    // Stay on preview — reload chart data
+    setAssignedChart(null);
+    setPhase(assignedId ? "preview" : "setup");
+    // Reload to check if chart still exists
+    const reloaded = await loadAssignedCharts(tid);
+    const still = reloaded.find((c) => c.id === assignedId);
+    if (!still) {
+      // Chart fully deleted, go back to session page
+      router.push("/athlete/kicking/session");
+    }
   };
 
   // ── Setup (self-service) ──
