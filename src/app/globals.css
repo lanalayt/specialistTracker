@@ -129,5 +129,22 @@ body {
   .make-pct {
     @apply text-accent font-semibold;
   }
+
+  /* Athlete Mode — brighter borders + top stripe */
+  .athlete-mode {
+    border-top: 3px solid var(--accent);
+  }
+  .athlete-mode .card {
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+  .athlete-mode .card-2 {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .athlete-mode .input {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .athlete-mode .input:focus {
+    border-color: var(--accent);
+  }
 }
 
