@@ -7,6 +7,9 @@ import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import Link from "next/link";
 import clsx from "clsx";
+import type { FGKick } from "@/types";
+
+const RESULT_LABEL: Record<string, string> = { YL: "GOOD", YC: "GOOD", YR: "GOOD", XL: "MISS LEFT", XR: "MISS RIGHT", XS: "MISS SHORT", X: "MISS" };
 
 const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
 
@@ -18,7 +21,7 @@ interface PresetKick {
 
 export default function CoachesChartPage() {
   const { user, isCoach } = useAuth();
-  const { athletes } = useFG();
+  const { athletes, history } = useFG();
   const athleteNames = athletes.map((a) => a.name);
 
   const [kicks, setKicks] = useState<PresetKick[]>([]);
@@ -34,6 +37,7 @@ export default function CoachesChartPage() {
   const [reassignId, setReassignId] = useState<string | null>(null);
   const [reassignPlayers, setReassignPlayers] = useState<string[]>([]);
   const [reassignDate, setReassignDate] = useState("");
+  const [showStatsId, setShowStatsId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCharts();
@@ -226,15 +230,73 @@ export default function CoachesChartPage() {
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {pending.map((a) => (
-                      <span key={a} className="text-[10px] px-2 py-0.5 rounded-input border border-miss/40 text-miss font-semibold">{a} — incomplete</span>
+                      <Link key={a} href={`/athlete/kicking/off-sticks/athlete-chart?assigned=${chart.id}`} className="text-[10px] px-2 py-0.5 rounded-input border border-miss/40 text-miss font-semibold hover:bg-miss/10 transition-colors">{a} — start chart</Link>
                     ))}
                     {completed.map((a) => (
                       <span key={a} className="text-[10px] px-2 py-0.5 rounded-input border border-make/40 text-make font-semibold">{a} — done</span>
                     ))}
                   </div>
-                  {!isReassigning && (
-                    <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign this chart</button>
-                  )}
+                  <div className="flex flex-wrap gap-3">
+                    {!isReassigning && (
+                      <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign this chart</button>
+                    )}
+                    {completed.length > 0 && showStatsId !== chart.id && (
+                      <button onClick={() => setShowStatsId(chart.id)} className="text-[10px] text-sky-400 hover:underline">Show stats</button>
+                    )}
+                  </div>
+                  {/* Show stats for completed athletes */}
+                  {showStatsId === chart.id && (() => {
+                    // Find sessions that match this assigned chart
+                    const assignedSessions = history.filter((s) =>
+                      s.label?.includes("(Assigned)") &&
+                      completed.some((a) => s.label?.includes(a))
+                    );
+                    // Get all kicks from matching sessions for completed athletes
+                    const athleteResults: Record<string, FGKick[]> = {};
+                    completed.forEach((a) => { athleteResults[a] = []; });
+                    assignedSessions.forEach((s) => {
+                      const kicks = (s.entries ?? []) as FGKick[];
+                      kicks.forEach((k) => {
+                        if (completed.includes(k.athlete) && athleteResults[k.athlete]) {
+                          athleteResults[k.athlete].push(k);
+                        }
+                      });
+                    });
+                    return (
+                      <div className="card space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Results</p>
+                          <button onClick={() => setShowStatsId(null)} className="text-[10px] text-muted hover:text-white">Close</button>
+                        </div>
+                        {completed.map((a) => {
+                          const kicks = athleteResults[a] ?? [];
+                          const made = kicks.filter((k) => k.result.startsWith("Y")).length;
+                          const completedDate = chart.completedBy[a];
+                          return (
+                            <div key={a} className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs font-bold text-slate-200">{a} — {made}/{kicks.length}</p>
+                                {completedDate && <p className="text-[10px] text-muted">{new Date(completedDate).toLocaleDateString()}</p>}
+                              </div>
+                              {kicks.length > 0 && (
+                                <div className="text-xs space-y-0.5">
+                                  {kicks.map((k, i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                      <span className="text-muted w-4">{k.kickNum ?? i + 1}.</span>
+                                      <span className="text-slate-300">{k.dist}yd {k.pos}</span>
+                                      {k.opTime ? <span className="text-slate-400">{k.opTime.toFixed(2)}s</span> : null}
+                                      <span className={clsx("font-bold ml-auto", k.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[k.result] ?? k.result}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {kicks.length === 0 && <p className="text-[10px] text-muted">No matching session found</p>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                   {isReassigning && (
                     <div className="card space-y-3">
                       <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Re-assign</p>
