@@ -8,7 +8,7 @@ import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/li
 import Link from "next/link";
 import clsx from "clsx";
 
-const HASH_OPTIONS = ["L", "M", "R"];
+const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
 
 interface PresetKick {
   distance: number;
@@ -24,7 +24,6 @@ export default function CoachesChartPage() {
   const [kicks, setKicks] = useState<PresetKick[]>([]);
   const [newDist, setNewDist] = useState("30");
   const [newHash, setNewHash] = useState("M");
-  const [newPoints, setNewPoints] = useState("1");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState("");
   const [saved, setSaved] = useState(false);
@@ -39,8 +38,7 @@ export default function CoachesChartPage() {
 
   const addKick = () => {
     const d = parseInt(newDist) || 30;
-    const p = parseInt(newPoints) || 1;
-    setKicks((prev) => [...prev, { distance: d, hash: newHash, pointValue: p }]);
+    setKicks((prev) => [...prev, { distance: d, hash: newHash, pointValue: 1 }]);
   };
 
   const removeKick = (idx: number) => {
@@ -80,7 +78,7 @@ export default function CoachesChartPage() {
 
   return (
     <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
-      <Link href="/athlete/kicking/off-sticks" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+      <Link href="/athlete/kicking/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
       <h2 className="text-lg font-bold text-slate-100">Create FG Chart</h2>
       <p className="text-xs text-muted">Build a chart, assign it to athletes with a due date.</p>
 
@@ -90,7 +88,7 @@ export default function CoachesChartPage() {
           <p className="text-sm text-muted">Sent to {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""} — due {new Date(dueDate).toLocaleDateString()}</p>
           <div className="flex gap-3 max-w-sm mx-auto">
             <button onClick={() => { setKicks([]); setSelectedPlayers([]); setDueDate(""); setSaved(false); }} className="btn-primary flex-1 py-3 text-sm">Create Another</button>
-            <Link href="/athlete/kicking/off-sticks" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
+            <Link href="/athlete/kicking/session" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
           </div>
         </div>
       ) : (
@@ -103,7 +101,6 @@ export default function CoachesChartPage() {
                   <span className="text-muted w-6">{i + 1}.</span>
                   <span className="text-slate-200 font-semibold">{k.distance}yd</span>
                   <span className="text-slate-300">{k.hash}</span>
-                  <span className="text-sky-400 font-bold">{k.pointValue}pt</span>
                   <button onClick={() => removeKick(i)} className="text-miss text-[10px] hover:underline">Remove</button>
                 </div>
               ))}
@@ -113,7 +110,7 @@ export default function CoachesChartPage() {
           {/* Add kick */}
           <div className="card space-y-3">
             <p className="text-xs font-semibold text-muted uppercase tracking-wider">Add Kick</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <p className="text-[10px] text-muted text-center mb-1">Distance</p>
                 <input type="text" inputMode="numeric" value={newDist} onChange={(e) => setNewDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
@@ -123,10 +120,6 @@ export default function CoachesChartPage() {
                 <select value={newHash} onChange={(e) => setNewHash(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5">
                   {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
                 </select>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted text-center mb-1">Points</p>
-                <input type="text" inputMode="numeric" value={newPoints} onChange={(e) => setNewPoints(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
               </div>
             </div>
             <button onClick={addKick} disabled={!newDist} className="btn-primary w-full py-2 text-xs font-bold disabled:opacity-40">Add Kick</button>

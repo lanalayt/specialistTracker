@@ -10,7 +10,7 @@ import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import Link from "next/link";
 import clsx from "clsx";
 
-const HASH_OPTIONS = ["L", "M", "R"];
+const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
 
 interface PresetKick { distance: number; hash: string; pointValue: number }
 interface FGResult { athlete: string; kickNum: number; distance: number; hash: string; pointValue: number; result: "make" | "miss"; score: number }
@@ -121,7 +121,7 @@ function AthleteChartInner() {
   if (phase === "setup") {
     return (
       <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
-        <Link href="/athlete/kicking/off-sticks" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+        <Link href="/athlete/kicking/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
         <h2 className="text-lg font-bold text-slate-100">Athlete Chart</h2>
         <p className="text-xs text-muted">Build your own chart and kick it.</p>
 
