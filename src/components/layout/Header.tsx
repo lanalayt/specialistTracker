@@ -82,7 +82,7 @@ export function Header({ title }: { title?: string }) {
     <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur border-b border-border">
       <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 h-14">
         {/* Logo (mobile) */}
-        <div className="flex items-center gap-2 lg:hidden min-w-0 flex-shrink">
+        <div className="flex items-center gap-2 lg:hidden min-w-0 flex-1">
           <input
             ref={fileRef}
             type="file"
@@ -108,7 +108,7 @@ export function Header({ title }: { title?: string }) {
               "ST"
             )}
           </button>
-          <span className="text-sm sm:text-lg font-extrabold text-slate-100 truncate min-w-0">
+          <span className="text-[11px] xs:text-sm sm:text-lg font-extrabold text-slate-100 leading-tight min-w-0 break-words">
             {title ?? "Specialist Tracker"}
           </span>
         </div>
