@@ -27,14 +27,24 @@ function AthletesContent() {
   const [isNewAthlete, setIsNewAthlete] = useState(false);
 
   useEffect(() => {
-    async function loadHolders() {
+    async function loadHoldersAndSync() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid) return;
       const h = await loadAthletes(tid, "HOLDING");
       setHolders(h);
+      // Sync team athletes → ATHLETE_* keys (backfill)
+      const pairs: [string, string][] = [["KICKING", "ATHLETE_KICKING"], ["PUNTING", "ATHLETE_PUNTING"], ["KICKOFF", "ATHLETE_KICKOFF"], ["LONGSNAP", "ATHLETE_LONGSNAP"]];
+      for (const [team, athlete] of pairs) {
+        const teamList = await loadAthletes(tid, team);
+        const athleteList = await loadAthletes(tid, athlete);
+        const athleteNames = new Set(athleteList.map((a) => a.name));
+        for (const a of teamList) {
+          if (!athleteNames.has(a.name)) await insertAthlete(tid, athlete, a.name);
+        }
+      }
     }
-    loadHolders();
+    loadHoldersAndSync();
   }, []);
 
   // Master list = union of all sports' athlete names, preserving order
