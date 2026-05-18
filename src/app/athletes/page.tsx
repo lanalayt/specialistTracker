@@ -20,6 +20,8 @@ function AthletesContent() {
   const snap = useLongSnap();
   const [newName, setNewName] = useState("");
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState("");
   const [holders, setHolders] = useState<StoredAthlete[]>([]);
 
   useEffect(() => {
@@ -69,6 +71,58 @@ function AthletesContent() {
     } else {
       setConfirmRemove(name);
     }
+  };
+
+  const handleRename = async (oldName: string, newNameVal: string) => {
+    const trimmed = newNameVal.trim();
+    if (!trimmed || trimmed === oldName || allNames.includes(trimmed)) { setEditingName(null); return; }
+    const tid = getTeamId();
+    if (!tid) return;
+    // Update in all sessions across all sports
+    const { createClient } = await import("@/lib/supabase");
+    const supabase = createClient();
+    const { data: sessions } = await supabase.from("sessions").select("id, entries").eq("team_id", tid);
+    if (sessions) {
+      for (const s of sessions) {
+        const entries = s.entries as { athlete?: string; athleteId?: string }[];
+        if (entries?.some((e) => e.athlete === oldName || e.athleteId === oldName)) {
+          const updated = entries.map((e) => ({
+            ...e,
+            athlete: e.athlete === oldName ? trimmed : e.athlete,
+            athleteId: e.athleteId === oldName ? trimmed : e.athleteId,
+          }));
+          await supabase.from("sessions").update({ entries: updated, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", s.id);
+        }
+      }
+    }
+    // Update athlete name in each sport's athlete table
+    const sports = ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP", "HOLDING"];
+    for (const sport of sports) {
+      const athletes = await loadAthletes(tid, sport);
+      const found = athletes.find((a) => a.name === oldName);
+      if (found) {
+        await removeAthleteById(tid, found.id);
+        await insertAthlete(tid, sport, trimmed);
+      }
+    }
+    setEditingName(null);
+    // Force reload
+    window.location.reload();
+  };
+
+  const toggleSport = async (name: string, sport: string, sportKey: string, isIn: boolean) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    if (isIn) {
+      // Remove from sport
+      const athletes = await loadAthletes(tid, sportKey);
+      const found = athletes.find((a) => a.name === name);
+      if (found) await removeAthleteById(tid, found.id);
+    } else {
+      // Add to sport
+      await insertAthlete(tid, sportKey, name);
+    }
+    window.location.reload();
   };
 
   const fgNames = new Set(fg.athletes.map((a) => a.name));
@@ -141,31 +195,37 @@ function AthletesContent() {
                     {name[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-100">{name}</p>
+                    {editingName === name ? (
+                      <div className="flex gap-1">
+                        <input
+                          className="input text-sm py-0.5 flex-1"
+                          value={editNameValue}
+                          onChange={(e) => setEditNameValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleRename(name, editNameValue); if (e.key === "Escape") setEditingName(null); }}
+                          autoFocus
+                        />
+                        <button onClick={() => handleRename(name, editNameValue)} className="text-[10px] text-make hover:underline">Save</button>
+                        <button onClick={() => setEditingName(null)} className="text-[10px] text-muted hover:underline">Cancel</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setEditingName(name); setEditNameValue(name); }} className="text-sm font-semibold text-slate-100 hover:text-accent transition-colors text-left">{name}</button>
+                    )}
                     <div className="flex gap-1 mt-1 flex-wrap">
-                      {sports.filter((s) => s !== "H").length === 0 && !holderNames.has(name) ? (
-                        <span className="text-[10px] text-muted italic">not on any roster</span>
-                      ) : sports.filter((s) => s !== "H").map((sp) => (
-                        <span key={sp} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold border border-accent/20">
-                          {sp}
-                        </span>
+                      {[
+                        { label: "FG", key: "KICKING", isIn: fgNames.has(name) },
+                        { label: "Punt", key: "PUNTING", isIn: puntNames.has(name) },
+                        { label: "KO", key: "KICKOFF", isIn: koNames.has(name) },
+                        { label: "LS", key: "LONGSNAP", isIn: snapNames.has(name) },
+                        { label: "H", key: "HOLDING", isIn: holderNames.has(name) },
+                      ].map((sp) => (
+                        <button
+                          key={sp.label}
+                          onClick={() => toggleSport(name, sp.label, sp.key, sp.isIn)}
+                          className={clsx("text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-all", sp.isIn ? "bg-accent/10 text-accent border-accent/20" : "bg-surface-2 text-muted border-border hover:text-white")}
+                        >
+                          {sp.label}
+                        </button>
                       ))}
-                      <button
-                        onClick={async () => {
-                          const tid = getTeamId();
-                          if (!tid) return;
-                          if (holderNames.has(name)) {
-                            const h = holders.find((a) => a.name === name);
-                            if (h) { await removeAthleteById(tid, h.id); setHolders((prev) => prev.filter((a) => a.id !== h.id)); }
-                          } else {
-                            const result = await insertAthlete(tid, "HOLDING", name);
-                            if (result) setHolders((prev) => [...prev, result]);
-                          }
-                        }}
-                        className={clsx("text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-all", holderNames.has(name) ? "bg-sky-500/15 text-sky-400 border-sky-500/30" : "bg-surface-2 text-muted border-border hover:text-white")}
-                      >
-                        H
-                      </button>
                     </div>
                   </div>
                   <RoleGuard coachOnly>

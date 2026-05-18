@@ -11,6 +11,7 @@ interface SnapSettings {
   chartMode: "simple" | "detailed";
   missMode: "simple" | "detailed";
   openSpiralIsBall: boolean;
+  holderEnabled: boolean;
 }
 
 function loadSettings(): SnapSettings {
@@ -22,10 +23,11 @@ function loadSettings(): SnapSettings {
         chartMode: parsed.chartMode === "detailed" ? "detailed" : "simple",
         missMode: parsed.missMode === "detailed" ? "detailed" : "simple",
         openSpiralIsBall: parsed.openSpiralIsBall !== false,
+        holderEnabled: parsed.holderEnabled !== false,
       };
     }
   } catch {}
-  return { chartMode: "simple", missMode: "simple", openSpiralIsBall: true };
+  return { chartMode: "simple", missMode: "simple", openSpiralIsBall: true, holderEnabled: true };
 }
 
 export default function SnapSettingsPage() {
@@ -38,6 +40,7 @@ function SnapSettingsContent() {
   const [chartMode, setChartMode] = useState<"simple" | "detailed">(() => loadSettings().chartMode);
   const [missMode, setMissMode] = useState<"simple" | "detailed">(() => loadSettings().missMode);
   const [openSpiralIsBall, setOpenSpiralIsBall] = useState(() => loadSettings().openSpiralIsBall);
+  const [holderEnabled, setHolderEnabled] = useState(() => loadSettings().holderEnabled);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [savedSettings, setSavedSettings] = useState<SnapSettings>(() => loadSettings());
@@ -48,10 +51,12 @@ function SnapSettingsContent() {
         const cm = (cloud.chartMode === "detailed" ? "detailed" : "simple") as "simple" | "detailed";
         const mm = (cloud.missMode === "detailed" ? "detailed" : "simple") as "simple" | "detailed";
         const osb = cloud.openSpiralIsBall !== false;
+        const he = cloud.holderEnabled !== false;
         setChartMode(cm);
         setMissMode(mm);
         setOpenSpiralIsBall(osb);
-        const synced: SnapSettings = { chartMode: cm, missMode: mm, openSpiralIsBall: osb };
+        setHolderEnabled(he);
+        const synced: SnapSettings = { chartMode: cm, missMode: mm, openSpiralIsBall: osb, holderEnabled: he };
         setSavedSettings(synced);
         // Sync cloud → localStorage so session pages pick it up
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(synced)); } catch {}
@@ -60,13 +65,13 @@ function SnapSettingsContent() {
   }, []);
 
   useEffect(() => {
-    const changed = chartMode !== savedSettings.chartMode || missMode !== savedSettings.missMode || openSpiralIsBall !== savedSettings.openSpiralIsBall;
+    const changed = chartMode !== savedSettings.chartMode || missMode !== savedSettings.missMode || openSpiralIsBall !== savedSettings.openSpiralIsBall || holderEnabled !== savedSettings.holderEnabled;
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [chartMode, missMode, openSpiralIsBall, savedSettings]);
+  }, [chartMode, missMode, openSpiralIsBall, holderEnabled, savedSettings]);
 
   const handleSave = () => {
-    const settings: SnapSettings = { chartMode, missMode, openSpiralIsBall };
+    const settings: SnapSettings = { chartMode, missMode, openSpiralIsBall, holderEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -112,6 +117,22 @@ function SnapSettingsContent() {
             className={clsx("w-10 h-5 rounded-full transition-colors relative", openSpiralIsBall ? "bg-accent" : "bg-surface-2 border border-border")}
           >
             <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", openSpiralIsBall ? "left-5" : "left-0.5")} />
+          </button>
+        </div>
+      </div>
+
+      <div className="card space-y-4">
+        <p className="text-sm font-bold text-slate-100 uppercase tracking-wider">Holder</p>
+        <p className="text-xs text-muted">
+          When enabled, holder selection appears in snap charting overlays.
+        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-slate-200">Holder Enabled</p>
+          <button
+            onClick={() => setHolderEnabled(!holderEnabled)}
+            className={clsx("w-10 h-5 rounded-full transition-colors relative", holderEnabled ? "bg-accent" : "bg-surface-2 border border-border")}
+          >
+            <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", holderEnabled ? "left-5" : "left-0.5")} />
           </button>
         </div>
       </div>

@@ -593,29 +593,27 @@ function AthleteChartInner() {
           <div className="h-full bg-sky-500 transition-all" style={{ width: `${(results.length / kicks.length) * 100}%` }} />
         </div>
 
-        {/* Sticks / Live toggle + Log Snap */}
-        <div className="flex items-center gap-3">
+        {/* Sticks / Live toggle + Op Time + Log Snap */}
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex rounded-input border border-border overflow-hidden w-fit">
             <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
             <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
           </div>
           {kickMode === "live" && (
-            <button onClick={() => setShowSnap(true)} className="px-3 py-1.5 rounded-input border border-sky-500/30 text-sky-400 text-[10px] font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
+            <>
+              <div className="flex items-center gap-1">
+                <p className="text-[10px] text-muted">OT:</p>
+                <input type="text" inputMode="numeric" value={opTimeInput ? formatOpTime(opTimeInput) : ""} onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))} placeholder="1.32" className="input w-14 text-center text-[10px] font-bold py-1" />
+              </div>
+              <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "border-make/50 text-make hover:bg-make/10" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? `Snap (${snapLogsMap[`${currentPlayer}-${currentKickIdx}`].length})` : "Log Snap"}</button>
+            </>
           )}
         </div>
 
-        {/* Current kick info + Op time */}
-        <div className="card-2 py-4 px-4 flex items-center justify-between">
-          <div className="text-center flex-1">
-            <p className="text-3xl font-black text-slate-100">{currentKick?.distance} Yard Kick</p>
-            <p className="text-sm text-slate-300">{HASH_DISPLAY[currentKick?.hash ?? "M"] ?? currentKick?.hash}</p>
-          </div>
-          {kickMode === "live" && (
-            <div className="text-center shrink-0 ml-3">
-              <p className="text-[10px] text-muted mb-1">Op Time</p>
-              <input type="text" inputMode="numeric" value={opTimeInput ? formatOpTime(opTimeInput) : ""} onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))} placeholder="1.32" className="input w-16 text-center text-sm font-bold py-1.5" />
-            </div>
-          )}
+        {/* Current kick info */}
+        <div className="card-2 py-4 text-center">
+          <p className="text-3xl font-black text-slate-100">{currentKick?.distance} Yard Kick</p>
+          <p className="text-sm text-slate-300">{HASH_DISPLAY[currentKick?.hash ?? "M"] ?? currentKick?.hash}</p>
         </div>
 
         {/* Result buttons — select then submit */}
