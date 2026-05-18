@@ -384,15 +384,15 @@ export default function PuntingSessionPage() {
     };
   }, []);
 
-  // Load punt types from cloud only if localStorage has no settings (fresh device)
+  // Load punt settings from cloud only if localStorage has no settings (fresh device)
   useEffect(() => {
     const hasLocal = !!localStorage.getItem("puntSettings");
     if (!hasLocal) {
-      loadSettingsFromCloud<{ puntTypes?: Record<string, unknown>[]; puntCategories?: PuntCategoryConfig[] }>("puntSettings").then((cloud) => {
-        if (cloud?.puntTypes && cloud.puntTypes.length > 0) {
-          const cats = cloud.puntCategories?.length ? cloud.puntCategories : DEFAULT_CATEGORIES;
+      loadSettingsFromCloud<Record<string, unknown>>("puntSettings").then((cloud) => {
+        if (cloud?.puntTypes && (cloud.puntTypes as unknown[]).length > 0) {
+          const cats = (cloud.puntCategories as PuntCategoryConfig[])?.length ? cloud.puntCategories as PuntCategoryConfig[] : DEFAULT_CATEGORIES;
           const enabledCats = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
-          const types = cloud.puntTypes.map((t) => {
+          const types = (cloud.puntTypes as Record<string, unknown>[]).map((t) => {
             const id = t.id as string;
             const upper = id.toUpperCase();
             let category = (t.category as string) ?? "DIRECTIONAL";
@@ -410,8 +410,10 @@ export default function PuntingSessionPage() {
             };
           }).filter((t) => enabledCats.has(t.category));
           setPuntTypes(types);
-          // Sync cloud → localStorage so future loads are correct
-          try { localStorage.setItem("puntSettings", JSON.stringify({ puntTypes: cloud.puntTypes, puntCategories: cloud.puntCategories })); } catch {}
+          // Sync full cloud settings → localStorage (preserves direction, opTime, etc.)
+          try { localStorage.setItem("puntSettings", JSON.stringify(cloud)); } catch {}
+          // Reload direction settings from the now-populated localStorage
+          setDirSettings(loadDirectionSettings());
         }
       });
     }
