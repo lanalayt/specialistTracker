@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
+
+const LIVE_HASH_OPTIONS = ["L", "M", "R"];
+const RESULT_LABEL: Record<string, string> = { YL: "GOOD", YC: "GOOD", YR: "GOOD", XL: "MISS LEFT", XR: "MISS RIGHT", XS: "MISS SHORT", X: "MISS" };
 
 interface FGEntry { athlete: string; kickNum: number; distance: number; hash: string; pointValue: number; result: "make" | "miss"; score: number }
 
@@ -18,6 +21,63 @@ export default function ScoutFGPage() {
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
+
+  // Live input state
+  const [liveAthletes, setLiveAthletes] = useState<string[]>([]);
+  const [liveDist, setLiveDist] = useState("");
+  const [liveHash, setLiveHash] = useState("M");
+  const [liveAthlete, setLiveAthlete] = useState("");
+  const [liveKicks, setLiveKicks] = useState<{ athlete: string; distance: number; hash: string; result: string; score: number }[]>([]);
+  const [newLiveAthlete, setNewLiveAthlete] = useState("");
+
+  useEffect(() => {
+    async function loadAthletes() {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const names = await loadScoutAthletes(tid, "fg");
+      setLiveAthletes(names);
+      if (names.length > 0 && !liveAthlete) setLiveAthlete(names[0]);
+    }
+    loadAthletes();
+  }, []);
+
+  const addLiveAthlete = async () => {
+    const trimmed = newLiveAthlete.trim();
+    if (!trimmed || liveAthletes.includes(trimmed)) return;
+    const updated = [...liveAthletes, trimmed];
+    setLiveAthletes(updated);
+    setNewLiveAthlete("");
+    if (!liveAthlete) setLiveAthlete(trimmed);
+    const tid = getTeamId();
+    if (tid) await saveScoutAthletes(tid, "fg", updated);
+  };
+
+  const handleLiveResult = async (result: string) => {
+    const dist = parseInt(liveDist);
+    if (!dist || !liveAthlete) return;
+    const kick = { athlete: liveAthlete, distance: dist, hash: liveHash, pointValue: 1, result: result === "make" ? "make" : "miss", score: result === "make" ? 1 : 0 };
+    const newKicks = [...liveKicks, kick];
+    setLiveKicks(newKicks);
+    setLiveDist("");
+  };
+
+  const handleLiveSave = async () => {
+    if (liveKicks.length === 0) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const athletes = [...new Set(liveKicks.map((k) => k.athlete))];
+    const label = `FG Scout — ${athletes.map((a) => { const ak = liveKicks.filter((k) => k.athlete === a); return `${a}: ${ak.filter((k) => k.result === "make").length}/${ak.length}`; }).join(", ")}`;
+    await insertScoutSession(tid, {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      sport: "SCOUT_FG",
+      label,
+      date: new Date().toISOString(),
+      entries: liveKicks.map((k, i) => ({ ...k, kickNum: i + 1 })) as unknown as Record<string, unknown>[],
+    });
+    setLiveKicks([]);
+    await loadData();
+  };
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -118,6 +178,58 @@ export default function ScoutFGPage() {
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Manual Chart</h3>
                 <p className="text-[10px] text-muted mt-1">Enter kicks on the fly</p>
               </Link>
+            </div>
+
+            {/* Live Input Chart */}
+            <div className="card space-y-3">
+              <p className="text-sm font-bold text-slate-100">Live Input</p>
+              <p className="text-[10px] text-muted">Enter distance, hash, athlete, result — submit one kick at a time.</p>
+
+              {/* Athlete selector */}
+              <div className="flex flex-wrap gap-1.5">
+                {liveAthletes.map((a) => (
+                  <button key={a} onClick={() => setLiveAthlete(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", liveAthlete === a ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <input type="text" value={newLiveAthlete} onChange={(e) => setNewLiveAthlete(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="Add athlete..." className="input flex-1 text-xs py-1" />
+                <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim()} className="text-[10px] text-amber-400 hover:underline disabled:opacity-40">Add</button>
+              </div>
+
+              {/* Inputs */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+                  <input type="text" inputMode="numeric" value={liveDist} onChange={(e) => setLiveDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted text-center mb-1">Hash</p>
+                  <select value={liveHash} onChange={(e) => setLiveHash(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5">
+                    {LIVE_HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Make / Miss */}
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => handleLiveResult("make")} disabled={!liveDist || !liveAthlete} className="py-3 rounded-input text-sm font-black bg-make/20 text-make border-2 border-make/40 hover:bg-make/30 transition-all active:scale-95 disabled:opacity-40">GOOD</button>
+                <button onClick={() => handleLiveResult("miss")} disabled={!liveDist || !liveAthlete} className="py-3 rounded-input text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95 disabled:opacity-40">MISS</button>
+              </div>
+
+              {/* Running log */}
+              {liveKicks.length > 0 && (
+                <div className="space-y-1 pt-2 border-t border-border/50">
+                  {[...liveKicks].reverse().map((k, i) => (
+                    <div key={liveKicks.length - 1 - i} className="flex items-center text-xs gap-2">
+                      <span className="text-muted w-5">#{liveKicks.length - i}</span>
+                      <span className="text-slate-400 w-16 truncate">{k.athlete}</span>
+                      <span className="text-slate-300">{k.distance}yd {k.hash}</span>
+                      <span className={clsx("font-bold ml-auto", k.result === "make" ? "text-make" : "text-miss")}>{k.result === "make" ? "GOOD" : "MISS"}</span>
+                    </div>
+                  ))}
+                  <button onClick={handleLiveSave} className="btn-primary w-full py-2 text-xs font-bold mt-2">Save {liveKicks.length} Kick{liveKicks.length !== 1 ? "s" : ""} to Rankings</button>
+                </div>
+              )}
             </div>
           </div>
         )}
