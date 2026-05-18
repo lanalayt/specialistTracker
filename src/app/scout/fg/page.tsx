@@ -76,11 +76,23 @@ export default function ScoutFGPage() {
     const tid = getTeamId();
     if (!tid) return;
     const updated = { ...profiles };
-    if (originalName && originalName !== profile.name) delete updated[originalName];
+    if (originalName && originalName !== profile.name) {
+      delete updated[originalName];
+      // Rename in all session entries
+      const supabase = createClient();
+      for (const s of sessions) {
+        const entries = s.entries as unknown as { athlete?: string }[];
+        if (entries.some((e) => e.athlete === originalName)) {
+          const renamed = entries.map((e) => e.athlete === originalName ? { ...e, athlete: profile.name } : e);
+          await supabase.from("sessions").update({ entries: renamed, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", s.id);
+        }
+      }
+    }
     updated[profile.name] = profile;
     setProfiles(updated);
     await saveScoutProfiles(tid, updated);
     setProfileOpen(null);
+    if (originalName && originalName !== profile.name) await loadData();
   };
 
   return (
