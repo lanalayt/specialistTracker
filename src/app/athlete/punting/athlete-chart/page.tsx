@@ -238,149 +238,151 @@ function PuntAthleteChartInner() {
     );
   }
 
-  // ── Live — Table-based like team mode ──
-  // Build the punt schedule from assigned chart or reps
-  const puntSchedule: { type: string; typeLabel: string; hash: string; idx: number }[] = [];
+  // ── Live — One punt at a time ──
+  const puntSchedule: { type: string; typeLabel: string; hash: string }[] = [];
   if (assignedChart?.puntTypes) {
-    let idx = 0;
     for (const pt of assignedChart.puntTypes as any[]) {
       for (let i = 0; i < (pt.count ?? 0); i++) {
-        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type, hash: pt.hash ?? "M", idx });
-        idx++;
+        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type, hash: pt.hash ?? "M" });
       }
-    }
-  } else {
-    for (let i = 0; i < totalReps; i++) {
-      puntSchedule.push({ type: livePuntType, typeLabel: "", hash: "M", idx: i });
     }
   }
 
-  // Track per-row data: rows[athlete][puntIdx] = { dist, hang, op, dir } or null
-  const [rowData, setRowData] = useState<Record<string, Record<number, { dist: string; hang: string; op: string; dir: boolean }>>>({});
-  const [activeRow, setActiveRow] = useState<{ player: string; puntIdx: number } | null>(null);
-
-  const getRowValue = (player: string, puntIdx: number) => rowData[player]?.[puntIdx];
-  const isRowFilled = (player: string, puntIdx: number) => {
-    const v = getRowValue(player, puntIdx);
-    return v && v.dist && v.hang;
-  };
-  const filledCount = selectedPlayers.reduce((s, p) => s + puntSchedule.filter((_, i) => isRowFilled(p, i)).length, 0);
-  const totalCount = selectedPlayers.length * puntSchedule.length;
-
-  const updateRowData = (player: string, puntIdx: number, field: string, value: string | boolean) => {
-    setRowData((prev) => ({
-      ...prev,
-      [player]: { ...(prev[player] ?? {}), [puntIdx]: { ...(prev[player]?.[puntIdx] ?? { dist: "", hang: "", op: "", dir: true }), [field]: value } },
-    }));
+  const getTypeInitials = (label: string): string => {
+    const parts = label.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 3);
   };
 
-  const handleSubmitAll = () => {
-    const entries: PuntEntry[] = [];
-    for (const player of selectedPlayers) {
-      for (let i = 0; i < puntSchedule.length; i++) {
-        const v = getRowValue(player, i);
-        if (!v || !v.dist || !v.hang) continue;
-        const dist = parseInt(v.dist) || 0;
-        const hang = parseHangRaw(v.hang);
-        const op = parseHangRaw(v.op);
-        const pt = puntSchedule[i];
-        entries.push({
-          athleteId: player, athlete: player, type: pt.type as any, hash: "M" as any,
-          yards: dist, hangTime: hang, opTime: op || 0,
-          directionalAccuracy: v.dir ? 1 : 0, landingZones: [] as any, kickNum: i + 1,
-        });
-      }
+  const playerPunts = getPlayerResults(currentPlayer);
+  const currentPuntIdx = playerPunts.length;
+  const currentScheduleItem = puntSchedule[currentPuntIdx];
+  const currentType = currentScheduleItem?.typeLabel || currentScheduleItem?.type || "";
+  const currentHash = currentScheduleItem?.hash || "M";
+
+  const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
+
+  const [liveType, setLiveType] = useState(livePuntType);
+  const [liveHash, setLiveHash] = useState("M");
+
+  const displayType = assignedChart ? currentType : liveType;
+  const displayHash = assignedChart ? currentHash : liveHash;
+
+  const handleLogPunt = () => {
+    const dist = parseInt(distInput);
+    const hang = parseHangRaw(hangInput);
+    const op = parseHangRaw(opInput);
+    if (isNaN(dist) || dist <= 0 || !hang) return;
+    const kickNum = playerPunts.length + 1;
+    const puntType = assignedChart ? (currentScheduleItem?.type ?? "DIR_STRAIGHT") : liveType;
+    const hash = assignedChart ? currentHash : liveHash;
+    const entry: PuntEntry = {
+      athleteId: currentPlayer, athlete: currentPlayer, type: puntType as any, hash: hash as any,
+      yards: dist, hangTime: hang, opTime: op || 0,
+      directionalAccuracy: dirGood ? 1 : 0, landingZones: [] as any, kickNum,
+    };
+    setResults((prev) => [...prev, entry]);
+    setDistInput(""); setHangInput(""); setOpInput(""); setDirGood(true);
+    // Auto-advance to next player
+    if (selectedPlayers.length > 1) {
+      setCurrentPlayerIdx((currentPlayerIdx + 1) % selectedPlayers.length);
     }
-    setResults(entries);
-    setPhase("results");
+    // Check if preset chart is done
+    if (chartType === "preset" && puntSchedule.length > 0) {
+      const totalNeeded = puntSchedule.length * selectedPlayers.length;
+      if (results.length + 1 >= totalNeeded) setPhase("results");
+    }
   };
 
   return (
-    <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-5xl">
-      <div className="space-y-4">
-        <Link href="/athlete/punting/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+    <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
+      <Link href="/athlete/punting/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+
+      {/* Per-athlete punt circles */}
+      {selectedPlayers.map((player) => {
+        const pr = getPlayerResults(player);
+        const isActive = player === currentPlayer;
+        return (
+          <div key={player} className={clsx("space-y-1", !isActive && selectedPlayers.length > 1 && "opacity-50")}>
+            <button onClick={() => setCurrentPlayerIdx(selectedPlayers.indexOf(player))} className="text-xs font-bold text-slate-200 hover:text-accent transition-colors">{player}</button>
+            <div className="flex flex-wrap gap-1.5">
+              {pr.map((r, i) => {
+                const label = getTypeInitials(puntSchedule[i]?.typeLabel || r.type);
+                return (
+                  <div key={i} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border", r.directionalAccuracy === 1 || r.directionalAccuracy === "1" ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss")} title={`${r.yards}yd ${r.hangTime.toFixed(2)}s`}>{label}</div>
+                );
+              })}
+              {/* Empty circles for remaining */}
+              {puntSchedule.length > 0 && Array.from({ length: Math.max(0, puntSchedule.length - pr.length) }).map((_, i) => {
+                const schedIdx = pr.length + i;
+                const label = getTypeInitials(puntSchedule[schedIdx]?.typeLabel || "");
+                return (
+                  <div key={`empty-${i}`} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border", schedIdx === currentPuntIdx && isActive ? "border-accent/60 text-accent bg-accent/10" : "border-border/40 text-muted/40")}>{label}</div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Current punt info */}
+      <div className="card space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Punt Chart</p>
-            <p className="text-lg font-extrabold text-slate-100">{selectedPlayers.join(", ")}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-black text-sky-400">{filledCount}/{totalCount}</p>
-            <p className="text-[10px] text-muted">logged</p>
-          </div>
+          <p className="text-sm font-bold text-slate-100">{currentPlayer}</p>
+          <p className="text-xs text-muted">Punt {playerPunts.length + 1}{puntSchedule.length > 0 ? ` / ${puntSchedule.length}` : ""}</p>
         </div>
 
-        <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-          <div className="h-full bg-sky-500 transition-all" style={{ width: `${totalCount > 0 ? (filledCount / totalCount) * 100 : 0}%` }} />
-        </div>
-
-        {/* Athlete tabs */}
-        {selectedPlayers.length > 1 && (
-          <div className="flex flex-wrap gap-2">
-            {selectedPlayers.map((p) => {
-              const filled = puntSchedule.filter((_, i) => isRowFilled(p, i)).length;
-              return (
-                <button key={p} onClick={() => setActiveRow(activeRow?.player === p ? null : { player: p, puntIdx: 0 })} className={clsx("card-2 px-3 py-1.5 text-center min-w-[70px]", activeRow?.player === p ? "ring-2 ring-sky-500" : "opacity-60 hover:opacity-100")}>
-                  <p className="text-[10px] font-bold text-slate-200">{p}</p>
-                  <p className="text-sm font-black text-sky-400">{filled}/{puntSchedule.length}</p>
-                </button>
-              );
-            })}
+        {/* Type + Hash display (assigned) or selection (live) */}
+        {assignedChart ? (
+          <div className="flex gap-3 text-xs">
+            <span className="text-muted">Type: <span className="text-slate-200 font-semibold">{displayType}</span></span>
+            <span className="text-muted">Hash: <span className="text-slate-200 font-semibold">{displayHash}</span></span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-[10px] text-muted mb-1">Type</p>
+              <input type="text" value={liveType} onChange={(e) => setLiveType(e.target.value)} className="input w-full text-sm py-1.5" placeholder="Type" />
+            </div>
+            <div>
+              <p className="text-[10px] text-muted mb-1">Hash</p>
+              <select value={liveHash} onChange={(e) => setLiveHash(e.target.value)} className="input w-full text-sm py-1.5">
+                {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
           </div>
         )}
 
-        {/* Table per athlete */}
-        {selectedPlayers.map((player) => (
-          <div key={player} className="card-2 space-y-2">
-            <p className="text-xs font-bold text-slate-200">{player}</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr>
-                    <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
-                    <th className="text-[10px] text-muted text-left py-1 px-1">Type</th>
-                    <th className="text-[10px] text-muted text-center py-1 px-1">Hash</th>
-                    <th className="text-[10px] text-muted text-center py-1 px-1">Dist</th>
-                    <th className="text-[10px] text-muted text-center py-1 px-1">Hang</th>
-                    <th className="text-[10px] text-muted text-center py-1 px-1">Op</th>
-                    <th className="text-[10px] text-muted text-center py-1 px-1">Dir</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {puntSchedule.map((pt, i) => {
-                    const v = getRowValue(player, i) ?? { dist: "", hang: "", op: "", dir: true };
-                    const filled = v.dist && v.hang;
-                    return (
-                      <tr key={i} className={clsx("border-t border-border/30", filled ? "bg-make/5" : "")}>
-                        <td className="text-muted py-1 px-1">{i + 1}</td>
-                        <td className="py-1 px-1 text-slate-300 text-[10px]">{pt.typeLabel || pt.type}</td>
-                        <td className="text-center py-1 px-1 text-slate-300 text-[10px]">{pt.hash}</td>
-                        <td className="text-center py-1 px-1">
-                          <input type="text" inputMode="numeric" value={v.dist} onChange={(e) => updateRowData(player, i, "dist", e.target.value.replace(/\D/g, ""))} className="w-10 bg-surface-2 border border-border rounded px-1 py-0.5 text-[10px] text-center text-slate-200" />
-                        </td>
-                        <td className="text-center py-1 px-1">
-                          <input type="text" inputMode="numeric" value={v.hang ? parseHangRaw(v.hang).toFixed(2) : ""} onChange={(e) => updateRowData(player, i, "hang", e.target.value.replace(/\D/g, ""))} className="w-12 bg-surface-2 border border-border rounded px-1 py-0.5 text-[10px] text-center text-slate-200" />
-                        </td>
-                        <td className="text-center py-1 px-1">
-                          <input type="text" inputMode="numeric" value={v.op ? parseHangRaw(v.op).toFixed(2) : ""} onChange={(e) => updateRowData(player, i, "op", e.target.value.replace(/\D/g, ""))} className="w-12 bg-surface-2 border border-border rounded px-1 py-0.5 text-[10px] text-center text-slate-200" />
-                        </td>
-                        <td className="text-center py-1 px-1">
-                          <button onClick={() => updateRowData(player, i, "dir", !v.dir)} className={clsx("px-1.5 py-0.5 rounded text-[10px] font-bold", v.dir ? "text-make" : "text-miss")}>{v.dir ? "G" : "B"}</button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+        {/* Inputs */}
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+            <input type="text" inputMode="numeric" value={distInput} onChange={(e) => setDistInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" placeholder="yd" />
           </div>
-        ))}
+          <div>
+            <p className="text-[10px] text-muted text-center mb-1">Hang Time</p>
+            <input type="text" inputMode="numeric" value={hangInput ? parseHangRaw(hangInput).toFixed(2) : ""} onChange={(e) => setHangInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" placeholder="sec" />
+          </div>
+          <div>
+            <p className="text-[10px] text-muted text-center mb-1">Op Time</p>
+            <input type="text" inputMode="numeric" value={opInput ? parseHangRaw(opInput).toFixed(2) : ""} onChange={(e) => setOpInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" placeholder="sec" />
+          </div>
+        </div>
 
-        <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
+        {/* Direction */}
+        <div className="flex gap-2">
+          <button onClick={() => setDirGood(true)} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border-2 transition-all", dirGood ? "bg-make/20 text-make border-make/40" : "bg-surface-2 text-muted border-border")}>Good</button>
+          <button onClick={() => setDirGood(false)} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border-2 transition-all", !dirGood ? "bg-miss/20 text-miss border-miss/40" : "bg-surface-2 text-muted border-border")}>Bad</button>
+        </div>
 
-        <button onClick={handleSubmitAll} disabled={filledCount === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">
-          Submit Chart ({filledCount} punt{filledCount !== 1 ? "s" : ""})
-        </button>
+        {/* Log punt */}
+        <button onClick={handleLogPunt} disabled={!distInput || !hangInput} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Log Punt</button>
+      </div>
+
+      {/* Undo + Finish */}
+      <div className="flex gap-2">
+        {results.length > 0 && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
+        {results.length > 0 && <button onClick={() => setPhase("results")} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish</button>}
       </div>
 
       {showSnap && (
