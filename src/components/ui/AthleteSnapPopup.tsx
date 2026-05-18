@@ -29,7 +29,9 @@ interface Props {
 }
 
 function getInitials(name: string): string {
-  return name.split(" ").map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
 export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved }: Props) {
