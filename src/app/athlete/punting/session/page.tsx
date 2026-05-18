@@ -9,6 +9,7 @@ export default function AthletePuntingSessionPage() {
   return (
     <main className="flex-1 flex items-center justify-center p-8">
       <div className="text-center space-y-4 max-w-sm">
+        <Link href="/athlete/punting" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
         <h2 className="text-xl font-bold text-slate-100">Punt Session</h2>
         <p className="text-sm text-muted">Choose chart type.</p>
         <div className="grid grid-cols-2 gap-3">

@@ -29,6 +29,12 @@ export function SportSubNav({ basePath, extraTabs, tabs }: SportSubNavProps) {
   return (
     <div className="sticky top-14 z-20 bg-surface border-b border-border overflow-x-auto shrink-0" data-tutorial="sport-subnav">
       <div className="flex">
+        <Link
+          href={basePath}
+          className="px-3 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px text-muted border-transparent hover:text-white"
+        >
+          &larr;
+        </Link>
         {visibleTabs.map((tab) => {
           const href = `${basePath}/${tab.slug}`;
           const isActive = pathname === href || pathname.startsWith(href + "/");

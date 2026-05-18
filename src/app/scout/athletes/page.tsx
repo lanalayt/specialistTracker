@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { getTeamId } from "@/lib/teamData";
 import {
   loadScoutAthletes,
@@ -121,6 +122,7 @@ export default function ScoutAthletesPage() {
   return (
     <>
       <Header title="Athlete Profiles" />
+      <Link href="/scout" className="text-xs text-muted hover:text-white transition-colors px-4 pt-3 block">&larr; Back to Scout Home</Link>
       <main className="p-4 lg:p-6 max-w-2xl space-y-6">
         <div>
           <h1 className="text-xl font-extrabold text-slate-100">Scout Athletes</h1>

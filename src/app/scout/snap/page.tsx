@@ -167,6 +167,7 @@ export default function ScoutSnapPage() {
   return (
     <>
       <Header title="Snap Scouting" />
+      <Link href="/scout" className="text-xs text-muted hover:text-white transition-colors px-4 pt-3 block">&larr; Back to Scout Home</Link>
       <main className="p-4 lg:p-6 max-w-4xl space-y-6">
         <div className="flex rounded-input border border-border overflow-hidden w-fit">
           <button onClick={() => setTab("chart")} className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors", tab === "chart" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Chart</button>

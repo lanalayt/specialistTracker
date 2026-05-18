@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { getTeamId } from "@/lib/teamData";
 import {
   loadScoutSessions,
@@ -118,6 +119,7 @@ export default function ScoutArchivesPage() {
   return (
     <>
       <Header title="Scout Archives" />
+      <Link href="/scout" className="text-xs text-muted hover:text-white transition-colors px-4 pt-3 block">&larr; Back to Scout Home</Link>
       <main className="p-4 lg:p-6 max-w-4xl space-y-6">
         {message && (
           <div className="card bg-amber-500/10 border-amber-500/30 text-amber-400 text-sm p-3">
