@@ -36,6 +36,8 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
   const [accuracy, setAccuracy] = useState<"good" | "bad" | "">("");
 
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const [totalLogged, setTotalLogged] = useState(0);
 
   const canSave = isFG
     ? !!marker && !!laces && !!spiral
@@ -84,8 +86,16 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
     stampSessionWrite(tid);
     await insertSession(tid, session as any);
     setSaving(false);
+    setTotalLogged((prev) => prev + 1);
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 1500);
     onSaved?.();
-    onClose();
+    // Reset for next snap — don't close
+    setMarker(null);
+    setLaces("");
+    setSpiral("");
+    setAccuracy("");
+    setTime("");
   };
 
   return (
@@ -93,9 +103,13 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface border border-border rounded-xl w-full max-w-sm mx-4 p-4 space-y-3 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-100">{isFG ? "Short" : "Long"} Snap — {snapper}</h3>
-          <button onClick={onClose} className="text-muted hover:text-white text-xs">Close</button>
+          <div>
+            <h3 className="text-sm font-bold text-slate-100">{isFG ? "Short" : "Long"} Snap — {snapper}</h3>
+            {totalLogged > 0 && <p className="text-[10px] text-sky-400">{totalLogged} snap{totalLogged !== 1 ? "s" : ""} logged</p>}
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-white text-xs">Done</button>
         </div>
+        {justSaved && <p className="text-xs text-make font-bold text-center">Saved!</p>}
 
         {isFG ? (
           <>

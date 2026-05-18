@@ -57,6 +57,7 @@ function AthleteChartInner() {
   const [liveDist, setLiveDist] = useState("30");
   const [liveHash, setLiveHash] = useState("M");
   const [showSnap, setShowSnap] = useState(false);
+  const [snapCount, setSnapCount] = useState(0);
 
   // Live charting state — rotate through athletes per kick
   const [currentKickIdx, setCurrentKickIdx] = useState(0);
