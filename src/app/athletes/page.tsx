@@ -20,8 +20,8 @@ function AthletesContent() {
   const snap = useLongSnap();
   const [newName, setNewName] = useState("");
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState<string | null>(null);
-  const [editNameValue, setEditNameValue] = useState("");
+  const [popupAthlete, setPopupAthlete] = useState<string | null>(null);
+  const [popupName, setPopupName] = useState("");
   const [holders, setHolders] = useState<StoredAthlete[]>([]);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ function AthletesContent() {
 
   const handleRename = async (oldName: string, newNameVal: string) => {
     const trimmed = newNameVal.trim();
-    if (!trimmed || trimmed === oldName || allNames.includes(trimmed)) { setEditingName(null); return; }
+    if (!trimmed || trimmed === oldName || allNames.includes(trimmed)) { setPopupAthlete(null); return; }
     const tid = getTeamId();
     if (!tid) return;
     // Update in all sessions across all sports
@@ -105,7 +105,7 @@ function AthletesContent() {
         await insertAthlete(tid, sport, trimmed);
       }
     }
-    setEditingName(null);
+    setPopupAthlete(null);
     // Force reload
     window.location.reload();
   };
@@ -195,37 +195,12 @@ function AthletesContent() {
                     {name[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    {editingName === name ? (
-                      <div className="flex gap-1">
-                        <input
-                          className="input text-sm py-0.5 flex-1"
-                          value={editNameValue}
-                          onChange={(e) => setEditNameValue(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") handleRename(name, editNameValue); if (e.key === "Escape") setEditingName(null); }}
-                          autoFocus
-                        />
-                        <button onClick={() => handleRename(name, editNameValue)} className="text-[10px] text-make hover:underline">Save</button>
-                        <button onClick={() => setEditingName(null)} className="text-[10px] text-muted hover:underline">Cancel</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setEditingName(name); setEditNameValue(name); }} className="text-sm font-semibold text-slate-100 hover:text-accent transition-colors text-left">{name}</button>
-                    )}
+                    <button onClick={() => { setPopupAthlete(name); setPopupName(name); }} className="text-sm font-semibold text-slate-100 hover:text-accent transition-colors text-left">{name}</button>
                     <div className="flex gap-1 mt-1 flex-wrap">
-                      {[
-                        { label: "FG", key: "KICKING", isIn: fgNames.has(name) },
-                        { label: "Punt", key: "PUNTING", isIn: puntNames.has(name) },
-                        { label: "KO", key: "KICKOFF", isIn: koNames.has(name) },
-                        { label: "LS", key: "LONGSNAP", isIn: snapNames.has(name) },
-                        { label: "H", key: "HOLDING", isIn: holderNames.has(name) },
-                      ].map((sp) => (
-                        <button
-                          key={sp.label}
-                          onClick={() => toggleSport(name, sp.label, sp.key, sp.isIn)}
-                          className={clsx("text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-all", sp.isIn ? "bg-accent/10 text-accent border-accent/20" : "bg-surface-2 text-muted border-border hover:text-white")}
-                        >
-                          {sp.label}
-                        </button>
+                      {sports.map((sp) => (
+                        <span key={sp} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold border border-accent/20">{sp}</span>
                       ))}
+                      {sports.length === 0 && <span className="text-[10px] text-muted italic">no phases</span>}
                     </div>
                   </div>
                   <RoleGuard coachOnly>
@@ -251,6 +226,53 @@ function AthletesContent() {
         <p className="text-xs text-muted">
           Removing an athlete takes them off every phase roster but preserves their historical stats in session history.
         </p>
+
+        {/* Athlete edit popup */}
+        {popupAthlete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPopupAthlete(null)} />
+            <div className="relative bg-surface border border-border rounded-xl w-full max-w-xs mx-4 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-100">Edit Athlete</h3>
+                <button onClick={() => setPopupAthlete(null)} className="text-muted hover:text-white text-xs">Close</button>
+              </div>
+
+              <div>
+                <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Name</p>
+                <input type="text" value={popupName} onChange={(e) => setPopupName(e.target.value)} className="input w-full text-sm py-1.5" />
+              </div>
+
+              <div>
+                <p className="text-[10px] text-muted uppercase tracking-wider mb-2">Phases</p>
+                <div className="space-y-2">
+                  {[
+                    { label: "FG Kicking", key: "KICKING", isIn: fgNames.has(popupAthlete) },
+                    { label: "Punting", key: "PUNTING", isIn: puntNames.has(popupAthlete) },
+                    { label: "Kickoff", key: "KICKOFF", isIn: koNames.has(popupAthlete) },
+                    { label: "Long Snap", key: "LONGSNAP", isIn: snapNames.has(popupAthlete) },
+                    { label: "Holder", key: "HOLDING", isIn: holderNames.has(popupAthlete) },
+                  ].map((sp) => (
+                    <label key={sp.key} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sp.isIn}
+                        onChange={() => toggleSport(popupAthlete, sp.label, sp.key, sp.isIn)}
+                        className="w-4 h-4 rounded border-border accent-accent"
+                      />
+                      <span className="text-xs text-slate-200">{sp.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {popupName.trim() && popupName.trim() !== popupAthlete && (
+                <button onClick={() => handleRename(popupAthlete, popupName)} className="btn-primary w-full py-2 text-sm font-bold">
+                  Save Name Change
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
