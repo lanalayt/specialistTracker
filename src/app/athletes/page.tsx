@@ -8,7 +8,7 @@ import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider, useLongSnap } from "@/lib/longSnapContext";
-import { loadAthletes, insertAthlete, removeAthlete as removeAthleteById, type StoredAthlete } from "@/lib/athleteStore";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteById, syncAthleteKeys, type StoredAthlete } from "@/lib/athleteStore";
 import { getTeamId } from "@/lib/teamData";
 import { useState as useStateReact, useEffect } from "react";
 import clsx from "clsx";
@@ -34,22 +34,7 @@ function AthletesContent() {
       if (!tid) return;
       const h = await loadAthletes(tid, "HOLDING");
       setHolders(h);
-      // Sync team athletes ↔ ATHLETE_* keys (backfill + cleanup)
-      const pairs: [string, string][] = [["KICKING", "ATHLETE_KICKING"], ["PUNTING", "ATHLETE_PUNTING"], ["KICKOFF", "ATHLETE_KICKOFF"], ["LONGSNAP", "ATHLETE_LONGSNAP"]];
-      for (const [team, athlete] of pairs) {
-        const teamList = await loadAthletes(tid, team);
-        const athleteList = await loadAthletes(tid, athlete);
-        const teamNames = new Set(teamList.map((a) => a.name));
-        const athleteNames = new Set(athleteList.map((a) => a.name));
-        // Add missing
-        for (const a of teamList) {
-          if (!athleteNames.has(a.name)) await insertAthlete(tid, athlete, a.name);
-        }
-        // Remove stale (in ATHLETE_* but not in team)
-        for (const a of athleteList) {
-          if (!teamNames.has(a.name)) await removeAthleteById(tid, a.id);
-        }
-      }
+      await syncAthleteKeys(tid);
     }
     loadHoldersAndSync();
   }, []);
