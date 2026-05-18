@@ -475,6 +475,7 @@ function AthleteChartInner() {
                 <thead>
                   <tr>
                     <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+                    <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
                     <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
                     <th className="text-[10px] text-muted text-center py-1 px-2">Hash</th>
                     {kickMode === "live" && <th className="text-[10px] text-muted text-center py-1 px-2">Op</th>}
@@ -482,15 +483,20 @@ function AthleteChartInner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...results].reverse().map((r, i) => (
-                    <tr key={i} className="border-t border-border/30">
-                      <td className="text-muted py-1 px-2">{results.length - i}</td>
-                      <td className="text-center py-1 px-2 text-slate-200">{r.dist}yd</td>
-                      <td className="text-center py-1 px-2 text-slate-300">{r.pos}</td>
-                      {kickMode === "live" && <td className="text-center py-1 px-2 text-slate-300">{r.opTime ? r.opTime.toFixed(2) : "—"}</td>}
-                      <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[r.result] ?? r.result}</td>
-                    </tr>
-                  ))}
+                  {[...results].reverse().map((r, i) => {
+                    const idx = results.length - 1 - i;
+                    const athleteKickNum = results.slice(0, idx + 1).filter((k) => k.athlete === r.athlete).length;
+                    return (
+                      <tr key={i} className="border-t border-border/30">
+                        <td className="text-muted py-1 px-2">{athleteKickNum}</td>
+                        <td className="text-left py-1 px-2 text-slate-200 truncate max-w-[60px]">{r.athlete}</td>
+                        <td className="text-center py-1 px-2 text-slate-200">{r.dist}yd</td>
+                        <td className="text-center py-1 px-2 text-slate-300">{r.pos}</td>
+                        {kickMode === "live" && <td className="text-center py-1 px-2 text-slate-300">{r.opTime ? r.opTime.toFixed(2) : "—"}</td>}
+                        <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[r.result] ?? r.result}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -681,6 +687,7 @@ function AthleteChartInner() {
               <thead>
                 <tr>
                   <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+                  <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
                   <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
                   <th className="text-[10px] text-muted text-center py-1 px-2">Hash</th>
                   {kickMode === "live" && <th className="text-[10px] text-muted text-center py-1 px-2">Op</th>}
@@ -689,12 +696,14 @@ function AthleteChartInner() {
               </thead>
               <tbody>
                 {[...results].reverse().map((r, i) => {
-                  const kickIdx = results.length - 1 - i;
+                  const idx = results.length - 1 - i;
+                  const athleteKickNum = results.slice(0, idx + 1).filter((k) => k.athlete === r.athlete).length;
                   return (
                     <tr key={i} className="border-t border-border/30">
-                      <td className="text-muted py-1 px-2">{kickIdx + 1}</td>
+                      <td className="text-muted py-1 px-2">{athleteKickNum}</td>
+                      <td className="text-left py-1 px-2 text-slate-200 truncate max-w-[60px]">{r.athlete}</td>
                       <td className="text-center py-1 px-2 text-slate-200">{r.dist}yd</td>
-                      <td className="text-center py-1 px-2 text-slate-300">{kicks[kickIdx]?.hash ?? r.pos}</td>
+                      <td className="text-center py-1 px-2 text-slate-300">{kicks[idx]?.hash ?? r.pos}</td>
                       {kickMode === "live" && <td className="text-center py-1 px-2 text-slate-300">{r.opTime ? r.opTime.toFixed(2) : "—"}</td>}
                       <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[r.result] ?? r.result}</td>
                     </tr>
