@@ -184,11 +184,24 @@ export default function PuntCoachesChartPage() {
             ))}
             <button onClick={addRow} className="text-[10px] text-sky-400 hover:underline">+ Add punt type</button>
 
-            {/* Add custom type */}
+            {/* Custom types management */}
             <div className="flex gap-2">
               <input type="text" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCustomType(); }} placeholder="Custom punt type..." className="input flex-1 text-xs py-1" />
               <button onClick={addCustomType} disabled={!newTypeName.trim()} className="text-[10px] text-sky-400 hover:underline disabled:opacity-40">Add</button>
             </div>
+            {puntTypeOptions.filter((t) => !DEFAULT_PUNT_TYPES.includes(t)).length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {puntTypeOptions.filter((t) => !DEFAULT_PUNT_TYPES.includes(t)).map((t) => (
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-input border border-border text-muted flex items-center gap-1">
+                    {t}
+                    <button onClick={() => {
+                      setPuntTypeOptions((prev) => prev.filter((p) => p !== t));
+                      setPuntRows((prev) => prev.map((r) => r.type === t ? { ...r, type: "Open Field" } : r));
+                    }} className="text-miss hover:text-miss/80">&times;</button>
+                  </span>
+                ))}
+              </div>
+            )}
 
             <p className="text-xs text-muted">Total: {totalReps} punt{totalReps !== 1 ? "s" : ""} per player</p>
           </div>

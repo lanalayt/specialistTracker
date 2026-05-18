@@ -11,6 +11,13 @@ import Link from "next/link";
 import clsx from "clsx";
 import type { PuntEntry } from "@/types";
 
+const PUNT_TYPE_TO_ID: Record<string, string> = {
+  "Open Field": "DIR_STRAIGHT",
+  "Pooch": "POOCH_MIDDLE",
+  "Rugby": "RUGBY",
+  "Banana": "BANANA_LEFT",
+};
+
 function PuntAthleteChartInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,6 +31,7 @@ function PuntAthleteChartInner() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [assignedChart, setAssignedChart] = useState<AssignedChart | null>(null);
+  const [livePuntType, setLivePuntType] = useState("DIR_STRAIGHT");
 
   const [results, setResults] = useState<PuntEntry[]>([]);
   const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
@@ -61,14 +69,41 @@ function PuntAthleteChartInner() {
 
   const togglePlayer = (name: string) => setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
 
+  // Determine the punt type for the current rep based on assigned chart breakdown
+  const getCurrentPuntType = (): string => {
+    const types = assignedChart?.puntTypes;
+    if (!types || types.length === 0) return "DIR_STRAIGHT";
+    const playerKickNum = getPlayerResults(currentPlayer).length;
+    let cumulative = 0;
+    for (const t of types) {
+      cumulative += t.count;
+      if (playerKickNum < cumulative) return PUNT_TYPE_TO_ID[t.type] ?? t.type;
+    }
+    return PUNT_TYPE_TO_ID[types[types.length - 1].type] ?? types[types.length - 1].type;
+  };
+
+  // For live/preset display — show the label
+  const getCurrentPuntTypeLabel = (): string => {
+    const types = assignedChart?.puntTypes;
+    if (!types || types.length === 0) return "";
+    const playerKickNum = getPlayerResults(currentPlayer).length;
+    let cumulative = 0;
+    for (const t of types) {
+      cumulative += t.count;
+      if (playerKickNum < cumulative) return t.type;
+    }
+    return types[types.length - 1].type;
+  };
+
   const handleLog = () => {
     const dist = parseInt(distInput);
     const hang = parseHangRaw(hangInput);
     const op = parseHangRaw(opInput);
     if (isNaN(dist) || dist <= 0 || !hang) return;
     const kickNum = getPlayerResults(currentPlayer).length + 1;
+    const puntType = assignedChart ? getCurrentPuntType() : livePuntType;
     const entry: PuntEntry = {
-      athleteId: currentPlayer, athlete: currentPlayer, type: "PUNT", hash: "M" as any,
+      athleteId: currentPlayer, athlete: currentPlayer, type: puntType as any, hash: "M" as any,
       yards: dist, hangTime: hang, opTime: op || 0,
       directionalAccuracy: dirGood ? 1 : 0, landingZones: [] as any, kickNum,
     };
@@ -189,7 +224,7 @@ function PuntAthleteChartInner() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{chartType === "preset" ? `Punt ${playerCount + 1} of ${totalReps}` : "Live Chart"}</p>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{chartType === "preset" ? `Punt ${playerCount + 1} of ${totalReps}` : "Live Chart"}{getCurrentPuntTypeLabel() ? ` — ${getCurrentPuntTypeLabel()}` : ""}</p>
             <p className="text-lg font-extrabold text-slate-100">{currentPlayer}</p>
           </div>
           <div className="text-right">
@@ -212,6 +247,19 @@ function PuntAthleteChartInner() {
         {chartType === "preset" && (
           <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
             <div className="h-full bg-sky-500 transition-all" style={{ width: `${(results.length / (totalReps * selectedPlayers.length)) * 100}%` }} />
+          </div>
+        )}
+
+        {/* Punt type selector (non-assigned charts) */}
+        {!assignedChart && (
+          <div>
+            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Punt Type</p>
+            <select value={livePuntType} onChange={(e) => setLivePuntType(e.target.value)} className="input w-full text-sm py-1.5">
+              <option value="DIR_STRAIGHT">Open Field</option>
+              <option value="POOCH_MIDDLE">Pooch</option>
+              <option value="RUGBY">Rugby</option>
+              <option value="BANANA_LEFT">Banana</option>
+            </select>
           </div>
         )}
 
