@@ -2,18 +2,16 @@
 
 import { useState } from "react";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
-import { getTeamId } from "@/lib/teamData";
-import { insertSession, stampSessionWrite } from "@/lib/sessionStore";
-import { genId } from "@/lib/stats";
 import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 import clsx from "clsx";
 
-interface SnapLogEntry {
+export interface SnapLogEntry {
   snapper: string;
   holder: string;
   accuracy: string;
   laces?: string;
   spiral: string;
+  dbEntry: LongSnapEntry;
 }
 
 interface Props {
@@ -49,23 +47,18 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
   const [accuracy, setAccuracy] = useState<"good" | "bad" | "">("");
   const [time, setTime] = useState("");
 
-  const [saving, setSaving] = useState(false);
-
   const canSave = isFG
     ? !!marker && !!laces && !!spiral && !!snapper
     : !!accuracy && !!spiral && !!snapper;
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!canSave) return;
-    setSaving(true);
-    const tid = getTeamId();
-    if (!tid) { setSaving(false); return; }
 
     const acc = isFG ? (marker?.inZone ? "ON_TARGET" : "HIGH") : (accuracy === "good" ? "ON_TARGET" : "HIGH");
 
-    const entry: LongSnapEntry = {
+    const dbEntry: LongSnapEntry = {
       athleteId: snapper, athlete: snapper,
-      snapType: snapType as SnapType, time: 0,
+      snapType: (isFG ? "FG" : "PUNT") as SnapType, time: 0,
       accuracy: acc as SnapAccuracy,
       laces: isFG ? laces || undefined : undefined,
       spiral: spiral || undefined,
@@ -73,23 +66,12 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
       markerX: marker?.x, markerY: marker?.y, markerInZone: marker?.inZone,
     };
 
-    const sportKey = isFG ? "ATHLETE_SHORTSNAP" : "ATHLETE_LONGSNAP";
-    const session = {
-      id: genId(), teamId: tid, sport: sportKey,
-      label: `${isFG ? "Short" : "Long"} Snap — ${snapper}`,
-      date: new Date().toISOString(), mode: "practice" as const,
-      entries: [entry],
-    };
-
-    stampSessionWrite(tid);
-    await insertSession(tid, session as any);
-    setSaving(false);
-
     const logEntry: SnapLogEntry = {
       snapper, holder,
       accuracy: isFG ? (marker?.inZone ? "Strike" : "Ball") : (accuracy === "good" ? "Strike" : "Ball"),
       laces: isFG ? laces || undefined : undefined,
       spiral: spiral === "Good" ? "Tight" : "Open",
+      dbEntry,
     };
     onSaved?.(logEntry);
     onClose();
@@ -197,8 +179,8 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
           </>
         )}
 
-        <button onClick={handleSave} disabled={!canSave || saving} className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-40">
-          {saving ? "Saving..." : "Log Snap"}
+        <button onClick={handleSave} disabled={!canSave} className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-40">
+          Log Snap
         </button>
 
         {/* Logged snaps for this kick */}

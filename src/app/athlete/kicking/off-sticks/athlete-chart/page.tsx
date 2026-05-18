@@ -7,12 +7,14 @@ import { useFG } from "@/lib/fgContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
-import { AthleteSnapPopup } from "@/components/ui/AthleteSnapPopup";
+import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
 import { FGFieldView } from "@/components/ui/FGFieldView";
 import { loadAthletes } from "@/lib/athleteStore";
+import { insertSession, stampSessionWrite } from "@/lib/sessionStore";
+import { genId } from "@/lib/stats";
 import Link from "next/link";
 import clsx from "clsx";
-import type { FGKick, FGPosition, FGResult } from "@/types";
+import type { FGKick, FGPosition, FGResult, LongSnapEntry } from "@/types";
 import { POSITIONS, RESULTS } from "@/types";
 
 const HASH_OPTIONS = ["Left Hash", "LM", "M", "RM", "Right Hash"];
@@ -61,7 +63,7 @@ function AthleteChartInner() {
   const [showSnap, setShowSnap] = useState(false);
   const [pendingResult, setPendingResult] = useState<FGResult | null>(null);
   // Store snap logs per kick key (player-kickIdx)
-  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, { snapper: string; holder: string; accuracy: string; laces?: string; spiral: string }[]>>({});
+  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
 
@@ -210,10 +212,28 @@ function AthleteChartInner() {
     if (results.length > 0) setPhase("results");
   };
 
+  // Collect all snap entries from snapLogsMap
+  const allSnapEntries: LongSnapEntry[] = Object.values(snapLogsMap).flat().map((s) => s.dbEntry);
+
   const handleSave = async () => {
     const names = selectedPlayers.join(", ");
     const label = `${new Date().toLocaleDateString()} — ${names}${assignedChart ? " (Assigned)" : ""}`;
     commitPractice(results, label);
+
+    // Batch save all snap entries as one session
+    if (allSnapEntries.length > 0) {
+      const tid = getTeamId();
+      if (tid) {
+        const snapSession = {
+          id: genId(), teamId: tid, sport: "ATHLETE_LONGSNAP",
+          label: `Short Snap — ${label}`,
+          date: new Date().toISOString(), mode: "practice" as const,
+          entries: allSnapEntries,
+        };
+        stampSessionWrite(tid);
+        await insertSession(tid, snapSession as any);
+      }
+    }
 
     if (assignedChart) {
       const tid = getTeamId();
@@ -575,6 +595,41 @@ function AthleteChartInner() {
             </div>
           );
         })}
+        {/* Snap Summary */}
+        {allSnapEntries.length > 0 && (() => {
+          const snapperMap: Record<string, { strikes: number; balls: number; lacesGood: number; laces14: number; lacesBack: number; spiralTight: number; spiralOpen: number }> = {};
+          allSnapEntries.forEach((e) => {
+            if (!snapperMap[e.athlete]) snapperMap[e.athlete] = { strikes: 0, balls: 0, lacesGood: 0, laces14: 0, lacesBack: 0, spiralTight: 0, spiralOpen: 0 };
+            const s = snapperMap[e.athlete];
+            if (e.accuracy === "ON_TARGET") s.strikes++; else s.balls++;
+            if (e.laces === "Good") s.lacesGood++;
+            else if (e.laces === "1/4 Turn") s.laces14++;
+            else if (e.laces === "Back") s.lacesBack++;
+            if (e.spiral === "Good") s.spiralTight++; else if (e.spiral === "Bad") s.spiralOpen++;
+          });
+          return (
+            <div className="card-2 text-left space-y-3">
+              <p className="text-xs font-bold text-sky-400 uppercase tracking-wider">Short Snap Summary</p>
+              {Object.entries(snapperMap).map(([name, s]) => {
+                const total = s.strikes + s.balls;
+                const pct = total > 0 ? Math.round((s.strikes / total) * 100) : 0;
+                return (
+                  <div key={name} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-slate-200">{name}</p>
+                      <p className="text-xs"><span className="text-make font-bold">{s.strikes}</span><span className="text-muted">/{total}</span> <span className="text-slate-300 font-semibold">{pct}%</span></p>
+                    </div>
+                    <div className="flex gap-3 text-[10px] text-muted">
+                      <span>Laces: <span className="text-make">{s.lacesGood}P</span> <span className="text-warn">{s.laces14}¼</span> <span className="text-miss">{s.lacesBack}B</span></span>
+                      <span>Spiral: <span className="text-make">{s.spiralTight}T</span> <span className="text-miss">{s.spiralOpen}O</span></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
         <div className="flex gap-3 max-w-sm mx-auto">
           {!saved ? <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
           <Link href="/athlete/kicking" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
