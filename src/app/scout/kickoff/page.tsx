@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { createClient } from "@/lib/supabase";
 import { exportKOScoutExcel, exportKOScoutPDF } from "@/lib/scoutExport";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
@@ -27,6 +28,10 @@ export default function ScoutKOPage() {
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
   const [dropWorst, setDropWorst] = useState(true);
+  const [editCell, setEditCell] = useState<{ sessionId: string; name: string; kickIdx: number } | null>(null);
+  const [editDist, setEditDist] = useState("");
+  const [editHang, setEditHang] = useState("");
+  const [editDir, setEditDir] = useState(true);
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -54,6 +59,37 @@ export default function ScoutKOPage() {
   }
   ranked.sort((a, b) => b.avg - a.avg);
   const maxKicks = ranked.length > 0 ? Math.max(...ranked.map((r) => r.entries.length)) : 0;
+
+  const startEditKick = (sessionId: string, name: string, kickIdx: number, entry: KOEntry) => {
+    setEditCell({ sessionId, name, kickIdx });
+    setEditDist(String(entry.distance));
+    setEditHang(String(entry.hangTime));
+    setEditDir(entry.directionGood);
+  };
+
+  const saveEditKick = async () => {
+    if (!editCell) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const sess = sessions.find((s) => s.id === editCell.sessionId);
+    if (!sess) return;
+    const allEntries = [...sess.entries] as unknown as KOEntry[];
+    const athleteEntries = allEntries.filter((e) => e.athlete === editCell.name);
+    const entry = athleteEntries[editCell.kickIdx];
+    if (!entry) return;
+    const dist = parseInt(editDist) || entry.distance;
+    const hang = parseFloat(editHang) || entry.hangTime;
+    entry.distance = dist;
+    entry.hangTime = hang;
+    entry.directionGood = editDir;
+    entry.score = parseFloat((dist + hang * 10 + (editDir ? 0 : -10)).toFixed(2));
+    try {
+      const supabase = createClient();
+      await supabase.from("sessions").update({ entries: allEntries, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", editCell.sessionId);
+    } catch {}
+    setEditCell(null);
+    await loadData();
+  };
 
   const handleDeleteRow = async (name: string, sessionId: string) => {
     if (!window.confirm(`Are you sure you want to delete this chart for ${name}? This cannot be undone.`)) return;
@@ -138,10 +174,13 @@ export default function ScoutKOPage() {
                           </td>
                           {r.entries.map((e, j) => {
                             const isDropped = r.worst !== null && e.score === r.worst && j === r.entries.findIndex((x) => x.score === r.worst);
+                            const isEditing = editCell?.sessionId === r.sessionId && editCell?.name === r.name && editCell?.kickIdx === j;
                             return (
-                              <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "", e.directionGood ? "text-make" : "text-miss")}>
-                                <span className="font-bold">{e.distance}</span>
-                                <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
+                              <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "")}>
+                                <button onClick={() => isEditing ? setEditCell(null) : startEditKick(r.sessionId, r.name, j, e)} className={clsx("hover:opacity-70 transition-opacity", e.directionGood ? "text-make" : "text-miss", isEditing && "ring-1 ring-amber-400 rounded px-1")}>
+                                  <span className="font-bold">{e.distance}</span>
+                                  <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
+                                </button>
                               </td>
                             );
                           })}
@@ -157,6 +196,30 @@ export default function ScoutKOPage() {
                     </tbody>
                   </table>
                 </div>
+                {editCell && (
+                  <div className="card space-y-2 mt-3">
+                    <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Edit Kick</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-[8px] text-muted text-center mb-1">Distance</p>
+                        <input type="text" inputMode="numeric" value={editDist} onChange={(e) => setEditDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-xs font-bold py-1.5" />
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-muted text-center mb-1">Hang Time</p>
+                        <input type="text" inputMode="decimal" value={editHang} onChange={(e) => setEditHang(e.target.value)} className="input w-full text-center text-xs font-bold py-1.5" />
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-muted text-center mb-1">Direction</p>
+                        <button onClick={() => setEditDir(true)} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editDir ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Good</button>
+                        <button onClick={() => setEditDir(false)} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", !editDir ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Bad</button>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditCell(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
+                      <button onClick={saveEditKick} className="btn-primary flex-1 py-2 text-xs font-bold">Save</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

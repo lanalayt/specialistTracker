@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { createClient } from "@/lib/supabase";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
@@ -44,6 +45,24 @@ export default function ScoutFGPage() {
   }
   athleteData.sort((a, b) => b.total - a.total);
   const maxKicks = athleteData.length > 0 ? Math.max(...athleteData.map((a) => a.entries.length)) : 0;
+
+  const handleToggleKick = async (sessionId: string, athleteName: string, kickIdx: number) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    const sess = sessions.find((s) => s.id === sessionId);
+    if (!sess) return;
+    const allEntries = [...sess.entries] as unknown as FGEntry[];
+    const athleteEntries = allEntries.filter((e) => e.athlete === athleteName);
+    const entry = athleteEntries[kickIdx];
+    if (!entry) return;
+    entry.result = entry.result === "make" ? "miss" : "make";
+    entry.score = entry.result === "make" ? entry.pointValue : 0;
+    try {
+      const supabase = createClient();
+      await supabase.from("sessions").update({ entries: allEntries, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", sessionId);
+    } catch {}
+    await loadData();
+  };
 
   const handleDeleteRow = async (name: string, sessionId: string) => {
     if (!window.confirm(`Are you sure you want to delete this chart for ${name}? This cannot be undone.`)) return;
@@ -123,8 +142,10 @@ export default function ScoutFGPage() {
                             <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
                           </td>
                           {r.entries.map((e, j) => (
-                            <td key={j} className={clsx("text-center py-1 px-2 font-bold", e.result === "make" ? "text-make" : "text-miss")}>
-                              {e.score}
+                            <td key={j} className="text-center py-1 px-2">
+                              <button onClick={() => handleToggleKick(r.sessionId, r.name, j)} className={clsx("font-bold hover:opacity-70 transition-opacity", e.result === "make" ? "text-make" : "text-miss")}>
+                                {e.score}
+                              </button>
                             </td>
                           ))}
                           {Array.from({ length: maxKicks - r.entries.length }, (_, j) => (
