@@ -416,7 +416,7 @@ function AthleteChartInner() {
 
           {/* Distance + Hash inputs */}
           <div className="card space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className={clsx("grid gap-2", kickMode === "live" ? "grid-cols-3" : "grid-cols-2")}>
               <div>
                 <p className="text-[10px] text-muted text-center mb-1">Distance</p>
                 <input type="text" inputMode="numeric" value={liveDist} onChange={(e) => setLiveDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
@@ -427,13 +427,13 @@ function AthleteChartInner() {
                   {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
+              {kickMode === "live" && (
+                <div>
+                  <p className="text-[10px] text-muted text-center mb-1">Op Time</p>
+                  <input type="text" inputMode="numeric" value={opTimeInput ? formatOpTime(opTimeInput) : ""} onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))} placeholder="1.32" className="input w-full text-center text-lg font-bold py-2" />
+                </div>
+              )}
             </div>
-            {kickMode === "live" && (
-              <div>
-                <p className="text-[10px] text-muted text-center mb-1">Op Time (optional)</p>
-                <input type="text" inputMode="numeric" value={opTimeInput ? formatOpTime(opTimeInput) : ""} onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))} placeholder="1.32" className="input w-32 mx-auto text-center text-sm font-bold py-1.5" />
-              </div>
-            )}
           </div>
 
           {/* Result buttons */}
@@ -602,26 +602,19 @@ function AthleteChartInner() {
           )}
         </div>
 
-        {/* Current kick info */}
-        <div className="card-2 py-4 text-center">
-          <p className="text-3xl font-black text-slate-100">{currentKick?.distance} Yard Kick</p>
-          <p className="text-sm text-slate-300">{HASH_DISPLAY[currentKick?.hash ?? "M"] ?? currentKick?.hash}</p>
-        </div>
-
-        {/* Op time input — live mode only */}
-        {kickMode === "live" && (
-          <div className="card-2 py-3 px-4">
-            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Op Time (optional)</p>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={opTimeInput ? formatOpTime(opTimeInput) : ""}
-              onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))}
-              placeholder="1.32"
-              className="input w-32 text-center text-sm font-bold py-1.5"
-            />
+        {/* Current kick info + Op time */}
+        <div className="card-2 py-4 px-4 flex items-center justify-between">
+          <div className="text-center flex-1">
+            <p className="text-3xl font-black text-slate-100">{currentKick?.distance} Yard Kick</p>
+            <p className="text-sm text-slate-300">{HASH_DISPLAY[currentKick?.hash ?? "M"] ?? currentKick?.hash}</p>
           </div>
-        )}
+          {kickMode === "live" && (
+            <div className="text-center shrink-0 ml-3">
+              <p className="text-[10px] text-muted mb-1">Op Time</p>
+              <input type="text" inputMode="numeric" value={opTimeInput ? formatOpTime(opTimeInput) : ""} onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))} placeholder="1.32" className="input w-16 text-center text-sm font-bold py-1.5" />
+            </div>
+          )}
+        </div>
 
         {/* Result buttons — select then submit */}
         <button
