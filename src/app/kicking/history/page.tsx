@@ -45,7 +45,8 @@ export default function KickingHistoryPage() {
 
 function KickingHistoryContent() {
   const pathname = usePathname();
-  const hideScore = pathname.startsWith("/athlete");
+  const isAthleteMode = pathname.startsWith("/athlete");
+  const hideScore = isAthleteMode;
   const { history, updateSessionDate, updateSessionWeather, updateSessionOpponent, updateSessionEntries, deleteSession } = useFG();
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() => {
     if (typeof window === "undefined") return "detailed";
@@ -141,7 +142,7 @@ function KickingHistoryContent() {
               Charting Games
             </button>
           </div>
-          {historyTab === "sessions" && (
+          {historyTab === "sessions" && !isAthleteMode && (
           <div className="flex rounded-input border border-border overflow-hidden">
             <button
               onClick={() => { setModeFilter("practice"); setSelectedId(null); }}

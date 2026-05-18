@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
 import { useAuth } from "@/lib/auth";
 import { exportPuntSession, exportSessionPDF } from "@/lib/exportStats";
@@ -27,6 +27,8 @@ export default function PuntHistoryPage() {
 }
 
 function PuntHistoryContent() {
+  const pathname = usePathname();
+  const isAthleteMode = pathname.startsWith("/athlete");
   const { history, updateSessionDate, updateSessionWeather, updateSessionOpponent, updateSessionEntries, deleteSession } = usePunt();
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
@@ -111,7 +113,7 @@ function PuntHistoryContent() {
               Charting Games
             </button>
           </div>
-          {historyTab === "sessions" && (
+          {historyTab === "sessions" && !isAthleteMode && (
           <div className="flex rounded-input border border-border overflow-hidden">
             <button
               onClick={() => { setModeFilter("practice"); setSelectedId(null); }}

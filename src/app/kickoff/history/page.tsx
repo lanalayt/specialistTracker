@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import { useKickoff } from "@/lib/kickoffContext";
 import { useAuth } from "@/lib/auth";
 import { exportKOSession, exportSessionPDF } from "@/lib/exportStats";
@@ -27,6 +27,8 @@ export default function KickoffHistoryPage() {
 }
 
 function KickoffHistoryContent() {
+  const pathname = usePathname();
+  const isAthleteMode = pathname.startsWith("/athlete");
   const { history, updateSessionDate, updateSessionWeather, updateSessionOpponent, updateSessionEntries, deleteSession } = useKickoff();
 
   const { isAthlete, canEdit } = useAuth();
@@ -76,6 +78,7 @@ function KickoffHistoryContent() {
       {/* Session list — hidden on mobile when a session is selected */}
       <div className={clsx("lg:w-64 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto shrink-0", selectedId && "hidden lg:block")}>
         <div className="p-4 border-b border-border space-y-2">
+          {!isAthleteMode && (
           <div className="flex rounded-input border border-border overflow-hidden">
             <button
               onClick={() => { setModeFilter("practice"); setSelectedId(null); }}
@@ -96,6 +99,7 @@ function KickoffHistoryContent() {
               GAME
             </button>
           </div>
+          )}
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">
             Sessions ({filteredHistory.length})
           </p>

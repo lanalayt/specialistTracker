@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import { processPunt, emptyPuntStats } from "@/lib/stats";
@@ -555,6 +556,8 @@ function PuntStatsView({
 }
 
 export default function PuntingStatisticsPage() {
+  const pathname = usePathname();
+  const isAthleteMode = pathname.startsWith("/athlete");
   const { athletes, stats, history } = usePunt();
   const [puntTypes, setPuntTypes] = useState(DEFAULT_PUNT_TYPES);
   const [puntCategories, setPuntCategories] = useState(DEFAULT_CATEGORIES);
@@ -622,6 +625,7 @@ export default function PuntingStatisticsPage() {
   return (
     <main className="p-4 lg:p-6 space-y-4 max-w-5xl overflow-y-auto">
       {/* Practice / Game mode toggle */}
+      {!isAthleteMode && (
       <div className="flex rounded-input border border-border overflow-hidden w-fit">
         <button
           onClick={() => setGameMode("practice")}
@@ -642,6 +646,7 @@ export default function PuntingStatisticsPage() {
           GAME Stats
         </button>
       </div>
+      )}
 
       {!hasAnyData && (
         <p className="text-sm text-muted">No punting data yet. Commit a session to see statistics.</p>

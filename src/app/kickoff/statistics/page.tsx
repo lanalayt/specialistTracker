@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useKickoff } from "@/lib/kickoffContext";
 import type { KickoffEntry, KickoffHash } from "@/types";
 import { KICKOFF_HASHES } from "@/types";
@@ -369,6 +370,8 @@ function CategorySection({
 }
 
 export default function KickoffStatisticsPage() {
+  const pathname = usePathname();
+  const isAthleteMode = pathname.startsWith("/athlete");
   const { athletes, history } = useKickoff();
   const dateFilter = useDateRangeFilter();
   const [koSettings, setKoSettings] = useState(() => loadKoSettings());
@@ -507,7 +510,7 @@ export default function KickoffStatisticsPage() {
     return total;
   }, [filteredHistory]);
 
-  const modeToggle = (
+  const modeToggle = isAthleteMode ? null : (
     <div className="flex rounded-input border border-border overflow-hidden w-fit">
       <button
         onClick={() => setGameMode("practice")}

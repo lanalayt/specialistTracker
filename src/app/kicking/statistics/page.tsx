@@ -395,6 +395,7 @@ export default function KickingStatisticsPage() {
   return (
     <main className="p-4 lg:p-6 space-y-4 max-w-5xl overflow-y-auto">
       {/* Practice / Game mode toggle */}
+      {!hideScore && (
       <div className="flex rounded-input border border-border overflow-hidden w-fit">
         <button
           onClick={() => setGameMode("practice")}
@@ -415,6 +416,7 @@ export default function KickingStatisticsPage() {
           GAME Stats
         </button>
       </div>
+      )}
 
       {!hasAnyData && (
         <p className="text-sm text-muted">No kicking data yet. Commit a session to see statistics.</p>
