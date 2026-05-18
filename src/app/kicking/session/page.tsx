@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useFG } from "@/lib/fgContext";
 import { LiveFGStats } from "@/components/ui/LiveSessionStats";
@@ -197,6 +198,8 @@ const MISS_BTNS: { r: FGResult; label: string }[] = [
 ];
 
 export default function KickingSessionPage() {
+  const pathname = usePathname();
+  const isAthleteMode = pathname.startsWith("/athlete");
   const { athletes, stats, commitPractice } =
     useFG();
   const { isAthlete, canEdit } = useAuth();
@@ -253,7 +256,7 @@ export default function KickingSessionPage() {
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedKicks, setCommittedKicks] = useState<FGKick[]>(draft.committedKicks ?? []);
-  const [sessionMode, setSessionMode] = useState<"practice" | "game" | null>(initialMode);
+  const [sessionMode, setSessionMode] = useState<"practice" | "game" | null>(isAthleteMode ? "practice" : initialMode);
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
   const [draftSaved, setDraftSaved] = useState(false);
@@ -269,7 +272,7 @@ export default function KickingSessionPage() {
   const [missMode, setMissMode] = useState(() => loadMissMode());
   const [scoreMode, setScoreMode] = useState(() => loadScoreMode());
   // Score is visible when: "on" (always), "practice" (only in practice mode), "off" (never)
-  const scoreEnabled = scoreMode === "on" || (scoreMode === "practice" && sessionMode !== "game");
+  const scoreEnabled = isAthleteMode ? false : (scoreMode === "on" || (scoreMode === "practice" && sessionMode !== "game"));
   const [scoreOptions, setScoreOptions] = useState<string[]>(() => loadScoreOptions());
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
