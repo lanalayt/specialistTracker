@@ -12,12 +12,10 @@ export default function AthletePuntingSessionPage() {
         <h2 className="text-xl font-bold text-slate-100">Punt Session</h2>
         <p className="text-sm text-muted">Choose chart type.</p>
         <div className="grid grid-cols-2 gap-3">
-          {isCoach && (
-            <Link href="/athlete/punting/coaches-chart" className="card hover:bg-surface-2 hover:border-sky-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8">
-              <h3 className="text-sm font-bold text-slate-100 group-hover:text-sky-400 transition-colors">Coaches Chart</h3>
-              <p className="text-[10px] text-muted mt-1">Create & assign charts</p>
-            </Link>
-          )}
+          <Link href="/athlete/punting/coaches-chart" className="card hover:bg-surface-2 hover:border-sky-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8">
+            <h3 className="text-sm font-bold text-slate-100 group-hover:text-sky-400 transition-colors">{isCoach ? "Coaches Chart" : "Assigned Charts"}</h3>
+            <p className="text-[10px] text-muted mt-1">{isCoach ? "Create & assign charts" : "View assigned charts"}</p>
+          </Link>
           <Link href="/athlete/punting/athlete-chart" className="card hover:bg-surface-2 hover:border-sky-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8">
             <h3 className="text-sm font-bold text-slate-100 group-hover:text-sky-400 transition-colors">Athlete Chart</h3>
             <p className="text-[10px] text-muted mt-1">Create your own chart</p>
