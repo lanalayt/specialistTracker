@@ -124,6 +124,7 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
                   ))}
                 </div>
               </div>
+              <div className="w-px self-stretch bg-accent/60 mx-0.5" />
               <div>
                 <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Holder</p>
                 <div className="flex gap-1">
