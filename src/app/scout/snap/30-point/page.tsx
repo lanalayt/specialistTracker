@@ -45,7 +45,6 @@ export default function ScoutShortSnapsPage() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [snapsPerPlayer, setSnapsPerPlayer] = useState("10");
   const [dropWorst, setDropWorst] = useState(false);
-  const [openSpiralIsBall, setOpenSpiralIsBall] = useState(true);
   const [saved, setSaved] = useState(false);
 
   const [results, setResults] = useState<SnapResult[]>([]);
@@ -108,10 +107,8 @@ export default function ScoutShortSnapsPage() {
 
   const handleLogSnap = () => {
     if (!accuracy || !laces || !spiral || !pendingMarker || !activePlayer) return;
-    const isForcedBall = openSpiralIsBall && spiral === "Bad";
-    const finalAccuracy = isForcedBall ? "Ball" as const : accuracy;
-    const points = isForcedBall ? 0 : calcPoints(accuracy, laces, spiral);
-    setResults((prev) => [...prev, { athlete: activePlayer, accuracy: finalAccuracy, laces, spiral, points, marker: pendingMarker }]);
+    const points = calcPoints(accuracy, laces, spiral);
+    setResults((prev) => [...prev, { athlete: activePlayer, accuracy, laces, spiral, points, marker: pendingMarker }]);
     setAccuracy(""); setLaces(""); setSpiral(""); setPendingMarker(null);
     // Auto-rotate
     const idx = selectedPlayers.indexOf(activePlayer);
@@ -144,10 +141,8 @@ export default function ScoutShortSnapsPage() {
 
   const saveEdit = () => {
     if (editIdx === null || !editAccuracy || !editLaces || !editSpiral) return;
-    const isForcedBall = openSpiralIsBall && editSpiral === "Bad";
-    const finalAcc = isForcedBall ? "Ball" as const : editAccuracy;
-    const pts = isForcedBall ? 0 : calcPoints(editAccuracy, editLaces, editSpiral);
-    setResults((prev) => prev.map((r, i) => i === editIdx ? { ...r, accuracy: finalAcc, laces: editLaces, spiral: editSpiral, points: pts } : r));
+    const pts = calcPoints(editAccuracy, editLaces, editSpiral);
+    setResults((prev) => prev.map((r, i) => i === editIdx ? { ...r, accuracy: editAccuracy, laces: editLaces, spiral: editSpiral, points: pts } : r));
     setEditIdx(null);
   };
 
@@ -210,18 +205,9 @@ export default function ScoutShortSnapsPage() {
               <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", dropWorst ? "left-5" : "left-0.5")} />
             </button>
           </div>
-          <div className="flex items-center justify-between card-2 px-4 py-3">
-            <div>
-              <p className="text-xs font-semibold text-slate-200">Open Spiral = Ball</p>
-              <p className="text-[10px] text-muted">Bad spiral makes the snap 0 points</p>
-            </div>
-            <button onClick={() => setOpenSpiralIsBall(!openSpiralIsBall)} className={clsx("w-10 h-5 rounded-full transition-colors relative", openSpiralIsBall ? "bg-amber-500" : "bg-surface-2 border border-border")}>
-              <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", openSpiralIsBall ? "left-5" : "left-0.5")} />
-            </button>
-          </div>
           <div className="card-2 p-3 text-xs text-muted space-y-1">
             <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Scoring</p>
-            <p>Each snap scores up to 3 points: Strike (1) + Laces (1 or 0.5) + Spiral (1).{openSpiralIsBall ? " Open spiral = 0 points." : ""}</p>
+            <p>Each snap scores up to 3 points: Strike (1) + Laces (1 or 0.5) + Spiral (1). Open spiral = 0 for spiral.</p>
             <p>Final = average per snap{dropWorst ? ", dropping the worst one" : ""}.</p>
           </div>
           <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || !spp} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
