@@ -166,9 +166,8 @@ function AthleteChartInner() {
   };
 
   const handleSave = async () => {
-    const total = chartType === "preset" ? kicks.length : getPlayerResults(selectedPlayers[0] ?? "").length;
-    const summary = selectedPlayers.map((p) => `${p}: ${getPlayerMakes(p)}/${chartType === "preset" ? kicks.length : getPlayerResults(p).length}`).join(", ");
-    const label = `${chartType === "preset" ? "Off Sticks" : "Live Chart"} — ${summary}${assignedChart ? " (Assigned)" : ""}`;
+    const names = selectedPlayers.join(", ");
+    const label = `${new Date().toLocaleDateString()} — ${names}${assignedChart ? " (Assigned)" : ""}`;
     commitPractice(results, label);
 
     if (assignedChart) {
