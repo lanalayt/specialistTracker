@@ -464,7 +464,7 @@ function AthleteChartInner() {
             return (
               <div key={p} className="card-2 px-4 py-3 text-center">
                 <p className="text-sm font-bold text-slate-200">{p}</p>
-                <p className="text-3xl font-black text-sky-400">{getPlayerMakes(p)}/{kicks.length}</p>
+                <p className="text-3xl font-black text-sky-400">{getPlayerMakes(p)}/{getPlayerResults(p).length}</p>
                 <p className="text-[10px] text-muted">FG Made</p>
                 {avgOp && <p className="text-[10px] text-sky-400 mt-1">Avg Op: {avgOp}s</p>}
               </div>
