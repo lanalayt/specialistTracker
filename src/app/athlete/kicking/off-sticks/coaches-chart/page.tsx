@@ -11,7 +11,7 @@ import type { FGKick } from "@/types";
 
 const RESULT_LABEL: Record<string, string> = { YL: "GOOD", YC: "GOOD", YR: "GOOD", XL: "MISS LEFT", XR: "MISS RIGHT", XS: "MISS SHORT", X: "MISS" };
 
-const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
+const HASH_OPTIONS = ["Left Hash", "LM", "M", "RM", "Right Hash"];
 
 interface PresetKick {
   distance: number;

@@ -14,8 +14,8 @@ import clsx from "clsx";
 import type { FGKick, FGPosition, FGResult } from "@/types";
 import { POSITIONS, RESULTS } from "@/types";
 
-const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
-const HASH_TO_POS: Record<string, FGPosition> = { "Left": "LH", "LM": "LM", "M": "M", "RM": "RM", "Right": "RH" };
+const HASH_OPTIONS = ["Left Hash", "LM", "M", "RM", "Right Hash"];
+const HASH_TO_POS: Record<string, FGPosition> = { "Left Hash": "LH", "LM": "LM", "M": "M", "RM": "RM", "Right Hash": "RH" };
 const RESULT_LABEL: Record<string, string> = { YL: "GOOD", YC: "GOOD", YR: "GOOD", XL: "MISS LEFT", XR: "MISS RIGHT", XS: "MISS SHORT", X: "MISS" };
 
 interface PresetKick { distance: number; hash: string; pointValue: number }

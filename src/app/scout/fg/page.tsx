@@ -10,7 +10,11 @@ import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
 
-const LIVE_HASH_OPTIONS = ["L", "M", "R"];
+const LIVE_HASH_OPTIONS = [
+  { value: "L", label: "Left Hash" },
+  { value: "M", label: "Middle" },
+  { value: "R", label: "Right Hash" },
+];
 const RESULT_LABEL: Record<string, string> = { YL: "GOOD", YC: "GOOD", YR: "GOOD", XL: "MISS LEFT", XR: "MISS RIGHT", XS: "MISS SHORT", X: "MISS" };
 
 interface FGEntry { athlete: string; kickNum: number; distance: number; hash: string; pointValue: number; result: "make" | "miss"; score: number }
@@ -206,7 +210,7 @@ export default function ScoutFGPage() {
                 <div>
                   <p className="text-[10px] text-muted text-center mb-1">Hash</p>
                   <select value={liveHash} onChange={(e) => setLiveHash(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5">
-                    {LIVE_HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                    {LIVE_HASH_OPTIONS.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
                   </select>
                 </div>
               </div>
