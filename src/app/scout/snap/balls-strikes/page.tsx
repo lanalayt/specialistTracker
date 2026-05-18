@@ -17,6 +17,14 @@ interface BsSnap {
   marker?: SnapMarker;
 }
 
+function formatSnapTime(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (!digits) return "";
+  if (digits.length === 1) return `0.0${digits}`;
+  if (digits.length === 2) return `0.${digits}`;
+  return `${digits.slice(0, -2)}.${digits.slice(-2)}`;
+}
+
 function calcAvg(scores: number[], dropWorst: boolean): number {
   if (scores.length === 0) return 0;
   if (scores.length === 1) return scores[0];
@@ -103,7 +111,7 @@ export default function ScoutLongSnapsPage() {
     const inZone = pendingMarker.inZone !== false;
     const accuracy: "Strike" | "Ball" = inZone && !isTimeBall && !isSpiralBall ? "Strike" : "Ball";
 
-    setSnaps((prev) => [...prev, { athlete: activePlayer, time: promptTime, accuracy, spiral: promptSpiral, marker: pendingMarker }]);
+    setSnaps((prev) => [...prev, { athlete: activePlayer, time: promptTime ? formatSnapTime(promptTime) : "", accuracy, spiral: promptSpiral, marker: pendingMarker }]);
     setPendingMarker(null); setPromptTime(""); setPromptSpiral("");
     // Auto-rotate
     const idx = selectedPlayers.indexOf(activePlayer);
@@ -137,7 +145,7 @@ export default function ScoutLongSnapsPage() {
     if (editIdx === null || !editAccuracy || !editSpiral) return;
     const isSpiralBall = openSpiralIsBall && editSpiral === "Bad";
     const finalAcc: "Strike" | "Ball" = editAccuracy === "Strike" && !isSpiralBall ? "Strike" : "Ball";
-    setSnaps((prev) => prev.map((s, i) => i === editIdx ? { ...s, accuracy: finalAcc, spiral: editSpiral, time: editTime } : s));
+    setSnaps((prev) => prev.map((s, i) => i === editIdx ? { ...s, accuracy: finalAcc, spiral: editSpiral, time: editTime ? formatSnapTime(editTime) : "" } : s));
     setEditIdx(null);
   };
 
@@ -325,7 +333,7 @@ export default function ScoutLongSnapsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-[10px] text-muted text-center mb-1">Time (sec)</p>
-                      <input type="text" inputMode="decimal" value={promptTime} onChange={(e) => setPromptTime(e.target.value)} className="input w-full text-center text-sm font-bold py-2" placeholder="0.65" autoFocus />
+                      <input type="text" inputMode="numeric" value={promptTime ? formatSnapTime(promptTime) : ""} onChange={(e) => setPromptTime(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-2" placeholder="0.65" autoFocus />
                     </div>
                     <div>
                       <p className="text-[10px] text-muted text-center mb-1">Spiral</p>
@@ -383,7 +391,7 @@ export default function ScoutLongSnapsPage() {
                           </div>
                           <div>
                             <p className="text-[8px] text-muted text-center mb-1">Time</p>
-                            <input type="text" inputMode="decimal" value={editTime} onChange={(e) => setEditTime(e.target.value)} className="input w-full text-center text-[10px] font-bold py-1.5" placeholder="0.65" />
+                            <input type="text" inputMode="numeric" value={editTime ? formatSnapTime(editTime) : ""} onChange={(e) => setEditTime(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-[10px] font-bold py-1.5" placeholder="0.65" />
                           </div>
                         </div>
                         <button onClick={saveEdit} className="btn-primary w-full py-2 text-xs font-bold">Save</button>
