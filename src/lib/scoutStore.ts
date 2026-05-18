@@ -268,7 +268,8 @@ export interface AssignedChart {
   dueDate: string;
   athletes: string[];
   kicks: { distance: number; hash: string; pointValue: number }[];
-  reps?: number; // for punt/KO — number of reps per athlete
+  reps?: number; // for punt/KO — total number of reps per athlete
+  puntTypes?: { type: string; count: number }[]; // punt type breakdown
   completedBy: Record<string, string>;
 }
 
