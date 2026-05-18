@@ -615,6 +615,7 @@ function AthleteChartInner() {
                       <thead>
                         <tr>
                           <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+                          <th className="text-[10px] text-muted text-center py-1 px-2">Result</th>
                           <th className="text-[10px] text-muted text-center py-1 px-2">Laces</th>
                           <th className="text-[10px] text-muted text-center py-1 px-2">Rotation</th>
                         </tr>
@@ -623,6 +624,7 @@ function AthleteChartInner() {
                         {snaps.map((s, i) => (
                           <tr key={i} className="border-t border-border/30">
                             <td className="text-muted py-1 px-2">{i + 1}</td>
+                            <td className={clsx("text-center py-1 px-2 font-bold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
                             <td className={clsx("text-center py-1 px-2 font-semibold", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{s.laces === "Good" ? "Perfect" : s.laces === "1/4 Turn" ? "1/4" : s.laces ?? "—"}</td>
                             <td className={clsx("text-center py-1 px-2 font-semibold", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
                           </tr>
