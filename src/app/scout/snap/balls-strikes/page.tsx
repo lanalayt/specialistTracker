@@ -314,30 +314,41 @@ export default function ScoutLongSnapsPage() {
             <p className="text-xs font-semibold text-muted uppercase tracking-wider">{activePlayer} — Snap {playerSnapCount + 1} of {spp}</p>
           </div>
 
-          <PunterStrikeZone markers={[...getPlayerMarkers(activePlayer), ...(pendingMarker ? [{ ...pendingMarker, num: playerSnapCount + 1, inZone: pendingMarker.inZone !== false }] : [])]} onSnap={handleSnapClick} nextNum={playerSnapCount + 1} editable />
+          <div className="relative">
+            <PunterStrikeZone markers={[...getPlayerMarkers(activePlayer), ...(pendingMarker ? [{ ...pendingMarker, num: playerSnapCount + 1, inZone: pendingMarker.inZone !== false }] : [])]} onSnap={handleSnapClick} nextNum={playerSnapCount + 1} editable />
 
-          {pendingMarker && (
-            <div className="card space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-[10px] text-muted text-center mb-1">Time (sec)</p>
-                  <input type="text" inputMode="decimal" value={promptTime} onChange={(e) => setPromptTime(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5" placeholder="0.65" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted text-center mb-1">Spiral</p>
-                  <div className="flex gap-1">
-                    <button onClick={() => setPromptSpiral("Good")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", promptSpiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
-                    <button onClick={() => setPromptSpiral("Bad")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", promptSpiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+            {/* Popup overlay on top of diagram */}
+            {pendingMarker && (
+              <div className="absolute inset-0 flex items-center justify-center z-10">
+                <div className="bg-surface border border-border rounded-xl p-4 shadow-xl space-y-3 w-[85%] max-w-[280px]">
+                  <p className="text-xs font-bold text-slate-100 text-center">{activePlayer} — Snap {playerSnapCount + 1}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[10px] text-muted text-center mb-1">Time (sec)</p>
+                      <input type="text" inputMode="decimal" value={promptTime} onChange={(e) => setPromptTime(e.target.value)} className="input w-full text-center text-sm font-bold py-2" placeholder="0.65" autoFocus />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted text-center mb-1">Spiral</p>
+                      <div className="flex flex-col gap-1">
+                        <button onClick={() => setPromptSpiral("Good")} className={clsx("py-2 rounded-input text-xs font-bold border transition-all", promptSpiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+                        <button onClick={() => setPromptSpiral("Bad")} className={clsx("py-2 rounded-input text-xs font-bold border transition-all", promptSpiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Cancel</button>
+                    <button onClick={handleLogSnap} disabled={!promptSpiral} className="btn-primary flex-1 py-2 text-sm font-bold disabled:opacity-40">Log Snap</button>
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+
+          {!pendingMarker && (
+            <div className="flex gap-2">
+              {snaps.length > 0 && <button onClick={handleUndo} className="text-xs px-3 py-3 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
             </div>
           )}
-
-          <div className="flex gap-2">
-            {(snaps.length > 0 || pendingMarker) && <button onClick={handleUndo} className="text-xs px-3 py-3 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
-            <button onClick={handleLogSnap} disabled={!pendingMarker || !promptSpiral} className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40">Log Snap</button>
-          </div>
           {snaps.length > 0 && (
             <button onClick={handleFinish} className="btn-ghost w-full py-2 text-xs font-bold border border-amber-500/40 text-amber-400">Finish</button>
           )}
