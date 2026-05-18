@@ -17,6 +17,7 @@ export default function AthleteLongSnapLayout({ children }: { children: React.Re
           tabs={[
             { label: "FG Snaps", slug: "session-fg", coachOnly: false },
             { label: "Punt Snaps", slug: "session-punt", coachOnly: false },
+            { label: "Statistics", slug: "statistics", coachOnly: false },
             { label: "History", slug: "history", coachOnly: false },
             { label: "Charting", slug: "charting", coachOnly: false },
             { label: "Settings", slug: "settings", coachOnly: false },
