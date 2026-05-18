@@ -61,15 +61,16 @@ function PuntAthleteChartInner() {
     try {
       const raw = localStorage.getItem("coach_punt_chart_now");
       if (raw) {
+        localStorage.removeItem("coach_punt_chart_now");
         const data = JSON.parse(raw);
         if (data.players?.length > 0) {
-          setSelectedPlayers(data.players);
-          setReps(String(data.reps ?? 5));
-          // Store puntRows for the schedule
-          if (data.puntRows) setAssignedChart({ id: "chart-now", sport: "ATHLETE_PUNTING", createdBy: "Coach", createdAt: new Date().toISOString(), dueDate: "", athletes: data.players, kicks: [], reps: data.reps, puntTypes: data.puntRows.map((r: any) => ({ type: r.category, typeId: r.typeId, typeLabel: r.category, count: r.count, hash: r.hash })), completedBy: {} } as AssignedChart);
-          setPhase("live");
+          setTimeout(() => {
+            setSelectedPlayers(data.players);
+            setReps(String(data.reps ?? 5));
+            if (data.puntRows) setAssignedChart({ id: "chart-now", sport: "ATHLETE_PUNTING", createdBy: "Coach", createdAt: new Date().toISOString(), dueDate: "", athletes: data.players, kicks: [], reps: data.reps, puntTypes: data.puntRows.map((r: any) => ({ type: r.category, typeId: r.typeId, typeLabel: r.category, count: r.count, hash: r.hash })), completedBy: {} } as AssignedChart);
+            setPhase("live");
+          }, 0);
         }
-        localStorage.removeItem("coach_punt_chart_now");
       }
     } catch {}
   }, []);

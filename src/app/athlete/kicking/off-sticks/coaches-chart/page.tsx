@@ -261,10 +261,10 @@ export default function CoachesChartPage() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    {isCoach && !isReassigning && (<>
+                    {isCoach && !isReassigning && (<div className="flex flex-col gap-1">
                       <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign this chart</button>
                       <button onClick={() => handleDeleteAssignedChart(chart.id)} className="text-[10px] text-miss hover:underline">Delete chart</button>
-                    </>)}
+                    </div>)}
                     {completed.length > 0 && showStatsId !== chart.id && (
                       <button onClick={() => setShowStatsId(chart.id)} className="text-[10px] text-sky-400 hover:underline">Show stats</button>
                     )}

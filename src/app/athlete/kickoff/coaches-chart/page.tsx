@@ -106,10 +106,10 @@ export default function KickoffCoachesChartPage() {
               ))}
             </div>
             <div className="flex flex-wrap gap-3">
-              {isCoach && !isReassigning && (<>
+              {isCoach && !isReassigning && (<div className="flex flex-col gap-1">
                 <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign</button>
                 <button onClick={() => handleDeleteAssignedChart(chart.id)} className="text-[10px] text-miss hover:underline">Delete chart</button>
-              </>)}
+              </div>)}
             </div>
             {isReassigning && (
               <div className="card space-y-3">

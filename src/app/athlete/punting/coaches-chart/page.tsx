@@ -201,10 +201,12 @@ export default function PuntCoachesChartPage() {
                 <span key={a} className="text-[10px] px-2 py-0.5 rounded-input border border-make/40 text-make font-semibold">{a} — done</span>
               ))}
             </div>
-            {isCoach && !isReassigning && (<>
-              <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign</button>
-              <button onClick={() => handleDeleteAssignedChart(chart.id)} className="text-[10px] text-miss hover:underline">Delete chart</button>
-            </>)}
+            {isCoach && !isReassigning && (
+              <div className="flex flex-col gap-1">
+                <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign</button>
+                <button onClick={() => handleDeleteAssignedChart(chart.id)} className="text-[10px] text-miss hover:underline">Delete chart</button>
+              </div>
+            )}
             {isReassigning && (
               <div className="card space-y-3">
                 <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Re-assign</p>

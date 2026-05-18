@@ -76,20 +76,23 @@ function AthleteChartInner() {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
   };
 
-  // Check for "Chart Now" from coaches chart
+  // Check for "Chart Now" from coaches chart — use timeout to avoid render conflicts
   useEffect(() => {
     try {
       const raw = localStorage.getItem("coach_fg_chart_now");
       if (raw) {
+        localStorage.removeItem("coach_fg_chart_now");
         const data = JSON.parse(raw);
         if (data.kicks?.length > 0 && data.players?.length > 0) {
-          setKicks(data.kicks);
-          setSelectedPlayers(data.players);
-          setPhase("live");
-          setCurrentKickIdx(0);
-          setCurrentPlayerIdx(0);
+          // Defer state updates to next tick so initial render completes
+          setTimeout(() => {
+            setKicks(data.kicks);
+            setSelectedPlayers(data.players);
+            setCurrentKickIdx(0);
+            setCurrentPlayerIdx(0);
+            setPhase("live");
+          }, 0);
         }
-        localStorage.removeItem("coach_fg_chart_now");
       }
     } catch {}
   }, []);

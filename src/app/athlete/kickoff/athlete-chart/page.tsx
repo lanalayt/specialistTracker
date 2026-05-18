@@ -48,14 +48,16 @@ function KOAthleteChartInner() {
     try {
       const raw = localStorage.getItem("coach_ko_chart_now");
       if (raw) {
+        localStorage.removeItem("coach_ko_chart_now");
         const data = JSON.parse(raw);
         if (data.players?.length > 0) {
-          setSelectedPlayers(data.players);
-          setReps(String(data.reps ?? 5));
-          setPhase("live");
-          setCurrentPlayerIdx(0);
+          setTimeout(() => {
+            setSelectedPlayers(data.players);
+            setReps(String(data.reps ?? 5));
+            setCurrentPlayerIdx(0);
+            setPhase("live");
+          }, 0);
         }
-        localStorage.removeItem("coach_ko_chart_now");
       }
     } catch {}
   }, []);
