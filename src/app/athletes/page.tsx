@@ -112,15 +112,27 @@ function AthletesContent() {
     window.location.reload();
   };
 
+  const ATHLETE_MIRROR: Record<string, string> = {
+    KICKING: "ATHLETE_KICKING", PUNTING: "ATHLETE_PUNTING",
+    KICKOFF: "ATHLETE_KICKOFF", LONGSNAP: "ATHLETE_LONGSNAP",
+  };
+
   const toggleSport = async (name: string, sport: string, sportKey: string, isIn: boolean) => {
     const tid = getTeamId();
     if (!tid) return;
+    const mirror = ATHLETE_MIRROR[sportKey];
     if (isIn) {
       const athletes = await loadAthletes(tid, sportKey);
       const found = athletes.find((a) => a.name === name);
       if (found) await removeAthleteById(tid, found.id);
+      if (mirror) {
+        const mAthletes = await loadAthletes(tid, mirror);
+        const mFound = mAthletes.find((a) => a.name === name);
+        if (mFound) await removeAthleteById(tid, mFound.id);
+      }
     } else {
       await insertAthlete(tid, sportKey, name);
+      if (mirror) await insertAthlete(tid, mirror, name);
     }
   };
 
@@ -269,13 +281,25 @@ function AthletesContent() {
                   if (!popupAthlete) return;
                   const name = popupName.trim() || popupAthlete;
                   if (isNewAthlete) {
-                    // Add new athlete to selected phases only
-                    if (popupPhases.KICKING) fg.addAthletes([name]);
-                    if (popupPhases.PUNTING) punt.addAthletes([name]);
-                    if (popupPhases.KICKOFF) kickoff.addAthletes([name]);
-                    if (popupPhases.LONGSNAP) snap.addAthletes([name]);
+                    // Add new athlete to selected phases (team + athlete mode keys)
+                    const tid = getTeamId();
+                    if (popupPhases.KICKING) {
+                      fg.addAthletes([name]);
+                      if (tid) await insertAthlete(tid, "ATHLETE_KICKING", name);
+                    }
+                    if (popupPhases.PUNTING) {
+                      punt.addAthletes([name]);
+                      if (tid) await insertAthlete(tid, "ATHLETE_PUNTING", name);
+                    }
+                    if (popupPhases.KICKOFF) {
+                      kickoff.addAthletes([name]);
+                      if (tid) await insertAthlete(tid, "ATHLETE_KICKOFF", name);
+                    }
+                    if (popupPhases.LONGSNAP) {
+                      snap.addAthletes([name]);
+                      if (tid) await insertAthlete(tid, "ATHLETE_LONGSNAP", name);
+                    }
                     if (popupPhases.HOLDING) {
-                      const tid = getTeamId();
                       if (tid) await insertAthlete(tid, "HOLDING", name);
                     }
                     setIsNewAthlete(false);

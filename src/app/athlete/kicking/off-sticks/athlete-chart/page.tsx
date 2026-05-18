@@ -9,6 +9,7 @@ import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/li
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { AthleteSnapPopup } from "@/components/ui/AthleteSnapPopup";
 import { FGFieldView } from "@/components/ui/FGFieldView";
+import { loadAthletes } from "@/lib/athleteStore";
 import Link from "next/link";
 import clsx from "clsx";
 import type { FGKick, FGPosition, FGResult } from "@/types";
@@ -61,6 +62,23 @@ function AthleteChartInner() {
   const [pendingResult, setPendingResult] = useState<FGResult | null>(null);
   // Store snap logs per kick key (player-kickIdx)
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, { snapper: string; holder: string; accuracy: string; laces?: string; spiral: string }[]>>({});
+  const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function loadSnappers() {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const ls = await loadAthletes(tid, "ATHLETE_LONGSNAP");
+      if (ls.length === 0) {
+        const teamLs = await loadAthletes(tid, "LONGSNAP");
+        setSnapAthletes(teamLs.map((a) => a.name));
+      } else {
+        setSnapAthletes(ls.map((a) => a.name));
+      }
+    }
+    loadSnappers();
+  }, []);
 
   // Live charting state — rotate through athletes per kick
   const [currentKickIdx, setCurrentKickIdx] = useState(0);
@@ -481,7 +499,7 @@ function AthleteChartInner() {
         {showSnap && (
           <AthleteSnapPopup
             snapType="FG"
-            athletes={athletes.map((a) => a.name)}
+            athletes={snapAthletes}
             kickerName={currentPlayer}
             kickDistance={kicks[currentKickIdx]?.distance}
             kickHash={kicks[currentKickIdx]?.hash}
