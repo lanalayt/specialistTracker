@@ -384,7 +384,7 @@ function PuntAthleteChartInner() {
       </div>
 
       {showSnap && (
-        <AthleteSnapPopup snapType="PUNT" snapper={selectedPlayers[0] ?? ""} onClose={() => setShowSnap(false)} />
+        <AthleteSnapPopup snapType="PUNT" athletes={athletes.map((a) => a.name)} onClose={() => setShowSnap(false)} />
       )}
     </main>
   );

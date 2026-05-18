@@ -4,49 +4,52 @@ import { useState } from "react";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { getTeamId } from "@/lib/teamData";
 import { insertSession, stampSessionWrite } from "@/lib/sessionStore";
-import { genId, sessionLabel } from "@/lib/stats";
+import { genId } from "@/lib/stats";
 import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 import clsx from "clsx";
 
+interface SnapLogEntry {
+  snapper: string;
+  holder: string;
+  accuracy: string;
+  laces?: string;
+  spiral: string;
+}
+
 interface Props {
   snapType: "FG" | "PUNT";
-  snapper: string;
+  athletes: string[]; // all athletes for snapper/holder selection
+  kickerName?: string; // who's kicking
+  kickDistance?: number; // distance of the kick
+  kickHash?: string; // hash of the kick
+  previousSnaps?: SnapLogEntry[]; // snaps already logged for this kick
   onClose: () => void;
-  onSaved?: () => void;
-  kickKey?: string; // unique key per kick to persist data
+  onSaved?: (entry: SnapLogEntry) => void;
 }
 
-function formatSnapTime(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 4);
-  if (!digits) return "";
-  if (digits.length === 1) return `0.0${digits}`;
-  if (digits.length === 2) return `0.${digits}`;
-  return `${digits.slice(0, -2)}.${digits.slice(-2)}`;
+function getInitials(name: string): string {
+  return name.split(" ").map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
-export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props) {
+export function AthleteSnapPopup({ snapType, athletes, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved }: Props) {
   const isFG = snapType === "FG";
 
-  // FG: diagram-based
   const [holderSide, setHolderSide] = useState<"right" | "left">("right");
+  const [snapper, setSnapper] = useState(athletes[0] ?? "");
+  const [holder, setHolder] = useState(athletes.length > 1 ? athletes[1] : athletes[0] ?? "");
   const [marker, setMarker] = useState<ShortSnapMarker | null>(null);
   const [laces, setLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
   const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
 
-  // Punt: simple buttons + time
-  const [time, setTime] = useState("");
+  // Punt
   const [accuracy, setAccuracy] = useState<"good" | "bad" | "">("");
+  const [time, setTime] = useState("");
 
   const [saving, setSaving] = useState(false);
-  const [totalLogged, setTotalLogged] = useState(0);
 
   const canSave = isFG
-    ? !!marker && !!laces && !!spiral
-    : !!accuracy && !!spiral;
-
-  const handleSnapClick = (m: ShortSnapMarker) => {
-    setMarker(m);
-  };
+    ? !!marker && !!laces && !!spiral && !!snapper
+    : !!accuracy && !!spiral && !!snapper;
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -54,66 +57,90 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
     const tid = getTeamId();
     if (!tid) { setSaving(false); return; }
 
-    const acc = isFG
-      ? (marker?.inZone ? "ON_TARGET" : "HIGH")
-      : (accuracy === "good" ? "ON_TARGET" : "HIGH");
-    const timeNum = !isFG && time ? parseFloat(formatSnapTime(time)) : 0;
+    const acc = isFG ? (marker?.inZone ? "ON_TARGET" : "HIGH") : (accuracy === "good" ? "ON_TARGET" : "HIGH");
 
     const entry: LongSnapEntry = {
-      athleteId: snapper,
-      athlete: snapper,
-      snapType: snapType as SnapType,
-      time: timeNum,
+      athleteId: snapper, athlete: snapper,
+      snapType: snapType as SnapType, time: 0,
       accuracy: acc as SnapAccuracy,
       laces: isFG ? laces || undefined : undefined,
       spiral: spiral || undefined,
       score: acc === "ON_TARGET" ? 1 : 0,
-      markerX: marker?.x,
-      markerY: marker?.y,
-      markerInZone: marker?.inZone,
+      markerX: marker?.x, markerY: marker?.y, markerInZone: marker?.inZone,
     };
 
     const sportKey = isFG ? "ATHLETE_SHORTSNAP" : "ATHLETE_LONGSNAP";
     const session = {
-      id: genId(),
-      teamId: tid,
-      sport: sportKey,
+      id: genId(), teamId: tid, sport: sportKey,
       label: `${isFG ? "Short" : "Long"} Snap — ${snapper}`,
-      date: new Date().toISOString(),
-      mode: "practice" as const,
+      date: new Date().toISOString(), mode: "practice" as const,
       entries: [entry],
     };
 
     stampSessionWrite(tid);
     await insertSession(tid, session as any);
     setSaving(false);
-    setTotalLogged((prev) => prev + 1);
-    onSaved?.();
+
+    const logEntry: SnapLogEntry = {
+      snapper, holder,
+      accuracy: isFG ? (marker?.inZone ? "Strike" : "Ball") : (accuracy === "good" ? "Strike" : "Ball"),
+      laces: isFG ? laces || undefined : undefined,
+      spiral: spiral === "Good" ? "Tight" : "Open",
+    };
+    onSaved?.(logEntry);
     onClose();
   };
+
+  const hashDisplay: Record<string, string> = { "Left Hash": "Left Hash", "LH": "Left Hash", "LM": "Left Middle", "M": "Middle", "RM": "Right Middle", "Right Hash": "Right Hash", "RH": "Right Hash" };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface border border-border rounded-xl w-full max-w-sm mx-4 p-4 space-y-3 max-h-[90vh] overflow-y-auto">
+        {/* Title: kicker, distance, hash */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-100">{isFG ? "Short" : "Long"} Snap — {snapper}</h3>
-            {totalLogged > 0 && <p className="text-[10px] text-sky-400">{totalLogged} snap{totalLogged !== 1 ? "s" : ""} logged</p>}
+            {kickerName && kickDistance ? (
+              <h3 className="text-sm font-bold text-slate-100">{kickerName} — {kickDistance} Yard Kick</h3>
+            ) : (
+              <h3 className="text-sm font-bold text-slate-100">{isFG ? "Short" : "Long"} Snap</h3>
+            )}
+            {kickHash && <p className="text-[10px] text-muted">{hashDisplay[kickHash] ?? kickHash}</p>}
           </div>
           <button onClick={onClose} className="text-muted hover:text-white text-xs">Done</button>
         </div>
 
         {isFG ? (
           <>
-            {/* Holder side toggle */}
-            <div className="flex rounded-input border border-border overflow-hidden w-fit">
-              <button onClick={() => setHolderSide("right")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", holderSide === "right" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Right</button>
-              <button onClick={() => setHolderSide("left")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", holderSide === "left" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Left</button>
+            {/* Snapper + Holder + Right/Left toggle row */}
+            <div className="flex items-start gap-3">
+              <div>
+                <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Snapper</p>
+                <div className="flex gap-1">
+                  {athletes.map((a) => (
+                    <button key={a} onClick={() => setSnapper(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", snapper === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Holder</p>
+                <div className="flex gap-1">
+                  {athletes.map((a) => (
+                    <button key={a} onClick={() => setHolder(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="ml-auto">
+                <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Side</p>
+                <div className="flex rounded-input border border-border overflow-hidden">
+                  <button onClick={() => setHolderSide("right")} className={clsx("px-2 py-1 text-[9px] font-semibold transition-colors", holderSide === "right" ? "bg-sky-500 text-slate-900" : "text-muted")}>R</button>
+                  <button onClick={() => setHolderSide("left")} className={clsx("px-2 py-1 text-[9px] font-semibold transition-colors border-l border-border", holderSide === "left" ? "bg-sky-500 text-slate-900" : "text-muted")}>L</button>
+                </div>
+              </div>
             </div>
 
-            {/* Holder diagram */}
-            <div className={clsx("flex items-center gap-1", holderSide === "left" && "flex-row-reverse")}>
+            {/* Diagram with Laces + Spiral */}
+            <div className="flex items-center gap-1">
               <div className="flex flex-col gap-1 shrink-0">
                 <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Laces</p>
                 <button onClick={() => setLaces("Good")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Perfect</button>
@@ -121,14 +148,7 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
                 <button onClick={() => setLaces("Back")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
               </div>
               <div className="flex-1 min-w-0" style={holderSide === "left" ? { transform: "scaleX(-1)" } : undefined}>
-                <HolderStrikeZone
-                  markers={marker ? [{ ...marker, num: 1 }] : []}
-                  onSnap={handleSnapClick}
-                  nextNum={1}
-                  chartMode="simple"
-                  missMode="simple"
-                  editable
-                />
+                <HolderStrikeZone markers={marker ? [{ ...marker, num: 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={1} chartMode="simple" missMode="simple" editable />
               </div>
               <div className="flex flex-col gap-1 shrink-0">
                 <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
@@ -137,33 +157,35 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
               </div>
             </div>
 
-            {marker && (
-              <p className="text-center text-xs">
-                <span className={clsx("font-bold", marker.inZone ? "text-make" : "text-miss")}>{marker.inZone ? "Strike" : "Ball"}</span>
-              </p>
-            )}
+            {marker && <p className="text-center text-xs"><span className={clsx("font-bold", marker.inZone ? "text-make" : "text-miss")}>{marker.inZone ? "Strike" : "Ball"}</span></p>}
           </>
         ) : (
           <>
-            {/* Punt snap: time + accuracy + spiral */}
-            <div>
-              <p className="text-[10px] text-muted mb-1">Time</p>
-              <input type="text" inputMode="numeric" value={time ? formatSnapTime(time) : ""} onChange={(e) => setTime(e.target.value.replace(/\D/g, ""))} placeholder="0.76" className="input w-24 text-center text-sm font-bold py-1.5" />
-            </div>
-
-            <div>
-              <p className="text-[10px] text-muted mb-1">Accuracy</p>
-              <div className="flex gap-1">
-                <button onClick={() => setAccuracy("good")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", accuracy === "good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Good</button>
-                <button onClick={() => setAccuracy("bad")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", accuracy === "bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Bad</button>
+            {/* Punt snap */}
+            <div className="flex items-start gap-3">
+              <div>
+                <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Snapper</p>
+                <div className="flex gap-1">
+                  {athletes.map((a) => (
+                    <button key={a} onClick={() => setSnapper(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", snapper === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
+                  ))}
+                </div>
               </div>
             </div>
-
-            <div>
-              <p className="text-[10px] text-muted mb-1">Spiral</p>
-              <div className="flex gap-1">
-                <button onClick={() => setSpiral("Good")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
-                <button onClick={() => setSpiral("Bad")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[10px] text-muted mb-1">Accuracy</p>
+                <div className="flex gap-1">
+                  <button onClick={() => setAccuracy("good")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", accuracy === "good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Good</button>
+                  <button onClick={() => setAccuracy("bad")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", accuracy === "bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Bad</button>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted mb-1">Spiral</p>
+                <div className="flex gap-1">
+                  <button onClick={() => setSpiral("Good")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+                  <button onClick={() => setSpiral("Bad")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+                </div>
               </div>
             </div>
           </>
@@ -172,6 +194,22 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
         <button onClick={handleSave} disabled={!canSave || saving} className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-40">
           {saving ? "Saving..." : "Log Snap"}
         </button>
+
+        {/* Logged snaps for this kick */}
+        {previousSnaps && previousSnaps.length > 0 && (
+          <div className="border-t border-border/50 pt-2 space-y-1">
+            {[...previousSnaps].reverse().map((s, i) => (
+              <div key={i} className="flex items-center text-[10px] gap-1.5">
+                <span className="text-muted">{previousSnaps.length - i}.</span>
+                <span className="text-slate-300 font-semibold">{getInitials(s.snapper)}</span>
+                {s.holder && <span className="text-slate-400">({getInitials(s.holder)})</span>}
+                <span className={clsx("font-bold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}</span>
+                {s.laces && <span className={clsx(s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{s.laces === "Good" ? "Perf" : s.laces}</span>}
+                <span className={clsx(s.spiral === "Tight" ? "text-make" : "text-miss")}>{s.spiral}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

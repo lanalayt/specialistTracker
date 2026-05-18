@@ -58,10 +58,9 @@ function AthleteChartInner() {
   const [liveDist, setLiveDist] = useState("30");
   const [liveHash, setLiveHash] = useState("M");
   const [showSnap, setShowSnap] = useState(false);
-  const [snapCount, setSnapCount] = useState(0);
   const [pendingResult, setPendingResult] = useState<FGResult | null>(null);
-  // Store snap data per kick key (player-kickIdx)
-  const [snapDataMap, setSnapDataMap] = useState<Record<string, { saved: boolean }>>({});
+  // Store snap logs per kick key (player-kickIdx)
+  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, { snapper: string; holder: string; accuracy: string; laces?: string; spiral: string }[]>>({});
 
   // Live charting state — rotate through athletes per kick
   const [currentKickIdx, setCurrentKickIdx] = useState(0);
@@ -410,7 +409,7 @@ function AthleteChartInner() {
               <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
             </div>
             {kickMode === "live" && (
-              <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", snapDataMap[`${currentPlayer}-${currentKickIdx}`]?.saved ? "border-make/50 text-make hover:bg-make/10" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{snapDataMap[`${currentPlayer}-${currentKickIdx}`]?.saved ? "Snap Logged" : "Log Snap"}</button>
+              <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "border-make/50 text-make hover:bg-make/10" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? `Snap (${snapLogsMap[`${currentPlayer}-${currentKickIdx}`].length})` : "Log Snap"}</button>
             )}
           </div>
 
@@ -482,10 +481,13 @@ function AthleteChartInner() {
         {showSnap && (
           <AthleteSnapPopup
             snapType="FG"
-            snapper={currentPlayer}
-            kickKey={`${currentPlayer}-${currentKickIdx}`}
+            athletes={athletes.map((a) => a.name)}
+            kickerName={currentPlayer}
+            kickDistance={kicks[currentKickIdx]?.distance}
+            kickHash={kicks[currentKickIdx]?.hash}
+            previousSnaps={snapLogsMap[`${currentPlayer}-${currentKickIdx}`]}
             onClose={() => setShowSnap(false)}
-            onSaved={() => setSnapDataMap((prev) => ({ ...prev, [`${currentPlayer}-${currentKickIdx}`]: { saved: true } }))}
+            onSaved={(entry) => setSnapLogsMap((prev) => ({ ...prev, [`${currentPlayer}-${currentKickIdx}`]: [...(prev[`${currentPlayer}-${currentKickIdx}`] ?? []), entry] }))}
           />
         )}
       </main>
@@ -688,7 +690,16 @@ function AthleteChartInner() {
       </div>
 
       {showSnap && (
-        <AthleteSnapPopup snapType="FG" snapper={currentPlayer} onClose={() => setShowSnap(false)} />
+        <AthleteSnapPopup
+          snapType="FG"
+          athletes={athletes.map((a) => a.name)}
+          kickerName={currentPlayer}
+          kickDistance={currentKick?.distance}
+          kickHash={currentKick?.hash}
+          previousSnaps={snapLogsMap[`${currentPlayer}-${currentKickIdx}`]}
+          onClose={() => setShowSnap(false)}
+          onSaved={(entry) => setSnapLogsMap((prev) => ({ ...prev, [`${currentPlayer}-${currentKickIdx}`]: [...(prev[`${currentPlayer}-${currentKickIdx}`] ?? []), entry] }))}
+        />
       )}
     </main>
   );
