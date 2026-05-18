@@ -8,6 +8,9 @@ import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider, useLongSnap } from "@/lib/longSnapContext";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteById, type StoredAthlete } from "@/lib/athleteStore";
+import { getTeamId } from "@/lib/teamData";
+import { useState as useStateReact, useEffect } from "react";
 import clsx from "clsx";
 
 function AthletesContent() {
@@ -17,6 +20,18 @@ function AthletesContent() {
   const snap = useLongSnap();
   const [newName, setNewName] = useState("");
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [holders, setHolders] = useState<StoredAthlete[]>([]);
+
+  useEffect(() => {
+    async function loadHolders() {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const h = await loadAthletes(tid, "HOLDING");
+      setHolders(h);
+    }
+    loadHolders();
+  }, []);
 
   // Master list = union of all sports' athlete names, preserving order
   const allNames = Array.from(
@@ -25,6 +40,7 @@ function AthletesContent() {
       ...punt.athletes.map((a) => a.name),
       ...kickoff.athletes.map((a) => a.name),
       ...snap.athletes.map((a) => a.name),
+      ...holders.map((a) => a.name),
     ])
   );
 
@@ -59,6 +75,7 @@ function AthletesContent() {
   const puntNames = new Set(punt.athletes.map((a) => a.name));
   const koNames = new Set(kickoff.athletes.map((a) => a.name));
   const snapNames = new Set(snap.athletes.map((a) => a.name));
+  const holderNames = new Set(holders.map((a) => a.name));
 
   const inSports = (name: string): string[] => {
     const sports: string[] = [];
@@ -66,6 +83,7 @@ function AthletesContent() {
     if (puntNames.has(name)) sports.push("Punt");
     if (koNames.has(name)) sports.push("KO");
     if (snapNames.has(name)) sports.push("Snap");
+    if (holderNames.has(name)) sports.push("H");
     return sports;
   };
 
@@ -124,14 +142,30 @@ function AthletesContent() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-100">{name}</p>
-                    <div className="flex gap-1 mt-1">
-                      {sports.length === 0 ? (
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {sports.filter((s) => s !== "H").length === 0 && !holderNames.has(name) ? (
                         <span className="text-[10px] text-muted italic">not on any roster</span>
-                      ) : sports.map((sp) => (
+                      ) : sports.filter((s) => s !== "H").map((sp) => (
                         <span key={sp} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold border border-accent/20">
                           {sp}
                         </span>
                       ))}
+                      <button
+                        onClick={async () => {
+                          const tid = getTeamId();
+                          if (!tid) return;
+                          if (holderNames.has(name)) {
+                            const h = holders.find((a) => a.name === name);
+                            if (h) { await removeAthleteById(tid, h.id); setHolders((prev) => prev.filter((a) => a.id !== h.id)); }
+                          } else {
+                            const result = await insertAthlete(tid, "HOLDING", name);
+                            if (result) setHolders((prev) => [...prev, result]);
+                          }
+                        }}
+                        className={clsx("text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-all", holderNames.has(name) ? "bg-sky-500/15 text-sky-400 border-sky-500/30" : "bg-surface-2 text-muted border-border hover:text-white")}
+                      >
+                        H
+                      </button>
                     </div>
                   </div>
                   <RoleGuard coachOnly>

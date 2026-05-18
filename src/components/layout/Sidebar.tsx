@@ -31,6 +31,7 @@ const ATHLETE_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: 
   { href: "/athlete/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/athlete/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/athlete/longsnap", label: "Snapping", icon: "📏" },
+  { href: "/athlete/athletes", label: "Athletes", icon: "👥" },
   { href: "/athlete/archives", label: "Archives", icon: "🗄" },
 ];
 
