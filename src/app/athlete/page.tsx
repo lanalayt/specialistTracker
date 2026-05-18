@@ -79,10 +79,10 @@ export default function AthleteDashboardPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-slate-100">
-                          FG Chart — {chart.kicks.length} kick{chart.kicks.length !== 1 ? "s" : ""}
+                          {chart.sport === "ATHLETE_KICKING" ? "FG" : chart.sport === "ATHLETE_PUNTING" ? "Punt" : "KO"} Chart — {chart.reps ? `${chart.reps} reps` : `${chart.kicks.length} kick${chart.kicks.length !== 1 ? "s" : ""}`}
                         </p>
                         <p className="text-[10px] text-muted">
-                          From {chart.createdBy} — {chart.kicks.map((k) => `${k.distance}${k.hash}`).join(", ")}
+                          From {chart.createdBy}{chart.kicks.length > 0 ? ` — ${chart.kicks.map((k) => `${k.distance}${k.hash}`).join(", ")}` : ""}
                         </p>
                       </div>
                       <div className="text-right shrink-0 ml-3">
@@ -92,15 +92,14 @@ export default function AthleteDashboardPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {pending.map((name) => (
-                        <Link
-                          key={name}
-                          href={`/athlete/kicking/off-sticks/athlete-chart?assigned=${chart.id}`}
-                          className="text-[10px] px-2 py-0.5 rounded-input border border-miss/40 text-miss font-semibold hover:bg-miss/10 transition-colors"
-                        >
-                          {name} — incomplete
-                        </Link>
-                      ))}
+                      {pending.map((name) => {
+                        const chartPath = chart.sport === "ATHLETE_PUNTING" ? "/athlete/punting/athlete-chart" : chart.sport === "ATHLETE_KICKOFF" ? "/athlete/kickoff/athlete-chart" : "/athlete/kicking/off-sticks/athlete-chart";
+                        return (
+                          <Link key={name} href={`${chartPath}?assigned=${chart.id}`} className="text-[10px] px-2 py-0.5 rounded-input border border-miss/40 text-miss font-semibold hover:bg-miss/10 transition-colors">
+                            {name} — incomplete
+                          </Link>
+                        );
+                      })}
                       {completed.map((name) => (
                         <span key={name} className="text-[10px] px-2 py-0.5 rounded-input border border-make/40 text-make font-semibold">
                           {name} — done

@@ -263,12 +263,13 @@ export async function saveScoutAthletes(teamId: string, sport: string, names: st
 export interface AssignedChart {
   id: string;
   sport: string;
-  createdBy: string; // coach name or id
+  createdBy: string;
   createdAt: string;
   dueDate: string;
-  athletes: string[]; // assigned athlete names
+  athletes: string[];
   kicks: { distance: number; hash: string; pointValue: number }[];
-  completedBy: Record<string, string>; // athleteName → completedDate ISO
+  reps?: number; // for punt/KO — number of reps per athlete
+  completedBy: Record<string, string>;
 }
 
 const ASSIGNED_CHARTS_KEY = "assigned_charts";
