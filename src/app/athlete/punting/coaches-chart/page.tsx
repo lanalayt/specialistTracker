@@ -8,16 +8,69 @@ import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/li
 import Link from "next/link";
 import clsx from "clsx";
 
-const DEFAULT_PUNT_TYPES = ["Open Field", "Pooch", "Rugby", "Banana"];
+const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
+
+interface PuntTypeConfig { id: string; label: string; category: string; metric: string; hangTime: boolean }
+interface PuntCategory { id: string; label: string; enabled: boolean }
+
+const DEFAULT_CATEGORIES: PuntCategory[] = [
+  { id: "DIRECTIONAL", label: "Directional", enabled: true },
+  { id: "POOCH", label: "Pooch", enabled: true },
+  { id: "BANANA", label: "Banana", enabled: true },
+  { id: "RUGBY", label: "Rugby", enabled: true },
+];
+
+const DEFAULT_TYPES: PuntTypeConfig[] = [
+  { id: "DIR_LEFT", label: "Left", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_STRAIGHT", label: "Straight", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_RIGHT", label: "Right", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "POOCH_LEFT", label: "Pooch Left", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_RIGHT", label: "Pooch Right", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "BANANA_LEFT", label: "Banana Left", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "BANANA_RIGHT", label: "Banana Right", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "RUGBY", label: "Rugby", category: "RUGBY", metric: "distance", hangTime: true },
+];
+
+function loadPuntSettings() {
+  if (typeof window === "undefined") return { types: DEFAULT_TYPES, categories: DEFAULT_CATEGORIES };
+  try {
+    const raw = localStorage.getItem("puntSettings");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const categories = parsed.puntCategories?.length > 0 ? parsed.puntCategories : DEFAULT_CATEGORIES;
+      const types = parsed.puntTypes?.length > 0 ? parsed.puntTypes : DEFAULT_TYPES;
+      return { types: types as PuntTypeConfig[], categories: categories as PuntCategory[] };
+    }
+  } catch {}
+  return { types: DEFAULT_TYPES, categories: DEFAULT_CATEGORIES };
+}
+
+interface PuntRow {
+  category: string;
+  count: number;
+  typeId: string;
+  hash: string;
+}
 
 export default function PuntCoachesChartPage() {
   const { user, isCoach } = useAuth();
   const { athletes } = usePunt();
   const athleteNames = athletes.map((a) => a.name);
 
-  const [puntTypeOptions, setPuntTypeOptions] = useState(DEFAULT_PUNT_TYPES);
-  const [puntRows, setPuntRows] = useState<{ type: string; count: number }[]>([{ type: "Open Field", count: 5 }]);
-  const [newTypeName, setNewTypeName] = useState("");
+  const [puntTypes, setPuntTypes] = useState<PuntTypeConfig[]>(DEFAULT_TYPES);
+  const [puntCategories, setPuntCategories] = useState<PuntCategory[]>(DEFAULT_CATEGORIES);
+
+  useEffect(() => {
+    const { types, categories } = loadPuntSettings();
+    setPuntTypes(types);
+    setPuntCategories(categories);
+  }, []);
+
+  const enabledCategories = puntCategories.filter((c) => c.enabled);
+  const getTypesForCategory = (catId: string) => puntTypes.filter((t) => t.category === catId);
+
+  const [puntRows, setPuntRows] = useState<PuntRow[]>([{ category: "DIRECTIONAL", count: 5, typeId: "DIR_STRAIGHT", hash: "M" }]);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState("");
   const [saved, setSaved] = useState(false);
@@ -44,16 +97,23 @@ export default function PuntCoachesChartPage() {
   const selectAll = () => setSelectedPlayers(athleteNames);
   const toggleReassignPlayer = (name: string) => setReassignPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
 
-  const updateRowType = (idx: number, type: string) => {
-    setPuntRows((prev) => prev.map((r, i) => i === idx ? { ...r, type } : r));
-  };
-
-  const updateRowCount = (idx: number, count: number) => {
-    setPuntRows((prev) => prev.map((r, i) => i === idx ? { ...r, count } : r));
+  const updateRow = (idx: number, field: keyof PuntRow, value: string | number) => {
+    setPuntRows((prev) => prev.map((r, i) => {
+      if (i !== idx) return r;
+      const updated = { ...r, [field]: value };
+      // When category changes, auto-select first type in that category
+      if (field === "category") {
+        const types = getTypesForCategory(value as string);
+        updated.typeId = types[0]?.id ?? "";
+      }
+      return updated;
+    }));
   };
 
   const addRow = () => {
-    setPuntRows((prev) => [...prev, { type: "Open Field", count: 0 }]);
+    const firstCat = enabledCategories[0]?.id ?? "DIRECTIONAL";
+    const firstType = getTypesForCategory(firstCat)[0]?.id ?? "";
+    setPuntRows((prev) => [...prev, { category: firstCat, count: 0, typeId: firstType, hash: "M" }]);
   };
 
   const removeRow = (idx: number) => {
@@ -61,21 +121,21 @@ export default function PuntCoachesChartPage() {
     setPuntRows((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const addCustomType = () => {
-    const trimmed = newTypeName.trim();
-    if (!trimmed || puntTypeOptions.includes(trimmed)) return;
-    setPuntTypeOptions((prev) => [...prev, trimmed]);
-    setNewTypeName("");
-  };
-
   const handleAssign = async () => {
     if (totalReps <= 0 || selectedPlayers.length === 0 || !dueDate) return;
     const tid = getTeamId();
     if (!tid) return;
+    const puntTypeBreakdown = puntRows.filter((r) => r.count > 0).map((r) => {
+      const typeConfig = puntTypes.find((t) => t.id === r.typeId);
+      const catConfig = puntCategories.find((c) => c.id === r.category);
+      return { type: catConfig?.label ?? r.category, typeId: r.typeId, typeLabel: typeConfig?.label ?? r.typeId, count: r.count, hash: r.hash };
+    });
     const chart: AssignedChart = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "ATHLETE_PUNTING", createdBy: user?.name ?? "Coach", createdAt: new Date().toISOString(),
-      dueDate, athletes: selectedPlayers, kicks: [], reps: totalReps, puntTypes: puntRows.filter((r) => r.count > 0), completedBy: {},
+      dueDate, athletes: selectedPlayers, kicks: [], reps: totalReps,
+      puntTypes: puntTypeBreakdown.map((p) => ({ type: `${p.type} - ${p.typeLabel}`, count: p.count, typeId: p.typeId, hash: p.hash } as any)),
+      completedBy: {},
     };
     const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
@@ -105,13 +165,13 @@ export default function PuntCoachesChartPage() {
     const isReassigning = reassignId === chart.id;
     const pending = chart.athletes.filter((a) => !chart.completedBy[a]);
     const completed = chart.athletes.filter((a) => !!chart.completedBy[a]);
-    const types = chart.puntTypes ?? (chart.reps ? [{ type: "Open Field", count: chart.reps }] : []);
+    const types = chart.puntTypes ?? [];
     return (
       <div key={chart.id} className="card-2 space-y-2">
         <button onClick={() => setExpandedId(isExpanded ? null : chart.id)} className="w-full text-left flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-200">{chart.reps} punt{(chart.reps ?? 0) !== 1 ? "s" : ""} — Due {new Date(chart.dueDate).toLocaleDateString()}</p>
-            <p className="text-[10px] text-muted">{types.map((t) => `${t.type} (${t.count})`).join(", ")}</p>
+            <p className="text-[10px] text-muted">{types.map((t: any) => `${t.type} ×${t.count}${t.hash ? ` (${t.hash})` : ""}`).join(", ")}</p>
           </div>
           <span className="text-xs text-muted">{isExpanded ? "▼" : "▶"}</span>
         </button>
@@ -162,47 +222,36 @@ export default function PuntCoachesChartPage() {
           <p className="text-2xl font-black text-sky-400">Chart Assigned!</p>
           <p className="text-sm text-muted">{totalReps} punts — {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""}</p>
           <div className="flex gap-3 max-w-sm mx-auto">
-            <button onClick={() => { setPuntRows([{ type: "Open Field", count: 5 }]); setSelectedPlayers([]); setDueDate(""); setSaved(false); }} className="btn-primary flex-1 py-3 text-sm">Create Another</button>
+            <button onClick={() => { setPuntRows([{ category: "DIRECTIONAL", count: 5, typeId: "DIR_STRAIGHT", hash: "M" }]); setSelectedPlayers([]); setDueDate(""); setSaved(false); }} className="btn-primary flex-1 py-3 text-sm">Create Another</button>
             <Link href="/athlete/punting/session" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
           </div>
         </div>
       ) : (
         <>
-          {/* Punt type rows */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Punt Types</p>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Punt Chart</p>
             {puntRows.map((row, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <select value={row.type} onChange={(e) => updateRowType(idx, e.target.value)} className="input flex-1 text-sm py-1.5">
-                  {puntTypeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+              <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                {/* Category */}
+                <select value={row.category} onChange={(e) => updateRow(idx, "category", e.target.value)} className="input text-xs py-1.5 w-24">
+                  {enabledCategories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
                 </select>
-                <input type="text" inputMode="numeric" value={row.count || ""} onChange={(e) => updateRowCount(idx, parseInt(e.target.value.replace(/\D/g, "")) || 0)} className="input w-14 text-center text-sm font-bold py-1.5" />
+                {/* Count */}
+                <input type="text" inputMode="numeric" value={row.count || ""} onChange={(e) => updateRow(idx, "count", parseInt(e.target.value.replace(/\D/g, "")) || 0)} className="input w-12 text-center text-xs font-bold py-1.5" />
+                {/* Sub-type */}
+                <select value={row.typeId} onChange={(e) => updateRow(idx, "typeId", e.target.value)} className="input text-xs py-1.5 flex-1 min-w-[80px]">
+                  {getTypesForCategory(row.category).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+                {/* Hash */}
+                <select value={row.hash} onChange={(e) => updateRow(idx, "hash", e.target.value)} className="input text-xs py-1.5 w-16">
+                  {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
                 {puntRows.length > 1 && (
                   <button onClick={() => removeRow(idx)} className="text-miss text-xs hover:underline">&times;</button>
                 )}
               </div>
             ))}
-            <button onClick={addRow} className="text-[10px] text-sky-400 hover:underline">+ Add punt type</button>
-
-            {/* Custom types management */}
-            <div className="flex gap-2">
-              <input type="text" value={newTypeName} onChange={(e) => setNewTypeName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCustomType(); }} placeholder="Custom punt type..." className="input flex-1 text-xs py-1" />
-              <button onClick={addCustomType} disabled={!newTypeName.trim()} className="text-[10px] text-sky-400 hover:underline disabled:opacity-40">Add</button>
-            </div>
-            {puntTypeOptions.filter((t) => !DEFAULT_PUNT_TYPES.includes(t)).length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {puntTypeOptions.filter((t) => !DEFAULT_PUNT_TYPES.includes(t)).map((t) => (
-                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-input border border-border text-muted flex items-center gap-1">
-                    {t}
-                    <button onClick={() => {
-                      setPuntTypeOptions((prev) => prev.filter((p) => p !== t));
-                      setPuntRows((prev) => prev.map((r) => r.type === t ? { ...r, type: "Open Field" } : r));
-                    }} className="text-miss hover:text-miss/80">&times;</button>
-                  </span>
-                ))}
-              </div>
-            )}
-
+            <button onClick={addRow} className="text-[10px] text-sky-400 hover:underline">+ Add punt</button>
             <p className="text-xs text-muted">Total: {totalReps} punt{totalReps !== 1 ? "s" : ""} per player</p>
           </div>
 
