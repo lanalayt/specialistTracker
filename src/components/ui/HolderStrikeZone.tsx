@@ -16,6 +16,7 @@ interface HolderStrikeZoneProps {
   chartMode?: "simple" | "detailed";
   missMode?: "simple" | "detailed";
   editable?: boolean;
+  flipped?: boolean;
 }
 
 const DEFAULT_HOLDER_ZONE = { top: 45, bottom: 78, left: 42, right: 76 };
@@ -46,7 +47,7 @@ function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simp
 
 type DragEdge = "top" | "bottom" | "left" | "right" | null;
 
-export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode, missMode, editable = false }: HolderStrikeZoneProps) {
+export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode, missMode, editable = false, flipped = false }: HolderStrikeZoneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zone, setZone] = useState(loadHolderZone);
   const [dragEdge, setDragEdge] = useState<DragEdge>(null);
@@ -159,7 +160,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
               border: `2px solid ${m.inZone ? "#00d4a0" : "#ef4444"}`,
             }}
           >
-            <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
+            <span className="text-[10px] font-black text-white leading-none" style={flipped ? { transform: "scaleX(-1)" } : undefined}>{m.num}</span>
           </div>
         ))}
 
@@ -176,7 +177,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
 
       {/* Edit controls */}
       {editable && (
-        <div className="flex gap-1 justify-center mt-1">
+        <div className="flex gap-1 justify-center mt-1" style={flipped ? { transform: "scaleX(-1)" } : undefined}>
           <button onClick={() => setIsEditing((v) => !v)} className={`text-[8px] px-1.5 py-0.5 rounded border font-semibold transition-all ${isEditing ? "border-accent/50 text-accent bg-accent/10" : "border-border/50 text-muted/60 hover:text-white"}`}>{isEditing ? "Done" : "Edit Zone"}</button>
           {isEditing && <button onClick={() => setZone({ ...DEFAULT_HOLDER_ZONE })} className="text-[8px] px-1.5 py-0.5 rounded border border-border/50 text-muted/60 hover:text-white font-semibold transition-all">Reset</button>}
         </div>

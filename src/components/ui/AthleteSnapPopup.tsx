@@ -154,7 +154,7 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
                 <button onClick={() => setLaces("Back")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
               </div>
               <div className="flex-1 min-w-0" style={holderSide === "left" ? { transform: "scaleX(-1)" } : undefined}>
-                <HolderStrikeZone markers={marker ? [{ ...marker, num: 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={1} chartMode="simple" missMode="simple" editable />
+                <HolderStrikeZone markers={marker ? [{ ...marker, num: 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={1} chartMode="simple" missMode="simple" editable flipped={holderSide === "left"} />
               </div>
               <div className="flex flex-col gap-1 shrink-0">
                 <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
