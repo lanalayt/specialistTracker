@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { FGProvider } from "@/lib/fgContext";
+import { Header } from "@/components/layout/Header";
 import { SportSubNav } from "@/components/ui/SportSubNav";
 
 export default function AthleteKickingLayout({ children }: { children: React.ReactNode }) {
@@ -9,6 +10,7 @@ export default function AthleteKickingLayout({ children }: { children: React.Rea
   const isHub = pathname === "/athlete/kicking";
   return (
     <FGProvider sportKey="ATHLETE_KICKING">
+      <Header title="FG Kicking" />
       {!isHub && (
         <SportSubNav
           basePath="/athlete/kicking"

@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { PuntProvider } from "@/lib/puntContext";
+import { Header } from "@/components/layout/Header";
 import { SportSubNav } from "@/components/ui/SportSubNav";
 
 export default function AthletePuntingLayout({ children }: { children: React.ReactNode }) {
@@ -9,6 +10,7 @@ export default function AthletePuntingLayout({ children }: { children: React.Rea
   const isHub = pathname === "/athlete/punting";
   return (
     <PuntProvider sportKey="ATHLETE_PUNTING">
+      <Header title="Punting" />
       {!isHub && (
         <SportSubNav
           basePath="/athlete/punting"

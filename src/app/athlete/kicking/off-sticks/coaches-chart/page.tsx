@@ -92,6 +92,15 @@ export default function CoachesChartPage() {
     loadCharts();
   };
 
+  const handleDeleteAssignedChart = async (chartId: string) => {
+    if (!window.confirm("Are you sure you want to delete this assigned chart? This cannot be undone.")) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const existing = await loadAssignedCharts(tid);
+    await saveAssignedCharts(tid, existing.filter((c) => c.id !== chartId));
+    loadCharts();
+  };
+
   const handleReassign = async (chartId: string) => {
     if (reassignPlayers.length === 0 || !reassignDate) return;
     const tid = getTeamId();
@@ -252,9 +261,10 @@ export default function CoachesChartPage() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    {isCoach && !isReassigning && (
+                    {isCoach && !isReassigning && (<>
                       <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign this chart</button>
-                    )}
+                      <button onClick={() => handleDeleteAssignedChart(chart.id)} className="text-[10px] text-miss hover:underline">Delete chart</button>
+                    </>)}
                     {completed.length > 0 && showStatsId !== chart.id && (
                       <button onClick={() => setShowStatsId(chart.id)} className="text-[10px] text-sky-400 hover:underline">Show stats</button>
                     )}

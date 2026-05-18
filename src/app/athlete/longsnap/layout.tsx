@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { LongSnapProvider } from "@/lib/longSnapContext";
+import { Header } from "@/components/layout/Header";
 import { SportSubNav } from "@/components/ui/SportSubNav";
 
 export default function AthleteLongSnapLayout({ children }: { children: React.ReactNode }) {
@@ -9,6 +10,7 @@ export default function AthleteLongSnapLayout({ children }: { children: React.Re
   const isHub = pathname === "/athlete/longsnap";
   return (
     <LongSnapProvider sportKey="ATHLETE_LONGSNAP">
+      <Header title="Snapping" />
       {!isHub && (
         <SportSubNav
           basePath="/athlete/longsnap"

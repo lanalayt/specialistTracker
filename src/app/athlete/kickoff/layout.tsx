@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { KickoffProvider } from "@/lib/kickoffContext";
+import { Header } from "@/components/layout/Header";
 import { SportSubNav } from "@/components/ui/SportSubNav";
 
 export default function AthleteKickoffLayout({ children }: { children: React.ReactNode }) {
@@ -9,6 +10,7 @@ export default function AthleteKickoffLayout({ children }: { children: React.Rea
   const isHub = pathname === "/athlete/kickoff";
   return (
     <KickoffProvider sportKey="ATHLETE_KICKOFF">
+      <Header title="Kickoff" />
       {!isHub && (
         <SportSubNav
           basePath="/athlete/kickoff"

@@ -150,6 +150,15 @@ export default function PuntCoachesChartPage() {
     loadCharts();
   };
 
+  const handleDeleteAssignedChart = async (chartId: string) => {
+    if (!window.confirm("Are you sure you want to delete this assigned chart? This cannot be undone.")) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const existing = await loadAssignedCharts(tid);
+    await saveAssignedCharts(tid, existing.filter((c) => c.id !== chartId));
+    loadCharts();
+  };
+
   const handleReassign = async (chartId: string) => {
     if (reassignPlayers.length === 0 || !reassignDate) return;
     const tid = getTeamId();
@@ -192,9 +201,10 @@ export default function PuntCoachesChartPage() {
                 <span key={a} className="text-[10px] px-2 py-0.5 rounded-input border border-make/40 text-make font-semibold">{a} — done</span>
               ))}
             </div>
-            {isCoach && !isReassigning && (
+            {isCoach && !isReassigning && (<>
               <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign</button>
-            )}
+              <button onClick={() => handleDeleteAssignedChart(chart.id)} className="text-[10px] text-miss hover:underline">Delete chart</button>
+            </>)}
             {isReassigning && (
               <div className="card space-y-3">
                 <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Re-assign</p>
