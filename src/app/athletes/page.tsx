@@ -22,6 +22,7 @@ function AthletesContent() {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [popupAthlete, setPopupAthlete] = useState<string | null>(null);
   const [popupName, setPopupName] = useState("");
+  const [popupPhases, setPopupPhases] = useState<Record<string, boolean>>({});
   const [holders, setHolders] = useState<StoredAthlete[]>([]);
 
   useEffect(() => {
@@ -114,15 +115,12 @@ function AthletesContent() {
     const tid = getTeamId();
     if (!tid) return;
     if (isIn) {
-      // Remove from sport
       const athletes = await loadAthletes(tid, sportKey);
       const found = athletes.find((a) => a.name === name);
       if (found) await removeAthleteById(tid, found.id);
     } else {
-      // Add to sport
       await insertAthlete(tid, sportKey, name);
     }
-    window.location.reload();
   };
 
   const fgNames = new Set(fg.athletes.map((a) => a.name));
@@ -195,7 +193,7 @@ function AthletesContent() {
                     {name[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <button onClick={() => { setPopupAthlete(name); setPopupName(name); }} className="text-sm font-semibold text-slate-100 hover:text-accent transition-colors text-left">{name}</button>
+                    <button onClick={() => { setPopupAthlete(name); setPopupName(name); setPopupPhases({ KICKING: fgNames.has(name), PUNTING: puntNames.has(name), KICKOFF: koNames.has(name), LONGSNAP: snapNames.has(name), HOLDING: holderNames.has(name) }); }} className="text-sm font-semibold text-slate-100 hover:text-accent transition-colors text-left">{name}</button>
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {sports.map((sp) => (
                         <span key={sp} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold border border-accent/20">{sp}</span>
@@ -246,17 +244,17 @@ function AthletesContent() {
                 <p className="text-[10px] text-muted uppercase tracking-wider mb-2">Phases</p>
                 <div className="space-y-2">
                   {[
-                    { label: "FG Kicking", key: "KICKING", isIn: fgNames.has(popupAthlete) },
-                    { label: "Punting", key: "PUNTING", isIn: puntNames.has(popupAthlete) },
-                    { label: "Kickoff", key: "KICKOFF", isIn: koNames.has(popupAthlete) },
-                    { label: "Long Snap", key: "LONGSNAP", isIn: snapNames.has(popupAthlete) },
-                    { label: "Holder", key: "HOLDING", isIn: holderNames.has(popupAthlete) },
+                    { label: "FG Kicking", key: "KICKING" },
+                    { label: "Punting", key: "PUNTING" },
+                    { label: "Kickoff", key: "KICKOFF" },
+                    { label: "Long Snap", key: "LONGSNAP" },
+                    { label: "Holder", key: "HOLDING" },
                   ].map((sp) => (
                     <label key={sp.key} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={sp.isIn}
-                        onChange={() => toggleSport(popupAthlete, sp.label, sp.key, sp.isIn)}
+                        checked={popupPhases[sp.key] ?? false}
+                        onChange={() => setPopupPhases((prev) => ({ ...prev, [sp.key]: !prev[sp.key] }))}
                         className="w-4 h-4 rounded border-border accent-accent"
                       />
                       <span className="text-xs text-slate-200">{sp.label}</span>
@@ -265,11 +263,31 @@ function AthletesContent() {
                 </div>
               </div>
 
-              {popupName.trim() && popupName.trim() !== popupAthlete && (
-                <button onClick={() => handleRename(popupAthlete, popupName)} className="btn-primary w-full py-2 text-sm font-bold">
-                  Save Name Change
-                </button>
-              )}
+              <button
+                onClick={async () => {
+                  if (!popupAthlete) return;
+                  // Handle name change
+                  if (popupName.trim() && popupName.trim() !== popupAthlete) {
+                    await handleRename(popupAthlete, popupName);
+                    return;
+                  }
+                  // Handle phase changes
+                  const original: Record<string, boolean> = {
+                    KICKING: fgNames.has(popupAthlete), PUNTING: puntNames.has(popupAthlete),
+                    KICKOFF: koNames.has(popupAthlete), LONGSNAP: snapNames.has(popupAthlete),
+                    HOLDING: holderNames.has(popupAthlete),
+                  };
+                  for (const key of Object.keys(popupPhases)) {
+                    if (popupPhases[key] !== original[key]) {
+                      await toggleSport(popupAthlete, key, key, original[key]);
+                    }
+                  }
+                  window.location.reload();
+                }}
+                className="btn-primary w-full py-2 text-sm font-bold"
+              >
+                Save
+              </button>
             </div>
           </div>
         )}
