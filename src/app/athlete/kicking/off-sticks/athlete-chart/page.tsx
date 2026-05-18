@@ -74,6 +74,24 @@ function AthleteChartInner() {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
   };
 
+  // Check for "Chart Now" from coaches chart
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("coach_fg_chart_now");
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.kicks?.length > 0 && data.players?.length > 0) {
+          setKicks(data.kicks);
+          setSelectedPlayers(data.players);
+          setPhase("live");
+          setCurrentKickIdx(0);
+          setCurrentPlayerIdx(0);
+        }
+        localStorage.removeItem("coach_fg_chart_now");
+      }
+    } catch {}
+  }, []);
+
   useUnsavedWarning(results.length > 0 && !saved);
 
   const addKick = () => {

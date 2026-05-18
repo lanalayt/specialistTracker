@@ -43,6 +43,23 @@ function KOAthleteChartInner() {
   const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
   const totalReps = parseInt(reps) || 0;
 
+  // Check for "Chart Now" from coaches chart
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("coach_ko_chart_now");
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.players?.length > 0) {
+          setSelectedPlayers(data.players);
+          setReps(String(data.reps ?? 5));
+          setPhase("live");
+          setCurrentPlayerIdx(0);
+        }
+        localStorage.removeItem("coach_ko_chart_now");
+      }
+    } catch {}
+  }, []);
+
   useUnsavedWarning(results.length > 0 && !saved);
 
   useEffect(() => {

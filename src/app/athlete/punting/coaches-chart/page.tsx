@@ -10,9 +10,9 @@ import clsx from "clsx";
 
 const HASH_OPTIONS = [
   { value: "Left", label: "Left Hash" },
-  { value: "LM", label: "LM Hash" },
+  { value: "LM", label: "LM" },
   { value: "M", label: "Middle" },
-  { value: "RM", label: "RM Hash" },
+  { value: "RM", label: "RM" },
   { value: "Right", label: "Right Hash" },
 ];
 

@@ -54,6 +54,24 @@ function PuntAthleteChartInner() {
 
   useUnsavedWarning(results.length > 0 && !saved);
 
+  // Check for "Chart Now" from coaches chart
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("coach_punt_chart_now");
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.players?.length > 0) {
+          setSelectedPlayers(data.players);
+          setReps(String(data.reps ?? 5));
+          // Store puntRows for the schedule
+          if (data.puntRows) setAssignedChart({ id: "chart-now", sport: "ATHLETE_PUNTING", createdBy: "Coach", createdAt: new Date().toISOString(), dueDate: "", athletes: data.players, kicks: [], reps: data.reps, puntTypes: data.puntRows.map((r: any) => ({ type: r.category, typeId: r.typeId, typeLabel: r.category, count: r.count, hash: r.hash })), completedBy: {} } as AssignedChart);
+          setPhase("live");
+        }
+        localStorage.removeItem("coach_punt_chart_now");
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (!assignedId) return;
     async function load() {
@@ -276,6 +294,7 @@ function PuntAthleteChartInner() {
   return (
     <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-5xl">
       <div className="space-y-4">
+        <Link href="/athlete/punting/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-muted uppercase tracking-wider">Punt Chart</p>
