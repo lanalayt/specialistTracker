@@ -8,7 +8,7 @@ const POSITION_OPTIONS = ["Kicker", "Punter", "Snapper"];
 
 interface Props {
   profile: ScoutProfile;
-  onSave: (profile: ScoutProfile) => void;
+  onSave: (profile: ScoutProfile, originalName?: string) => void;
   onClose: () => void;
 }
 
@@ -62,7 +62,6 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
                 onChange={(e) => update(f.key, e.target.value)}
                 placeholder={f.placeholder}
                 className="input w-full text-sm py-1.5"
-                readOnly={f.key === "name"}
               />
             </div>
           ))}
@@ -111,7 +110,7 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
         </div>
 
         <button
-          onClick={() => onSave(form)}
+          onClick={() => onSave(form, profile.name !== form.name ? profile.name : undefined)}
           className="btn-primary w-full py-2.5 text-sm font-bold"
         >
           Save Profile

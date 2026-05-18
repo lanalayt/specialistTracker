@@ -99,10 +99,12 @@ export default function ScoutKOPage() {
     await loadData();
   };
 
-  const handleSaveProfile = async (profile: ScoutProfile) => {
+  const handleSaveProfile = async (profile: ScoutProfile, originalName?: string) => {
     const tid = getTeamId();
     if (!tid) return;
-    const updated = { ...profiles, [profile.name]: profile };
+    const updated = { ...profiles };
+    if (originalName && originalName !== profile.name) delete updated[originalName];
+    updated[profile.name] = profile;
     setProfiles(updated);
     await saveScoutProfiles(tid, updated);
     setProfileOpen(null);

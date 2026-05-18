@@ -95,10 +95,24 @@ export default function ScoutAthletesPage() {
     setAllNames((prev) => prev.filter((n) => n !== name));
   };
 
-  const handleSaveProfile = async (profile: ScoutProfile) => {
+  const handleSaveProfile = async (profile: ScoutProfile, originalName?: string) => {
     const tid = getTeamId();
     if (!tid) return;
-    const updated = { ...profiles, [profile.name]: profile };
+    const updated = { ...profiles };
+    if (originalName && originalName !== profile.name) {
+      delete updated[originalName];
+      // Update name in all sport athlete lists
+      for (const sport of SPORTS) {
+        const list = sportAthletes[sport.key] ?? [];
+        if (list.includes(originalName)) {
+          const newList = list.map((n) => n === originalName ? profile.name : n);
+          setSportAthletes((prev) => ({ ...prev, [sport.key]: newList }));
+          await saveScoutAthletes(tid, sport.key, newList);
+        }
+      }
+      setAllNames((prev) => prev.map((n) => n === originalName ? profile.name : n).sort((a, b) => a.localeCompare(b)));
+    }
+    updated[profile.name] = profile;
     setProfiles(updated);
     await saveScoutProfiles(tid, updated);
     setProfileOpen(null);
