@@ -1790,7 +1790,7 @@ export default function KickingSessionPage() {
                   onClick={() => setShowSnapOverlay(true)}
                   className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
                 >
-                  Snap
+                  Log Snap
                 </button>
                 <button
                   onClick={addRow}
