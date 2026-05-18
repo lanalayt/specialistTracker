@@ -16,6 +16,7 @@ import { POSITIONS, RESULTS } from "@/types";
 
 const HASH_OPTIONS = ["Left Hash", "LM", "M", "RM", "Right Hash"];
 const HASH_TO_POS: Record<string, FGPosition> = { "Left Hash": "LH", "LM": "LM", "M": "M", "RM": "RM", "Right Hash": "RH" };
+const HASH_DISPLAY: Record<string, string> = { "Left Hash": "Left Hash", "LH": "Left Hash", "LM": "Left Middle", "M": "Middle", "RM": "Right Middle", "Right Hash": "Right Hash", "RH": "Right Hash" };
 const RESULT_LABEL: Record<string, string> = { YL: "GOOD", YC: "GOOD", YR: "GOOD", XL: "MISS LEFT", XR: "MISS RIGHT", XS: "MISS SHORT", X: "MISS" };
 
 interface PresetKick { distance: number; hash: string; pointValue: number }
@@ -394,10 +395,15 @@ function AthleteChartInner() {
             </div>
           )}
 
-          {/* Sticks / Live toggle */}
-          <div className="flex rounded-input border border-border overflow-hidden w-fit">
-            <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
-            <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
+          {/* Sticks / Live toggle + Log Snap */}
+          <div className="flex items-center gap-3">
+            <div className="flex rounded-input border border-border overflow-hidden w-fit">
+              <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
+              <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
+            </div>
+            {kickMode === "live" && (
+              <button onClick={() => setShowSnap(true)} className="px-3 py-1.5 rounded-input border border-sky-500/30 text-sky-400 text-[10px] font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
+            )}
           </div>
 
           {/* Distance + Hash inputs */}
@@ -435,8 +441,6 @@ function AthleteChartInner() {
             {results.length > 0 && <button onClick={handleFinishLive} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish</button>}
           </div>
 
-          {/* Snap button */}
-          <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
 
           {/* Running log */}
           {results.length > 0 && (
@@ -573,16 +577,21 @@ function AthleteChartInner() {
           <div className="h-full bg-sky-500 transition-all" style={{ width: `${(results.length / kicks.length) * 100}%` }} />
         </div>
 
-        {/* Sticks / Live toggle */}
-        <div className="flex rounded-input border border-border overflow-hidden w-fit">
-          <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
-          <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
+        {/* Sticks / Live toggle + Log Snap */}
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+            <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
+            <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
+          </div>
+          {kickMode === "live" && (
+            <button onClick={() => setShowSnap(true)} className="px-3 py-1.5 rounded-input border border-sky-500/30 text-sky-400 text-[10px] font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
+          )}
         </div>
 
         {/* Current kick info */}
         <div className="card-2 py-4 text-center">
-          <p className="text-3xl font-black text-slate-100">{currentKick?.distance}yd</p>
-          <p className="text-sm text-slate-300">{currentKick?.hash} Hash</p>
+          <p className="text-3xl font-black text-slate-100">{currentKick?.distance} Yard Kick</p>
+          <p className="text-sm text-slate-300">{HASH_DISPLAY[currentKick?.hash ?? "M"] ?? currentKick?.hash}</p>
         </div>
 
         {/* Op time input — live mode only */}
@@ -664,8 +673,6 @@ function AthleteChartInner() {
           </div>
         )}
 
-        {/* Snap button */}
-        <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors mt-4">Log Snap</button>
       </div>
 
       {showSnap && (

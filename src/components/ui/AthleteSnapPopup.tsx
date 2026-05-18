@@ -27,6 +27,7 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
   const isFG = snapType === "FG";
 
   // FG: diagram-based
+  const [holderSide, setHolderSide] = useState<"right" | "left">("right");
   const [marker, setMarker] = useState<ShortSnapMarker | null>(null);
   const [laces, setLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
   const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
@@ -113,15 +114,21 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
 
         {isFG ? (
           <>
+            {/* Holder side toggle */}
+            <div className="flex rounded-input border border-border overflow-hidden w-fit">
+              <button onClick={() => setHolderSide("right")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", holderSide === "right" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Right</button>
+              <button onClick={() => setHolderSide("left")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", holderSide === "left" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Left</button>
+            </div>
+
             {/* Holder diagram */}
-            <div className="flex items-center gap-1">
+            <div className={clsx("flex items-center gap-1", holderSide === "left" && "flex-row-reverse")}>
               <div className="flex flex-col gap-1 shrink-0">
                 <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Laces</p>
                 <button onClick={() => setLaces("Good")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Perfect</button>
                 <button onClick={() => setLaces("1/4 Turn")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4</button>
                 <button onClick={() => setLaces("Back")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0" style={holderSide === "left" ? { transform: "scaleX(-1)" } : undefined}>
                 <HolderStrikeZone
                   markers={marker ? [{ ...marker, num: 1 }] : []}
                   onSnap={handleSnapClick}
