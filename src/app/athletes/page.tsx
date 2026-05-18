@@ -34,14 +34,20 @@ function AthletesContent() {
       if (!tid) return;
       const h = await loadAthletes(tid, "HOLDING");
       setHolders(h);
-      // Sync team athletes → ATHLETE_* keys (backfill)
+      // Sync team athletes ↔ ATHLETE_* keys (backfill + cleanup)
       const pairs: [string, string][] = [["KICKING", "ATHLETE_KICKING"], ["PUNTING", "ATHLETE_PUNTING"], ["KICKOFF", "ATHLETE_KICKOFF"], ["LONGSNAP", "ATHLETE_LONGSNAP"]];
       for (const [team, athlete] of pairs) {
         const teamList = await loadAthletes(tid, team);
         const athleteList = await loadAthletes(tid, athlete);
+        const teamNames = new Set(teamList.map((a) => a.name));
         const athleteNames = new Set(athleteList.map((a) => a.name));
+        // Add missing
         for (const a of teamList) {
           if (!athleteNames.has(a.name)) await insertAthlete(tid, athlete, a.name);
+        }
+        // Remove stale (in ATHLETE_* but not in team)
+        for (const a of athleteList) {
+          if (!teamNames.has(a.name)) await removeAthleteById(tid, a.id);
         }
       }
     }
