@@ -59,13 +59,18 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
 
   useEffect(() => { saveHolderZone(zone); }, [zone]);
 
+  // Mirror zone horizontally when flipped
+  const displayZone = flipped
+    ? { top: zone.top, bottom: zone.bottom, left: 100 - zone.right, right: 100 - zone.left }
+    : zone;
+
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isEditing || dragEdge) return;
     if (!onSnap || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
-    const inZone2 = isInZone(xPct, yPct, zone);
+    const inZone2 = isInZone(xPct, yPct, displayZone);
     onSnap({ x: xPct, y: yPct, num: nextNum, inZone: inZone2 });
   };
 
@@ -112,14 +117,14 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
         {/* Detailed miss lines — zone edges extended to outer box */}
         {isDetailedMiss && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <line x1={zone.left} y1="0" x2={zone.left} y2={zone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={zone.left} y1={zone.bottom} x2={zone.left} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={zone.right} y1="0" x2={zone.right} y2={zone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={zone.right} y1={zone.bottom} x2={zone.right} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1="0" y1={zone.top} x2={zone.left} y2={zone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={zone.right} y1={zone.top} x2="100" y2={zone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1="0" y1={zone.bottom} x2={zone.left} y2={zone.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
-            <line x1={zone.right} y1={zone.bottom} x2="100" y2={zone.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={displayZone.left} y1="0" x2={displayZone.left} y2={displayZone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={displayZone.left} y1={displayZone.bottom} x2={displayZone.left} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={displayZone.right} y1="0" x2={displayZone.right} y2={displayZone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={displayZone.right} y1={displayZone.bottom} x2={displayZone.right} y2="100" stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1="0" y1={displayZone.top} x2={displayZone.left} y2={displayZone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={displayZone.right} y1={displayZone.top} x2="100" y2={displayZone.top} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1="0" y1={displayZone.bottom} x2={displayZone.left} y2={displayZone.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
+            <line x1={displayZone.right} y1={displayZone.bottom} x2="100" y2={displayZone.bottom} stroke="rgba(239,68,68,0.25)" strokeWidth="0.4" />
           </svg>
         )}
 
@@ -127,10 +132,10 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
         <div
           className="absolute border-2 border-red-500 rounded pointer-events-none"
           style={{
-            top: `${zone.top}%`,
-            left: `${zone.left}%`,
-            width: `${zone.right - zone.left}%`,
-            height: `${zone.bottom - zone.top}%`,
+            top: `${displayZone.top}%`,
+            left: `${displayZone.left}%`,
+            width: `${displayZone.right - displayZone.left}%`,
+            height: `${displayZone.bottom - displayZone.top}%`,
             backgroundColor: "rgba(239, 68, 68, 0.06)",
             ...(isDetailedStrike ? {
               display: "grid",
@@ -167,10 +172,10 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
         {/* Drag handles when editing */}
         {isEditing && (
           <>
-            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${zone.top}%`, left: `${zone.left}%`, width: `${zone.right - zone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("top"); }} />
-            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${zone.bottom}%`, left: `${zone.left}%`, width: `${zone.right - zone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("bottom"); }} />
-            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${zone.top}%`, left: `${zone.left}%`, width: 6, height: `${zone.bottom - zone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("left"); }} />
-            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${zone.top}%`, left: `${zone.right}%`, width: 6, height: `${zone.bottom - zone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("right"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.left}%`, width: `${displayZone.right - displayZone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("top"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.bottom}%`, left: `${displayZone.left}%`, width: `${displayZone.right - displayZone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("bottom"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.left}%`, width: 6, height: `${displayZone.bottom - displayZone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("left"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.right}%`, width: 6, height: `${displayZone.bottom - displayZone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("right"); }} />
           </>
         )}
       </div>
