@@ -133,6 +133,7 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
                   {holderList.map((a) => (
                     <button key={a} onClick={() => setHolder(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
                   ))}
+                  <button onClick={() => setHolder("")} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === "" ? "bg-miss/30 text-miss border border-miss/50" : "bg-surface-2 text-miss/60 border border-border")} title="No holder">✕</button>
                 </div>
               </div>
               <div className="ml-auto">
