@@ -120,6 +120,27 @@ export default function ScoutLongSnapsPage() {
     if (phase === "results") setPhase("live");
   };
 
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editSpiral, setEditSpiral] = useState<"Good" | "Bad" | "">("");
+  const [editAccuracy, setEditAccuracy] = useState<"Strike" | "Ball" | "">("");
+  const [editTime, setEditTime] = useState("");
+
+  const startEdit = (idx: number) => {
+    const s = snaps[idx];
+    setEditIdx(idx);
+    setEditAccuracy(s.accuracy);
+    setEditSpiral(s.spiral as "Good" | "Bad" | "");
+    setEditTime(s.time);
+  };
+
+  const saveEdit = () => {
+    if (editIdx === null || !editAccuracy || !editSpiral) return;
+    const isSpiralBall = openSpiralIsBall && editSpiral === "Bad";
+    const finalAcc: "Strike" | "Ball" = editAccuracy === "Strike" && !isSpiralBall ? "Strike" : "Ball";
+    setSnaps((prev) => prev.map((s, i) => i === editIdx ? { ...s, accuracy: finalAcc, spiral: editSpiral, time: editTime } : s));
+    setEditIdx(null);
+  };
+
   const handleFinish = () => {
     if (snaps.length > 0) setPhase("results");
   };
@@ -322,16 +343,44 @@ export default function ScoutLongSnapsPage() {
           )}
 
           {snaps.length > 0 && (
-            <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[200px]">
-              {[...snaps].reverse().map((s, i) => (
-                <div key={snaps.length - 1 - i} className="flex items-center text-xs gap-2">
-                  <span className="text-muted w-5">#{snaps.length - i}</span>
-                  <span className="text-slate-400 w-20 truncate">{s.athlete}</span>
-                  <span className={clsx("font-semibold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}</span>
-                  <span className="text-slate-300">{s.time || "—"}s</span>
-                  <span className={clsx("ml-auto", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : "Open"}</span>
-                </div>
-              ))}
+            <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[250px]">
+              {[...snaps].reverse().map((s, ri) => {
+                const idx = snaps.length - 1 - ri;
+                const isEditing = editIdx === idx;
+                return (
+                  <div key={idx}>
+                    <button onClick={() => isEditing ? setEditIdx(null) : startEdit(idx)} className="w-full flex items-center text-xs gap-2 py-1 hover:bg-surface-2 rounded transition-colors px-1">
+                      <span className="text-muted w-5">#{idx + 1}</span>
+                      <span className="text-slate-400 w-16 truncate">{s.athlete}</span>
+                      <span className={clsx("font-semibold", s.accuracy === "Strike" ? "text-make" : "text-miss")}>{s.accuracy}</span>
+                      <span className="text-slate-300">{s.time || "—"}s</span>
+                      <span className={clsx("ml-auto", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : "Open"}</span>
+                    </button>
+                    {isEditing && (
+                      <div className="card space-y-2 mt-1 mb-2">
+                        <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Edit Snap #{idx + 1} — {s.athlete}</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <p className="text-[8px] text-muted text-center mb-1">Location</p>
+                            <button onClick={() => setEditAccuracy("Strike")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editAccuracy === "Strike" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Strike</button>
+                            <button onClick={() => setEditAccuracy("Ball")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editAccuracy === "Ball" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Ball</button>
+                          </div>
+                          <div>
+                            <p className="text-[8px] text-muted text-center mb-1">Spiral</p>
+                            <button onClick={() => setEditSpiral("Good")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editSpiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+                            <button onClick={() => setEditSpiral("Bad")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editSpiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+                          </div>
+                          <div>
+                            <p className="text-[8px] text-muted text-center mb-1">Time</p>
+                            <input type="text" inputMode="decimal" value={editTime} onChange={(e) => setEditTime(e.target.value)} className="input w-full text-center text-[10px] font-bold py-1.5" placeholder="0.65" />
+                          </div>
+                        </div>
+                        <button onClick={saveEdit} className="btn-primary w-full py-2 text-xs font-bold">Save</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

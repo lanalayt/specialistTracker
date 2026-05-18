@@ -129,6 +129,28 @@ export default function ScoutShortSnapsPage() {
     setAccuracy(""); setLaces(""); setSpiral(""); setPendingMarker(null);
   };
 
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editLaces, setEditLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
+  const [editSpiral, setEditSpiral] = useState<"Good" | "Bad" | "">("");
+  const [editAccuracy, setEditAccuracy] = useState<"Strike" | "Ball" | "">("");
+
+  const startEdit = (idx: number) => {
+    const r = results[idx];
+    setEditIdx(idx);
+    setEditAccuracy(r.accuracy);
+    setEditLaces(r.laces);
+    setEditSpiral(r.spiral);
+  };
+
+  const saveEdit = () => {
+    if (editIdx === null || !editAccuracy || !editLaces || !editSpiral) return;
+    const isForcedBall = openSpiralIsBall && editSpiral === "Bad";
+    const finalAcc = isForcedBall ? "Ball" as const : editAccuracy;
+    const pts = isForcedBall ? 0 : calcPoints(editAccuracy, editLaces, editSpiral);
+    setResults((prev) => prev.map((r, i) => i === editIdx ? { ...r, accuracy: finalAcc, laces: editLaces, spiral: editSpiral, points: pts } : r));
+    setEditIdx(null);
+  };
+
   const handleFinish = () => {
     if (results.length > 0) setPhase("results");
   };
@@ -329,6 +351,52 @@ export default function ScoutShortSnapsPage() {
           </div>
           {results.length > 0 && (
             <button onClick={handleFinish} className="btn-ghost w-full py-2 text-xs font-bold border border-amber-500/40 text-amber-400">Finish</button>
+          )}
+
+          {/* Editable snap log */}
+          {results.length > 0 && (
+            <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[200px]">
+              {[...results].reverse().map((r, ri) => {
+                const idx = results.length - 1 - ri;
+                const isEditing = editIdx === idx;
+                return (
+                  <div key={idx}>
+                    <button onClick={() => isEditing ? setEditIdx(null) : startEdit(idx)} className="w-full flex items-center text-xs gap-2 py-1 hover:bg-surface-2 rounded transition-colors px-1">
+                      <span className="text-muted w-5">#{idx + 1}</span>
+                      <span className="text-slate-400 w-16 truncate">{r.athlete}</span>
+                      <span className={clsx("font-semibold", r.accuracy === "Strike" ? "text-make" : "text-miss")}>{r.accuracy}</span>
+                      <span className={clsx(r.laces === "Good" ? "text-make" : r.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{r.laces === "Good" ? "Perf" : r.laces}</span>
+                      <span className={clsx(r.spiral === "Good" ? "text-make" : "text-miss")}>{r.spiral === "Good" ? "Tight" : "Open"}</span>
+                      <span className="text-amber-400 font-bold ml-auto">{r.points}pt</span>
+                    </button>
+                    {isEditing && (
+                      <div className="card space-y-2 mt-1 mb-2">
+                        <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Edit Snap #{idx + 1} — {r.athlete}</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <p className="text-[8px] text-muted text-center mb-1">Location</p>
+                            <button onClick={() => setEditAccuracy("Strike")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editAccuracy === "Strike" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Strike</button>
+                            <button onClick={() => setEditAccuracy("Ball")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editAccuracy === "Ball" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Ball</button>
+                          </div>
+                          <div>
+                            <p className="text-[8px] text-muted text-center mb-1">Laces</p>
+                            <button onClick={() => setEditLaces("Good")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editLaces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Perfect</button>
+                            <button onClick={() => setEditLaces("1/4 Turn")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editLaces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4</button>
+                            <button onClick={() => setEditLaces("Back")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editLaces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
+                          </div>
+                          <div>
+                            <p className="text-[8px] text-muted text-center mb-1">Spiral</p>
+                            <button onClick={() => setEditSpiral("Good")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editSpiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+                            <button onClick={() => setEditSpiral("Bad")} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editSpiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+                          </div>
+                        </div>
+                        <button onClick={saveEdit} className="btn-primary w-full py-2 text-xs font-bold">Save</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </main>
