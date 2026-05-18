@@ -18,7 +18,8 @@ interface SnapLogEntry {
 
 interface Props {
   snapType: "FG" | "PUNT";
-  athletes: string[]; // all athletes for snapper/holder selection
+  athletes: string[]; // snappers
+  holders?: string[]; // holders (falls back to athletes if not provided)
   kickerName?: string; // who's kicking
   kickDistance?: number; // distance of the kick
   kickHash?: string; // hash of the kick
@@ -31,12 +32,13 @@ function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
-export function AthleteSnapPopup({ snapType, athletes, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved }: Props) {
+export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved }: Props) {
   const isFG = snapType === "FG";
+  const holderList = holdersProp && holdersProp.length > 0 ? holdersProp : athletes;
 
   const [holderSide, setHolderSide] = useState<"right" | "left">("right");
   const [snapper, setSnapper] = useState(athletes[0] ?? "");
-  const [holder, setHolder] = useState(athletes.length > 1 ? athletes[1] : athletes[0] ?? "");
+  const [holder, setHolder] = useState(holderList[0] ?? "");
   const [marker, setMarker] = useState<ShortSnapMarker | null>(null);
   const [laces, setLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
   const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
@@ -125,7 +127,7 @@ export function AthleteSnapPopup({ snapType, athletes, kickerName, kickDistance,
               <div>
                 <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Holder</p>
                 <div className="flex gap-1">
-                  {athletes.map((a) => (
+                  {holderList.map((a) => (
                     <button key={a} onClick={() => setHolder(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
                   ))}
                 </div>

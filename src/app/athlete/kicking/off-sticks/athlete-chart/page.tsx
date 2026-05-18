@@ -63,21 +63,22 @@ function AthleteChartInner() {
   // Store snap logs per kick key (player-kickIdx)
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, { snapper: string; holder: string; accuracy: string; laces?: string; spiral: string }[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
+  const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
 
   useEffect(() => {
-    async function loadSnappers() {
+    async function loadSnapAndHold() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid) return;
+      // Load snappers
       const ls = await loadAthletes(tid, "ATHLETE_LONGSNAP");
-      if (ls.length === 0) {
-        const teamLs = await loadAthletes(tid, "LONGSNAP");
-        setSnapAthletes(teamLs.map((a) => a.name));
-      } else {
-        setSnapAthletes(ls.map((a) => a.name));
-      }
+      const teamLs = ls.length > 0 ? ls : await loadAthletes(tid, "LONGSNAP");
+      setSnapAthletes(teamLs.map((a) => a.name));
+      // Load holders
+      const h = await loadAthletes(tid, "HOLDING");
+      setHolderAthletes(h.map((a) => a.name));
     }
-    loadSnappers();
+    loadSnapAndHold();
   }, []);
 
   // Live charting state — rotate through athletes per kick
@@ -500,6 +501,7 @@ function AthleteChartInner() {
           <AthleteSnapPopup
             snapType="FG"
             athletes={snapAthletes}
+            holders={holderAthletes}
             kickerName={currentPlayer}
             kickDistance={kicks[currentKickIdx]?.distance}
             kickHash={kicks[currentKickIdx]?.hash}
@@ -708,7 +710,8 @@ function AthleteChartInner() {
       {showSnap && (
         <AthleteSnapPopup
           snapType="FG"
-          athletes={athletes.map((a) => a.name)}
+          athletes={snapAthletes}
+          holders={holderAthletes}
           kickerName={currentPlayer}
           kickDistance={currentKick?.distance}
           kickHash={currentKick?.hash}
