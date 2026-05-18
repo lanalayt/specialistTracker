@@ -24,6 +24,7 @@ function AthletesContent() {
   const [popupName, setPopupName] = useState("");
   const [popupPhases, setPopupPhases] = useState<Record<string, boolean>>({});
   const [holders, setHolders] = useState<StoredAthlete[]>([]);
+  const [isNewAthlete, setIsNewAthlete] = useState(false);
 
   useEffect(() => {
     async function loadHolders() {
@@ -49,12 +50,12 @@ function AthletesContent() {
 
   const handleAdd = () => {
     const trimmed = newName.trim();
-    if (!trimmed) return;
-    fg.addAthletes([trimmed]);
-    punt.addAthletes([trimmed]);
-    kickoff.addAthletes([trimmed]);
-    snap.addAthletes([trimmed]);
+    if (!trimmed || allNames.includes(trimmed)) return;
+    setPopupAthlete(trimmed);
+    setPopupName(trimmed);
+    setPopupPhases({ KICKING: true, PUNTING: true, KICKOFF: true, LONGSNAP: true, HOLDING: false });
     setNewName("");
+    setIsNewAthlete(true);
   };
 
   const handleRemove = (name: string) => {
@@ -96,8 +97,8 @@ function AthletesContent() {
         }
       }
     }
-    // Update athlete name in each sport's athlete table
-    const sports = ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP", "HOLDING"];
+    // Update athlete name in each sport's athlete table (all modes)
+    const sports = ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP", "HOLDING", "ATHLETE_KICKING", "ATHLETE_PUNTING", "ATHLETE_KICKOFF", "ATHLETE_LONGSNAP", "SCOUT_FG", "SCOUT_PUNT", "SCOUT_KO", "SCOUT_SNAP"];
     for (const sport of sports) {
       const athletes = await loadAthletes(tid, sport);
       const found = athletes.find((a) => a.name === oldName);
@@ -193,7 +194,7 @@ function AthletesContent() {
                     {name[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <button onClick={() => { setPopupAthlete(name); setPopupName(name); setPopupPhases({ KICKING: fgNames.has(name), PUNTING: puntNames.has(name), KICKOFF: koNames.has(name), LONGSNAP: snapNames.has(name), HOLDING: holderNames.has(name) }); }} className="text-sm font-semibold text-slate-100 hover:text-accent transition-colors text-left">{name}</button>
+                    <button onClick={() => { setPopupAthlete(name); setPopupName(name); setPopupPhases({ KICKING: fgNames.has(name), PUNTING: puntNames.has(name), KICKOFF: koNames.has(name), LONGSNAP: snapNames.has(name), HOLDING: holderNames.has(name) }); setIsNewAthlete(false); }} className="text-sm font-semibold text-slate-100 hover:text-accent transition-colors text-left">{name}</button>
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {sports.map((sp) => (
                         <span key={sp} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold border border-accent/20">{sp}</span>
@@ -228,11 +229,11 @@ function AthletesContent() {
         {/* Athlete edit popup */}
         {popupAthlete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPopupAthlete(null)} />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setPopupAthlete(null); setIsNewAthlete(false); }} />
             <div className="relative bg-surface border border-border rounded-xl w-full max-w-xs mx-4 p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-100">Edit Athlete</h3>
-                <button onClick={() => setPopupAthlete(null)} className="text-muted hover:text-white text-xs">Close</button>
+                <h3 className="text-sm font-bold text-slate-100">{isNewAthlete ? "Add Athlete" : "Edit Athlete"}</h3>
+                <button onClick={() => { setPopupAthlete(null); setIsNewAthlete(false); }} className="text-muted hover:text-white text-xs">Close</button>
               </div>
 
               <div>
@@ -266,9 +267,25 @@ function AthletesContent() {
               <button
                 onClick={async () => {
                   if (!popupAthlete) return;
+                  const name = popupName.trim() || popupAthlete;
+                  if (isNewAthlete) {
+                    // Add new athlete to selected phases only
+                    if (popupPhases.KICKING) fg.addAthletes([name]);
+                    if (popupPhases.PUNTING) punt.addAthletes([name]);
+                    if (popupPhases.KICKOFF) kickoff.addAthletes([name]);
+                    if (popupPhases.LONGSNAP) snap.addAthletes([name]);
+                    if (popupPhases.HOLDING) {
+                      const tid = getTeamId();
+                      if (tid) await insertAthlete(tid, "HOLDING", name);
+                    }
+                    setIsNewAthlete(false);
+                    setPopupAthlete(null);
+                    window.location.reload();
+                    return;
+                  }
                   // Handle name change
-                  if (popupName.trim() && popupName.trim() !== popupAthlete) {
-                    await handleRename(popupAthlete, popupName);
+                  if (name !== popupAthlete) {
+                    await handleRename(popupAthlete, name);
                     return;
                   }
                   // Handle phase changes
@@ -286,7 +303,7 @@ function AthletesContent() {
                 }}
                 className="btn-primary w-full py-2 text-sm font-bold"
               >
-                Save
+                {isNewAthlete ? "Add Athlete" : "Save"}
               </button>
             </div>
           </div>

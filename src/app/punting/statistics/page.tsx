@@ -163,7 +163,7 @@ function PuntStatTable({
           const s = statsMap[a.name];
           if (!s) return null;
           const b = getBucket(s);
-          if (!b) return null;
+          if (!b || b.att === 0) return null;
           return (
             <tr key={a.id} className="hover:bg-surface/30 transition-colors">
               <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>

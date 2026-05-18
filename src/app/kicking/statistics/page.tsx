@@ -56,6 +56,7 @@ function StatTable({
           const s = statsMap[a.name];
           if (!s) return null;
           const v = getValue(s);
+          if (v.att === 0) return null;
           return (
             <tr key={a.id} className="hover:bg-surface/30 transition-colors">
               <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
@@ -155,6 +156,7 @@ function FGStatsView({
               const s = statsMap[a.name];
               if (!s) return null;
               const o = s.overall;
+              if (o.att === 0 && (s.pat?.att ?? 0) === 0) return null;
               const avgOT = (o.opTimeAtt || 0) > 0 ? ((o.totalOpTime || 0) / o.opTimeAtt).toFixed(2) : "—";
               return (
                 <tr key={a.id} className="hover:bg-surface/30 transition-colors">
@@ -188,7 +190,7 @@ function FGStatsView({
             <tbody>
               {athletes.map((a) => {
                 const s = statsMap[a.name];
-                if (!s) return null;
+                if (!s || s.overall.att === 0) return null;
                 const total = s.miss.XL + s.miss.XR + s.miss.XS + s.miss.X;
                 return (
                   <tr key={a.id} className="hover:bg-surface/30 transition-colors">
@@ -260,7 +262,7 @@ function FGStatsView({
             <tbody>
               {athletes.map((a) => {
                 const s = statsMap[a.name];
-                if (!s) return null;
+                if (!s || s.overall.att === 0) return null;
                 const ot = s.overall.opTimeAtt || 0;
                 const avg = ot > 0 ? ((s.overall.totalOpTime || 0) / ot).toFixed(2) : "—";
                 return (
