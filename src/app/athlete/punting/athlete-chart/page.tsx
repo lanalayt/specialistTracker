@@ -7,10 +7,13 @@ import { usePunt } from "@/lib/puntContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
-import { AthleteSnapPopup } from "@/components/ui/AthleteSnapPopup";
+import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
+import { loadAthletes } from "@/lib/athleteStore";
+import { insertSession, stampSessionWrite } from "@/lib/sessionStore";
+import { genId } from "@/lib/stats";
 import Link from "next/link";
 import clsx from "clsx";
-import type { PuntEntry } from "@/types";
+import type { PuntEntry, LongSnapEntry } from "@/types";
 
 const PUNT_TYPE_TO_ID: Record<string, string> = {
   "Open Field": "DIR_STRAIGHT",
@@ -56,6 +59,20 @@ function PuntAthleteChartInner() {
   const [opInput, setOpInput] = useState("");
   const [dirGood, setDirGood] = useState(true);
   const [showSnap, setShowSnap] = useState(false);
+  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
+  const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function loadSnappers() {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const ls = await loadAthletes(tid, "ATHLETE_LONGSNAP");
+      const teamLs = ls.length > 0 ? ls : await loadAthletes(tid, "LONGSNAP");
+      setSnapAthletes(teamLs.map((a) => a.name));
+    }
+    loadSnappers();
+  }, []);
 
   const parseHangRaw = (raw: string): number => {
     const digits = raw.replace(/\D/g, "");
@@ -144,9 +161,27 @@ function PuntAthleteChartInner() {
     if (phase === "results") setPhase("live");
   };
 
+  const allSnapEntries: LongSnapEntry[] = Object.values(snapLogsMap).flat().map((s) => s.dbEntry);
+
   const handleSave = async () => {
     const label = `Punt Chart — ${selectedPlayers.map((p) => `${p}: ${getPlayerResults(p).length} punts`).join(", ")}${assignedChart ? " (Assigned)" : ""}`;
     commitPractice(results, label);
+
+    // Batch save snap entries
+    if (allSnapEntries.length > 0) {
+      const tid = getTeamId();
+      if (tid) {
+        const snapSession = {
+          id: genId(), teamId: tid, sport: "ATHLETE_LONGSNAP",
+          label: `Long Snap — ${label}`,
+          date: new Date().toISOString(), mode: "practice" as const,
+          entries: allSnapEntries,
+        };
+        stampSessionWrite(tid);
+        await insertSession(tid, snapSession as any);
+      }
+    }
+
     if (assignedChart) {
       const tid = getTeamId();
       if (tid) {
@@ -230,6 +265,49 @@ function PuntAthleteChartInner() {
             );
           })}
         </div>
+        {/* Long Snap Summary */}
+        {allSnapEntries.length > 0 && (() => {
+          const snapperNames = [...new Set(allSnapEntries.map((e) => e.athlete))];
+          const snapsBySnapper: Record<string, LongSnapEntry[]> = {};
+          allSnapEntries.forEach((e) => {
+            if (!snapsBySnapper[e.athlete]) snapsBySnapper[e.athlete] = [];
+            snapsBySnapper[e.athlete].push(e);
+          });
+          return (
+            <div className="card-2 text-left space-y-3">
+              <p className="text-xs font-bold text-sky-400 uppercase tracking-wider">Long Snap Summary</p>
+              {snapperNames.map((name) => {
+                const snaps = snapsBySnapper[name];
+                return (
+                  <div key={name}>
+                    <p className="text-xs font-bold text-slate-200 mb-1">{name}</p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr>
+                          <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+                          <th className="text-[10px] text-muted text-center py-1 px-2">Result</th>
+                          <th className="text-[10px] text-muted text-center py-1 px-2">Spiral</th>
+                          {snaps.some((s) => s.time > 0) && <th className="text-[10px] text-muted text-center py-1 px-2">Time</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {snaps.map((s, i) => (
+                          <tr key={i} className="border-t border-border/30">
+                            <td className="text-muted py-1 px-2">{i + 1}</td>
+                            <td className={clsx("text-center py-1 px-2 font-bold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                            <td className={clsx("text-center py-1 px-2 font-semibold", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                            {snaps.some((ss) => ss.time > 0) && <td className="text-center py-1 px-2 text-slate-300">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
         <div className="flex gap-3 max-w-sm mx-auto">
           {!saved ? <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
           <Link href="/athlete/punting" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
@@ -375,8 +453,11 @@ function PuntAthleteChartInner() {
           <button onClick={() => setDirGood(false)} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border-2 transition-all", !dirGood ? "bg-miss/20 text-miss border-miss/40" : "bg-surface-2 text-muted border-border")}>Bad</button>
         </div>
 
-        {/* Log punt */}
-        <button onClick={handleLogPunt} disabled={!distInput || !hangInput} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Log Punt</button>
+        {/* Log Snap + Log Punt */}
+        <div className="flex gap-2">
+          <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-3 rounded-input border text-xs font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentPuntIdx}`]?.length ?? 0) > 0 ? "bg-make/20 border-make/50 text-make hover:bg-make/30" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentPuntIdx}`]?.length ?? 0) > 0 ? "Snap Logged ✓" : "Log Snap"}</button>
+          <button onClick={handleLogPunt} disabled={!distInput || !hangInput} className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40">Log Punt</button>
+        </div>
       </div>
 
       {/* Undo + Finish */}
@@ -386,7 +467,14 @@ function PuntAthleteChartInner() {
       </div>
 
       {showSnap && (
-        <AthleteSnapPopup snapType="PUNT" athletes={athletes.map((a) => a.name)} onClose={() => setShowSnap(false)} />
+        <AthleteSnapPopup
+          snapType="PUNT"
+          athletes={snapAthletes}
+          kickerName={currentPlayer}
+          previousSnaps={snapLogsMap[`${currentPlayer}-${currentPuntIdx}`]}
+          onClose={() => setShowSnap(false)}
+          onSaved={(entry) => setSnapLogsMap((prev) => ({ ...prev, [`${currentPlayer}-${currentPuntIdx}`]: [...(prev[`${currentPlayer}-${currentPuntIdx}`] ?? []), entry] }))}
+        />
       )}
     </main>
   );

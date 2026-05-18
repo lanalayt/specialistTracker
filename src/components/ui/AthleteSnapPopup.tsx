@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
+import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 import clsx from "clsx";
 
@@ -44,31 +45,39 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
   const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
 
   // Punt
-  const [accuracy, setAccuracy] = useState<"good" | "bad" | "">("");
-  const [time, setTime] = useState("");
+  const [puntMarker, setPuntMarker] = useState<SnapMarker | null>(null);
+  const [snapTime, setSnapTime] = useState("");
+
+  const parseTimeRaw = (raw: string): number => {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return 0;
+    return parseFloat(`${digits.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${digits.padStart(3, "0").slice(-2)}`);
+  };
 
   const canSave = isFG
     ? !!marker && !!laces && !!spiral && !!snapper
-    : !!accuracy && !!spiral && !!snapper;
+    : !!puntMarker && !!spiral && !!snapper;
 
   const handleSave = () => {
     if (!canSave) return;
 
-    const acc = isFG ? (marker?.inZone ? "ON_TARGET" : "HIGH") : (accuracy === "good" ? "ON_TARGET" : "HIGH");
+    const acc = isFG ? (marker?.inZone ? "ON_TARGET" : "HIGH") : (puntMarker?.inZone ? "ON_TARGET" : "HIGH");
+    const snapTimeVal = snapTime ? parseTimeRaw(snapTime) : 0;
 
     const dbEntry: LongSnapEntry = {
       athleteId: snapper, athlete: snapper,
-      snapType: (isFG ? "FG" : "PUNT") as SnapType, time: 0,
+      snapType: (isFG ? "FG" : "PUNT") as SnapType, time: snapTimeVal,
       accuracy: acc as SnapAccuracy,
       laces: isFG ? laces || undefined : undefined,
       spiral: spiral || undefined,
       score: acc === "ON_TARGET" ? 1 : 0,
-      markerX: marker?.x, markerY: marker?.y, markerInZone: marker?.inZone,
+      markerX: isFG ? marker?.x : puntMarker?.x, markerY: isFG ? marker?.y : puntMarker?.y,
+      markerInZone: isFG ? marker?.inZone : puntMarker?.inZone,
     };
 
     const logEntry: SnapLogEntry = {
-      snapper, holder,
-      accuracy: isFG ? (marker?.inZone ? "Strike" : "Ball") : (accuracy === "good" ? "Strike" : "Ball"),
+      snapper, holder: isFG ? holder : "",
+      accuracy: isFG ? (marker?.inZone ? "Strike" : "Ball") : (puntMarker?.inZone ? "Strike" : "Ball"),
       laces: isFG ? laces || undefined : undefined,
       spiral: spiral === "Good" ? "Tight" : "Open",
       dbEntry,
@@ -150,31 +159,33 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
         ) : (
           <>
             {/* Punt snap */}
-            <div className="flex items-start gap-3">
-              <div>
-                <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Snapper</p>
-                <div className="flex gap-1">
-                  {athletes.map((a) => (
-                    <button key={a} onClick={() => setSnapper(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", snapper === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
-                  ))}
-                </div>
+            <div>
+              <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Snapper</p>
+              <div className="flex gap-1">
+                {athletes.map((a) => (
+                  <button key={a} onClick={() => setSnapper(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", snapper === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
+                ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-[10px] text-muted mb-1">Accuracy</p>
-                <div className="flex gap-1">
-                  <button onClick={() => setAccuracy("good")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", accuracy === "good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Good</button>
-                  <button onClick={() => setAccuracy("bad")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", accuracy === "bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Bad</button>
-                </div>
+
+            {/* Diagram + Spiral */}
+            <div className="flex items-center gap-1">
+              <div className="flex-1 min-w-0">
+                <PunterStrikeZone markers={puntMarker ? [{ ...puntMarker, num: 1 }] : []} onSnap={(m) => setPuntMarker(m)} nextNum={1} chartMode="simple" missMode="simple" editable />
               </div>
-              <div>
-                <p className="text-[10px] text-muted mb-1">Spiral</p>
-                <div className="flex gap-1">
-                  <button onClick={() => setSpiral("Good")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
-                  <button onClick={() => setSpiral("Bad")} className={clsx("flex-1 py-1.5 rounded-input text-xs font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
-                </div>
+              <div className="flex flex-col gap-1 shrink-0">
+                <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
+                <button onClick={() => setSpiral("Good")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+                <button onClick={() => setSpiral("Bad")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
               </div>
+            </div>
+
+            {puntMarker && <p className="text-center text-xs"><span className={clsx("font-bold", puntMarker.inZone ? "text-make" : "text-miss")}>{puntMarker.inZone ? "Strike" : "Ball"}</span></p>}
+
+            {/* Snap Time (optional) */}
+            <div>
+              <p className="text-[10px] text-muted mb-1">Snap Time <span className="text-muted/50">(optional)</span></p>
+              <input type="text" inputMode="numeric" value={snapTime ? parseTimeRaw(snapTime).toFixed(2) : ""} onChange={(e) => setSnapTime(e.target.value.replace(/\D/g, ""))} placeholder="0.75" className="input w-24 text-center text-sm font-bold py-1.5" />
             </div>
           </>
         )}
