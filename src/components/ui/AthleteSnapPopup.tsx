@@ -135,7 +135,7 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
                 <button onClick={() => setLaces("1/4 Turn")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4</button>
                 <button onClick={() => setLaces("Back")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
               </div>
-              <div className="flex-1 min-w-0" style={holderSide === "left" ? { transform: "scaleX(-1)" } : undefined}>
+              <div className="flex-1 min-w-0">
                 <HolderStrikeZone markers={marker ? [{ ...marker, num: 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={1} chartMode="simple" missMode="simple" editable flipped={holderSide === "left"} />
               </div>
               <div className="flex flex-col gap-1 shrink-0">

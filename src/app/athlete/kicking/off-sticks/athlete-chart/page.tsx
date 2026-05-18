@@ -448,7 +448,7 @@ function AthleteChartInner() {
               <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
             </div>
             {kickMode === "live" && (
-              <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "border-make/50 text-make hover:bg-make/10" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "Snap Logged ✓" : "Log Snap"}</button>
+              <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "bg-make/20 border-make/50 text-make hover:bg-make/30" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "Snap Logged ✓" : "Log Snap"}</button>
             )}
           </div>
 
@@ -686,7 +686,7 @@ function AthleteChartInner() {
                 <p className="text-[10px] text-muted">OT:</p>
                 <input type="text" inputMode="numeric" value={opTimeInput ? formatOpTime(opTimeInput) : ""} onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))} placeholder="1.32" className="input w-14 text-center text-[10px] font-bold py-1" />
               </div>
-              <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "border-make/50 text-make hover:bg-make/10" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "Snap Logged ✓" : "Log Snap"}</button>
+              <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "bg-make/20 border-make/50 text-make hover:bg-make/30" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "Snap Logged ✓" : "Log Snap"}</button>
             </>
           )}
         </div>

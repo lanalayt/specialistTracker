@@ -63,9 +63,8 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
     if (isEditing || dragEdge) return;
     if (!onSnap || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    let xPct = ((e.clientX - rect.left) / rect.width) * 100;
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
-    if (flipped) xPct = 100 - xPct;
     const inZone2 = isInZone(xPct, yPct, zone);
     onSnap({ x: xPct, y: yPct, num: nextNum, inZone: inZone2 });
   };
@@ -101,12 +100,12 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
         className="relative border-2 border-slate-400/60 rounded-lg cursor-crosshair select-none overflow-hidden flex items-end w-full max-w-[300px]"
         style={{ aspectRatio: "300/260", background: "#000000", padding: 0 }}
       >
-        {/* Holder image — left side, scaled up */}
+        {/* Holder image */}
         <img
           src="/holder-silhouette.png?v=7"
           alt="Holder"
           className="pointer-events-none select-none"
-          style={{ height: "130%", width: "auto", objectFit: "contain", marginLeft: "-7%", position: "absolute", bottom: "-23%", left: 0 }}
+          style={{ height: "130%", width: "auto", objectFit: "contain", position: "absolute", bottom: "-23%", ...(flipped ? { right: 0, marginRight: "-7%", transform: "scaleX(-1)" } : { left: 0, marginLeft: "-7%" }) }}
           draggable={false}
         />
 
@@ -151,7 +150,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
             key={m.num}
             className="absolute pointer-events-none flex items-center justify-center"
             style={{
-              left: `${flipped ? 100 - m.x : m.x}%`,
+              left: `${m.x}%`,
               top: `${m.y}%`,
               transform: "translate(-50%, -50%)",
               width: 26,
@@ -161,7 +160,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
               border: `2px solid ${m.inZone ? "#00d4a0" : "#ef4444"}`,
             }}
           >
-            <span className="text-[10px] font-black text-white leading-none" style={flipped ? { transform: "scaleX(-1)" } : undefined}>{m.num}</span>
+            <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
           </div>
         ))}
 
@@ -178,7 +177,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
 
       {/* Edit controls */}
       {editable && (
-        <div className="flex gap-1 justify-center mt-1" style={flipped ? { transform: "scaleX(-1)" } : undefined}>
+        <div className="flex gap-1 justify-center mt-1">
           <button onClick={() => setIsEditing((v) => !v)} className={`text-[8px] px-1.5 py-0.5 rounded border font-semibold transition-all ${isEditing ? "border-accent/50 text-accent bg-accent/10" : "border-border/50 text-muted/60 hover:text-white"}`}>{isEditing ? "Done" : "Edit Zone"}</button>
           {isEditing && <button onClick={() => setZone({ ...DEFAULT_HOLDER_ZONE })} className="text-[8px] px-1.5 py-0.5 rounded border border-border/50 text-muted/60 hover:text-white font-semibold transition-all">Reset</button>}
         </div>
