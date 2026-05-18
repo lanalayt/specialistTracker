@@ -51,13 +51,8 @@ export default function CoachesChartPage() {
     setCharts(all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   };
 
-  if (!isCoach) {
-    return (
-      <main className="p-4 lg:p-6">
-        <p className="text-sm text-muted">Only coaches can create charts.</p>
-      </main>
-    );
-  }
+  // Athletes skip straight to chart lists (no creation form)
+  // Handled below by wrapping creation form in isCoach check
 
   const addKick = () => {
     const d = parseInt(newDist) || 30;
@@ -127,10 +122,9 @@ export default function CoachesChartPage() {
   return (
     <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
       <Link href="/athlete/kicking/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
-      <h2 className="text-lg font-bold text-slate-100">Create FG Chart</h2>
-      <p className="text-xs text-muted">Build a chart, assign it to athletes with a due date.</p>
+      <h2 className="text-lg font-bold text-slate-100">{isCoach ? "Coaches Chart" : "Assigned Charts"}</h2>
 
-      {saved ? (
+      {isCoach && (saved ? (
         <div className="space-y-4 text-center py-8">
           <p className="text-2xl font-black text-sky-400">Chart Assigned!</p>
           <p className="text-sm text-muted">Sent to {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""} — due {new Date(dueDate).toLocaleDateString()}</p>
@@ -197,7 +191,7 @@ export default function CoachesChartPage() {
             Assign Chart ({kicks.length} kick{kicks.length !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
           </button>
         </>
-      )}
+      ))}
 
       {/* Active & Recent Charts */}
       {charts.length > 0 && (() => {
@@ -237,7 +231,7 @@ export default function CoachesChartPage() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    {!isReassigning && (
+                    {isCoach && !isReassigning && (
                       <button onClick={() => { setReassignId(chart.id); setReassignPlayers([]); setReassignDate(""); }} className="text-[10px] text-sky-400 hover:underline">Re-assign this chart</button>
                     )}
                     {completed.length > 0 && showStatsId !== chart.id && (
