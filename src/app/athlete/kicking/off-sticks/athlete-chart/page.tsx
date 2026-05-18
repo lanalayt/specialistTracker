@@ -7,6 +7,7 @@ import { useFG } from "@/lib/fgContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
+import { AthleteSnapPopup } from "@/components/ui/AthleteSnapPopup";
 import { FGFieldView } from "@/components/ui/FGFieldView";
 import Link from "next/link";
 import clsx from "clsx";
@@ -41,6 +42,7 @@ function AthleteChartInner() {
   // Live chart inputs
   const [liveDist, setLiveDist] = useState("30");
   const [liveHash, setLiveHash] = useState("M");
+  const [showSnap, setShowSnap] = useState(false);
 
   // Live charting state — rotate through athletes per kick
   const [currentKickIdx, setCurrentKickIdx] = useState(0);
@@ -435,6 +437,11 @@ function AthleteChartInner() {
             {results.length > 0 && <button onClick={handleFinishLive} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish</button>}
           </div>
 
+          {/* Snap button */}
+          {kickMode === "live" && (
+            <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
+          )}
+
           {/* Running log */}
           {results.length > 0 && (
             <div className="card-2 text-xs">
@@ -656,7 +663,16 @@ function AthleteChartInner() {
             </table>
           </div>
         )}
+
+        {/* Snap button for preset live mode */}
+        {kickMode === "live" && phase === "live" && (
+          <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors mt-4">Log Snap</button>
+        )}
       </div>
+
+      {showSnap && (
+        <AthleteSnapPopup snapType="FG" snapper={currentPlayer} onClose={() => setShowSnap(false)} />
+      )}
     </main>
   );
 }

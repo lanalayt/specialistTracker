@@ -7,6 +7,7 @@ import { usePunt } from "@/lib/puntContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
+import { AthleteSnapPopup } from "@/components/ui/AthleteSnapPopup";
 import Link from "next/link";
 import clsx from "clsx";
 import type { PuntEntry } from "@/types";
@@ -41,6 +42,7 @@ function PuntAthleteChartInner() {
   const [hangInput, setHangInput] = useState("");
   const [opInput, setOpInput] = useState("");
   const [dirGood, setDirGood] = useState(true);
+  const [showSnap, setShowSnap] = useState(false);
 
   const parseHangRaw = (raw: string): number => {
     const digits = raw.replace(/\D/g, "");
@@ -372,10 +374,16 @@ function PuntAthleteChartInner() {
           </div>
         ))}
 
+        <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
+
         <button onClick={handleSubmitAll} disabled={filledCount === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">
           Submit Chart ({filledCount} punt{filledCount !== 1 ? "s" : ""})
         </button>
       </div>
+
+      {showSnap && (
+        <AthleteSnapPopup snapType="PUNT" snapper={selectedPlayers[0] ?? ""} onClose={() => setShowSnap(false)} />
+      )}
     </main>
   );
 }
