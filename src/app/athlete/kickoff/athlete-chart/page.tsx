@@ -18,10 +18,23 @@ function KOAthleteChartInner() {
   const { user } = useAuth();
   const { athletes, commitPractice } = useKickoff();
 
-  const [phase, setPhase] = useState<"setup" | "preview" | "live" | "results">(assignedId ? "preview" : "setup");
+  const [chartNowData] = useState(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("coach_ko_chart_now");
+      if (raw) {
+        localStorage.removeItem("coach_ko_chart_now");
+        const data = JSON.parse(raw);
+        if (data.players?.length > 0) return data;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [phase, setPhase] = useState<"setup" | "preview" | "live" | "results">(assignedId ? "preview" : chartNowData ? "live" : "setup");
   const [chartType, setChartType] = useState<"preset" | "live">("preset");
-  const [reps, setReps] = useState("5");
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [reps, setReps] = useState(chartNowData ? String(chartNowData.reps ?? 5) : "5");
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(chartNowData?.players ?? []);
   const [saved, setSaved] = useState(false);
   const [assignedChart, setAssignedChart] = useState<AssignedChart | null>(null);
 
@@ -45,21 +58,7 @@ function KOAthleteChartInner() {
 
   // Check for "Chart Now" from coaches chart
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("coach_ko_chart_now");
-      if (raw) {
-        localStorage.removeItem("coach_ko_chart_now");
-        const data = JSON.parse(raw);
-        if (data.players?.length > 0) {
-          setTimeout(() => {
-            setSelectedPlayers(data.players);
-            setReps(String(data.reps ?? 5));
-            setCurrentPlayerIdx(0);
-            setPhase("live");
-          }, 0);
-        }
-      }
-    } catch {}
+    // no-op — Chart Now handled via initial state
   }, []);
 
   useUnsavedWarning(results.length > 0 && !saved);

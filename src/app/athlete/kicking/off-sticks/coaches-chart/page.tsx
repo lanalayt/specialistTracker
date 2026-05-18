@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useFG } from "@/lib/fgContext";
 import { getTeamId } from "@/lib/teamData";
@@ -20,6 +21,7 @@ interface PresetKick {
 }
 
 export default function CoachesChartPage() {
+  const router = useRouter();
   const { user, isCoach } = useAuth();
   const { athletes, history } = useFG();
   const athleteNames = athletes.map((a) => a.name);
@@ -209,16 +211,16 @@ export default function CoachesChartPage() {
               Assign Chart ({kicks.length} kick{kicks.length !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
             </button>
           ) : (
-            <Link
-              href={`/athlete/kicking/off-sticks/athlete-chart`}
+            <button
               onClick={() => {
-                // Store kicks in localStorage for the athlete chart to pick up
                 localStorage.setItem("coach_fg_chart_now", JSON.stringify({ kicks, players: selectedPlayers }));
+                router.push("/athlete/kicking/off-sticks/athlete-chart");
               }}
-              className={clsx("btn-primary w-full py-3 text-sm font-bold text-center block", (kicks.length === 0 || selectedPlayers.length === 0) && "opacity-40 pointer-events-none")}
+              disabled={kicks.length === 0 || selectedPlayers.length === 0}
+              className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40"
             >
               Start Chart Now
-            </Link>
+            </button>
           )}
         </>
       ))}

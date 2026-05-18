@@ -27,13 +27,27 @@ function AthleteChartInner() {
   const { user } = useAuth();
   const { athletes, commitPractice } = useFG();
 
-  const [phase, setPhase] = useState<"setup" | "preview" | "live" | "live-chart" | "results">(assignedId ? "preview" : "setup");
+  // Check for "Chart Now" data before initial state
+  const [chartNowData] = useState(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("coach_fg_chart_now");
+      if (raw) {
+        localStorage.removeItem("coach_fg_chart_now");
+        const data = JSON.parse(raw);
+        if (data.kicks?.length > 0 && data.players?.length > 0) return data;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [phase, setPhase] = useState<"setup" | "preview" | "live" | "live-chart" | "results">(assignedId ? "preview" : chartNowData ? "live" : "setup");
   const [chartType, setChartType] = useState<"preset" | "live">("preset");
-  const [kicks, setKicks] = useState<PresetKick[]>([]);
+  const [kicks, setKicks] = useState<PresetKick[]>(chartNowData?.kicks ?? []);
   const [newDist, setNewDist] = useState("30");
   const [newHash, setNewHash] = useState("M");
   const [newPoints, setNewPoints] = useState("1");
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(chartNowData?.players ?? []);
   const [saved, setSaved] = useState(false);
   const [assignedChart, setAssignedChart] = useState<AssignedChart | null>(null);
   const [kickMode, setKickMode] = useState<"sticks" | "live">("sticks");
@@ -76,26 +90,6 @@ function AthleteChartInner() {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
   };
 
-  // Check for "Chart Now" from coaches chart — use timeout to avoid render conflicts
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("coach_fg_chart_now");
-      if (raw) {
-        localStorage.removeItem("coach_fg_chart_now");
-        const data = JSON.parse(raw);
-        if (data.kicks?.length > 0 && data.players?.length > 0) {
-          // Defer state updates to next tick so initial render completes
-          setTimeout(() => {
-            setKicks(data.kicks);
-            setSelectedPlayers(data.players);
-            setCurrentKickIdx(0);
-            setCurrentPlayerIdx(0);
-            setPhase("live");
-          }, 0);
-        }
-      }
-    } catch {}
-  }, []);
 
   useUnsavedWarning(results.length > 0 && !saved);
 

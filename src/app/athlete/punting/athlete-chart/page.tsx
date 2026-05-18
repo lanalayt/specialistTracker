@@ -26,10 +26,23 @@ function PuntAthleteChartInner() {
   const { user } = useAuth();
   const { athletes, commitPractice } = usePunt();
 
-  const [phase, setPhase] = useState<"setup" | "preview" | "live" | "results">(assignedId ? "preview" : "setup");
+  const [chartNowData] = useState(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("coach_punt_chart_now");
+      if (raw) {
+        localStorage.removeItem("coach_punt_chart_now");
+        const data = JSON.parse(raw);
+        if (data.players?.length > 0) return data;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [phase, setPhase] = useState<"setup" | "preview" | "live" | "results">(assignedId ? "preview" : chartNowData ? "live" : "setup");
   const [chartType, setChartType] = useState<"preset" | "live">("preset");
-  const [reps, setReps] = useState("5");
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [reps, setReps] = useState(chartNowData ? String(chartNowData.reps ?? 5) : "5");
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(chartNowData?.players ?? []);
   const [saved, setSaved] = useState(false);
   const [assignedChart, setAssignedChart] = useState<AssignedChart | null>(null);
   const [livePuntType, setLivePuntType] = useState("DIR_STRAIGHT");
@@ -56,23 +69,11 @@ function PuntAthleteChartInner() {
 
   useUnsavedWarning(results.length > 0 && !saved);
 
-  // Check for "Chart Now" from coaches chart
+  // Set assigned chart from Chart Now data
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("coach_punt_chart_now");
-      if (raw) {
-        localStorage.removeItem("coach_punt_chart_now");
-        const data = JSON.parse(raw);
-        if (data.players?.length > 0) {
-          setTimeout(() => {
-            setSelectedPlayers(data.players);
-            setReps(String(data.reps ?? 5));
-            if (data.puntRows) setAssignedChart({ id: "chart-now", sport: "ATHLETE_PUNTING", createdBy: "Coach", createdAt: new Date().toISOString(), dueDate: "", athletes: data.players, kicks: [], reps: data.reps, puntTypes: data.puntRows.map((r: any) => ({ type: r.category, typeId: r.typeId, typeLabel: r.category, count: r.count, hash: r.hash })), completedBy: {} } as AssignedChart);
-            setPhase("live");
-          }, 0);
-        }
-      }
-    } catch {}
+    if (chartNowData?.puntRows) {
+      setAssignedChart({ id: "chart-now", sport: "ATHLETE_PUNTING", createdBy: "Coach", createdAt: new Date().toISOString(), dueDate: "", athletes: chartNowData.players, kicks: [], reps: chartNowData.reps, puntTypes: chartNowData.puntRows.map((r: any) => ({ type: r.category, typeId: r.typeId, typeLabel: r.category, count: r.count, hash: r.hash })), completedBy: {} } as AssignedChart);
+    }
   }, []);
 
   useEffect(() => {
