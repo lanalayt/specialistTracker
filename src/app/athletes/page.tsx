@@ -25,6 +25,7 @@ function AthletesContent() {
   const [popupPhases, setPopupPhases] = useState<Record<string, boolean>>({});
   const [holders, setHolders] = useState<StoredAthlete[]>([]);
   const [isNewAthlete, setIsNewAthlete] = useState(false);
+  const [popupSaving, setPopupSaving] = useState(false);
 
   useEffect(() => {
     async function loadHoldersAndSync() {
@@ -287,8 +288,10 @@ function AthletesContent() {
               </div>
 
               <button
+                disabled={popupSaving}
                 onClick={async () => {
-                  if (!popupAthlete) return;
+                  if (!popupAthlete || popupSaving) return;
+                  setPopupSaving(true);
                   const name = popupName.trim() || popupAthlete;
                   if (isNewAthlete) {
                     // Add new athlete to selected phases (team + athlete mode keys)
@@ -335,9 +338,10 @@ function AthletesContent() {
                   }
                   window.location.reload();
                 }}
-                className="btn-primary w-full py-2 text-sm font-bold"
+                className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                {isNewAthlete ? "Add Athlete" : "Save"}
+                {popupSaving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {popupSaving ? "Saving..." : isNewAthlete ? "Add Athlete" : "Save"}
               </button>
             </div>
           </div>
