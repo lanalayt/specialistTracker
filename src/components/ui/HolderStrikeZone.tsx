@@ -63,8 +63,9 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
     if (isEditing || dragEdge) return;
     if (!onSnap || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+    let xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+    if (flipped) xPct = 100 - xPct;
     const inZone2 = isInZone(xPct, yPct, zone);
     onSnap({ x: xPct, y: yPct, num: nextNum, inZone: inZone2 });
   };
@@ -150,7 +151,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
             key={m.num}
             className="absolute pointer-events-none flex items-center justify-center"
             style={{
-              left: `${m.x}%`,
+              left: `${flipped ? 100 - m.x : m.x}%`,
               top: `${m.y}%`,
               transform: "translate(-50%, -50%)",
               width: 26,
