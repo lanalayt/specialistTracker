@@ -13,6 +13,7 @@ interface Props {
   snapper: string;
   onClose: () => void;
   onSaved?: () => void;
+  kickKey?: string; // unique key per kick to persist data
 }
 
 function formatSnapTime(raw: string): string {
@@ -37,7 +38,6 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
   const [accuracy, setAccuracy] = useState<"good" | "bad" | "">("");
 
   const [saving, setSaving] = useState(false);
-  const [justSaved, setJustSaved] = useState(false);
   const [totalLogged, setTotalLogged] = useState(0);
 
   const canSave = isFG
@@ -88,15 +88,8 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
     await insertSession(tid, session as any);
     setSaving(false);
     setTotalLogged((prev) => prev + 1);
-    setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 1500);
     onSaved?.();
-    // Reset for next snap — don't close
-    setMarker(null);
-    setLaces("");
-    setSpiral("");
-    setAccuracy("");
-    setTime("");
+    onClose();
   };
 
   return (
@@ -110,7 +103,6 @@ export function AthleteSnapPopup({ snapType, snapper, onClose, onSaved }: Props)
           </div>
           <button onClick={onClose} className="text-muted hover:text-white text-xs">Done</button>
         </div>
-        {justSaved && <p className="text-xs text-make font-bold text-center">Saved!</p>}
 
         {isFG ? (
           <>

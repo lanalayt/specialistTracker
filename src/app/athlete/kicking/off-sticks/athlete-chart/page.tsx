@@ -59,6 +59,9 @@ function AthleteChartInner() {
   const [liveHash, setLiveHash] = useState("M");
   const [showSnap, setShowSnap] = useState(false);
   const [snapCount, setSnapCount] = useState(0);
+  const [pendingResult, setPendingResult] = useState<FGResult | null>(null);
+  // Store snap data per kick key (player-kickIdx)
+  const [snapDataMap, setSnapDataMap] = useState<Record<string, { saved: boolean }>>({});
 
   // Live charting state — rotate through athletes per kick
   const [currentKickIdx, setCurrentKickIdx] = useState(0);
@@ -114,7 +117,11 @@ function AthleteChartInner() {
   };
 
   const handleResult = (result: FGResult) => {
-    if (currentKickIdx >= kicks.length) return;
+    setPendingResult(result);
+  };
+
+  const handleSubmitKick = () => {
+    if (!pendingResult || currentKickIdx >= kicks.length) return;
     const kick = kicks[currentKickIdx];
     const pos = HASH_TO_POS[kick.hash] ?? "M";
     const opTime = kickMode === "live" && opTimeInput ? parseOpTime(formatOpTime(opTimeInput)) : undefined;
@@ -123,13 +130,14 @@ function AthleteChartInner() {
       athlete: currentPlayer,
       dist: kick.distance,
       pos,
-      result,
+      result: pendingResult,
       score: 0,
       opTime: opTime || undefined,
       kickNum: currentKickIdx + 1,
     };
     setResults((prev) => [...prev, entry]);
     setOpTimeInput("");
+    setPendingResult(null);
 
     // Rotate: next player on same kick, or next kick when all players done
     const nextPlayerIdx = currentPlayerIdx + 1;
@@ -402,7 +410,7 @@ function AthleteChartInner() {
               <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
             </div>
             {kickMode === "live" && (
-              <button onClick={() => setShowSnap(true)} className="px-3 py-1.5 rounded-input border border-sky-500/30 text-sky-400 text-[10px] font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
+              <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", snapDataMap[`${currentPlayer}-${currentKickIdx}`]?.saved ? "border-make/50 text-make hover:bg-make/10" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{snapDataMap[`${currentPlayer}-${currentKickIdx}`]?.saved ? "Snap Logged" : "Log Snap"}</button>
             )}
           </div>
 
@@ -472,7 +480,13 @@ function AthleteChartInner() {
         </div>
 
         {showSnap && (
-          <AthleteSnapPopup snapType="FG" snapper={currentPlayer} onClose={() => setShowSnap(false)} />
+          <AthleteSnapPopup
+            snapType="FG"
+            snapper={currentPlayer}
+            kickKey={`${currentPlayer}-${currentKickIdx}`}
+            onClose={() => setShowSnap(false)}
+            onSaved={() => setSnapDataMap((prev) => ({ ...prev, [`${currentPlayer}-${currentKickIdx}`]: { saved: true } }))}
+          />
         )}
       </main>
     );
@@ -609,38 +623,43 @@ function AthleteChartInner() {
           </div>
         )}
 
-        {/* Result buttons */}
+        {/* Result buttons — select then submit */}
         <button
           onClick={() => handleResult("YC")}
-          className="w-full py-6 rounded-card text-xl font-black bg-make/20 text-make border-2 border-make/40 hover:bg-make/30 transition-all active:scale-95"
+          className={clsx("w-full py-6 rounded-card text-xl font-black border-2 transition-all active:scale-95", pendingResult === "YC" ? "bg-make text-slate-900 border-make" : "bg-make/20 text-make border-make/40 hover:bg-make/30")}
         >
           GOOD
         </button>
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => handleResult("XL")}
-            className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95"
+            className={clsx("py-4 rounded-card text-sm font-black border-2 transition-all active:scale-95", pendingResult === "XL" ? "bg-miss text-white border-miss" : "bg-miss/20 text-miss border-miss/40 hover:bg-miss/30")}
           >
             MISS LEFT
           </button>
           <button
             onClick={() => handleResult("XS")}
-            className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95"
+            className={clsx("py-4 rounded-card text-sm font-black border-2 transition-all active:scale-95", pendingResult === "XS" ? "bg-miss text-white border-miss" : "bg-miss/20 text-miss border-miss/40 hover:bg-miss/30")}
           >
             MISS SHORT
           </button>
           <button
             onClick={() => handleResult("XR")}
-            className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95"
+            className={clsx("py-4 rounded-card text-sm font-black border-2 transition-all active:scale-95", pendingResult === "XR" ? "bg-miss text-white border-miss" : "bg-miss/20 text-miss border-miss/40 hover:bg-miss/30")}
           >
             MISS RIGHT
           </button>
         </div>
 
-        {/* Undo */}
-        {results.length > 0 && (
-          <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo Last</button>
-        )}
+        {/* Submit + Undo */}
+        <div className="flex gap-2">
+          {results.length > 0 && (
+            <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>
+          )}
+          <button onClick={handleSubmitKick} disabled={!pendingResult} className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40">
+            Submit Kick
+          </button>
+        </div>
 
         {/* Running log */}
         {results.length > 0 && (
