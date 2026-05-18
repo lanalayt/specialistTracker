@@ -8,7 +8,7 @@ import { POSITIONS, DIST_RANGES } from "@/types";
 import type { FGPosition, DistRange, AthleteStats, FGKick } from "@/types";
 import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
-import { exportFGStats } from "@/lib/exportStats";
+import { exportFGStats, exportFGStatsPDF } from "@/lib/exportStats";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 
 const POS_LABELS: Record<FGPosition, string> = {
@@ -429,12 +429,20 @@ export default function KickingStatisticsPage() {
       {/* Header with date filter + export */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
-        <button
-          onClick={() => exportFGStats(athletes.map((a) => a.name), history as { date?: string; entries?: FGKick[] }[], hasStarred)}
-          className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
-        >
-          Export
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => exportFGStats(athletes.map((a) => a.name), history as { date?: string; entries?: FGKick[] }[], hasStarred)}
+            className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
+          >
+            Export Excel
+          </button>
+          <button
+            onClick={() => exportFGStatsPDF(athletes.map((a) => a.name), history as { date?: string; entries?: FGKick[] }[], hasStarred)}
+            className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
+          >
+            Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Tabs + toggle */}

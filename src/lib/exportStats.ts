@@ -594,3 +594,124 @@ export function exportSessionPDF(
     setTimeout(() => win.print(), 300);
   }
 }
+
+// ─── PDF Stats Export ──────────────────────────────────────────────────────
+
+export function exportFGStatsPDF(
+  athletes: string[],
+  history: { date?: string; entries?: FGKick[] }[],
+  hasStarred: boolean
+) {
+  import("jspdf").then(({ default: jsPDF }) => {
+    import("jspdf-autotable").then(({ default: autoTable }) => {
+      const doc = new jsPDF({ orientation: "landscape" });
+
+      const addSheet = (title: string, aoa: Row[]) => {
+        if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
+        doc.setFontSize(14);
+        doc.text(title, 14, 15);
+        if (aoa.length > 0) {
+          autoTable(doc, {
+            head: [aoa[0].map(String)],
+            body: aoa.slice(1).map((r) => r.map(String)),
+            startY: 20,
+            styles: { fontSize: 8 },
+          });
+        }
+      };
+
+      const allStats = computeFGStats(athletes, history, () => true);
+      addSheet("All Time", fgStatsToAOA(athletes, allStats));
+
+      const now = new Date();
+      const weekStart = getMonday(now);
+      const weekEnd = getSunday(weekStart);
+      addSheet("Weekly", fgStatsToAOA(athletes, computeFGStats(athletes, filterSessions(history, weekStart, weekEnd), () => true)));
+
+      const monthStart = getMonthStart(now);
+      const monthEnd = getMonthEnd(now);
+      addSheet("Monthly", fgStatsToAOA(athletes, computeFGStats(athletes, filterSessions(history, monthStart, monthEnd), () => true)));
+
+      if (hasStarred) {
+        addSheet("Live Reps", fgStatsToAOA(athletes, computeFGStats(athletes, history, (k) => !!k.starred)));
+      }
+
+      doc.save("FG_Kicking_Stats.pdf");
+    });
+  });
+}
+
+export function exportPuntStatsPDF(
+  athletes: string[],
+  history: { date?: string; entries?: PuntEntry[] }[],
+  puntTypes: { id: string; label: string }[]
+) {
+  import("jspdf").then(({ default: jsPDF }) => {
+    import("jspdf-autotable").then(({ default: autoTable }) => {
+      const doc = new jsPDF({ orientation: "landscape" });
+
+      const addSheet = (title: string, aoa: Row[]) => {
+        if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
+        doc.setFontSize(14);
+        doc.text(title, 14, 15);
+        if (aoa.length > 0) {
+          autoTable(doc, {
+            head: [aoa[0].map(String)],
+            body: aoa.slice(1).map((r) => r.map(String)),
+            startY: 20,
+            styles: { fontSize: 7 },
+          });
+        }
+      };
+
+      const allStats = computePuntStats(athletes, history, () => true);
+      addSheet("All Time", puntStatsToAOA(athletes, allStats, puntTypes));
+
+      const now = new Date();
+      const weekStart = getMonday(now);
+      const weekEnd = getSunday(weekStart);
+      addSheet("Weekly", puntStatsToAOA(athletes, computePuntStats(athletes, filterSessions(history, weekStart, weekEnd), () => true), puntTypes));
+
+      addSheet("Monthly", puntStatsToAOA(athletes, computePuntStats(athletes, filterSessions(history, getMonthStart(now), getMonthEnd(now)), () => true), puntTypes));
+
+      doc.save("Punting_Stats.pdf");
+    });
+  });
+}
+
+export function exportKickoffStatsPDF(
+  athletes: string[],
+  history: { date?: string; entries?: KickoffEntry[] }[]
+) {
+  import("jspdf").then(({ default: jsPDF }) => {
+    import("jspdf-autotable").then(({ default: autoTable }) => {
+      const doc = new jsPDF({ orientation: "landscape" });
+
+      const addSheet = (title: string, aoa: Row[]) => {
+        if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
+        doc.setFontSize(14);
+        doc.text(title, 14, 15);
+        if (aoa.length > 0) {
+          autoTable(doc, {
+            head: [aoa[0].map(String)],
+            body: aoa.slice(1).map((r) => r.map(String)),
+            startY: 20,
+            styles: { fontSize: 8 },
+          });
+        }
+      };
+
+      const allStats = computeKOStats(athletes, history);
+      addSheet("All Time", koStatsToAOA(athletes, allStats));
+
+      const now = new Date();
+      const weekStart = getMonday(now);
+      const weekEnd = getSunday(weekStart);
+      addSheet("Weekly", koStatsToAOA(athletes, computeKOStats(athletes, filterSessions(history, weekStart, weekEnd))));
+
+      addSheet("Monthly", koStatsToAOA(athletes, computeKOStats(athletes, filterSessions(history, getMonthStart(now), getMonthEnd(now)))));
+
+      doc.save("Kickoff_Stats.pdf");
+    });
+  });
+}

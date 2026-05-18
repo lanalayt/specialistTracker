@@ -7,7 +7,7 @@ import type { KickoffEntry, KickoffHash } from "@/types";
 import { KICKOFF_HASHES } from "@/types";
 import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
-import { exportKickoffStats } from "@/lib/exportStats";
+import { exportKickoffStats, exportKickoffStatsPDF } from "@/lib/exportStats";
 
 const LEGACY_TYPE_LABELS: Record<string, string> = {
   REG: "Regular",
@@ -549,12 +549,20 @@ export default function KickoffStatisticsPage() {
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
-        <button
-          onClick={() => exportKickoffStats(athletes.map((a) => a.name), history as { date?: string; entries?: KickoffEntry[] }[])}
-          className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
-        >
-          Export
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => exportKickoffStats(athletes.map((a) => a.name), history as { date?: string; entries?: KickoffEntry[] }[])}
+            className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
+          >
+            Export Excel
+          </button>
+          <button
+            onClick={() => exportKickoffStatsPDF(athletes.map((a) => a.name), history as { date?: string; entries?: KickoffEntry[] }[])}
+            className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
+          >
+            Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Category toggle */}
