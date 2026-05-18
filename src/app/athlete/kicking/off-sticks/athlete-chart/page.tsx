@@ -26,7 +26,8 @@ function AthleteChartInner() {
   const { user } = useAuth();
   const { athletes, commitPractice } = useFG();
 
-  const [phase, setPhase] = useState<"setup" | "preview" | "live" | "results">(assignedId ? "preview" : "setup");
+  const [phase, setPhase] = useState<"setup" | "preview" | "live" | "live-chart" | "results">(assignedId ? "preview" : "setup");
+  const [chartType, setChartType] = useState<"preset" | "live">("preset");
   const [kicks, setKicks] = useState<PresetKick[]>([]);
   const [newDist, setNewDist] = useState("30");
   const [newHash, setNewHash] = useState("M");
@@ -36,6 +37,10 @@ function AthleteChartInner() {
   const [assignedChart, setAssignedChart] = useState<AssignedChart | null>(null);
   const [kickMode, setKickMode] = useState<"sticks" | "live">("sticks");
   const [opTimeInput, setOpTimeInput] = useState("");
+
+  // Live chart inputs
+  const [liveDist, setLiveDist] = useState("30");
+  const [liveHash, setLiveHash] = useState("M");
 
   // Live charting state — rotate through athletes per kick
   const [currentKickIdx, setCurrentKickIdx] = useState(0);
@@ -131,12 +136,39 @@ function AthleteChartInner() {
       setCurrentPlayerIdx(selectedPlayers.length - 1);
       setCurrentKickIdx(Math.max(0, currentKickIdx - (phase === "results" ? 0 : 1)));
     }
-    if (phase === "results") setPhase("live");
+    if (phase === "results") setPhase(chartType === "live" ? "live-chart" : "live");
+  };
+
+  const handleLiveResult = (result: FGResult) => {
+    const dist = parseInt(liveDist) || 0;
+    if (dist <= 0) return;
+    const pos = HASH_TO_POS[liveHash] ?? "M";
+    const opTime = kickMode === "live" && opTimeInput ? parseOpTime(formatOpTime(opTimeInput)) : undefined;
+    const entry: FGKick = {
+      athleteId: currentPlayer,
+      athlete: currentPlayer,
+      dist,
+      pos,
+      result,
+      score: 0,
+      opTime: opTime || undefined,
+      kickNum: getPlayerResults(currentPlayer).length + 1,
+    };
+    setResults((prev) => [...prev, entry]);
+    setOpTimeInput("");
+    // Auto-rotate
+    const nextIdx = (selectedPlayers.indexOf(currentPlayer) + 1) % selectedPlayers.length;
+    setCurrentPlayerIdx(nextIdx);
+  };
+
+  const handleFinishLive = () => {
+    if (results.length > 0) setPhase("results");
   };
 
   const handleSave = async () => {
-    const summary = selectedPlayers.map((p) => `${p}: ${getPlayerMakes(p)}/${kicks.length}`).join(", ");
-    const label = `Off Sticks — ${summary}${assignedChart ? " (Assigned)" : ""}`;
+    const total = chartType === "preset" ? kicks.length : getPlayerResults(selectedPlayers[0] ?? "").length;
+    const summary = selectedPlayers.map((p) => `${p}: ${getPlayerMakes(p)}/${chartType === "preset" ? kicks.length : getPlayerResults(p).length}`).join(", ");
+    const label = `${chartType === "preset" ? "Off Sticks" : "Live Chart"} — ${summary}${assignedChart ? " (Assigned)" : ""}`;
     commitPractice(results, label);
 
     if (assignedChart) {
@@ -200,7 +232,12 @@ function AthleteChartInner() {
       <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
         <Link href="/athlete/kicking/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
         <h2 className="text-lg font-bold text-slate-100">Athlete Chart</h2>
-        <p className="text-xs text-muted">Build your own chart and kick it.</p>
+
+        {/* Preset / Live tabs */}
+        <div className="flex rounded-input border border-border overflow-hidden w-fit">
+          <button onClick={() => setChartType("preset")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", chartType === "preset" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Preset Chart</button>
+          <button onClick={() => setChartType("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", chartType === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live Chart</button>
+        </div>
 
         <div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Kicker(s)</p>
@@ -212,27 +249,29 @@ function AthleteChartInner() {
           {selectedPlayers.length > 1 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
         </div>
 
-        {kicks.length > 0 && (
-          <div className="card-2 space-y-1">
-            {kicks.map((k, i) => (
-              <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-border/30 last:border-0">
-                <span className="text-muted w-6">{i + 1}.</span>
-                <span className="text-slate-200 font-semibold">{k.distance}yd</span>
-                <span className="text-slate-300">{k.hash}</span>
-                <button onClick={() => setKicks((prev) => prev.filter((_, j) => j !== i))} className="text-miss text-[10px] hover:underline">Remove</button>
+        {chartType === "preset" && (
+          <>
+            {kicks.length > 0 && (
+              <div className="card-2 space-y-1">
+                {kicks.map((k, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-border/30 last:border-0">
+                    <span className="text-muted w-6">{i + 1}.</span>
+                    <span className="text-slate-200 font-semibold">{k.distance}yd</span>
+                    <span className="text-slate-300">{k.hash}</span>
+                    <button onClick={() => setKicks((prev) => prev.filter((_, j) => j !== i))} className="text-miss text-[10px] hover:underline">Remove</button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        <div className="card space-y-3">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider">Add Kick</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-[10px] text-muted text-center mb-1">Distance</p>
-              <input type="text" inputMode="numeric" value={newDist} onChange={(e) => setNewDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
-            </div>
-            <div>
+            <div className="card space-y-3">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider">Add Kick</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+                  <input type="text" inputMode="numeric" value={newDist} onChange={(e) => setNewDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+                </div>
+                <div>
               <p className="text-[10px] text-muted text-center mb-1">Hash</p>
               <select value={newHash} onChange={(e) => setNewHash(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5">
                 {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
@@ -242,7 +281,13 @@ function AthleteChartInner() {
           <button onClick={addKick} disabled={!newDist} className="btn-primary w-full py-2 text-xs font-bold disabled:opacity-40">Add Kick</button>
         </div>
 
-        <button onClick={() => setPhase("preview")} disabled={kicks.length === 0 || selectedPlayers.length === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Preview Chart</button>
+            <button onClick={() => setPhase("preview")} disabled={kicks.length === 0 || selectedPlayers.length === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Preview Chart</button>
+          </>
+        )}
+
+        {chartType === "live" && (
+          <button onClick={() => { setPhase("live-chart"); setCurrentPlayerIdx(0); setResults([]); }} disabled={selectedPlayers.length === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Live Chart</button>
+        )}
       </main>
     );
   }
@@ -301,6 +346,106 @@ function AthleteChartInner() {
             </div>
           </div>
         )}
+      </main>
+    );
+  }
+
+  // ── Live Chart (on the fly) ──
+  if (phase === "live-chart") {
+    return (
+      <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-4xl">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider">Live Chart</p>
+              <p className="text-lg font-extrabold text-slate-100">{currentPlayer}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-3xl font-black text-sky-400">{getPlayerMakes(currentPlayer)}/{getPlayerResults(currentPlayer).length}</p>
+              <p className="text-[10px] text-muted">FG Made</p>
+            </div>
+          </div>
+
+          {selectedPlayers.length > 1 && (
+            <div className="flex flex-wrap gap-2 justify-center">
+              {selectedPlayers.map((p) => (
+                <button key={p} onClick={() => setCurrentPlayerIdx(selectedPlayers.indexOf(p))} className={clsx("card-2 px-3 py-1.5 text-center min-w-[70px]", p === currentPlayer ? "ring-2 ring-sky-500" : "opacity-60 hover:opacity-100")}>
+                  <p className="text-[10px] font-bold text-slate-200">{p}</p>
+                  <p className="text-sm font-black text-sky-400">{getPlayerMakes(p)}/{getPlayerResults(p).length}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Sticks / Live toggle */}
+          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+            <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
+            <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
+          </div>
+
+          {/* Distance + Hash inputs */}
+          <div className="card space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+                <input type="text" inputMode="numeric" value={liveDist} onChange={(e) => setLiveDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
+              </div>
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Hash</p>
+                <select value={liveHash} onChange={(e) => setLiveHash(e.target.value)} className="input w-full text-center text-lg font-bold py-2">
+                  {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+            </div>
+            {kickMode === "live" && (
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Op Time (optional)</p>
+                <input type="text" inputMode="numeric" value={opTimeInput ? formatOpTime(opTimeInput) : ""} onChange={(e) => setOpTimeInput(e.target.value.replace(/\D/g, ""))} placeholder="1.32" className="input w-32 mx-auto text-center text-sm font-bold py-1.5" />
+              </div>
+            )}
+          </div>
+
+          {/* Result buttons */}
+          <button onClick={() => handleLiveResult("YC")} disabled={!liveDist} className="w-full py-6 rounded-card text-xl font-black bg-make/20 text-make border-2 border-make/40 hover:bg-make/30 transition-all active:scale-95 disabled:opacity-40">GOOD</button>
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={() => handleLiveResult("XL")} disabled={!liveDist} className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95 disabled:opacity-40">MISS LEFT</button>
+            <button onClick={() => handleLiveResult("XS")} disabled={!liveDist} className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95 disabled:opacity-40">MISS SHORT</button>
+            <button onClick={() => handleLiveResult("XR")} disabled={!liveDist} className="py-4 rounded-card text-sm font-black bg-miss/20 text-miss border-2 border-miss/40 hover:bg-miss/30 transition-all active:scale-95 disabled:opacity-40">MISS RIGHT</button>
+          </div>
+
+          <div className="flex gap-2">
+            {results.length > 0 && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
+            {results.length > 0 && <button onClick={handleFinishLive} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish</button>}
+          </div>
+
+          {/* Running log */}
+          {results.length > 0 && (
+            <div className="card-2 text-xs">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-2">Hash</th>
+                    {kickMode === "live" && <th className="text-[10px] text-muted text-center py-1 px-2">Op</th>}
+                    <th className="text-[10px] text-muted text-right py-1 px-2">Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...results].reverse().map((r, i) => (
+                    <tr key={i} className="border-t border-border/30">
+                      <td className="text-muted py-1 px-2">{results.length - i}</td>
+                      <td className="text-center py-1 px-2 text-slate-200">{r.dist}yd</td>
+                      <td className="text-center py-1 px-2 text-slate-300">{r.pos}</td>
+                      {kickMode === "live" && <td className="text-center py-1 px-2 text-slate-300">{r.opTime ? r.opTime.toFixed(2) : "—"}</td>}
+                      <td className={clsx("text-right py-1 px-2 font-bold", r.result.startsWith("Y") ? "text-make" : "text-miss")}>{RESULT_LABEL[r.result] ?? r.result}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </main>
     );
   }
