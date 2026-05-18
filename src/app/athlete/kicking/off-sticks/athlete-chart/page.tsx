@@ -441,9 +441,7 @@ function AthleteChartInner() {
           </div>
 
           {/* Snap button */}
-          {kickMode === "live" && (
-            <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
-          )}
+          <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors">Log Snap</button>
 
           {/* Running log */}
           {results.length > 0 && (
@@ -473,6 +471,10 @@ function AthleteChartInner() {
             </div>
           )}
         </div>
+
+        {showSnap && (
+          <AthleteSnapPopup snapType="FG" snapper={currentPlayer} onClose={() => setShowSnap(false)} />
+        )}
       </main>
     );
   }
@@ -667,10 +669,8 @@ function AthleteChartInner() {
           </div>
         )}
 
-        {/* Snap button for preset live mode */}
-        {kickMode === "live" && phase === "live" && (
-          <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors mt-4">Log Snap</button>
-        )}
+        {/* Snap button */}
+        <button onClick={() => setShowSnap(true)} className="w-full py-2 rounded-input border border-sky-500/30 text-sky-400 text-xs font-semibold hover:bg-sky-500/10 transition-colors mt-4">Log Snap</button>
       </div>
 
       {showSnap && (
