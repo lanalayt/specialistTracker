@@ -216,109 +216,146 @@ function PuntAthleteChartInner() {
     );
   }
 
-  // ── Live ──
-  const playerCount = getPlayerResults(currentPlayer).length;
+  // ── Live — Table-based like team mode ──
+  // Build the punt schedule from assigned chart or reps
+  const puntSchedule: { type: string; typeLabel: string; hash: string; idx: number }[] = [];
+  if (assignedChart?.puntTypes) {
+    let idx = 0;
+    for (const pt of assignedChart.puntTypes as any[]) {
+      for (let i = 0; i < (pt.count ?? 0); i++) {
+        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type, hash: pt.hash ?? "M", idx });
+        idx++;
+      }
+    }
+  } else {
+    for (let i = 0; i < totalReps; i++) {
+      puntSchedule.push({ type: livePuntType, typeLabel: "", hash: "M", idx: i });
+    }
+  }
+
+  // Track per-row data: rows[athlete][puntIdx] = { dist, hang, op, dir } or null
+  const [rowData, setRowData] = useState<Record<string, Record<number, { dist: string; hang: string; op: string; dir: boolean }>>>({});
+  const [activeRow, setActiveRow] = useState<{ player: string; puntIdx: number } | null>(null);
+
+  const getRowValue = (player: string, puntIdx: number) => rowData[player]?.[puntIdx];
+  const isRowFilled = (player: string, puntIdx: number) => {
+    const v = getRowValue(player, puntIdx);
+    return v && v.dist && v.hang;
+  };
+  const filledCount = selectedPlayers.reduce((s, p) => s + puntSchedule.filter((_, i) => isRowFilled(p, i)).length, 0);
+  const totalCount = selectedPlayers.length * puntSchedule.length;
+
+  const updateRowData = (player: string, puntIdx: number, field: string, value: string | boolean) => {
+    setRowData((prev) => ({
+      ...prev,
+      [player]: { ...(prev[player] ?? {}), [puntIdx]: { ...(prev[player]?.[puntIdx] ?? { dist: "", hang: "", op: "", dir: true }), [field]: value } },
+    }));
+  };
+
+  const handleSubmitAll = () => {
+    const entries: PuntEntry[] = [];
+    for (const player of selectedPlayers) {
+      for (let i = 0; i < puntSchedule.length; i++) {
+        const v = getRowValue(player, i);
+        if (!v || !v.dist || !v.hang) continue;
+        const dist = parseInt(v.dist) || 0;
+        const hang = parseHangRaw(v.hang);
+        const op = parseHangRaw(v.op);
+        const pt = puntSchedule[i];
+        entries.push({
+          athleteId: player, athlete: player, type: pt.type as any, hash: "M" as any,
+          yards: dist, hangTime: hang, opTime: op || 0,
+          directionalAccuracy: v.dir ? 1 : 0, landingZones: [] as any, kickNum: i + 1,
+        });
+      }
+    }
+    setResults(entries);
+    setPhase("results");
+  };
 
   return (
-    <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-4xl">
+    <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-5xl">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{chartType === "preset" ? `Punt ${playerCount + 1} of ${totalReps}` : "Live Chart"}{getCurrentPuntTypeLabel() ? ` — ${getCurrentPuntTypeLabel()}` : ""}</p>
-            <p className="text-lg font-extrabold text-slate-100">{currentPlayer}</p>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Punt Chart</p>
+            <p className="text-lg font-extrabold text-slate-100">{selectedPlayers.join(", ")}</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-black text-sky-400">{getPlayerResults(currentPlayer).length}</p>
-            <p className="text-[10px] text-muted">punts</p>
+            <p className="text-2xl font-black text-sky-400">{filledCount}/{totalCount}</p>
+            <p className="text-[10px] text-muted">logged</p>
           </div>
         </div>
 
+        <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+          <div className="h-full bg-sky-500 transition-all" style={{ width: `${totalCount > 0 ? (filledCount / totalCount) * 100 : 0}%` }} />
+        </div>
+
+        {/* Athlete tabs */}
         {selectedPlayers.length > 1 && (
-          <div className="flex flex-wrap gap-2 justify-center">
-            {selectedPlayers.map((p) => (
-              <button key={p} onClick={() => setCurrentPlayerIdx(selectedPlayers.indexOf(p))} className={clsx("card-2 px-3 py-1.5 text-center min-w-[70px]", p === currentPlayer ? "ring-2 ring-sky-500" : "opacity-60 hover:opacity-100")}>
-                <p className="text-[10px] font-bold text-slate-200">{p}</p>
-                <p className="text-sm font-black text-sky-400">{getPlayerResults(p).length}</p>
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2">
+            {selectedPlayers.map((p) => {
+              const filled = puntSchedule.filter((_, i) => isRowFilled(p, i)).length;
+              return (
+                <button key={p} onClick={() => setActiveRow(activeRow?.player === p ? null : { player: p, puntIdx: 0 })} className={clsx("card-2 px-3 py-1.5 text-center min-w-[70px]", activeRow?.player === p ? "ring-2 ring-sky-500" : "opacity-60 hover:opacity-100")}>
+                  <p className="text-[10px] font-bold text-slate-200">{p}</p>
+                  <p className="text-sm font-black text-sky-400">{filled}/{puntSchedule.length}</p>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {chartType === "preset" && (
-          <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-            <div className="h-full bg-sky-500 transition-all" style={{ width: `${(results.length / (totalReps * selectedPlayers.length)) * 100}%` }} />
-          </div>
-        )}
-
-        {/* Punt type selector (non-assigned charts) */}
-        {!assignedChart && (
-          <div>
-            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Punt Type</p>
-            <select value={livePuntType} onChange={(e) => setLivePuntType(e.target.value)} className="input w-full text-sm py-1.5">
-              <option value="DIR_STRAIGHT">Open Field</option>
-              <option value="POOCH_MIDDLE">Pooch</option>
-              <option value="RUGBY">Rugby</option>
-              <option value="BANANA_LEFT">Banana</option>
-            </select>
-          </div>
-        )}
-
-        <div className="card space-y-3">
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Distance</p>
-              <input type="text" inputMode="numeric" value={distInput} onChange={(e) => setDistInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
-            </div>
-            <div>
-              <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Hang Time</p>
-              <input type="text" inputMode="numeric" value={hangInput ? parseHangRaw(hangInput).toFixed(2) : ""} onChange={(e) => setHangInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
-            </div>
-            <div>
-              <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Op Time</p>
-              <input type="text" inputMode="numeric" value={opInput ? parseHangRaw(opInput).toFixed(2) : ""} onChange={(e) => setOpInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
-            </div>
-          </div>
-          <div>
-            <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Direction</p>
-            <div className="flex rounded-input border border-border overflow-hidden">
-              <button onClick={() => setDirGood(true)} className={clsx("flex-1 py-2 text-sm font-semibold transition-colors", dirGood ? "bg-make text-slate-900" : "text-muted hover:text-white")}>Good</button>
-              <button onClick={() => setDirGood(false)} className={clsx("flex-1 py-2 text-sm font-semibold transition-colors border-l border-border", !dirGood ? "bg-miss text-white" : "text-muted hover:text-white")}>Bad</button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          {results.length > 0 && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
-          <button onClick={handleLog} disabled={!distInput || !hangInput} className="btn-primary flex-1 py-2 text-sm font-bold disabled:opacity-40">Log Punt</button>
-        </div>
-        {chartType === "live" && results.length > 0 && (
-          <button onClick={() => setPhase("results")} className="btn-ghost w-full py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish</button>
-        )}
-
-        {results.length > 0 && (
-          <div className="card-2 text-xs">
-            <table className="w-full">
-              <thead><tr>
-                <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
-                <th className="text-[10px] text-muted text-center py-1 px-2">Athlete</th>
-                <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
-                <th className="text-[10px] text-muted text-center py-1 px-2">Hang</th>
-                <th className="text-[10px] text-muted text-right py-1 px-2">Dir</th>
-              </tr></thead>
-              <tbody>
-                {[...results].reverse().map((r, i) => (
-                  <tr key={i} className="border-t border-border/30">
-                    <td className="text-muted py-1 px-2">{results.length - i}</td>
-                    <td className="text-center py-1 px-2 text-slate-300">{r.athlete}</td>
-                    <td className="text-center py-1 px-2 text-slate-200">{r.yards}yd</td>
-                    <td className="text-center py-1 px-2 text-slate-200">{r.hangTime.toFixed(2)}s</td>
-                    <td className={clsx("text-right py-1 px-2 font-bold", r.directionalAccuracy === 1 ? "text-make" : "text-miss")}>{r.directionalAccuracy === 1 ? "Good" : "Bad"}</td>
+        {/* Table per athlete */}
+        {selectedPlayers.map((player) => (
+          <div key={player} className="card-2 space-y-2">
+            <p className="text-xs font-bold text-slate-200">{player}</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
+                    <th className="text-[10px] text-muted text-left py-1 px-1">Type</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-1">Hash</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-1">Dist</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-1">Hang</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-1">Op</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-1">Dir</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {puntSchedule.map((pt, i) => {
+                    const v = getRowValue(player, i) ?? { dist: "", hang: "", op: "", dir: true };
+                    const filled = v.dist && v.hang;
+                    return (
+                      <tr key={i} className={clsx("border-t border-border/30", filled ? "bg-make/5" : "")}>
+                        <td className="text-muted py-1 px-1">{i + 1}</td>
+                        <td className="py-1 px-1 text-slate-300 text-[10px]">{pt.typeLabel || pt.type}</td>
+                        <td className="text-center py-1 px-1 text-slate-300 text-[10px]">{pt.hash}</td>
+                        <td className="text-center py-1 px-1">
+                          <input type="text" inputMode="numeric" value={v.dist} onChange={(e) => updateRowData(player, i, "dist", e.target.value.replace(/\D/g, ""))} className="w-10 bg-surface-2 border border-border rounded px-1 py-0.5 text-[10px] text-center text-slate-200" />
+                        </td>
+                        <td className="text-center py-1 px-1">
+                          <input type="text" inputMode="numeric" value={v.hang ? parseHangRaw(v.hang).toFixed(2) : ""} onChange={(e) => updateRowData(player, i, "hang", e.target.value.replace(/\D/g, ""))} className="w-12 bg-surface-2 border border-border rounded px-1 py-0.5 text-[10px] text-center text-slate-200" />
+                        </td>
+                        <td className="text-center py-1 px-1">
+                          <input type="text" inputMode="numeric" value={v.op ? parseHangRaw(v.op).toFixed(2) : ""} onChange={(e) => updateRowData(player, i, "op", e.target.value.replace(/\D/g, ""))} className="w-12 bg-surface-2 border border-border rounded px-1 py-0.5 text-[10px] text-center text-slate-200" />
+                        </td>
+                        <td className="text-center py-1 px-1">
+                          <button onClick={() => updateRowData(player, i, "dir", !v.dir)} className={clsx("px-1.5 py-0.5 rounded text-[10px] font-bold", v.dir ? "text-make" : "text-miss")}>{v.dir ? "G" : "B"}</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        )}
+        ))}
+
+        <button onClick={handleSubmitAll} disabled={filledCount === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">
+          Submit Chart ({filledCount} punt{filledCount !== 1 ? "s" : ""})
+        </button>
       </div>
     </main>
   );
