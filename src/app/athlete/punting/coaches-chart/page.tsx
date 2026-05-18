@@ -8,7 +8,13 @@ import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/li
 import Link from "next/link";
 import clsx from "clsx";
 
-const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
+const HASH_OPTIONS = [
+  { value: "Left", label: "Left Hash" },
+  { value: "LM", label: "LM Hash" },
+  { value: "M", label: "Middle" },
+  { value: "RM", label: "RM Hash" },
+  { value: "Right", label: "Right Hash" },
+];
 
 interface PuntTypeConfig { id: string; label: string; category: string; metric: string; hangTime: boolean }
 interface PuntCategory { id: string; label: string; enabled: boolean }
@@ -72,6 +78,7 @@ export default function PuntCoachesChartPage() {
 
   const [puntRows, setPuntRows] = useState<PuntRow[]>([{ category: "DIRECTIONAL", count: 5, typeId: "DIR_STRAIGHT", hash: "M" }]);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
   const [dueDate, setDueDate] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -243,8 +250,8 @@ export default function PuntCoachesChartPage() {
                   {getTypesForCategory(row.category).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
                 </select>
                 {/* Hash */}
-                <select value={row.hash} onChange={(e) => updateRow(idx, "hash", e.target.value)} className="input text-xs py-1.5 w-16">
-                  {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                <select value={row.hash} onChange={(e) => updateRow(idx, "hash", e.target.value)} className="input text-xs py-1.5 w-24">
+                  {HASH_OPTIONS.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
                 </select>
                 {puntRows.length > 1 && (
                   <button onClick={() => removeRow(idx)} className="text-miss text-xs hover:underline">&times;</button>
@@ -267,14 +274,31 @@ export default function PuntCoachesChartPage() {
             </div>
           </div>
 
-          <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Due Date</p>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
+          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+            <button onClick={() => setChartAction("now")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", chartAction === "now" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Chart Now</button>
+            <button onClick={() => setChartAction("assign")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", chartAction === "assign" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Assign Chart</button>
           </div>
 
-          <button onClick={handleAssign} disabled={totalReps <= 0 || selectedPlayers.length === 0 || !dueDate} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">
-            Assign Chart ({totalReps} punt{totalReps !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
-          </button>
+          {chartAction === "assign" && (
+            <div>
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Due Date</p>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
+            </div>
+          )}
+
+          {chartAction === "assign" ? (
+            <button onClick={handleAssign} disabled={totalReps <= 0 || selectedPlayers.length === 0 || !dueDate} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">
+              Assign Chart ({totalReps} punt{totalReps !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
+            </button>
+          ) : (
+            <Link
+              href="/athlete/punting/athlete-chart"
+              onClick={() => localStorage.setItem("coach_punt_chart_now", JSON.stringify({ reps: totalReps, puntRows, players: selectedPlayers }))}
+              className={clsx("btn-primary w-full py-3 text-sm font-bold text-center block", (totalReps <= 0 || selectedPlayers.length === 0) && "opacity-40 pointer-events-none")}
+            >
+              Start Chart Now
+            </Link>
+          )}
         </>
       ))}
 

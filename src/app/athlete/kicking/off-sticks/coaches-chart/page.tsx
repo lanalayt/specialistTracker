@@ -28,6 +28,7 @@ export default function CoachesChartPage() {
   const [newDist, setNewDist] = useState("30");
   const [newHash, setNewHash] = useState("M");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
   const [dueDate, setDueDate] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -178,18 +179,38 @@ export default function CoachesChartPage() {
             {athleteNames.length === 0 && <p className="text-xs text-muted mt-1">No athletes found. Add athletes in Team Mode first.</p>}
           </div>
 
-          <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Due Date</p>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
+          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+            <button onClick={() => setChartAction("now")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", chartAction === "now" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Chart Now</button>
+            <button onClick={() => setChartAction("assign")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", chartAction === "assign" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Assign Chart</button>
           </div>
 
-          <button
-            onClick={handleAssign}
-            disabled={kicks.length === 0 || selectedPlayers.length === 0 || !dueDate}
-            className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40"
-          >
-            Assign Chart ({kicks.length} kick{kicks.length !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
-          </button>
+          {chartAction === "assign" && (
+            <div>
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Due Date</p>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
+            </div>
+          )}
+
+          {chartAction === "assign" ? (
+            <button
+              onClick={handleAssign}
+              disabled={kicks.length === 0 || selectedPlayers.length === 0 || !dueDate}
+              className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40"
+            >
+              Assign Chart ({kicks.length} kick{kicks.length !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
+            </button>
+          ) : (
+            <Link
+              href={`/athlete/kicking/off-sticks/athlete-chart`}
+              onClick={() => {
+                // Store kicks in localStorage for the athlete chart to pick up
+                localStorage.setItem("coach_fg_chart_now", JSON.stringify({ kicks, players: selectedPlayers }));
+              }}
+              className={clsx("btn-primary w-full py-3 text-sm font-bold text-center block", (kicks.length === 0 || selectedPlayers.length === 0) && "opacity-40 pointer-events-none")}
+            >
+              Start Chart Now
+            </Link>
+          )}
         </>
       ))}
 
