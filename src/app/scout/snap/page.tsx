@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { createClient } from "@/lib/supabase";
 import { exportSnapScoutExcel, exportSnapScoutPDF } from "@/lib/scoutExport";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { HolderStrikeZone } from "@/components/ui/HolderStrikeZone";
@@ -45,6 +46,63 @@ export default function ScoutSnapPage() {
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState<RankedRow | null>(null);
   const [rankingTab, setRankingTab] = useState<"short" | "long">("short");
+  const [editSnapIdx, setEditSnapIdx] = useState<number | null>(null);
+  const [editAccuracy, setEditAccuracy] = useState<"Strike" | "Ball" | "">("");
+  const [editLaces, setEditLaces] = useState("");
+  const [editSpiral, setEditSpiral] = useState("");
+  const [editTime, setEditTime] = useState("");
+
+  const startSnapEdit = (idx: number) => {
+    if (!detailOpen) return;
+    const e = detailOpen.entries[idx];
+    setEditSnapIdx(idx);
+    setEditAccuracy((e.accuracy as "Strike" | "Ball") ?? "");
+    setEditLaces(e.laces ?? "");
+    setEditSpiral(e.spiral ?? "");
+    setEditTime(e.time ?? "");
+  };
+
+  const saveSnapEdit = async () => {
+    if (editSnapIdx === null || !detailOpen || !editAccuracy || !editSpiral) return;
+    const updated = [...detailOpen.entries];
+    const is30 = detailOpen.is30Point;
+    let pts = 0;
+    if (is30) {
+      if (editAccuracy === "Strike") pts += 1;
+      if (editLaces === "Good") pts += 1;
+      else if (editLaces === "1/4 Turn") pts += 0.5;
+      if (editSpiral === "Good") pts += 1;
+    } else {
+      pts = editAccuracy === "Strike" ? 1 : 0;
+    }
+    updated[editSnapIdx] = { ...updated[editSnapIdx], accuracy: editAccuracy, laces: editLaces || undefined, spiral: editSpiral, points: is30 ? pts : undefined, score: is30 ? undefined : pts, time: editTime || undefined };
+
+    // Save to database
+    const tid = getTeamId();
+    if (tid) {
+      // Find the session and update all entries for this athlete
+      const sess = sessions.find((s) => s.id === detailOpen.sessionId);
+      if (sess) {
+        const allEntries = sess.entries as unknown as SnapEntry[];
+        const athleteEntries = allEntries.filter((e) => e.athlete === detailOpen.name);
+        const otherEntries = allEntries.filter((e) => e.athlete !== detailOpen.name);
+        // Replace athlete entries with updated ones
+        const newAllEntries = [...otherEntries, ...updated];
+        try {
+          const supabase = createClient();
+          await supabase.from("sessions").update({ entries: newAllEntries, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", detailOpen.sessionId);
+        } catch {}
+      }
+    }
+
+    // Update local state
+    const newTotal = updated.reduce((s, e) => s + (e.points ?? e.score ?? 0), 0);
+    const newMaxScore = is30 ? updated.length * 3 : updated.length;
+    const newPct = newMaxScore > 0 ? Math.round((newTotal / newMaxScore) * 100) : 0;
+    setDetailOpen({ ...detailOpen, entries: updated, total: newTotal, maxScore: newMaxScore, pct: newPct });
+    setEditSnapIdx(null);
+    loadData();
+  };
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -234,27 +292,64 @@ export default function ScoutSnapPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {detailOpen.entries.map((e, i) => (
-                    <tr key={i} className="border-t border-border/30">
-                      <td className="text-muted py-1 px-1">{i + 1}</td>
-                      <td className={clsx("text-center py-1 px-1 font-semibold", e.accuracy === "Strike" ? "text-make" : "text-miss")}>{e.accuracy}</td>
-                      {detailOpen.is30Point && (
-                        <td className={clsx("text-center py-1 px-1", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>
-                          {e.laces === "Good" ? "Perfect" : e.laces}
+                  {detailOpen.entries.map((e, i) => {
+                    const isEditing = editSnapIdx === i;
+                    return (
+                      <tr key={i} className={clsx("border-t border-border/30 cursor-pointer hover:bg-surface-2/50 transition-colors", isEditing && "bg-surface-2/30")} onClick={() => isEditing ? setEditSnapIdx(null) : startSnapEdit(i)}>
+                        <td className="text-muted py-1 px-1">{i + 1}</td>
+                        <td className={clsx("text-center py-1 px-1 font-semibold", e.accuracy === "Strike" ? "text-make" : "text-miss")}>{e.accuracy}</td>
+                        {detailOpen.is30Point && (
+                          <td className={clsx("text-center py-1 px-1", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>
+                            {e.laces === "Good" ? "Perfect" : e.laces}
+                          </td>
+                        )}
+                        {!detailOpen.is30Point && (
+                          <td className="text-center py-1 px-1 text-slate-300">{e.time || "—"}</td>
+                        )}
+                        <td className={clsx("text-center py-1 px-1", e.spiral === "Good" ? "text-make" : "text-miss")}>
+                          {e.spiral === "Good" ? "Tight" : "Open"}
                         </td>
-                      )}
-                      {!detailOpen.is30Point && (
-                        <td className="text-center py-1 px-1 text-slate-300">{e.time || "—"}</td>
-                      )}
-                      <td className={clsx("text-center py-1 px-1", e.spiral === "Good" ? "text-make" : "text-miss")}>
-                        {e.spiral === "Good" ? "Tight" : "Open"}
-                      </td>
-                      <td className="text-right py-1 px-1 font-bold text-amber-400">{e.points ?? e.score ?? 0}</td>
-                    </tr>
-                  ))}
+                        <td className="text-right py-1 px-1 font-bold text-amber-400">{e.points ?? e.score ?? 0}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+
+            {/* Edit panel */}
+            {editSnapIdx !== null && (
+              <div className="card space-y-2" onClick={(ev) => ev.stopPropagation()}>
+                <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Edit Snap #{editSnapIdx + 1}</p>
+                <div className={clsx("grid gap-2", detailOpen.is30Point ? "grid-cols-3" : "grid-cols-3")}>
+                  <div>
+                    <p className="text-[8px] text-muted text-center mb-1">Location</p>
+                    <button onClick={(ev) => { ev.stopPropagation(); setEditAccuracy("Strike"); }} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editAccuracy === "Strike" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Strike</button>
+                    <button onClick={(ev) => { ev.stopPropagation(); setEditAccuracy("Ball"); }} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editAccuracy === "Ball" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Ball</button>
+                  </div>
+                  {detailOpen.is30Point && (
+                    <div>
+                      <p className="text-[8px] text-muted text-center mb-1">Laces</p>
+                      <button onClick={(ev) => { ev.stopPropagation(); setEditLaces("Good"); }} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editLaces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Perfect</button>
+                      <button onClick={(ev) => { ev.stopPropagation(); setEditLaces("1/4 Turn"); }} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editLaces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4</button>
+                      <button onClick={(ev) => { ev.stopPropagation(); setEditLaces("Back"); }} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editLaces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[8px] text-muted text-center mb-1">Spiral</p>
+                    <button onClick={(ev) => { ev.stopPropagation(); setEditSpiral("Good"); }} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editSpiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+                    <button onClick={(ev) => { ev.stopPropagation(); setEditSpiral("Bad"); }} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", editSpiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+                  </div>
+                  {!detailOpen.is30Point && (
+                    <div>
+                      <p className="text-[8px] text-muted text-center mb-1">Time</p>
+                      <input type="text" inputMode="decimal" value={editTime} onClick={(ev) => ev.stopPropagation()} onChange={(e) => setEditTime(e.target.value)} className="input w-full text-center text-[10px] font-bold py-1.5" placeholder="0.65" />
+                    </div>
+                  )}
+                </div>
+                <button onClick={(ev) => { ev.stopPropagation(); saveSnapEdit(); }} className="btn-primary w-full py-2 text-xs font-bold">Save</button>
+              </div>
+            )}
           </div>
         </div>
       )}
