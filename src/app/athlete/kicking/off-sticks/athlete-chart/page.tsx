@@ -597,32 +597,38 @@ function AthleteChartInner() {
         })}
         {/* Snap Summary */}
         {allSnapEntries.length > 0 && (() => {
-          const snapperMap: Record<string, { strikes: number; balls: number; lacesGood: number; laces14: number; lacesBack: number; spiralTight: number; spiralOpen: number }> = {};
+          const snapperNames = [...new Set(allSnapEntries.map((e) => e.athlete))];
+          const snapsBySnapper: Record<string, LongSnapEntry[]> = {};
           allSnapEntries.forEach((e) => {
-            if (!snapperMap[e.athlete]) snapperMap[e.athlete] = { strikes: 0, balls: 0, lacesGood: 0, laces14: 0, lacesBack: 0, spiralTight: 0, spiralOpen: 0 };
-            const s = snapperMap[e.athlete];
-            if (e.accuracy === "ON_TARGET") s.strikes++; else s.balls++;
-            if (e.laces === "Good") s.lacesGood++;
-            else if (e.laces === "1/4 Turn") s.laces14++;
-            else if (e.laces === "Back") s.lacesBack++;
-            if (e.spiral === "Good") s.spiralTight++; else if (e.spiral === "Bad") s.spiralOpen++;
+            if (!snapsBySnapper[e.athlete]) snapsBySnapper[e.athlete] = [];
+            snapsBySnapper[e.athlete].push(e);
           });
           return (
             <div className="card-2 text-left space-y-3">
               <p className="text-xs font-bold text-sky-400 uppercase tracking-wider">Short Snap Summary</p>
-              {Object.entries(snapperMap).map(([name, s]) => {
-                const total = s.strikes + s.balls;
-                const pct = total > 0 ? Math.round((s.strikes / total) * 100) : 0;
+              {snapperNames.map((name) => {
+                const snaps = snapsBySnapper[name];
                 return (
-                  <div key={name} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-slate-200">{name}</p>
-                      <p className="text-xs"><span className="text-make font-bold">{s.strikes}</span><span className="text-muted">/{total}</span> <span className="text-slate-300 font-semibold">{pct}%</span></p>
-                    </div>
-                    <div className="flex gap-3 text-[10px] text-muted">
-                      <span>Laces: <span className="text-make">{s.lacesGood}P</span> <span className="text-warn">{s.laces14}¼</span> <span className="text-miss">{s.lacesBack}B</span></span>
-                      <span>Spiral: <span className="text-make">{s.spiralTight}T</span> <span className="text-miss">{s.spiralOpen}O</span></span>
-                    </div>
+                  <div key={name}>
+                    <p className="text-xs font-bold text-slate-200 mb-1">{name}</p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr>
+                          <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+                          <th className="text-[10px] text-muted text-center py-1 px-2">Laces</th>
+                          <th className="text-[10px] text-muted text-center py-1 px-2">Rotation</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {snaps.map((s, i) => (
+                          <tr key={i} className="border-t border-border/30">
+                            <td className="text-muted py-1 px-2">{i + 1}</td>
+                            <td className={clsx("text-center py-1 px-2 font-semibold", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{s.laces === "Good" ? "Perfect" : s.laces === "1/4 Turn" ? "1/4" : s.laces ?? "—"}</td>
+                            <td className={clsx("text-center py-1 px-2 font-semibold", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 );
               })}
