@@ -96,11 +96,26 @@ export default function KickoffCoachesChartPage() {
 
   const getTypesForCategory = (catId: string) => koTypes.filter((t) => t.category === catId);
 
-  const [koRows, setKoRows] = useState<KORow[]>([{ category: "DEEP", count: 5, typeId: "DEEP_LEFT", hash: "M" }]);
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
-  const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
-  const [dueDate, setDueDate] = useState("");
+  const KO_DRAFT_KEY = "ko_coaches_chart_draft";
+
+  const [koRows, setKoRows] = useState<KORow[]>(() => {
+    try { const d = JSON.parse(localStorage.getItem(KO_DRAFT_KEY) ?? ""); if (d?.koRows?.length) return d.koRows; } catch {}
+    return [{ category: "DEEP", count: 5, typeId: "DEEP_LEFT", hash: "M" }];
+  });
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(() => {
+    try { const d = JSON.parse(localStorage.getItem(KO_DRAFT_KEY) ?? ""); return d?.selectedPlayers ?? []; } catch {} return [];
+  });
+  const [chartAction, setChartAction] = useState<"assign" | "now">(() => {
+    try { const d = JSON.parse(localStorage.getItem(KO_DRAFT_KEY) ?? ""); return d?.chartAction ?? "assign"; } catch {} return "assign";
+  });
+  const [dueDate, setDueDate] = useState(() => {
+    try { const d = JSON.parse(localStorage.getItem(KO_DRAFT_KEY) ?? ""); return d?.dueDate ?? ""; } catch {} return "";
+  });
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem(KO_DRAFT_KEY, JSON.stringify({ koRows, selectedPlayers, chartAction, dueDate })); } catch {}
+  }, [koRows, selectedPlayers, chartAction, dueDate]);
   const [charts, setCharts] = useState<AssignedChart[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reassignId, setReassignId] = useState<string | null>(null);
@@ -159,6 +174,7 @@ export default function KickoffCoachesChartPage() {
     };
     const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
+    try { localStorage.removeItem(KO_DRAFT_KEY); } catch {}
     setSaved(true);
     loadChartsData();
   };
@@ -169,6 +185,7 @@ export default function KickoffCoachesChartPage() {
       return { typeId: r.typeId, typeLabel: t?.label ?? r.typeId, count: r.count, hash: r.hash };
     });
     localStorage.setItem("coach_ko_chart_now", JSON.stringify({ reps: totalReps, players: selectedPlayers, koRows: rows }));
+    try { localStorage.removeItem(KO_DRAFT_KEY); } catch {}
   };
 
   const handleDeleteAssignedChart = async (chartId: string) => {

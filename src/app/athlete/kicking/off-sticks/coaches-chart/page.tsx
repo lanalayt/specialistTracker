@@ -41,13 +41,27 @@ export default function CoachesChartPage() {
     ? athletes.map((a) => a.name).filter((n) => teamRoster.has(n))
     : athletes.map((a) => a.name);
 
-  const [kicks, setKicks] = useState<PresetKick[]>([]);
+  const FG_DRAFT_KEY = "fg_coaches_chart_draft";
+
+  const [kicks, setKicks] = useState<PresetKick[]>(() => {
+    try { const d = JSON.parse(localStorage.getItem(FG_DRAFT_KEY) ?? ""); return d?.kicks ?? []; } catch {} return [];
+  });
   const [newDist, setNewDist] = useState("30");
   const [newHash, setNewHash] = useState("M");
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
-  const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
-  const [dueDate, setDueDate] = useState("");
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(() => {
+    try { const d = JSON.parse(localStorage.getItem(FG_DRAFT_KEY) ?? ""); return d?.selectedPlayers ?? []; } catch {} return [];
+  });
+  const [chartAction, setChartAction] = useState<"assign" | "now">(() => {
+    try { const d = JSON.parse(localStorage.getItem(FG_DRAFT_KEY) ?? ""); return d?.chartAction ?? "assign"; } catch {} return "assign";
+  });
+  const [dueDate, setDueDate] = useState(() => {
+    try { const d = JSON.parse(localStorage.getItem(FG_DRAFT_KEY) ?? ""); return d?.dueDate ?? ""; } catch {} return "";
+  });
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem(FG_DRAFT_KEY, JSON.stringify({ kicks, selectedPlayers, chartAction, dueDate })); } catch {}
+  }, [kicks, selectedPlayers, chartAction, dueDate]);
 
   // Recent charts
   const [charts, setCharts] = useState<AssignedChart[]>([]);
@@ -105,6 +119,7 @@ export default function CoachesChartPage() {
     };
     const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
+    try { localStorage.removeItem(FG_DRAFT_KEY); } catch {}
     setSaved(true);
     loadCharts();
   };
@@ -229,6 +244,7 @@ export default function CoachesChartPage() {
             <button
               onClick={() => {
                 localStorage.setItem("coach_fg_chart_now", JSON.stringify({ kicks, players: selectedPlayers }));
+                try { localStorage.removeItem(FG_DRAFT_KEY); } catch {}
                 router.push("/athlete/kicking/off-sticks/athlete-chart");
               }}
               disabled={kicks.length === 0 || selectedPlayers.length === 0}

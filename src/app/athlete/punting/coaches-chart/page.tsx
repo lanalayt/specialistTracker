@@ -107,11 +107,27 @@ export default function PuntCoachesChartPage() {
   const enabledCategories = puntCategories.filter((c) => c.enabled);
   const getTypesForCategory = (catId: string) => puntTypes.filter((t) => t.category === catId);
 
-  const [puntRows, setPuntRows] = useState<PuntRow[]>([{ category: "DIRECTIONAL", count: 5, typeId: "DIR_STRAIGHT", hash: "M" }]);
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
-  const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
-  const [dueDate, setDueDate] = useState("");
+  const DRAFT_KEY = "punt_coaches_chart_draft";
+
+  const [puntRows, setPuntRows] = useState<PuntRow[]>(() => {
+    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); if (d?.puntRows?.length) return d.puntRows; } catch {}
+    return [{ category: "DIRECTIONAL", count: 5, typeId: "DIR_STRAIGHT", hash: "M" }];
+  });
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(() => {
+    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); return d?.selectedPlayers ?? []; } catch {} return [];
+  });
+  const [chartAction, setChartAction] = useState<"assign" | "now">(() => {
+    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); return d?.chartAction ?? "assign"; } catch {} return "assign";
+  });
+  const [dueDate, setDueDate] = useState(() => {
+    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); return d?.dueDate ?? ""; } catch {} return "";
+  });
   const [saved, setSaved] = useState(false);
+
+  // Persist draft
+  useEffect(() => {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ puntRows, selectedPlayers, chartAction, dueDate })); } catch {}
+  }, [puntRows, selectedPlayers, chartAction, dueDate]);
 
   const [charts, setCharts] = useState<AssignedChart[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -178,6 +194,7 @@ export default function PuntCoachesChartPage() {
     const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
     setSaved(true);
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
     loadCharts();
   };
 
@@ -345,6 +362,7 @@ export default function PuntCoachesChartPage() {
                   return { type: catConfig?.label ?? r.category, typeId: r.typeId, typeLabel: typeConfig?.label ?? r.typeId, count: r.count, hash: r.hash, yardLine: r.yardLine || undefined };
                 });
                 localStorage.setItem("coach_punt_chart_now", JSON.stringify({ reps: totalReps, puntRows: rows, players: selectedPlayers }));
+                try { localStorage.removeItem(DRAFT_KEY); } catch {}
               }}
               className={clsx("btn-primary w-full py-3 text-sm font-bold text-center block", (totalReps <= 0 || selectedPlayers.length === 0) && "opacity-40 pointer-events-none")}
             >
