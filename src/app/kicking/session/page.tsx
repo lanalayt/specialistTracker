@@ -2383,8 +2383,9 @@ export default function KickingSessionPage() {
               const nextUnlogged = filledRows.slice(currentFilledIdx + 1).find(({ i }) => !(snapLogsMap[String(i)]?.length) && i !== snapKickIdx);
               if (nextUnlogged) setSnapKickIdx(nextUnlogged.i);
             }}
-            kickList={filledRows.map(({ r, i }) => ({
+            kickList={filledRows.map(({ r, i }, fi) => ({
               idx: i,
+              kickNum: fi + 1,
               athlete: r.athlete || "?",
               dist: r.dist || "?",
               pos: r.pos || "?",

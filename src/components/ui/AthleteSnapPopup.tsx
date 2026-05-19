@@ -26,7 +26,7 @@ interface Props {
   previousSnaps?: SnapLogEntry[]; // snaps already logged for this kick
   onClose: () => void;
   onSaved?: (entry: SnapLogEntry) => void;
-  kickList?: { idx: number; athlete: string; dist: string; pos: string; hasSnap: boolean; isActive: boolean }[];
+  kickList?: { idx: number; kickNum: number; athlete: string; dist: string; pos: string; hasSnap: boolean; isActive: boolean }[];
   onKickSelect?: (idx: number) => void;
 }
 
@@ -117,17 +117,6 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface border border-border rounded-xl w-full max-w-sm mx-4 p-4 space-y-3 max-h-[90vh] overflow-y-auto">
-        {/* Kick list bar (team mode) */}
-        {kickList && kickList.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-            {kickList.map((k) => (
-              <button key={k.idx} onClick={() => onKickSelect?.(k.idx)} className={clsx("flex-shrink-0 px-2 py-1 rounded-input text-[10px] font-semibold border transition-all", k.isActive ? "bg-accent/20 border-accent/50 text-accent ring-1 ring-accent" : k.hasSnap ? "bg-make/10 border-make/40 text-make" : "bg-surface-2 border-border text-muted hover:text-white")}>
-                <span className="font-bold">{k.athlete}</span> {k.dist}yd {k.pos}{k.hasSnap ? " ✓" : ""}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Title: kicker, distance, hash */}
         <div className="flex items-center justify-between">
           <div>
@@ -229,6 +218,22 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
         <button onClick={handleSave} disabled={!canSave} className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-40">
           Log Snap
         </button>
+
+        {/* Kick list (team mode) */}
+        {kickList && kickList.length > 0 && (
+          <div className="border-t border-border/50 pt-2 space-y-1">
+            <p className="text-[10px] text-muted uppercase tracking-wider font-semibold mb-1">Kicks</p>
+            {kickList.map((k) => (
+              <button key={k.idx} onClick={() => onKickSelect?.(k.idx)} className={clsx("w-full flex items-center gap-2 px-2 py-1.5 rounded-input text-[10px] transition-all text-left", k.isActive ? "bg-accent/15 border border-accent/50 text-accent" : k.hasSnap ? "bg-make/5 border border-make/30 text-make" : "border border-border/40 text-muted hover:text-white hover:border-border")}>
+                <span className="font-bold w-4 text-center">{k.kickNum}</span>
+                <span className="font-semibold text-slate-200 flex-1">{k.athlete}</span>
+                <span className="text-slate-400">{k.dist}yd</span>
+                <span className="text-slate-400">{k.pos}</span>
+                {k.hasSnap && <span className="text-make font-bold">✓</span>}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Logged snaps for this kick */}
         {previousSnaps && previousSnaps.length > 0 && (
