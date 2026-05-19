@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
@@ -23,6 +24,8 @@ const BM_COLORS: Record<SnapBenchmark, string> = {
 };
 
 export default function LongSnapHistoryPage() {
+  const pathname = usePathname();
+  const isAthleteMode = pathname.startsWith("/athlete");
   const { history, updateSessionWeather, deleteSession } = useLongSnap();
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
@@ -274,7 +277,7 @@ export default function LongSnapHistoryPage() {
                             <th className="table-header">Acc</th>
                             <th className="table-header">Laces</th>
                             <th className="table-header">Spiral</th>
-                            <th className="table-header">Crit</th>
+                            {!isAthleteMode && <th className="table-header">Crit</th>}
                           </tr>
                         </thead>
                         <tbody>
@@ -289,7 +292,7 @@ export default function LongSnapHistoryPage() {
                               </td>
                               <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces || "—"}</td>
                               <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Good" : s.spiral === "Bad" ? "Bad" : "—"}</td>
-                              <td className="table-cell">{s.critical ? <span className="text-miss font-bold">!</span> : "—"}</td>
+                              {!isAthleteMode && <td className="table-cell">{s.critical ? <span className="text-miss font-bold">!</span> : "—"}</td>}
                             </tr>
                           ))}
                         </tbody>
