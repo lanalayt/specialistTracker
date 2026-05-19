@@ -171,9 +171,10 @@ function PuntAthleteChartInner() {
     if (allSnapEntries.length > 0) {
       const tid = getTeamId();
       if (tid) {
+        const snapperNames = [...new Set(allSnapEntries.map((e) => e.athlete))].join(", ");
         const snapSession = {
           id: genId(), teamId: tid, sport: "ATHLETE_LONGSNAP",
-          label: `Long Snap — ${label}`,
+          label: `Long Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
           date: new Date().toISOString(), mode: "practice" as const,
           entries: allSnapEntries,
         };
