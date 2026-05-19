@@ -64,13 +64,25 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
     const acc = isFG ? (marker?.inZone ? "ON_TARGET" : "HIGH") : (puntMarker?.inZone ? "ON_TARGET" : "HIGH");
     const snapTimeVal = snapTime ? parseTimeRaw(snapTime) : 0;
 
+    // Score: FG uses 30-point scoring (strike 1 + laces 0/0.5/1 + spiral 0/1 = max 3)
+    // Punt uses simple strike/ball (1 or 0)
+    let score = 0;
+    if (isFG) {
+      if (acc === "ON_TARGET") score += 1;
+      if (laces === "Good") score += 1;
+      else if (laces === "1/4 Turn") score += 0.5;
+      if (spiral === "Good") score += 1;
+    } else {
+      score = acc === "ON_TARGET" ? 1 : 0;
+    }
+
     const dbEntry: LongSnapEntry = {
       athleteId: snapper, athlete: snapper,
       snapType: (isFG ? "FG" : "PUNT") as SnapType, time: snapTimeVal,
       accuracy: acc as SnapAccuracy,
       laces: isFG ? laces || undefined : undefined,
       spiral: spiral || undefined,
-      score: acc === "ON_TARGET" ? 1 : 0,
+      score,
       markerX: isFG ? marker?.x : puntMarker?.x, markerY: isFG ? marker?.y : puntMarker?.y,
       markerInZone: isFG ? marker?.inZone : puntMarker?.inZone,
     };

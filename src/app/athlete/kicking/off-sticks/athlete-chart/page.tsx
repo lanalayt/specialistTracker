@@ -608,16 +608,23 @@ function AthleteChartInner() {
               <p className="text-xs font-bold text-sky-400 uppercase tracking-wider">Short Snap Summary</p>
               {snapperNames.map((name) => {
                 const snaps = snapsBySnapper[name];
+                const totalScore = snaps.reduce((s, e) => s + e.score, 0);
+                const maxScore = snaps.length * 3;
+                const pct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
                 return (
                   <div key={name}>
-                    <p className="text-xs font-bold text-slate-200 mb-1">{name}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-200">{name}</p>
+                      <p className="text-xs"><span className="text-sky-400 font-bold">{totalScore}</span><span className="text-muted">/{maxScore}</span> <span className="text-slate-300 font-semibold">{pct}%</span></p>
+                    </div>
                     <table className="w-full text-xs">
                       <thead>
                         <tr>
                           <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
                           <th className="text-[10px] text-muted text-center py-1 px-2">Result</th>
                           <th className="text-[10px] text-muted text-center py-1 px-2">Laces</th>
-                          <th className="text-[10px] text-muted text-center py-1 px-2">Rotation</th>
+                          <th className="text-[10px] text-muted text-center py-1 px-2">Spiral</th>
+                          <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -627,6 +634,7 @@ function AthleteChartInner() {
                             <td className={clsx("text-center py-1 px-2 font-bold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
                             <td className={clsx("text-center py-1 px-2 font-semibold", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{s.laces === "Good" ? "Perfect" : s.laces === "1/4 Turn" ? "1/4" : s.laces ?? "—"}</td>
                             <td className={clsx("text-center py-1 px-2 font-semibold", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                            <td className="text-right py-1 px-2 font-bold text-sky-400">{s.score}/{3}</td>
                           </tr>
                         ))}
                       </tbody>
