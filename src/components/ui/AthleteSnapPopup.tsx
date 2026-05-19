@@ -26,6 +26,8 @@ interface Props {
   previousSnaps?: SnapLogEntry[]; // snaps already logged for this kick
   onClose: () => void;
   onSaved?: (entry: SnapLogEntry) => void;
+  kickList?: { idx: number; athlete: string; dist: string; pos: string; hasSnap: boolean; isActive: boolean }[];
+  onKickSelect?: (idx: number) => void;
 }
 
 function getInitials(name: string): string {
@@ -34,7 +36,7 @@ function getInitials(name: string): string {
   return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
-export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved }: Props) {
+export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved, kickList, onKickSelect }: Props) {
   const isFG = snapType === "FG";
   const showHolder = isFG && holderEnabled;
   const holderList = holdersProp && holdersProp.length > 0 ? holdersProp : athletes;
@@ -106,6 +108,17 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-surface border border-border rounded-xl w-full max-w-sm mx-4 p-4 space-y-3 max-h-[90vh] overflow-y-auto">
+        {/* Kick list bar (team mode) */}
+        {kickList && kickList.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+            {kickList.map((k) => (
+              <button key={k.idx} onClick={() => onKickSelect?.(k.idx)} className={clsx("flex-shrink-0 px-2 py-1 rounded-input text-[10px] font-semibold border transition-all", k.isActive ? "bg-accent/20 border-accent/50 text-accent ring-1 ring-accent" : k.hasSnap ? "bg-make/10 border-make/40 text-make" : "bg-surface-2 border-border text-muted hover:text-white")}>
+                <span className="font-bold">{k.athlete}</span> {k.dist}yd {k.pos}{k.hasSnap ? " ✓" : ""}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Title: kicker, distance, hash */}
         <div className="flex items-center justify-between">
           <div>

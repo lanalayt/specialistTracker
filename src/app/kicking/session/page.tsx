@@ -280,6 +280,7 @@ export default function KickingSessionPage() {
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
+  const [snapKickIdx, setSnapKickIdx] = useState(0);
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
@@ -1834,7 +1835,12 @@ export default function KickingSessionPage() {
             {!viewOnly && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => setShowSnapOverlay(true)}
+                  onClick={() => {
+                    // Start at first filled row without a snap logged
+                    const firstUnlogged = filledRows.findIndex(({ i }) => !snapLogsMap[String(i)]?.length);
+                    setSnapKickIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
+                    setShowSnapOverlay(true);
+                  }}
                   className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
                 >
                   Log Snap
@@ -2355,20 +2361,38 @@ export default function KickingSessionPage() {
         />
       )}
 
-      {showSnapOverlay && (
-        <AthleteSnapPopup
-          snapType="FG"
-          athletes={snapAthletes}
-          holders={holderAthletes}
-          holderEnabled={holderEnabled}
-          kickerName={rows[currentKickIdx]?.athlete || undefined}
-          kickDistance={rows[currentKickIdx]?.dist ? parseInt(rows[currentKickIdx].dist) : undefined}
-          kickHash={rows[currentKickIdx]?.pos || undefined}
-          previousSnaps={snapLogsMap[String(currentKickIdx)]}
-          onClose={() => setShowSnapOverlay(false)}
-          onSaved={(entry) => setSnapLogsMap((prev) => ({ ...prev, [String(currentKickIdx)]: [...(prev[String(currentKickIdx)] ?? []), entry] }))}
-        />
-      )}
+      {showSnapOverlay && (() => {
+        const snapKickRow = rows[snapKickIdx];
+        return (
+          <AthleteSnapPopup
+            snapType="FG"
+            athletes={snapAthletes}
+            holders={holderAthletes}
+            holderEnabled={holderEnabled}
+            kickerName={snapKickRow?.athlete || undefined}
+            kickDistance={snapKickRow?.dist ? parseInt(snapKickRow.dist) : undefined}
+            kickHash={snapKickRow?.pos || undefined}
+            previousSnaps={snapLogsMap[String(snapKickIdx)]}
+            onClose={() => setShowSnapOverlay(false)}
+            onSaved={(entry) => {
+              setSnapLogsMap((prev) => ({ ...prev, [String(snapKickIdx)]: [...(prev[String(snapKickIdx)] ?? []), entry] }));
+              // Auto-advance to next unlogged kick
+              const currentFilledIdx = filledRows.findIndex(({ i }) => i === snapKickIdx);
+              const nextUnlogged = filledRows.slice(currentFilledIdx + 1).find(({ i }) => !(snapLogsMap[String(i)]?.length) && i !== snapKickIdx);
+              if (nextUnlogged) setSnapKickIdx(nextUnlogged.i);
+            }}
+            kickList={filledRows.map(({ r, i }) => ({
+              idx: i,
+              athlete: r.athlete || "?",
+              dist: r.dist || "?",
+              pos: r.pos || "?",
+              hasSnap: (snapLogsMap[String(i)]?.length ?? 0) > 0,
+              isActive: snapKickIdx === i,
+            }))}
+            onKickSelect={(idx) => setSnapKickIdx(idx)}
+          />
+        );
+      })()}
     </>
   );
 }
