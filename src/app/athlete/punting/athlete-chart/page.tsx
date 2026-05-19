@@ -51,6 +51,8 @@ function PuntAthleteChartInner() {
   const [livePuntType, setLivePuntType] = useState("DIR_STRAIGHT");
 
   const [results, setResults] = useState<PuntEntry[]>([]);
+  // slotResults: player → slotIdx → PuntEntry (for random-access slot filling)
+  const [slotResults, setSlotResults] = useState<Record<string, Record<number, PuntEntry>>>({});
   const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
   const currentPlayer = selectedPlayers[currentPlayerIdx] ?? "";
 
@@ -60,6 +62,7 @@ function PuntAthleteChartInner() {
   const [dirGood, setDirGood] = useState(true);
   const [liveType, setLiveType] = useState("DIR_STRAIGHT");
   const [liveHash, setLiveHash] = useState("M");
+  const [selectedSlotIdx, setSelectedSlotIdx] = useState(0);
   const [showSnap, setShowSnap] = useState(false);
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
@@ -156,18 +159,23 @@ function PuntAthleteChartInner() {
   };
 
   const handleUndo = () => {
-    if (results.length === 0) return;
-    const last = results[results.length - 1];
-    setResults((prev) => prev.slice(0, -1));
-    setCurrentPlayerIdx(selectedPlayers.indexOf(last.athlete));
+    // Remove the currently selected slot
+    const filled = getSlotResult(currentPlayer, selectedSlotIdx);
+    if (!filled) return;
+    setSlotResults((prev) => {
+      const playerSlots = { ...(prev[currentPlayer] ?? {}) };
+      delete playerSlots[selectedSlotIdx];
+      return { ...prev, [currentPlayer]: playerSlots };
+    });
+    setResults((prev) => prev.filter((r) => !(r.athlete === currentPlayer && r.kickNum === selectedSlotIdx + 1)));
     if (phase === "results") setPhase("live");
   };
 
   const allSnapEntries: LongSnapEntry[] = Object.values(snapLogsMap).flat().map((s) => s.dbEntry);
 
   const handleSave = async () => {
-    const label = `Punt Chart — ${selectedPlayers.map((p) => `${p}: ${getPlayerResults(p).length} punts`).join(", ")}${assignedChart ? " (Assigned)" : ""}`;
-    commitPractice(results, label);
+    const label = `Punt Chart — ${selectedPlayers.map((p) => `${p}: ${allResults.filter((r) => r.athlete === p).length} punts`).join(", ")}${assignedChart ? " (Assigned)" : ""}`;
+    commitPractice(allResults, label);
 
     // Batch save snap entries
     if (allSnapEntries.length > 0) {
@@ -256,7 +264,7 @@ function PuntAthleteChartInner() {
         <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
         <div className="flex flex-wrap gap-3 justify-center">
           {selectedPlayers.map((p) => {
-            const pr = getPlayerResults(p);
+            const pr = allResults.filter((r) => r.athlete === p);
             const avgDist = pr.length > 0 ? (pr.reduce((s, r) => s + r.yards, 0) / pr.length).toFixed(1) : "—";
             const avgHang = pr.length > 0 ? (pr.reduce((s, r) => s + r.hangTime, 0) / pr.length).toFixed(2) : "—";
             return (
@@ -335,9 +343,21 @@ function PuntAthleteChartInner() {
     return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 3);
   };
 
-  const playerPunts = getPlayerResults(currentPlayer);
-  const currentPuntIdx = playerPunts.length;
-  const currentScheduleItem = puntSchedule[currentPuntIdx];
+  const getSlotResult = (player: string, slotIdx: number) => slotResults[player]?.[slotIdx];
+  const isSlotFilled = (player: string, slotIdx: number) => !!getSlotResult(player, slotIdx);
+  const filledCount = selectedPlayers.reduce((s, p) => s + puntSchedule.filter((_, i) => isSlotFilled(p, i)).length, 0);
+  const totalSlots = puntSchedule.length * selectedPlayers.length;
+
+  // Build flat results from slotResults for saving
+  const allResults: PuntEntry[] = [];
+  for (const player of selectedPlayers) {
+    for (let i = 0; i < puntSchedule.length; i++) {
+      const r = getSlotResult(player, i);
+      if (r) allResults.push({ ...r, kickNum: i + 1 });
+    }
+  }
+
+  const currentScheduleItem = puntSchedule[selectedSlotIdx];
   const currentType = currentScheduleItem?.typeLabel || currentScheduleItem?.type || "";
   const currentHash = currentScheduleItem?.hash || "M";
 
@@ -346,29 +366,54 @@ function PuntAthleteChartInner() {
   const displayType = assignedChart ? currentType : liveType;
   const displayHash = assignedChart ? currentHash : liveHash;
 
+  // Find next empty slot for current player
+  const findNextEmptySlot = (player: string, afterIdx: number): number => {
+    for (let i = afterIdx + 1; i < puntSchedule.length; i++) {
+      if (!isSlotFilled(player, i)) return i;
+    }
+    for (let i = 0; i <= afterIdx; i++) {
+      if (!isSlotFilled(player, i)) return i;
+    }
+    return afterIdx;
+  };
+
   const handleLogPunt = () => {
     const dist = parseInt(distInput);
     const hang = parseHangRaw(hangInput);
     const op = parseHangRaw(opInput);
     if (isNaN(dist) || dist <= 0 || !hang) return;
-    const kickNum = playerPunts.length + 1;
     const puntType = assignedChart ? (currentScheduleItem?.type ?? "DIR_STRAIGHT") : liveType;
     const hash = assignedChart ? currentHash : liveHash;
+    const playerSlotsFilled = puntSchedule.filter((_, i) => isSlotFilled(currentPlayer, i)).length;
     const entry: PuntEntry = {
       athleteId: currentPlayer, athlete: currentPlayer, type: puntType as any, hash: hash as any,
       yards: dist, hangTime: hang, opTime: op || 0,
-      directionalAccuracy: dirGood ? 1 : 0, landingZones: [] as any, kickNum,
+      directionalAccuracy: dirGood ? 1 : 0, landingZones: [] as any, kickNum: playerSlotsFilled + 1,
     };
-    setResults((prev) => [...prev, entry]);
+    // Store in slotResults
+    setSlotResults((prev) => ({
+      ...prev,
+      [currentPlayer]: { ...(prev[currentPlayer] ?? {}), [selectedSlotIdx]: entry },
+    }));
+    // Also add to flat results for save
+    setResults((prev) => [...prev.filter((r) => !(r.athlete === currentPlayer && r.kickNum === selectedSlotIdx + 1)), { ...entry, kickNum: selectedSlotIdx + 1 }]);
     setDistInput(""); setHangInput(""); setOpInput(""); setDirGood(true);
-    // Auto-advance to next player
-    if (selectedPlayers.length > 1) {
-      setCurrentPlayerIdx((currentPlayerIdx + 1) % selectedPlayers.length);
+
+    // Auto-advance: find next empty slot, or next player
+    const nextSlot = findNextEmptySlot(currentPlayer, selectedSlotIdx);
+    if (nextSlot !== selectedSlotIdx || !isSlotFilled(currentPlayer, nextSlot)) {
+      setSelectedSlotIdx(nextSlot);
+    } else if (selectedPlayers.length > 1) {
+      // Current player done, go to next player
+      const nextPlayerIdx = (currentPlayerIdx + 1) % selectedPlayers.length;
+      setCurrentPlayerIdx(nextPlayerIdx);
+      const nextPlayer = selectedPlayers[nextPlayerIdx];
+      const firstEmpty = findNextEmptySlot(nextPlayer, -1);
+      setSelectedSlotIdx(firstEmpty);
     }
-    // Check if preset chart is done
+    // Check if all done
     if (chartType === "preset" && puntSchedule.length > 0) {
-      const totalNeeded = puntSchedule.length * selectedPlayers.length;
-      if (results.length + 1 >= totalNeeded) setPhase("results");
+      if (filledCount + 1 >= totalSlots) setPhase("results");
     }
   };
 
@@ -378,24 +423,23 @@ function PuntAthleteChartInner() {
 
       {/* Per-athlete punt circles */}
       {selectedPlayers.map((player) => {
-        const pr = getPlayerResults(player);
         const isActive = player === currentPlayer;
         return (
           <div key={player} className={clsx("space-y-1", !isActive && selectedPlayers.length > 1 && "opacity-50")}>
-            <button onClick={() => setCurrentPlayerIdx(selectedPlayers.indexOf(player))} className="text-xs font-bold text-slate-200 hover:text-accent transition-colors">{player}</button>
+            <button onClick={() => { setCurrentPlayerIdx(selectedPlayers.indexOf(player)); const first = findNextEmptySlot(player, -1); setSelectedSlotIdx(first); }} className="text-xs font-bold text-slate-200 hover:text-accent transition-colors">{player}</button>
             <div className="flex flex-wrap gap-1.5">
-              {pr.map((r, i) => {
-                const label = getTypeInitials(puntSchedule[i]?.typeLabel || r.type);
+              {puntSchedule.map((sched, i) => {
+                const filled = getSlotResult(player, i);
+                const label = getTypeInitials(sched.typeLabel || sched.type);
+                const isSelected = isActive && selectedSlotIdx === i;
+                if (filled) {
+                  const dirOk = filled.directionalAccuracy === 1 || filled.directionalAccuracy === "1";
+                  return (
+                    <button key={i} onClick={() => { setCurrentPlayerIdx(selectedPlayers.indexOf(player)); setSelectedSlotIdx(i); }} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border cursor-pointer transition-all", dirOk ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss", isSelected && "ring-2 ring-accent")} title={`${filled.yards}yd | ${filled.hangTime.toFixed(2)}s | ${filled.opTime ? filled.opTime.toFixed(2) + "s OT | " : ""}${dirOk ? "Good" : "Bad"} Dir`}>{label}</button>
+                  );
+                }
                 return (
-                  <div key={i} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border", r.directionalAccuracy === 1 || r.directionalAccuracy === "1" ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss")} title={`${r.yards}yd ${r.hangTime.toFixed(2)}s`}>{label}</div>
-                );
-              })}
-              {/* Empty circles for remaining */}
-              {puntSchedule.length > 0 && Array.from({ length: Math.max(0, puntSchedule.length - pr.length) }).map((_, i) => {
-                const schedIdx = pr.length + i;
-                const label = getTypeInitials(puntSchedule[schedIdx]?.typeLabel || "");
-                return (
-                  <div key={`empty-${i}`} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border", schedIdx === currentPuntIdx && isActive ? "border-accent/60 text-accent bg-accent/10" : "border-border/40 text-muted/40")}>{label}</div>
+                  <button key={i} onClick={() => { setCurrentPlayerIdx(selectedPlayers.indexOf(player)); setSelectedSlotIdx(i); }} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border cursor-pointer transition-all", isSelected ? "border-accent/60 text-accent bg-accent/10 ring-2 ring-accent" : "border-border/40 text-muted/40 hover:border-accent/40 hover:text-accent/60")}>{label}</button>
                 );
               })}
             </div>
@@ -407,7 +451,7 @@ function PuntAthleteChartInner() {
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-slate-100">{currentPlayer}</p>
-          <p className="text-xs text-muted">Punt {playerPunts.length + 1}{puntSchedule.length > 0 ? ` / ${puntSchedule.length}` : ""}</p>
+          <p className="text-xs text-muted">Punt {selectedSlotIdx + 1}{puntSchedule.length > 0 ? ` / ${puntSchedule.length}` : ""}{isSlotFilled(currentPlayer, selectedSlotIdx) ? " (filled)" : ""}</p>
         </div>
 
         {/* Type + Hash display (assigned) or selection (live) */}
@@ -455,15 +499,15 @@ function PuntAthleteChartInner() {
 
         {/* Log Snap + Log Punt */}
         <div className="flex gap-2">
-          <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-3 rounded-input border text-xs font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentPuntIdx}`]?.length ?? 0) > 0 ? "bg-make/20 border-make/50 text-make hover:bg-make/30" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentPuntIdx}`]?.length ?? 0) > 0 ? "Snap Logged ✓" : "Log Snap"}</button>
+          <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-3 rounded-input border text-xs font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${selectedSlotIdx}`]?.length ?? 0) > 0 ? "bg-make/20 border-make/50 text-make hover:bg-make/30" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${selectedSlotIdx}`]?.length ?? 0) > 0 ? "Snap Logged ✓" : "Log Snap"}</button>
           <button onClick={handleLogPunt} disabled={!distInput || !hangInput} className="btn-primary flex-1 py-3 text-sm font-bold disabled:opacity-40">Log Punt</button>
         </div>
       </div>
 
       {/* Undo + Finish */}
       <div className="flex gap-2">
-        {results.length > 0 && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
-        {results.length > 0 && <button onClick={() => setPhase("results")} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish</button>}
+        {isSlotFilled(currentPlayer, selectedSlotIdx) && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
+        {filledCount > 0 && <button onClick={() => setPhase("results")} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish ({filledCount}/{totalSlots})</button>}
       </div>
 
       {showSnap && (
@@ -471,9 +515,9 @@ function PuntAthleteChartInner() {
           snapType="PUNT"
           athletes={snapAthletes}
           kickerName={currentPlayer}
-          previousSnaps={snapLogsMap[`${currentPlayer}-${currentPuntIdx}`]}
+          previousSnaps={snapLogsMap[`${currentPlayer}-${selectedSlotIdx}`]}
           onClose={() => setShowSnap(false)}
-          onSaved={(entry) => setSnapLogsMap((prev) => ({ ...prev, [`${currentPlayer}-${currentPuntIdx}`]: [...(prev[`${currentPlayer}-${currentPuntIdx}`] ?? []), entry] }))}
+          onSaved={(entry) => setSnapLogsMap((prev) => ({ ...prev, [`${currentPlayer}-${selectedSlotIdx}`]: [...(prev[`${currentPlayer}-${selectedSlotIdx}`] ?? []), entry] }))}
         />
       )}
     </main>
