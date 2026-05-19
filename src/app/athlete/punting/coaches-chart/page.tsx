@@ -6,6 +6,7 @@ import { usePunt } from "@/lib/puntContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAthletes } from "@/lib/athleteStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
+import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import Link from "next/link";
 import clsx from "clsx";
 
@@ -87,6 +88,18 @@ export default function PuntCoachesChartPage() {
     const { types, categories } = loadPuntSettings();
     setPuntTypes(types);
     setPuntCategories(categories);
+    // Also try cloud if localStorage had no settings
+    const hasLocal = !!localStorage.getItem("puntSettings");
+    if (!hasLocal) {
+      loadSettingsFromCloud<Record<string, unknown>>("puntSettings").then((cloud) => {
+        if (cloud) {
+          try { localStorage.setItem("puntSettings", JSON.stringify(cloud)); } catch {}
+          const reloaded = loadPuntSettings();
+          setPuntTypes(reloaded.types);
+          setPuntCategories(reloaded.categories);
+        }
+      });
+    }
   }, []);
 
   const enabledCategories = puntCategories.filter((c) => c.enabled);
