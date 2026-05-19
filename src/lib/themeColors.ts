@@ -26,7 +26,7 @@ export const PRESETS: { name: string; colors: ThemeColors }[] = [
   { name: "Default", colors: DEFAULT_THEME },
   // SEC
   { name: "Alabama", colors: { primary: "#9e1b32", secondary: "#0a0606", tertiary: "#3d1520" } },
-  { name: "Auburn", colors: { primary: "#f47b20", secondary: "#0a0d14", tertiary: "#1a2744" } },
+  { name: "Auburn", colors: { primary: "#ffffff", secondary: "#0a1428", tertiary: "#f47b20" } },
   { name: "LSU", colors: { primary: "#fdd023", secondary: "#1a0a2e", tertiary: "#461d7c" } },
   { name: "Georgia", colors: { primary: "#ba0c2f", secondary: "#0a0a0a", tertiary: "#1a1a1a" } },
   { name: "Texas A&M", colors: { primary: "#500000", secondary: "#0a0606", tertiary: "#2a1010" } },
@@ -45,7 +45,6 @@ export const PRESETS: { name: string; colors: ThemeColors }[] = [
   // WCC / Other D1
   { name: "San Diego", colors: { primary: "#84BCE8", secondary: "#001a3a", tertiary: "#002868" } },
   // Other / D2 / Common combos
-  { name: "Navy & Orange", colors: { primary: "#ffffff", secondary: "#0a1428", tertiary: "#f97316" } },
   { name: "Black & Maroon", colors: { primary: "#ffffff", secondary: "#0a0a0a", tertiary: "#7c2d3c" } },
   { name: "Black & Gold", colors: { primary: "#ffd700", secondary: "#0a0a0a", tertiary: "#2a2510" } },
   { name: "Scarlet & Gray", colors: { primary: "#ce1141", secondary: "#121212", tertiary: "#555555" } },
