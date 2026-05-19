@@ -59,7 +59,7 @@ export function Header({ title }: { title?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isScoutRoute = pathname.startsWith("/scout");
-  const isAthleteRoute = pathname.startsWith("/athlete");
+  const isAthleteRoute = pathname.startsWith("/athlete/") || pathname === "/athlete";
   const currentMode = isScoutRoute ? "scout" : isAthleteRoute ? "athlete" : "team";
   const [appMode, setAppMode] = useState<"team" | "scout" | "athlete">(currentMode);
 
@@ -350,7 +350,7 @@ const ATHLETE_MOBILE_NAV = [
 export function MobileNav() {
   const pathname = usePathname();
   const isScout = pathname.startsWith("/scout");
-  const isAthlete = pathname.startsWith("/athlete");
+  const isAthlete = pathname.startsWith("/athlete/") || pathname === "/athlete";
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");

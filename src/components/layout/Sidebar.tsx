@@ -53,7 +53,7 @@ export function Sidebar() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isScoutRoute = pathname.startsWith("/scout");
-  const isAthleteRoute = pathname.startsWith("/athlete");
+  const isAthleteRoute = pathname.startsWith("/athlete/") || pathname === "/athlete";
 
   const isActive = (href: string) =>
     href === "/dashboard" || href === "/scout" || href === "/athlete"
