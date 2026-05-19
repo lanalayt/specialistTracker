@@ -832,7 +832,7 @@ export default function KickingSessionPage() {
     setPendingKicks(sessionKicks);
   };
 
-  const handleConfirmCommit = async () => {
+  const handleConfirmCommit = () => {
     if (!pendingKicks) return;
     // Attach holder from snap logs to each kick
     const enrichedKicks = pendingKicks.map((k, i) => {
@@ -841,22 +841,7 @@ export default function KickingSessionPage() {
       return holder ? { ...k, holder } : k;
     });
     commitPractice(enrichedKicks, undefined, weather, sessionMode ?? undefined, opponent, gameTime);
-    // Batch save snap entries
-    const allSnapEntries = Object.values(snapLogsMap).flat().map((s) => s.dbEntry);
-    if (allSnapEntries.length > 0) {
-      const tid = getTeamId();
-      if (tid) {
-        const snapperNames = [...new Set(allSnapEntries.map((e) => e.athlete))].join(", ");
-        const snapSession = {
-          id: genSnapId(), teamId: tid, sport: "LONGSNAP",
-          label: `Short Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
-          date: new Date().toISOString(), mode: "practice" as const,
-          entries: allSnapEntries,
-        };
-        stampSnapWrite(tid);
-        await insertSnapSession(tid, snapSession as any);
-      }
-    }
+    // Snaps already saved immediately on log — no batch save needed
     setCommittedKicks(enrichedKicks);
     setPendingKicks(null);
     setCommitted(true);
@@ -2378,6 +2363,18 @@ export default function KickingSessionPage() {
             onClose={() => setShowSnapOverlay(false)}
             onSaved={(entry) => {
               setSnapLogsMap((prev) => ({ ...prev, [String(snapKickIdx)]: [...(prev[String(snapKickIdx)] ?? []), entry] }));
+              // Save immediately to longsnap session
+              const tid = getTeamId();
+              if (tid) {
+                const session = {
+                  id: genSnapId(), teamId: tid, sport: isAthleteMode ? "ATHLETE_LONGSNAP" : "LONGSNAP",
+                  label: `Short Snap — ${entry.snapper}`,
+                  date: new Date().toISOString(), mode: "practice" as const,
+                  entries: [entry.dbEntry],
+                };
+                stampSnapWrite(tid);
+                insertSnapSession(tid, session as any);
+              }
               // Auto-advance to next unlogged kick
               const currentFilledIdx = filledRows.findIndex(({ i }) => i === snapKickIdx);
               const nextUnlogged = filledRows.slice(currentFilledIdx + 1).find(({ i }) => !(snapLogsMap[String(i)]?.length) && i !== snapKickIdx);
