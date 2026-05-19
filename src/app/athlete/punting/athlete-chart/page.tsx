@@ -366,6 +366,21 @@ function PuntAthleteChartInner() {
   const displayType = assignedChart ? currentType : liveType;
   const displayHash = assignedChart ? currentHash : liveHash;
 
+  const selectSlot = (playerIdx: number, slotIdx: number) => {
+    setCurrentPlayerIdx(playerIdx);
+    setSelectedSlotIdx(slotIdx);
+    const player = selectedPlayers[playerIdx];
+    const filled = slotResults[player]?.[slotIdx];
+    if (filled) {
+      setDistInput(String(filled.yards));
+      setHangInput(String(Math.round(filled.hangTime * 100)));
+      setOpInput(filled.opTime ? String(Math.round(filled.opTime * 100)) : "");
+      setDirGood(filled.directionalAccuracy === 1 || filled.directionalAccuracy === "1");
+    } else {
+      setDistInput(""); setHangInput(""); setOpInput(""); setDirGood(true);
+    }
+  };
+
   // Find next empty slot for current player
   const findNextEmptySlot = (player: string, afterIdx: number): number => {
     for (let i = afterIdx + 1; i < puntSchedule.length; i++) {
@@ -399,16 +414,26 @@ function PuntAthleteChartInner() {
     setResults((prev) => [...prev.filter((r) => !(r.athlete === currentPlayer && r.kickNum === selectedSlotIdx + 1)), { ...entry, kickNum: selectedSlotIdx + 1 }]);
     setDistInput(""); setHangInput(""); setOpInput(""); setDirGood(true);
 
-    // Auto-advance: find next empty slot, or next player
-    const nextSlot = findNextEmptySlot(currentPlayer, selectedSlotIdx);
-    if (nextSlot !== selectedSlotIdx || !isSlotFilled(currentPlayer, nextSlot)) {
+    // Auto-advance using updated state (include the slot we just filled)
+    const updatedSlots = { ...(slotResults[currentPlayer] ?? {}), [selectedSlotIdx]: entry };
+    const findNextEmpty = (player: string, afterIdx: number, slots: Record<number, PuntEntry>): number => {
+      for (let i = afterIdx + 1; i < puntSchedule.length; i++) {
+        if (!slots[i]) return i;
+      }
+      for (let i = 0; i <= afterIdx; i++) {
+        if (!slots[i]) return i;
+      }
+      return afterIdx;
+    };
+    const nextSlot = findNextEmpty(currentPlayer, selectedSlotIdx, updatedSlots);
+    if (nextSlot !== selectedSlotIdx) {
       setSelectedSlotIdx(nextSlot);
     } else if (selectedPlayers.length > 1) {
-      // Current player done, go to next player
       const nextPlayerIdx = (currentPlayerIdx + 1) % selectedPlayers.length;
       setCurrentPlayerIdx(nextPlayerIdx);
       const nextPlayer = selectedPlayers[nextPlayerIdx];
-      const firstEmpty = findNextEmptySlot(nextPlayer, -1);
+      const nextPlayerSlots = slotResults[nextPlayer] ?? {};
+      const firstEmpty = findNextEmpty(nextPlayer, -1, nextPlayerSlots);
       setSelectedSlotIdx(firstEmpty);
     }
     // Check if all done
@@ -426,7 +451,7 @@ function PuntAthleteChartInner() {
         const isActive = player === currentPlayer;
         return (
           <div key={player} className={clsx("space-y-1", !isActive && selectedPlayers.length > 1 && "opacity-50")}>
-            <button onClick={() => { setCurrentPlayerIdx(selectedPlayers.indexOf(player)); const first = findNextEmptySlot(player, -1); setSelectedSlotIdx(first); }} className="text-xs font-bold text-slate-200 hover:text-accent transition-colors">{player}</button>
+            <button onClick={() => { const pidx = selectedPlayers.indexOf(player); const first = findNextEmptySlot(player, -1); selectSlot(pidx, first); }} className="text-xs font-bold text-slate-200 hover:text-accent transition-colors">{player}</button>
             <div className="flex flex-wrap gap-1.5">
               {puntSchedule.map((sched, i) => {
                 const filled = getSlotResult(player, i);
@@ -435,11 +460,11 @@ function PuntAthleteChartInner() {
                 if (filled) {
                   const dirOk = filled.directionalAccuracy === 1 || filled.directionalAccuracy === "1";
                   return (
-                    <button key={i} onClick={() => { setCurrentPlayerIdx(selectedPlayers.indexOf(player)); setSelectedSlotIdx(i); }} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border cursor-pointer transition-all", dirOk ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss", isSelected && "ring-2 ring-accent")} title={`${sched.subType || sched.typeLabel}${sched.yardLine ? " | YL " + sched.yardLine : ""} | ${filled.yards}yd | ${filled.hangTime.toFixed(2)}s | ${filled.opTime ? filled.opTime.toFixed(2) + "s OT | " : ""}${dirOk ? "Good" : "Bad"} Dir`}>{label}</button>
+                    <button key={i} onClick={() => selectSlot(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border cursor-pointer transition-all", dirOk ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss", isSelected && "ring-2 ring-accent")} title={`${sched.subType || sched.typeLabel}${sched.yardLine ? " | YL " + sched.yardLine : ""} | ${filled.yards}yd | ${filled.hangTime.toFixed(2)}s | ${filled.opTime ? filled.opTime.toFixed(2) + "s OT | " : ""}${dirOk ? "Good" : "Bad"} Dir`}>{label}</button>
                   );
                 }
                 return (
-                  <button key={i} onClick={() => { setCurrentPlayerIdx(selectedPlayers.indexOf(player)); setSelectedSlotIdx(i); }} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border cursor-pointer transition-all", isSelected ? "border-accent/60 text-accent bg-accent/10 ring-2 ring-accent" : "border-border/40 text-muted/40 hover:border-accent/40 hover:text-accent/60")}>{label}</button>
+                  <button key={i} onClick={() => selectSlot(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border cursor-pointer transition-all", isSelected ? "border-accent/60 text-accent bg-accent/10 ring-2 ring-accent" : "border-border/40 text-muted/40 hover:border-accent/40 hover:text-accent/60")}>{label}</button>
                 );
               })}
             </div>
@@ -521,6 +546,37 @@ function PuntAthleteChartInner() {
         {isSlotFilled(currentPlayer, selectedSlotIdx) && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
         {filledCount > 0 && <button onClick={() => setPhase("results")} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish ({filledCount}/{totalSlots})</button>}
       </div>
+
+      {/* Running log */}
+      {allResults.length > 0 && (
+        <div className="card-2 text-xs">
+          <table className="w-full">
+            <thead><tr>
+              <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+              <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
+              <th className="text-[10px] text-muted text-left py-1 px-2">Type</th>
+              <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
+              <th className="text-[10px] text-muted text-center py-1 px-2">HT</th>
+              <th className="text-[10px] text-muted text-right py-1 px-2">Dir</th>
+            </tr></thead>
+            <tbody>
+              {[...allResults].reverse().map((r, i) => {
+                const num = allResults.length - i;
+                return (
+                  <tr key={i} className="border-t border-border/30">
+                    <td className="text-muted py-1 px-2">{num}</td>
+                    <td className="py-1 px-2 text-slate-200 truncate max-w-[60px]">{r.athlete}</td>
+                    <td className="py-1 px-2 text-slate-300">{r.type}</td>
+                    <td className="text-center py-1 px-2 text-slate-200">{r.yards}yd</td>
+                    <td className="text-center py-1 px-2 text-slate-200">{r.hangTime.toFixed(2)}s</td>
+                    <td className={clsx("text-right py-1 px-2 font-bold", (r.directionalAccuracy === 1 || r.directionalAccuracy === "1") ? "text-make" : "text-miss")}>{(r.directionalAccuracy === 1 || r.directionalAccuracy === "1") ? "G" : "B"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showSnap && (
         <AthleteSnapPopup
