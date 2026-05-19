@@ -11,6 +11,15 @@ import Link from "next/link";
 import clsx from "clsx";
 import type { KickoffEntry } from "@/types";
 
+const HASH_OPTIONS = ["LH", "LM", "M", "RM", "RH"];
+const HASH_LABELS: Record<string, string> = { LH: "Left Hash", LM: "Left Middle", M: "Middle", RM: "Right Middle", RH: "Right Hash" };
+
+function getTypeInitials(label: string): string {
+  const parts = label.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 3);
+}
+
 function KOAthleteChartInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -45,6 +54,8 @@ function KOAthleteChartInner() {
   const [distInput, setDistInput] = useState("");
   const [hangInput, setHangInput] = useState("");
   const [dirGood, setDirGood] = useState(true);
+  const [liveType, setLiveType] = useState("Deep");
+  const [liveHash, setLiveHash] = useState("M");
 
   const parseHangRaw = (raw: string): number => {
     const digits = raw.replace(/\D/g, "");
@@ -56,9 +67,17 @@ function KOAthleteChartInner() {
   const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
   const totalReps = parseInt(reps) || 0;
 
-  // Check for "Chart Now" from coaches chart
+  // Set assigned chart from Chart Now data
   useEffect(() => {
-    // no-op — Chart Now handled via initial state
+    if (chartNowData?.koRows) {
+      const totalR = chartNowData.koRows.reduce((s: number, r: any) => s + (r.count ?? 0), 0);
+      setAssignedChart({
+        id: "chart-now", sport: "ATHLETE_KICKOFF", createdBy: "Coach",
+        createdAt: new Date().toISOString(), dueDate: "", athletes: chartNowData.players,
+        kicks: [], reps: totalR, koRows: chartNowData.koRows, completedBy: {},
+      } as AssignedChart);
+      setReps(String(totalR));
+    }
   }, []);
 
   useUnsavedWarning(results.length > 0 && !saved);
@@ -71,28 +90,54 @@ function KOAthleteChartInner() {
       if (!tid) return;
       const charts = await loadAssignedCharts(tid);
       const chart = charts.find((c) => c.id === assignedId);
-      if (chart) { setAssignedChart(chart); setReps(String(chart.reps ?? 5)); }
+      if (chart) {
+        setAssignedChart(chart);
+        const totalR = chart.koRows ? chart.koRows.reduce((s, r) => s + r.count, 0) : (chart.reps ?? 5);
+        setReps(String(totalR));
+      }
     }
     load();
   }, [assignedId]);
 
   const togglePlayer = (name: string) => setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
 
+  // Build kick schedule from koRows
+  const kickSchedule: { typeId: string; typeLabel: string; hash: string }[] = [];
+  if (assignedChart?.koRows) {
+    for (const row of assignedChart.koRows) {
+      for (let i = 0; i < row.count; i++) {
+        kickSchedule.push({ typeId: row.typeId, typeLabel: row.typeLabel, hash: row.hash });
+      }
+    }
+  }
+
+  const playerKicks = getPlayerResults(currentPlayer);
+  const currentKickIdx = playerKicks.length;
+  const currentScheduleItem = kickSchedule[currentKickIdx];
+  const displayType = assignedChart ? (currentScheduleItem?.typeLabel || "") : liveType;
+  const displayHash = assignedChart ? (currentScheduleItem?.hash || "M") : liveHash;
+
   const handleLog = () => {
     const dist = parseInt(distInput);
     const hang = parseHangRaw(hangInput);
-    if (isNaN(dist) || dist <= 0 || !hang) return;
-    const kickNum = getPlayerResults(currentPlayer).length + 1;
+    if (isNaN(dist) || dist <= 0) return;
+    const kickNum = playerKicks.length + 1;
+    const typeId = assignedChart ? (currentScheduleItem?.typeId ?? "REG") : liveType;
+    const hash = assignedChart ? (currentScheduleItem?.hash ?? "M") : liveHash;
     const entry: KickoffEntry = {
-      athleteId: currentPlayer, athlete: currentPlayer, type: "REG" as any, hash: "M" as any,
-      distance: dist, hangTime: hang, direction: dirGood ? "Good" : "Bad",
+      athleteId: currentPlayer, athlete: currentPlayer, type: typeId as any, hash: hash as any,
+      distance: dist, hangTime: hang || 0, direction: dirGood ? "Good" : "Bad",
       score: 0, landingZone: "FIELD" as any, kickNum,
     };
     setResults((prev) => [...prev, entry]);
     setDistInput(""); setHangInput(""); setDirGood(true);
-    const nextIdx = (currentPlayerIdx + 1) % selectedPlayers.length;
-    setCurrentPlayerIdx(nextIdx);
-    if (chartType === "preset" && results.length + 1 >= totalReps * selectedPlayers.length) setPhase("results");
+    if (selectedPlayers.length > 1) {
+      setCurrentPlayerIdx((currentPlayerIdx + 1) % selectedPlayers.length);
+    }
+    if (chartType === "preset" && kickSchedule.length > 0) {
+      const totalNeeded = kickSchedule.length * selectedPlayers.length;
+      if (results.length + 1 >= totalNeeded) setPhase("results");
+    }
   };
 
   const handleUndo = () => {
@@ -119,6 +164,7 @@ function KOAthleteChartInner() {
     setSaved(true);
   };
 
+  // ── Setup ──
   if (phase === "setup") {
     return (
       <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
@@ -148,13 +194,25 @@ function KOAthleteChartInner() {
     );
   }
 
+  // ── Preview (assigned) ──
   if (phase === "preview") {
     return (
       <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
         <Link href="/athlete/kickoff/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
         <h2 className="text-lg font-bold text-slate-100">Assigned KO Chart</h2>
         {assignedChart && <p className="text-xs text-muted">From {assignedChart.createdBy} — Due {new Date(assignedChart.dueDate).toLocaleDateString()}</p>}
-        <p className="text-sm text-slate-200">{reps} kicks per athlete</p>
+        {assignedChart?.koRows && (
+          <div className="card-2 space-y-1">
+            {assignedChart.koRows.map((r, i) => (
+              <div key={i} className="flex items-center gap-3 text-xs text-slate-300">
+                <span className="text-muted w-4">{i + 1}.</span>
+                <span className="font-semibold text-slate-200">{r.typeLabel}</span>
+                <span>x{r.count}</span>
+                <span className="text-muted">{HASH_LABELS[r.hash] ?? r.hash}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Kicker(s)</p>
           <div className="flex flex-wrap gap-1.5">
@@ -168,6 +226,7 @@ function KOAthleteChartInner() {
     );
   }
 
+  // ── Results ──
   if (phase === "results") {
     return (
       <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-6 text-center">
@@ -176,7 +235,7 @@ function KOAthleteChartInner() {
           {selectedPlayers.map((p) => {
             const pr = getPlayerResults(p);
             const avgDist = pr.length > 0 ? (pr.reduce((s, r) => s + r.distance, 0) / pr.length).toFixed(1) : "—";
-            const avgHang = pr.length > 0 ? (pr.reduce((s, r) => s + r.hangTime, 0) / pr.length).toFixed(2) : "—";
+            const avgHang = pr.filter((r) => r.hangTime > 0).length > 0 ? (pr.filter((r) => r.hangTime > 0).reduce((s, r) => s + r.hangTime, 0) / pr.filter((r) => r.hangTime > 0).length).toFixed(2) : "—";
             return (
               <div key={p} className="card-2 px-4 py-3 text-center">
                 <p className="text-sm font-bold text-slate-200">{p}</p>
@@ -186,6 +245,39 @@ function KOAthleteChartInner() {
             );
           })}
         </div>
+        {/* Per-athlete breakdown */}
+        {selectedPlayers.map((p) => {
+          const pr = getPlayerResults(p);
+          return (
+            <div key={p} className="card-2 text-left text-xs">
+              <p className="text-xs font-bold text-slate-200 mb-2">{p}</p>
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+                    <th className="text-[10px] text-muted text-left py-1 px-2">Type</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-2">Loc</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-2">Hang</th>
+                    <th className="text-[10px] text-muted text-right py-1 px-2">Dir</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pr.map((r, i) => (
+                    <tr key={i} className="border-t border-border/30">
+                      <td className="text-muted py-1 px-2">{i + 1}</td>
+                      <td className="py-1 px-2 text-slate-300">{kickSchedule[i]?.typeLabel || r.type}</td>
+                      <td className="text-center py-1 px-2 text-slate-400">{r.hash}</td>
+                      <td className="text-center py-1 px-2 text-slate-200">{r.distance}yd</td>
+                      <td className="text-center py-1 px-2 text-slate-200">{r.hangTime > 0 ? `${r.hangTime.toFixed(2)}s` : "—"}</td>
+                      <td className={clsx("text-right py-1 px-2 font-bold", r.direction === "Good" ? "text-make" : "text-miss")}>{r.direction}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
         <div className="flex gap-3 max-w-sm mx-auto">
           {!saved ? <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
           <Link href="/athlete/kickoff" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
@@ -194,92 +286,124 @@ function KOAthleteChartInner() {
     );
   }
 
-  const playerCount = getPlayerResults(currentPlayer).length;
-
+  // ── Live — One kick at a time ──
   return (
-    <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-4xl">
-      <div className="space-y-4">
+    <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
+      <Link href="/athlete/kickoff/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+
+      {/* Per-athlete kick circles */}
+      {selectedPlayers.map((player) => {
+        const pr = getPlayerResults(player);
+        const isActive = player === currentPlayer;
+        return (
+          <div key={player} className={clsx("space-y-1", !isActive && selectedPlayers.length > 1 && "opacity-50")}>
+            <button onClick={() => setCurrentPlayerIdx(selectedPlayers.indexOf(player))} className="text-xs font-bold text-slate-200 hover:text-accent transition-colors">{player}</button>
+            <div className="flex flex-wrap gap-1.5">
+              {pr.map((r, i) => {
+                const label = getTypeInitials(kickSchedule[i]?.typeLabel || r.type);
+                return (
+                  <div key={i} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border", r.direction === "Good" ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss")} title={`${r.distance}yd ${r.hangTime.toFixed(2)}s ${r.hash}`}>{label}</div>
+                );
+              })}
+              {kickSchedule.length > 0 && Array.from({ length: Math.max(0, kickSchedule.length - pr.length) }).map((_, i) => {
+                const schedIdx = pr.length + i;
+                const label = getTypeInitials(kickSchedule[schedIdx]?.typeLabel || "");
+                return (
+                  <div key={`empty-${i}`} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border", schedIdx === currentKickIdx && isActive ? "border-accent/60 text-accent bg-accent/10" : "border-border/40 text-muted/40")}>{label}</div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Current kick info */}
+      <div className="card space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{chartType === "preset" ? `Kick ${playerCount + 1} of ${totalReps}` : "Live Chart"}</p>
-            <p className="text-lg font-extrabold text-slate-100">{currentPlayer}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-black text-sky-400">{playerCount}</p>
-            <p className="text-[10px] text-muted">kicks</p>
-          </div>
+          <p className="text-sm font-bold text-slate-100">{currentPlayer}</p>
+          <p className="text-xs text-muted">Kick {playerKicks.length + 1}{kickSchedule.length > 0 ? ` / ${kickSchedule.length}` : ""}</p>
         </div>
 
-        {selectedPlayers.length > 1 && (
-          <div className="flex flex-wrap gap-2 justify-center">
-            {selectedPlayers.map((p) => (
-              <button key={p} onClick={() => setCurrentPlayerIdx(selectedPlayers.indexOf(p))} className={clsx("card-2 px-3 py-1.5 text-center min-w-[70px]", p === currentPlayer ? "ring-2 ring-sky-500" : "opacity-60 hover:opacity-100")}>
-                <p className="text-[10px] font-bold text-slate-200">{p}</p>
-                <p className="text-sm font-black text-sky-400">{getPlayerResults(p).length}</p>
-              </button>
-            ))}
+        {/* Type + Location */}
+        {assignedChart ? (
+          <div className="flex gap-3 text-xs">
+            <span className="text-muted">Type: <span className="text-slate-200 font-semibold">{displayType}</span></span>
+            <span className="text-muted">Location: <span className="text-slate-200 font-semibold">{HASH_LABELS[displayHash] ?? displayHash}</span></span>
           </div>
-        )}
-
-        {chartType === "preset" && (
-          <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-            <div className="h-full bg-sky-500 transition-all" style={{ width: `${(results.length / (totalReps * selectedPlayers.length)) * 100}%` }} />
-          </div>
-        )}
-
-        <div className="card space-y-3">
+        ) : (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Distance</p>
-              <input type="text" inputMode="numeric" value={distInput} onChange={(e) => setDistInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
+              <p className="text-[10px] text-muted mb-1">Type</p>
+              <input type="text" value={liveType} onChange={(e) => setLiveType(e.target.value)} className="input w-full text-sm py-1.5" placeholder="Type" />
             </div>
             <div>
-              <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Hang Time</p>
-              <input type="text" inputMode="numeric" value={hangInput ? parseHangRaw(hangInput).toFixed(2) : ""} onChange={(e) => setHangInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" />
+              <p className="text-[10px] text-muted mb-1">Location</p>
+              <select value={liveHash} onChange={(e) => setLiveHash(e.target.value)} className="input w-full text-sm py-1.5">
+                {HASH_OPTIONS.map((h) => <option key={h} value={h}>{HASH_LABELS[h]}</option>)}
+              </select>
             </div>
+          </div>
+        )}
+
+        {/* Inputs */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+            <input type="text" inputMode="numeric" value={distInput} onChange={(e) => setDistInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" placeholder="yd" />
           </div>
           <div>
-            <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Direction</p>
-            <div className="flex rounded-input border border-border overflow-hidden">
-              <button onClick={() => setDirGood(true)} className={clsx("flex-1 py-2 text-sm font-semibold transition-colors", dirGood ? "bg-make text-slate-900" : "text-muted hover:text-white")}>Good</button>
-              <button onClick={() => setDirGood(false)} className={clsx("flex-1 py-2 text-sm font-semibold transition-colors border-l border-border", !dirGood ? "bg-miss text-white" : "text-muted hover:text-white")}>Bad</button>
-            </div>
+            <p className="text-[10px] text-muted text-center mb-1">Hang Time</p>
+            <input type="text" inputMode="numeric" value={hangInput ? parseHangRaw(hangInput).toFixed(2) : ""} onChange={(e) => setHangInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" placeholder="sec" />
           </div>
         </div>
 
+        {/* Direction */}
         <div className="flex gap-2">
-          {results.length > 0 && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
-          <button onClick={handleLog} disabled={!distInput || !hangInput} className="btn-primary flex-1 py-2 text-sm font-bold disabled:opacity-40">Log Kick</button>
+          <button onClick={() => setDirGood(true)} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border-2 transition-all", dirGood ? "bg-make/20 text-make border-make/40" : "bg-surface-2 text-muted border-border")}>Good</button>
+          <button onClick={() => setDirGood(false)} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border-2 transition-all", !dirGood ? "bg-miss/20 text-miss border-miss/40" : "bg-surface-2 text-muted border-border")}>Bad</button>
         </div>
-        {chartType === "live" && results.length > 0 && (
-          <button onClick={() => setPhase("results")} className="btn-ghost w-full py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish</button>
-        )}
 
-        {results.length > 0 && (
-          <div className="card-2 text-xs">
-            <table className="w-full">
-              <thead><tr>
-                <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
-                <th className="text-[10px] text-muted text-center py-1 px-2">Athlete</th>
-                <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
-                <th className="text-[10px] text-muted text-center py-1 px-2">Hang</th>
-                <th className="text-[10px] text-muted text-right py-1 px-2">Dir</th>
-              </tr></thead>
-              <tbody>
-                {[...results].reverse().map((r, i) => (
-                  <tr key={i} className="border-t border-border/30">
-                    <td className="text-muted py-1 px-2">{results.length - i}</td>
-                    <td className="text-center py-1 px-2 text-slate-300">{r.athlete}</td>
-                    <td className="text-center py-1 px-2 text-slate-200">{r.distance}yd</td>
-                    <td className="text-center py-1 px-2 text-slate-200">{r.hangTime.toFixed(2)}s</td>
-                    <td className={clsx("text-right py-1 px-2 font-bold", r.direction === "Good" ? "text-make" : "text-miss")}>{r.direction}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Log kick */}
+        <button onClick={handleLog} disabled={!distInput} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Log Kick</button>
       </div>
+
+      {/* Undo + Finish */}
+      <div className="flex gap-2">
+        {results.length > 0 && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
+        {results.length > 0 && <button onClick={() => setPhase("results")} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish</button>}
+      </div>
+
+      {/* Running log */}
+      {results.length > 0 && (
+        <div className="card-2 text-xs">
+          <table className="w-full">
+            <thead><tr>
+              <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+              <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
+              <th className="text-[10px] text-muted text-left py-1 px-2">Type</th>
+              <th className="text-[10px] text-muted text-center py-1 px-2">Loc</th>
+              <th className="text-[10px] text-muted text-center py-1 px-2">Dist</th>
+              <th className="text-[10px] text-muted text-right py-1 px-2">Dir</th>
+            </tr></thead>
+            <tbody>
+              {[...results].reverse().map((r, i) => {
+                const idx = results.length - 1 - i;
+                const athleteKickNum = results.slice(0, idx + 1).filter((k) => k.athlete === r.athlete).length;
+                return (
+                  <tr key={i} className="border-t border-border/30">
+                    <td className="text-muted py-1 px-2">{athleteKickNum}</td>
+                    <td className="py-1 px-2 text-slate-200 truncate max-w-[60px]">{r.athlete}</td>
+                    <td className="py-1 px-2 text-slate-300">{kickSchedule[athleteKickNum - 1]?.typeLabel || r.type}</td>
+                    <td className="text-center py-1 px-2 text-slate-400">{r.hash}</td>
+                    <td className="text-center py-1 px-2 text-slate-200">{r.distance}yd</td>
+                    <td className={clsx("text-right py-1 px-2 font-bold", r.direction === "Good" ? "text-make" : "text-miss")}>{r.direction === "Good" ? "G" : "B"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </main>
   );
 }
