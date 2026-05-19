@@ -460,7 +460,7 @@ function PuntAthleteChartInner() {
                 if (filled) {
                   const dirOk = filled.directionalAccuracy === 1 || filled.directionalAccuracy === "1";
                   return (
-                    <button key={i} onClick={() => selectSlot(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border cursor-pointer transition-all", dirOk ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss", isSelected && "ring-2 ring-accent")} title={`${sched.subType || sched.typeLabel}${sched.yardLine ? " | YL " + sched.yardLine : ""} | ${filled.yards}yd | ${filled.hangTime.toFixed(2)}s | ${filled.opTime ? filled.opTime.toFixed(2) + "s OT | " : ""}${dirOk ? "Good" : "Bad"} Dir`}>{label}</button>
+                    <button key={i} onClick={() => selectSlot(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border cursor-pointer transition-all", dirOk ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss", isSelected && "ring-2 ring-accent")} title={`${sched.subType || sched.typeLabel}${sched.yardLine ? " | LOS" + sched.yardLine : ""} | ${filled.yards}yd | ${filled.hangTime.toFixed(2)}s | ${filled.opTime ? filled.opTime.toFixed(2) + "s OT | " : ""}${dirOk ? "Good" : "Bad"} Dir`}>{label}</button>
                   );
                 }
                 return (
@@ -492,7 +492,7 @@ function PuntAthleteChartInner() {
             ) : (
               <span className="text-muted">Hash: <span className="text-slate-200 font-semibold">{displayHash}</span></span>
             )}
-            {currentScheduleItem?.yardLine && <span className="text-muted">YL: <span className="text-sky-400 font-semibold">{currentScheduleItem.yardLine}</span></span>}
+            {currentScheduleItem?.yardLine && <span className="text-muted">LOS: <span className="text-sky-400 font-semibold">{currentScheduleItem.yardLine}</span></span>}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">

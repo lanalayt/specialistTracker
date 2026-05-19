@@ -289,7 +289,7 @@ export default function PuntCoachesChartPage() {
                 {/* Count */}
                 <input type="text" inputMode="numeric" value={row.count || ""} onChange={(e) => updateRow(idx, "count", parseInt(e.target.value.replace(/\D/g, "")) || 0)} className="input w-12 text-center text-xs font-bold py-1.5" placeholder="#" />
                 {/* Yard Line (optional) */}
-                <input type="text" value={row.yardLine ?? ""} onChange={(e) => updateRow(idx, "yardLine", e.target.value.replace(/[^0-9+\-]/g, ""))} className="input w-14 text-center text-xs py-1.5" placeholder="YL" />
+                <input type="text" value={row.yardLine ?? ""} onChange={(e) => updateRow(idx, "yardLine", e.target.value.replace(/[^0-9+\-]/g, ""))} className="input w-14 text-center text-xs py-1.5" placeholder="LOS" />
                 {/* Sub-type */}
                 <select value={row.typeId} onChange={(e) => updateRow(idx, "typeId", e.target.value)} className="input text-xs py-1.5 flex-1 min-w-[80px]">
                   {getTypesForCategory(row.category).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
