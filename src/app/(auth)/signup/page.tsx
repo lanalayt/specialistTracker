@@ -11,6 +11,7 @@ export default function SignupPage() {
   const { signUp } = useAuth();
   const router = useRouter();
   const [roleChoice, setRoleChoice] = useState<"coach" | "athlete">("coach");
+  const [teamChoice, setTeamChoice] = useState<"new" | "existing">("new");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -40,18 +41,24 @@ export default function SignupPage() {
       setError("Athletes must enter a Team Code from their coach");
       return;
     }
+    if (roleChoice === "coach" && teamChoice === "existing" && !teamCode.trim()) {
+      setError("Enter the Team Code from the head coach");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       const role: UserRole = roleChoice === "athlete" ? "athlete" : "admin";
-      await signUp(form.email, form.password, form.name, role, roleChoice === "athlete" ? teamCode.trim() : undefined);
+      const needsTeamCode = roleChoice === "athlete" || (roleChoice === "coach" && teamChoice === "existing");
+      await signUp(form.email, form.password, form.name, role, needsTeamCode ? teamCode.trim() : undefined);
       // Notify about new signup
       await fetch("/api/notify-signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: form.name, email: form.email, school: form.school, role: roleChoice }),
       }).catch(() => {});
-      router.push(roleChoice === "athlete" ? "/dashboard" : "/onboard");
+      // New team coaches → onboard, existing team coaches & athletes → dashboard
+      router.push(roleChoice === "coach" && teamChoice === "new" ? "/onboard" : "/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Sign up failed");
     } finally {
@@ -111,7 +118,39 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {roleChoice === "athlete" && (
+            {roleChoice === "coach" && (
+              <div>
+                <label className="label">Team</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setTeamChoice("new"); setTeamCode(""); }}
+                    className={clsx(
+                      "py-2.5 rounded-input text-xs font-bold border transition-all",
+                      teamChoice === "new"
+                        ? "bg-accent/20 text-accent border-accent/50"
+                        : "bg-surface-2 text-muted border-border hover:text-white"
+                    )}
+                  >
+                    New Team
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTeamChoice("existing")}
+                    className={clsx(
+                      "py-2.5 rounded-input text-xs font-bold border transition-all",
+                      teamChoice === "existing"
+                        ? "bg-accent/20 text-accent border-accent/50"
+                        : "bg-surface-2 text-muted border-border hover:text-white"
+                    )}
+                  >
+                    Existing Team
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(roleChoice === "athlete" || (roleChoice === "coach" && teamChoice === "existing")) && (
               <div>
                 <label className="label">Team Code</label>
                 <input
@@ -121,7 +160,7 @@ export default function SignupPage() {
                   onChange={(e) => setTeamCode(e.target.value)}
                   required
                 />
-                <p className="text-[10px] text-muted mt-1">Ask your coach for the Team Code (found in Settings)</p>
+                <p className="text-[10px] text-muted mt-1">{roleChoice === "athlete" ? "Ask your coach for the Team Code (found in Settings)" : "Get the Team Code from the head coach (found in Settings)"}</p>
               </div>
             )}
 
