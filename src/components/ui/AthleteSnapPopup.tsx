@@ -99,7 +99,16 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
       dbEntry,
     };
     onSaved?.(logEntry);
-    onClose();
+    // In team mode (kickList), stay open for next kick. In athlete mode, close.
+    if (!kickList || kickList.length === 0) {
+      onClose();
+    } else {
+      // Reset inputs for next snap
+      setMarker(null);
+      setPuntMarker(null);
+      setLaces("");
+      setSpiral("");
+    }
   };
 
   const hashDisplay: Record<string, string> = { "Left Hash": "Left Hash", "LH": "Left Hash", "LM": "Left Middle", "M": "Middle", "RM": "Right Middle", "Right Hash": "Right Hash", "RH": "Right Hash" };

@@ -9,6 +9,7 @@ interface SessionSummaryProps {
   label: string;
   onConfirm: () => void;
   onCancel: () => void;
+  snapCount?: number;
 }
 
 export function SessionSummary({
@@ -16,6 +17,7 @@ export function SessionSummary({
   label,
   onConfirm,
   onCancel,
+  snapCount = 0,
 }: SessionSummaryProps) {
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
   const misses = kicks.length - makes;
@@ -90,6 +92,13 @@ export function SessionSummary({
             ))}
           </div>
 
+          {snapCount > 0 && (
+            <div className="flex items-center gap-2 p-2.5 rounded-input bg-sky-500/10 border border-sky-500/30">
+              <span className="text-xs text-sky-400 font-semibold">{snapCount} snap{snapCount !== 1 ? "s" : ""} logged</span>
+              <span className="text-[10px] text-muted">— will be saved to snap history</span>
+            </div>
+          )}
+
           <p className="text-xs text-muted">
             This will be added to cumulative stats. You can undo once after committing.
           </p>
@@ -101,7 +110,7 @@ export function SessionSummary({
             Cancel
           </button>
           <button onClick={onConfirm} className="btn-primary flex-1">
-            Commit {kicks.length} kick{kicks.length !== 1 ? "s" : ""}
+            Commit {kicks.length} kick{kicks.length !== 1 ? "s" : ""}{snapCount > 0 ? ` + ${snapCount} snap${snapCount !== 1 ? "s" : ""}` : ""}
           </button>
         </div>
       </div>

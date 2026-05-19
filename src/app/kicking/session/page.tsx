@@ -1584,6 +1584,7 @@ export default function KickingSessionPage() {
             })}
             onConfirm={handleConfirmCommit}
             onCancel={() => setPendingKicks(null)}
+            snapCount={Object.values(snapLogsMap).flat().length}
           />
         )}
       </>
@@ -2358,6 +2359,7 @@ export default function KickingSessionPage() {
           })}
           onConfirm={handleConfirmCommit}
           onCancel={() => setPendingKicks(null)}
+          snapCount={Object.values(snapLogsMap).flat().length}
         />
       )}
 
