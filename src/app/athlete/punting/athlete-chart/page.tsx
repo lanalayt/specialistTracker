@@ -501,9 +501,12 @@ function PuntAthleteChartInner() {
         </div>
 
         {/* Direction */}
-        <div className="flex gap-2">
+        <div>
+          <p className="text-[10px] text-muted text-center mb-1">Direction</p>
+          <div className="flex gap-2">
           <button onClick={() => setDirGood(true)} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border-2 transition-all", dirGood ? "bg-make/20 text-make border-make/40" : "bg-surface-2 text-muted border-border")}>Good</button>
           <button onClick={() => setDirGood(false)} className={clsx("flex-1 py-3 rounded-input text-sm font-bold border-2 transition-all", !dirGood ? "bg-miss/20 text-miss border-miss/40" : "bg-surface-2 text-muted border-border")}>Bad</button>
+          </div>
         </div>
 
         {/* Log Snap + Log Punt */}
