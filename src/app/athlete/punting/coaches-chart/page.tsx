@@ -59,6 +59,7 @@ interface PuntRow {
   count: number;
   typeId: string;
   hash: string;
+  yardLine?: string;
 }
 
 export default function PuntCoachesChartPage() {
@@ -164,13 +165,13 @@ export default function PuntCoachesChartPage() {
     const puntTypeBreakdown = puntRows.filter((r) => r.count > 0).map((r) => {
       const typeConfig = puntTypes.find((t) => t.id === r.typeId);
       const catConfig = puntCategories.find((c) => c.id === r.category);
-      return { type: catConfig?.label ?? r.category, typeId: r.typeId, typeLabel: typeConfig?.label ?? r.typeId, count: r.count, hash: r.hash };
+      return { type: catConfig?.label ?? r.category, typeId: r.typeId, typeLabel: typeConfig?.label ?? r.typeId, count: r.count, hash: r.hash, yardLine: r.yardLine || undefined };
     });
     const chart: AssignedChart = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "ATHLETE_PUNTING", createdBy: user?.name ?? "Coach", createdAt: new Date().toISOString(),
       dueDate, athletes: selectedPlayers, kicks: [], reps: totalReps,
-      puntTypes: puntTypeBreakdown.map((p) => ({ type: `${p.type} - ${p.typeLabel}`, count: p.count, typeId: p.typeId, hash: p.hash } as any)),
+      puntTypes: puntTypeBreakdown.map((p) => ({ type: p.type, typeId: p.typeId, typeLabel: p.typeLabel, count: p.count, hash: p.hash, yardLine: p.yardLine } as any)),
       completedBy: {},
     };
     const existing = await loadAssignedCharts(tid);
@@ -285,7 +286,9 @@ export default function PuntCoachesChartPage() {
                   {enabledCategories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
                 </select>
                 {/* Count */}
-                <input type="text" inputMode="numeric" value={row.count || ""} onChange={(e) => updateRow(idx, "count", parseInt(e.target.value.replace(/\D/g, "")) || 0)} className="input w-12 text-center text-xs font-bold py-1.5" />
+                <input type="text" inputMode="numeric" value={row.count || ""} onChange={(e) => updateRow(idx, "count", parseInt(e.target.value.replace(/\D/g, "")) || 0)} className="input w-12 text-center text-xs font-bold py-1.5" placeholder="#" />
+                {/* Yard Line (optional) */}
+                <input type="text" inputMode="numeric" value={row.yardLine ?? ""} onChange={(e) => updateRow(idx, "yardLine", e.target.value.replace(/[^0-9-]/g, ""))} className="input w-14 text-center text-xs py-1.5" placeholder="YL" />
                 {/* Sub-type */}
                 <select value={row.typeId} onChange={(e) => updateRow(idx, "typeId", e.target.value)} className="input text-xs py-1.5 flex-1 min-w-[80px]">
                   {getTypesForCategory(row.category).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -334,7 +337,14 @@ export default function PuntCoachesChartPage() {
           ) : (
             <Link
               href="/athlete/punting/athlete-chart"
-              onClick={() => localStorage.setItem("coach_punt_chart_now", JSON.stringify({ reps: totalReps, puntRows, players: selectedPlayers }))}
+              onClick={() => {
+                const rows = puntRows.filter((r) => r.count > 0).map((r) => {
+                  const typeConfig = puntTypes.find((t) => t.id === r.typeId);
+                  const catConfig = puntCategories.find((c) => c.id === r.category);
+                  return { type: catConfig?.label ?? r.category, typeId: r.typeId, typeLabel: typeConfig?.label ?? r.typeId, count: r.count, hash: r.hash, yardLine: r.yardLine || undefined };
+                });
+                localStorage.setItem("coach_punt_chart_now", JSON.stringify({ reps: totalReps, puntRows: rows, players: selectedPlayers }));
+              }}
               className={clsx("btn-primary w-full py-3 text-sm font-bold text-center block", (totalReps <= 0 || selectedPlayers.length === 0) && "opacity-40 pointer-events-none")}
             >
               Start Chart Now

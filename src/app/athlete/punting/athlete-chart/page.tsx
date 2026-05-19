@@ -94,7 +94,7 @@ function PuntAthleteChartInner() {
   // Set assigned chart from Chart Now data
   useEffect(() => {
     if (chartNowData?.puntRows) {
-      setAssignedChart({ id: "chart-now", sport: "ATHLETE_PUNTING", createdBy: "Coach", createdAt: new Date().toISOString(), dueDate: "", athletes: chartNowData.players, kicks: [], reps: chartNowData.reps, puntTypes: chartNowData.puntRows.map((r: any) => ({ type: r.category, typeId: r.typeId, typeLabel: r.category, count: r.count, hash: r.hash })), completedBy: {} } as AssignedChart);
+      setAssignedChart({ id: "chart-now", sport: "ATHLETE_PUNTING", createdBy: "Coach", createdAt: new Date().toISOString(), dueDate: "", athletes: chartNowData.players, kicks: [], reps: chartNowData.reps, puntTypes: chartNowData.puntRows.map((r: any) => ({ type: r.type ?? r.category, typeId: r.typeId, typeLabel: r.typeLabel ?? r.category, count: r.count, hash: r.hash, yardLine: r.yardLine })), completedBy: {} } as AssignedChart);
     }
   }, []);
 
@@ -328,11 +328,11 @@ function PuntAthleteChartInner() {
   }
 
   // ── Live — One punt at a time ──
-  const puntSchedule: { type: string; typeLabel: string; hash: string }[] = [];
+  const puntSchedule: { type: string; typeLabel: string; subType: string; hash: string; yardLine?: string }[] = [];
   if (assignedChart?.puntTypes) {
     for (const pt of assignedChart.puntTypes as any[]) {
       for (let i = 0; i < (pt.count ?? 0); i++) {
-        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type, hash: pt.hash ?? "M" });
+        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type ?? pt.typeLabel, subType: pt.typeLabel ?? "", hash: pt.hash ?? "M", yardLine: pt.yardLine });
       }
     }
   }
@@ -435,7 +435,7 @@ function PuntAthleteChartInner() {
                 if (filled) {
                   const dirOk = filled.directionalAccuracy === 1 || filled.directionalAccuracy === "1";
                   return (
-                    <button key={i} onClick={() => { setCurrentPlayerIdx(selectedPlayers.indexOf(player)); setSelectedSlotIdx(i); }} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border cursor-pointer transition-all", dirOk ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss", isSelected && "ring-2 ring-accent")} title={`${filled.yards}yd | ${filled.hangTime.toFixed(2)}s | ${filled.opTime ? filled.opTime.toFixed(2) + "s OT | " : ""}${dirOk ? "Good" : "Bad"} Dir`}>{label}</button>
+                    <button key={i} onClick={() => { setCurrentPlayerIdx(selectedPlayers.indexOf(player)); setSelectedSlotIdx(i); }} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border cursor-pointer transition-all", dirOk ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss", isSelected && "ring-2 ring-accent")} title={`${sched.subType || sched.typeLabel}${sched.yardLine ? " | YL " + sched.yardLine : ""} | ${filled.yards}yd | ${filled.hangTime.toFixed(2)}s | ${filled.opTime ? filled.opTime.toFixed(2) + "s OT | " : ""}${dirOk ? "Good" : "Bad"} Dir`}>{label}</button>
                   );
                 }
                 return (
@@ -458,7 +458,9 @@ function PuntAthleteChartInner() {
         {assignedChart ? (
           <div className="flex gap-3 text-xs">
             <span className="text-muted">Type: <span className="text-slate-200 font-semibold">{displayType}</span></span>
+            {currentScheduleItem?.subType && currentScheduleItem.subType !== displayType && <span className="text-muted">Sub: <span className="text-accent font-semibold">{currentScheduleItem.subType}</span></span>}
             <span className="text-muted">Hash: <span className="text-slate-200 font-semibold">{displayHash}</span></span>
+            {currentScheduleItem?.yardLine && <span className="text-muted">YL: <span className="text-sky-400 font-semibold">{currentScheduleItem.yardLine}</span></span>}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
