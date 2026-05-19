@@ -28,7 +28,7 @@ export const PRESETS: { name: string; colors: ThemeColors }[] = [
   { name: "Alabama", colors: { primary: "#9e1b32", secondary: "#0a0606", tertiary: "#3d1520" } },
   { name: "Auburn", colors: { primary: "#ffffff", secondary: "#0a1428", tertiary: "#f47b20" } },
   { name: "LSU", colors: { primary: "#fdd023", secondary: "#1a0a2e", tertiary: "#461d7c" } },
-  { name: "Georgia", colors: { primary: "#ffffff", secondary: "#0a0a0a", tertiary: "#ba0c2f" } },
+  { name: "Georgia", colors: { primary: "#ba0c2f", secondary: "#0a0a0a", tertiary: "#ba0c2f" } },
   { name: "Texas A&M", colors: { primary: "#500000", secondary: "#0a0606", tertiary: "#2a1010" } },
   { name: "Tennessee", colors: { primary: "#ff8200", secondary: "#0a0a0a", tertiary: "#1a1a1a" } },
   { name: "Florida", colors: { primary: "#fa4616", secondary: "#003087", tertiary: "#fa4616" } },
