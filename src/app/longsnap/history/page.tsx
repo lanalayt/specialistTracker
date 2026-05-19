@@ -294,8 +294,8 @@ export default function LongSnapHistoryPage() {
                                   {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
                                 </span>
                               </td>
-                              <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces || "—"}</td>
-                              <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Good" : s.spiral === "Bad" ? "Bad" : "—"}</td>
+                              <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
+                              <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
                               {isAthleteMode && <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>}
                               {!isAthleteMode && <td className="table-cell">{s.critical ? <span className="text-miss font-bold">!</span> : "—"}</td>}
                             </tr>
