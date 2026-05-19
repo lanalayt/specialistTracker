@@ -41,7 +41,7 @@ export const PRESETS: { name: string; colors: ThemeColors }[] = [
   { name: "Penn State", colors: { primary: "#ffffff", secondary: "#041e42", tertiary: "#0a2a5f" } },
   { name: "Oregon", colors: { primary: "#154733", secondary: "#0a0a08", tertiary: "#fce122" } },
   { name: "Clemson", colors: { primary: "#f56600", secondary: "#1a0a2e", tertiary: "#522d80" } },
-  { name: "Colorado", colors: { primary: "#cfb87c", secondary: "#0a0a0a", tertiary: "#1a1a1a" } },
+  { name: "Colorado", colors: { primary: "#ffffff", secondary: "#0a0a0a", tertiary: "#cfb87c" } },
   // WCC / Other D1
   { name: "San Diego", colors: { primary: "#ffffff", secondary: "#001a3a", tertiary: "#84BCE8" } },
   // Other / D2 / Common combos
