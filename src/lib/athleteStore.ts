@@ -86,16 +86,23 @@ const ATHLETE_PAIRS: [string, string][] = [
 
 export async function syncAthleteKeys(teamId: string): Promise<void> {
   if (!teamId || teamId === "local-dev") return;
+  const supabase = createClient();
   for (const [team, athlete] of ATHLETE_PAIRS) {
     const teamList = await loadAthletes(teamId, team);
     const athleteList = await loadAthletes(teamId, athlete);
     const teamNames = new Set(teamList.map((a) => a.name));
     const athleteNames = new Set(athleteList.map((a) => a.name));
+    // Add missing
     for (const a of teamList) {
       if (!athleteNames.has(a.name)) await insertAthlete(teamId, athlete, a.name);
     }
+    // Remove stale — delete directly by name to avoid silent failures
     for (const a of athleteList) {
-      if (!teamNames.has(a.name)) await removeAthlete(teamId, a.id);
+      if (!teamNames.has(a.name)) {
+        try {
+          await supabase.from("athletes").delete().eq("team_id", teamId).eq("sport", athlete).eq("name", a.name);
+        } catch {}
+      }
     }
   }
 }
