@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { usePunt } from "@/lib/puntContext";
 import { getTeamId } from "@/lib/teamData";
+import { loadAthletes } from "@/lib/athleteStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import Link from "next/link";
 import clsx from "clsx";
@@ -62,7 +63,22 @@ interface PuntRow {
 export default function PuntCoachesChartPage() {
   const { user, isCoach } = useAuth();
   const { athletes } = usePunt();
-  const athleteNames = athletes.map((a) => a.name);
+  const [teamRoster, setTeamRoster] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const team = await loadAthletes(tid, "PUNTING");
+      setTeamRoster(new Set(team.map((a) => a.name)));
+    })();
+  }, []);
+
+  // Filter to only athletes that exist in team roster (removes stale renamed entries)
+  const athleteNames = teamRoster
+    ? athletes.map((a) => a.name).filter((n) => teamRoster.has(n))
+    : athletes.map((a) => a.name);
 
   const [puntTypes, setPuntTypes] = useState<PuntTypeConfig[]>(DEFAULT_TYPES);
   const [puntCategories, setPuntCategories] = useState<PuntCategory[]>(DEFAULT_CATEGORIES);

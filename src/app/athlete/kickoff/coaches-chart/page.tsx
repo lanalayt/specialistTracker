@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useKickoff } from "@/lib/kickoffContext";
 import { getTeamId } from "@/lib/teamData";
+import { loadAthletes } from "@/lib/athleteStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import Link from "next/link";
 import clsx from "clsx";
@@ -11,7 +12,21 @@ import clsx from "clsx";
 export default function KickoffCoachesChartPage() {
   const { user, isCoach } = useAuth();
   const { athletes, history } = useKickoff();
-  const athleteNames = athletes.map((a) => a.name);
+  const [teamRoster, setTeamRoster] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const team = await loadAthletes(tid, "KICKOFF");
+      setTeamRoster(new Set(team.map((a) => a.name)));
+    })();
+  }, []);
+
+  const athleteNames = teamRoster
+    ? athletes.map((a) => a.name).filter((n) => teamRoster.has(n))
+    : athletes.map((a) => a.name);
 
   const [reps, setReps] = useState("5");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);

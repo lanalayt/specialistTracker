@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useFG } from "@/lib/fgContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
+import { loadAthletes } from "@/lib/athleteStore";
 import Link from "next/link";
 import clsx from "clsx";
 import type { FGKick } from "@/types";
@@ -24,7 +25,21 @@ export default function CoachesChartPage() {
   const router = useRouter();
   const { user, isCoach } = useAuth();
   const { athletes, history } = useFG();
-  const athleteNames = athletes.map((a) => a.name);
+  const [teamRoster, setTeamRoster] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const team = await loadAthletes(tid, "KICKING");
+      setTeamRoster(new Set(team.map((a) => a.name)));
+    })();
+  }, []);
+
+  const athleteNames = teamRoster
+    ? athletes.map((a) => a.name).filter((n) => teamRoster.has(n))
+    : athletes.map((a) => a.name);
 
   const [kicks, setKicks] = useState<PresetKick[]>([]);
   const [newDist, setNewDist] = useState("30");
