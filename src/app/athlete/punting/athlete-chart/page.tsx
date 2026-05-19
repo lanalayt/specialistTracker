@@ -455,7 +455,7 @@ function PuntAthleteChartInner() {
             <div className="flex flex-wrap gap-1.5">
               {puntSchedule.map((sched, i) => {
                 const filled = getSlotResult(player, i);
-                const label = getTypeInitials(sched.typeLabel || sched.type);
+                const label = getTypeInitials(sched.subType || sched.typeLabel || sched.type);
                 const isSelected = isActive && selectedSlotIdx === i;
                 if (filled) {
                   const dirOk = filled.directionalAccuracy === 1 || filled.directionalAccuracy === "1";
@@ -566,7 +566,7 @@ function PuntAthleteChartInner() {
                   <tr key={i} className="border-t border-border/30">
                     <td className="text-muted py-1 px-2">{num}</td>
                     <td className="py-1 px-2 text-slate-200 truncate max-w-[60px]">{r.athlete}</td>
-                    <td className="py-1 px-2 text-slate-300">{r.type}</td>
+                    <td className="py-1 px-2 text-slate-300">{puntSchedule[(r.kickNum ?? 1) - 1]?.subType || puntSchedule[(r.kickNum ?? 1) - 1]?.typeLabel || r.type}</td>
                     <td className="text-center py-1 px-2 text-slate-200">{r.yards}yd</td>
                     <td className="text-center py-1 px-2 text-slate-200">{r.hangTime.toFixed(2)}s</td>
                     <td className={clsx("text-right py-1 px-2 font-bold", (r.directionalAccuracy === 1 || r.directionalAccuracy === "1") ? "text-make" : "text-miss")}>{(r.directionalAccuracy === 1 || r.directionalAccuracy === "1") ? "G" : "B"}</td>
