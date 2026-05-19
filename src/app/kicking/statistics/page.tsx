@@ -503,6 +503,69 @@ export default function KickingStatisticsPage() {
       {tab === "starred" && starredStats && (
         <FGStatsView athletes={athletes} statsMap={starredStats} label="Live Reps" makeMode={makeMode} hideScore={hideScore} />
       )}
+
+      {/* By Holder — athlete mode only */}
+      {hideScore && tab === "all" && (() => {
+        const holderData: Record<string, { kicks: FGKick[] }> = {};
+        filteredHistory.forEach((s) => {
+          ((s.entries ?? []) as FGKick[]).forEach((k) => {
+            if (!k.holder) return;
+            if (!holderData[k.holder]) holderData[k.holder] = { kicks: [] };
+            holderData[k.holder].kicks.push(k);
+          });
+        });
+        const holders = Object.keys(holderData);
+        if (holders.length === 0) return null;
+        return (
+          <CollapsibleSection title="By Holder" defaultOpen>
+            <div className="space-y-4">
+              {holders.map((h) => {
+                const kicks = holderData[h].kicks;
+                const byKicker: Record<string, FGKick[]> = {};
+                kicks.forEach((k) => {
+                  if (!byKicker[k.athlete]) byKicker[k.athlete] = [];
+                  byKicker[k.athlete].push(k);
+                });
+                return (
+                  <div key={h} className="card-2">
+                    <p className="text-xs font-bold text-accent uppercase tracking-wider mb-2">{h}</p>
+                    <table className="w-full text-xs sm:text-sm">
+                      <thead>
+                        <tr>
+                          <th className="table-header text-left">Kicker</th>
+                          <th className="table-header">Made</th>
+                          <th className="table-header">Att</th>
+                          <th className="table-header">%</th>
+                          <th className="table-header">Long</th>
+                          <th className="table-header">Avg OT</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(byKicker).map(([kicker, ks]) => {
+                          const made = ks.filter((k) => k.result.startsWith("Y")).length;
+                          const longFG = ks.filter((k) => k.result.startsWith("Y")).reduce((mx, k) => Math.max(mx, k.dist), 0);
+                          const opTimes = ks.filter((k) => k.opTime && k.opTime > 0).map((k) => k.opTime!);
+                          const avgOT = opTimes.length > 0 ? (opTimes.reduce((s, v) => s + v, 0) / opTimes.length).toFixed(2) : "—";
+                          return (
+                            <tr key={kicker} className="hover:bg-surface/30 transition-colors">
+                              <td className="table-name">{kicker}</td>
+                              <td className="table-cell">{made || "—"}</td>
+                              <td className="table-cell">{ks.length}</td>
+                              <td className="table-cell make-pct">{makePct(ks.length, made)}</td>
+                              <td className="table-cell">{longFG > 0 ? `${longFG} yd` : "—"}</td>
+                              <td className="table-cell">{avgOT !== "—" ? `${avgOT}s` : "—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
+        );
+      })()}
     </main>
   );
 }

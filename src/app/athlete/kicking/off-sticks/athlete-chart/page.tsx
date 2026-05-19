@@ -66,6 +66,15 @@ function AthleteChartInner() {
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
+  const [holderEnabled, setHolderEnabled] = useState(true);
+
+  // Load holderEnabled from FG settings
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("fgSettings");
+      if (raw) { const p = JSON.parse(raw); if (typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled); }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     async function loadSnapAndHold() {
@@ -218,7 +227,14 @@ function AthleteChartInner() {
   const handleSave = async () => {
     const names = selectedPlayers.join(", ");
     const label = `${new Date().toLocaleDateString()} — ${names}${assignedChart ? " (Assigned)" : ""}`;
-    commitPractice(results, label);
+    // Attach holder from snap logs to each kick
+    const enrichedResults = results.map((r, i) => {
+      const playerKickIdx = results.slice(0, i + 1).filter((k) => k.athlete === r.athlete).length - 1;
+      const snapLog = snapLogsMap[`${r.athlete}-${playerKickIdx}`];
+      const holder = snapLog?.[0]?.snapper ? (snapLog[0].holder || undefined) : undefined;
+      return holder ? { ...r, holder } : r;
+    });
+    commitPractice(enrichedResults, label);
 
     // Batch save all snap entries as one session
     if (allSnapEntries.length > 0) {
@@ -529,6 +545,7 @@ function AthleteChartInner() {
             snapType="FG"
             athletes={snapAthletes}
             holders={holderAthletes}
+            holderEnabled={holderEnabled}
             kickerName={currentPlayer}
             kickDistance={kicks[currentKickIdx]?.distance}
             kickHash={kicks[currentKickIdx]?.hash}

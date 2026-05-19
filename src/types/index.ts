@@ -82,6 +82,7 @@ export interface FGKick {
   isPAT?: boolean;
   starred?: boolean;
   kickNum?: number;
+  holder?: string;
 }
 
 // ─── Punt entry ─────────────────────────────────────────────────────────────

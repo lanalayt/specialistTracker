@@ -18,6 +18,7 @@ interface FGSettings {
   scoreEnabled: ScoreMode;
   scoreOptions: string[];
   opTimeEnabled: boolean;
+  holderEnabled?: boolean;
 }
 
 const DEFAULT_SCORE_OPTIONS = ["0", "1", "2", "3", "4"];
@@ -28,6 +29,7 @@ const DEFAULT_SETTINGS: FGSettings = {
   scoreEnabled: "practice",
   scoreOptions: DEFAULT_SCORE_OPTIONS,
   opTimeEnabled: true,
+  holderEnabled: true,
 };
 
 function parseScoreMode(val: unknown): ScoreMode {
@@ -70,6 +72,7 @@ function FGSettingsContent() {
   const [scoreEnabled, setScoreEnabled] = useState<ScoreMode>("practice");
   const [scoreOptions, setScoreOptions] = useState<string[]>(DEFAULT_SCORE_OPTIONS);
   const [opTimeEnabled, setOpTimeEnabled] = useState(true);
+  const [holderEnabled, setHolderEnabled] = useState(true);
   const [newScore, setNewScore] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -87,6 +90,7 @@ function FGSettingsContent() {
     setScoreEnabled(local.scoreEnabled);
     setScoreOptions(local.scoreOptions);
     setOpTimeEnabled(local.opTimeEnabled);
+    setHolderEnabled(local.holderEnabled !== false);
     setSavedSettings(local);
     setLoaded(true);
 
@@ -99,6 +103,7 @@ function FGSettingsContent() {
         setScoreEnabled(parseScoreMode(cloud.scoreEnabled));
         setScoreOptions(Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS);
         if (typeof cloud.opTimeEnabled === "boolean") setOpTimeEnabled(cloud.opTimeEnabled);
+        if (typeof cloud.holderEnabled === "boolean") setHolderEnabled(cloud.holderEnabled);
         setSavedSettings({
           snapDistance: cloud.snapDistance ?? "7",
           makeMode: cloud.makeMode ?? "detailed",
@@ -106,6 +111,7 @@ function FGSettingsContent() {
           scoreEnabled: parseScoreMode(cloud.scoreEnabled),
           scoreOptions: Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS,
           opTimeEnabled: cloud.opTimeEnabled !== false,
+          holderEnabled: cloud.holderEnabled !== false,
         });
       }
     });
@@ -120,10 +126,11 @@ function FGSettingsContent() {
       missMode !== savedSettings.missMode ||
       scoreEnabled !== savedSettings.scoreEnabled ||
       JSON.stringify(scoreOptions) !== JSON.stringify(savedSettings.scoreOptions) ||
-      opTimeEnabled !== savedSettings.opTimeEnabled;
+      opTimeEnabled !== savedSettings.opTimeEnabled ||
+      holderEnabled !== (savedSettings.holderEnabled !== false);
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, savedSettings, loaded]);
+  }, [snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, holderEnabled, savedSettings, loaded]);
 
   const handleAddScore = () => {
     const trimmed = newScore.trim();
@@ -138,7 +145,7 @@ function FGSettingsContent() {
   };
 
   const handleSave = () => {
-    const settings: FGSettings = { snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled };
+    const settings: FGSettings = { snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, holderEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -328,6 +335,31 @@ function FGSettingsContent() {
         </div>
         <p className="text-xs text-muted">
           Track snap-to-kick operation time on each attempt. Existing op time data is preserved in stats even when disabled.
+        </p>
+      </div>
+
+      {/* Holder toggle */}
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="label mb-0">Include Holder</p>
+          <button
+            onClick={() => setHolderEnabled((v) => !v)}
+            className={clsx(
+              "relative w-11 h-6 rounded-full transition-colors",
+              holderEnabled ? "bg-accent" : "bg-border"
+            )}
+            aria-label="Toggle holder"
+          >
+            <span
+              className={clsx(
+                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                holderEnabled ? "left-[22px]" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
+        <p className="text-xs text-muted">
+          When enabled, holder selection appears in the snap log during FG charting. Stats will include a By Holder breakdown.
         </p>
       </div>
       </div>

@@ -19,6 +19,7 @@ interface Props {
   snapType: "FG" | "PUNT";
   athletes: string[]; // snappers
   holders?: string[]; // holders (falls back to athletes if not provided)
+  holderEnabled?: boolean; // show holder selection (default true for FG)
   kickerName?: string; // who's kicking
   kickDistance?: number; // distance of the kick
   kickHash?: string; // hash of the kick
@@ -33,8 +34,9 @@ function getInitials(name: string): string {
   return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
-export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved }: Props) {
+export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved }: Props) {
   const isFG = snapType === "FG";
+  const showHolder = isFG && holderEnabled;
   const holderList = holdersProp && holdersProp.length > 0 ? holdersProp : athletes;
 
   const [holderSide, setHolderSide] = useState<"right" | "left">("right");
@@ -129,8 +131,8 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
                   ))}
                 </div>
               </div>
-              <div className="w-px self-stretch bg-accent/60 mx-0.5" />
-              <div>
+              {showHolder && <div className="w-px self-stretch bg-accent/60 mx-0.5" />}
+              {showHolder && <div>
                 <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Holder</p>
                 <div className="flex gap-1">
                   {holderList.map((a) => (
@@ -138,7 +140,7 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, kic
                   ))}
                   <button onClick={() => setHolder("")} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === "" ? "bg-miss/30 text-miss border border-miss/50" : "bg-surface-2 text-miss/60 border border-border")} title="No holder">✕</button>
                 </div>
-              </div>
+              </div>}
               <div className="ml-auto">
                 <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Side</p>
                 <div className="flex rounded-input border border-border overflow-hidden">
