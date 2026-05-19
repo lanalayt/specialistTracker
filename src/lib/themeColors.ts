@@ -34,7 +34,7 @@ export const PRESETS: { name: string; colors: ThemeColors }[] = [
   { name: "Florida", colors: { primary: "#1a2a5f", secondary: "#003087", tertiary: "#ffffff" } },
   { name: "Ole Miss", colors: { primary: "#ce1126", secondary: "#0a0d1a", tertiary: "#14213d" } },
   // Big 12 / Big Ten / ACC
-  { name: "Texas", colors: { primary: "#bf5700", secondary: "#0a0a0a", tertiary: "#ffffff" } },
+  { name: "Texas", colors: { primary: "#ffffff", secondary: "#bf5700", tertiary: "#0a0a0a" } },
   { name: "Oklahoma", colors: { primary: "#841617", secondary: "#0a0606", tertiary: "#2a1010" } },
   { name: "Ohio State", colors: { primary: "#bb0000", secondary: "#0a0a0a", tertiary: "#333333" } },
   { name: "Michigan", colors: { primary: "#ffcb05", secondary: "#00274c", tertiary: "#0a1a30" } },
