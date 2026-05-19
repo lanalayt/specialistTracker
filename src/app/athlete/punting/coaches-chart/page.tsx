@@ -11,6 +11,7 @@ import Link from "next/link";
 import clsx from "clsx";
 
 const HASH_OPTIONS = [
+  { value: "ANY", label: "Any" },
   { value: "Left", label: "Left Hash" },
   { value: "LM", label: "LM" },
   { value: "M", label: "Middle" },

@@ -383,7 +383,7 @@ function PuntAthleteChartInner() {
     const op = parseHangRaw(opInput);
     if (isNaN(dist) || dist <= 0 || !hang) return;
     const puntType = assignedChart ? (currentScheduleItem?.type ?? "DIR_STRAIGHT") : liveType;
-    const hash = assignedChart ? currentHash : liveHash;
+    const hash = assignedChart ? (currentHash === "ANY" ? (liveHash || "") : currentHash) : liveHash;
     const playerSlotsFilled = puntSchedule.filter((_, i) => isSlotFilled(currentPlayer, i)).length;
     const entry: PuntEntry = {
       athleteId: currentPlayer, athlete: currentPlayer, type: puntType as any, hash: hash as any,
@@ -456,10 +456,17 @@ function PuntAthleteChartInner() {
 
         {/* Type + Hash display (assigned) or selection (live) */}
         {assignedChart ? (
-          <div className="flex gap-3 text-xs">
+          <div className="flex gap-3 text-xs flex-wrap items-center">
             <span className="text-muted">Type: <span className="text-slate-200 font-semibold">{displayType}</span></span>
             {currentScheduleItem?.subType && currentScheduleItem.subType !== displayType && <span className="text-muted">Sub: <span className="text-accent font-semibold">{currentScheduleItem.subType}</span></span>}
-            <span className="text-muted">Hash: <span className="text-slate-200 font-semibold">{displayHash}</span></span>
+            {displayHash === "ANY" ? (
+              <span className="text-muted">Hash: <select value={liveHash} onChange={(e) => setLiveHash(e.target.value)} className="input text-xs py-0.5 px-1 inline w-auto ml-1">
+                <option value="">—</option>
+                {["Left", "LM", "M", "RM", "Right"].map((h) => <option key={h} value={h}>{h}</option>)}
+              </select></span>
+            ) : (
+              <span className="text-muted">Hash: <span className="text-slate-200 font-semibold">{displayHash}</span></span>
+            )}
             {currentScheduleItem?.yardLine && <span className="text-muted">YL: <span className="text-sky-400 font-semibold">{currentScheduleItem.yardLine}</span></span>}
           </div>
         ) : (
