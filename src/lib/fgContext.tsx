@@ -19,7 +19,7 @@ import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
 import { cloudGet } from "@/lib/supabaseData";
 import { teamGet, getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
-import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, syncAthleteKeys, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
 
 interface FGStateData {
@@ -84,6 +84,7 @@ export function FGProvider({ children, sportKey = "KICKING" }: { children: React
 
       // Load athletes from athletes table
       if (tid && tid !== "local-dev") {
+        if (sportKey.startsWith("ATHLETE_")) await syncAthleteKeys(tid);
         const dbAthletes = await loadAthletes(tid, sportKey);
         if (dbAthletes.length > 0) {
           setAthletes(dbAthletes);
