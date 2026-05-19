@@ -171,6 +171,35 @@ function PuntAthleteChartInner() {
     if (phase === "results") setPhase("live");
   };
 
+  // ── Computed values (must be before phase checks) ──
+  const puntSchedule: { type: string; typeLabel: string; subType: string; hash: string; yardLine?: string }[] = [];
+  if (assignedChart?.puntTypes) {
+    for (const pt of assignedChart.puntTypes as any[]) {
+      for (let i = 0; i < (pt.count ?? 0); i++) {
+        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type ?? pt.typeLabel, subType: pt.typeLabel ?? "", hash: pt.hash ?? "M", yardLine: pt.yardLine });
+      }
+    }
+  }
+
+  const getTypeInitials = (label: string): string => {
+    const parts = label.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 3);
+  };
+
+  const getSlotResult = (player: string, slotIdx: number) => slotResults[player]?.[slotIdx];
+  const isSlotFilled = (player: string, slotIdx: number) => !!getSlotResult(player, slotIdx);
+  const filledCount = selectedPlayers.reduce((s, p) => s + puntSchedule.filter((_, i) => isSlotFilled(p, i)).length, 0);
+  const totalSlots = puntSchedule.length * selectedPlayers.length;
+
+  const allResults: PuntEntry[] = [];
+  for (const player of selectedPlayers) {
+    for (let i = 0; i < puntSchedule.length; i++) {
+      const r = getSlotResult(player, i);
+      if (r) allResults.push({ ...r, kickNum: i + 1 });
+    }
+  }
+
   const allSnapEntries: LongSnapEntry[] = Object.values(snapLogsMap).flat().map((s) => s.dbEntry);
 
   const handleSave = async () => {
@@ -328,35 +357,6 @@ function PuntAthleteChartInner() {
   }
 
   // ── Live — One punt at a time ──
-  const puntSchedule: { type: string; typeLabel: string; subType: string; hash: string; yardLine?: string }[] = [];
-  if (assignedChart?.puntTypes) {
-    for (const pt of assignedChart.puntTypes as any[]) {
-      for (let i = 0; i < (pt.count ?? 0); i++) {
-        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type ?? pt.typeLabel, subType: pt.typeLabel ?? "", hash: pt.hash ?? "M", yardLine: pt.yardLine });
-      }
-    }
-  }
-
-  const getTypeInitials = (label: string): string => {
-    const parts = label.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 3);
-  };
-
-  const getSlotResult = (player: string, slotIdx: number) => slotResults[player]?.[slotIdx];
-  const isSlotFilled = (player: string, slotIdx: number) => !!getSlotResult(player, slotIdx);
-  const filledCount = selectedPlayers.reduce((s, p) => s + puntSchedule.filter((_, i) => isSlotFilled(p, i)).length, 0);
-  const totalSlots = puntSchedule.length * selectedPlayers.length;
-
-  // Build flat results from slotResults for saving
-  const allResults: PuntEntry[] = [];
-  for (const player of selectedPlayers) {
-    for (let i = 0; i < puntSchedule.length; i++) {
-      const r = getSlotResult(player, i);
-      if (r) allResults.push({ ...r, kickNum: i + 1 });
-    }
-  }
-
   const currentScheduleItem = puntSchedule[selectedSlotIdx];
   const currentType = currentScheduleItem?.typeLabel || currentScheduleItem?.type || "";
   const currentHash = currentScheduleItem?.hash || "M";
