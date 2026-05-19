@@ -58,6 +58,8 @@ function PuntAthleteChartInner() {
   const [hangInput, setHangInput] = useState("");
   const [opInput, setOpInput] = useState("");
   const [dirGood, setDirGood] = useState(true);
+  const [liveType, setLiveType] = useState("DIR_STRAIGHT");
+  const [liveHash, setLiveHash] = useState("M");
   const [showSnap, setShowSnap] = useState(false);
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
@@ -340,9 +342,6 @@ function PuntAthleteChartInner() {
   const currentHash = currentScheduleItem?.hash || "M";
 
   const HASH_OPTIONS = ["Left", "LM", "M", "RM", "Right"];
-
-  const [liveType, setLiveType] = useState(livePuntType);
-  const [liveHash, setLiveHash] = useState("M");
 
   const displayType = assignedChart ? currentType : liveType;
   const displayHash = assignedChart ? currentHash : liveHash;
