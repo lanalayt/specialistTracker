@@ -504,8 +504,8 @@ export default function KickingStatisticsPage() {
         <FGStatsView athletes={athletes} statsMap={starredStats} label="Live Reps" makeMode={makeMode} hideScore={hideScore} />
       )}
 
-      {/* By Holder — athlete mode only */}
-      {hideScore && tab === "all" && (() => {
+      {/* By Holder */}
+      {tab === "all" && (() => {
         const holderData: Record<string, { kicks: FGKick[] }> = {};
         filteredHistory.forEach((s) => {
           ((s.entries ?? []) as FGKick[]).forEach((k) => {

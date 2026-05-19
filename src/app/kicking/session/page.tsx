@@ -14,7 +14,10 @@ import type { FGKick, FGPosition, FGResult } from "@/types";
 import { POSITIONS, RESULTS } from "@/types";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
-import { SnapOverlay, clearSnapOverlayData } from "@/components/ui/SnapOverlay";
+import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
+import { loadAthletes as loadAthleteList } from "@/lib/athleteStore";
+import { insertSession as insertSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
+import { genId as genSnapId } from "@/lib/stats";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
@@ -277,7 +280,28 @@ export default function KickingSessionPage() {
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
+  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
+  const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
+  const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
+  const [holderEnabled, setHolderEnabled] = useState(true);
   const [showSetupPrompt, setShowSetupPrompt] = useState(false);
+
+  // Load snap/holder athletes and holderEnabled setting
+  useEffect(() => {
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const ls = await loadAthleteList(tid, "LONGSNAP");
+      setSnapAthletes(ls.map((a) => a.name));
+      const h = await loadAthleteList(tid, "HOLDING");
+      setHolderAthletes(h.map((a) => a.name));
+    })();
+    try {
+      const raw = localStorage.getItem("fgSettings");
+      if (raw) { const p = JSON.parse(raw); if (typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled); }
+    } catch {}
+  }, []);
 
   // Re-read settings — poll every 2s to catch SPA navigation changes
   useEffect(() => {
@@ -807,13 +831,36 @@ export default function KickingSessionPage() {
     setPendingKicks(sessionKicks);
   };
 
-  const handleConfirmCommit = () => {
+  const handleConfirmCommit = async () => {
     if (!pendingKicks) return;
-    commitPractice(pendingKicks, undefined, weather, sessionMode ?? undefined, opponent, gameTime);
-    setCommittedKicks(pendingKicks);
+    // Attach holder from snap logs to each kick
+    const enrichedKicks = pendingKicks.map((k, i) => {
+      const snapLog = snapLogsMap[String(i)];
+      const holder = snapLog?.[0]?.holder || undefined;
+      return holder ? { ...k, holder } : k;
+    });
+    commitPractice(enrichedKicks, undefined, weather, sessionMode ?? undefined, opponent, gameTime);
+    // Batch save snap entries
+    const allSnapEntries = Object.values(snapLogsMap).flat().map((s) => s.dbEntry);
+    if (allSnapEntries.length > 0) {
+      const tid = getTeamId();
+      if (tid) {
+        const snapperNames = [...new Set(allSnapEntries.map((e) => e.athlete))].join(", ");
+        const snapSession = {
+          id: genSnapId(), teamId: tid, sport: "LONGSNAP",
+          label: `Short Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
+          date: new Date().toISOString(), mode: "practice" as const,
+          entries: allSnapEntries,
+        };
+        stampSnapWrite(tid);
+        await insertSnapSession(tid, snapSession as any);
+      }
+    }
+    setCommittedKicks(enrichedKicks);
     setPendingKicks(null);
     setCommitted(true);
     setSessionActive(false);
+    setSnapLogsMap({});
   };
 
   const handleBackToLog = () => {
@@ -871,8 +918,8 @@ export default function KickingSessionPage() {
     setPlannedRowIndices([]);
     setCurrentKickIdx(0);
     setPartialInputs({});
-    clearSnapOverlayData("FG");
     setShowSnapOverlay(false);
+    setSnapLogsMap({});
   };
 
   const undoClear = () => {
@@ -2309,12 +2356,17 @@ export default function KickingSessionPage() {
       )}
 
       {showSnapOverlay && (
-        <SnapOverlay
+        <AthleteSnapPopup
           snapType="FG"
-          entryCount={filledCount}
+          athletes={snapAthletes}
+          holders={holderAthletes}
+          holderEnabled={holderEnabled}
+          kickerName={rows[currentKickIdx]?.athlete || undefined}
+          kickDistance={rows[currentKickIdx]?.dist ? parseInt(rows[currentKickIdx].dist) : undefined}
+          kickHash={rows[currentKickIdx]?.pos || undefined}
+          previousSnaps={snapLogsMap[String(currentKickIdx)]}
           onClose={() => setShowSnapOverlay(false)}
-          kickInfos={filledRows.map(({ r }) => ({ dist: r.dist || "", pos: r.pos || "" }))}
-          gameMode={sessionMode === "game"}
+          onSaved={(entry) => setSnapLogsMap((prev) => ({ ...prev, [String(currentKickIdx)]: [...(prev[String(currentKickIdx)] ?? []), entry] }))}
         />
       )}
     </>
