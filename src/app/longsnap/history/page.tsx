@@ -260,13 +260,16 @@ export default function LongSnapHistoryPage() {
               const isLong = snaps.every((s) => s.snapType === "PUNT");
               if (isShort) {
                 const strikes = snaps.filter((s) => s.accuracy === "ON_TARGET").length;
-                const crits = snaps.filter((s) => s.critical).length;
+                const totalScore = snaps.reduce((s, e) => s + (e.score ?? 0), 0);
+                const maxScore = snaps.length * 3;
+                const scorePct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
                 return (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-bold text-accent uppercase tracking-wider">FG / Short Snap</span>
                       <span className="text-xs text-muted">·</span>
                       <span className="text-xs text-muted">{strikes}/{snaps.length} Strikes</span>
+                      {isAthleteMode && <><span className="text-xs text-muted">·</span><span className="text-xs text-sky-400 font-semibold">{totalScore}/{maxScore} ({scorePct}%)</span></>}
                     </div>
                     <div className="card-2 overflow-x-auto">
                       <table className="w-full text-sm">
@@ -277,6 +280,7 @@ export default function LongSnapHistoryPage() {
                             <th className="table-header">Acc</th>
                             <th className="table-header">Laces</th>
                             <th className="table-header">Spiral</th>
+                            {isAthleteMode && <th className="table-header">Score</th>}
                             {!isAthleteMode && <th className="table-header">Crit</th>}
                           </tr>
                         </thead>
@@ -292,6 +296,7 @@ export default function LongSnapHistoryPage() {
                               </td>
                               <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces || "—"}</td>
                               <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Good" : s.spiral === "Bad" ? "Bad" : "—"}</td>
+                              {isAthleteMode && <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>}
                               {!isAthleteMode && <td className="table-cell">{s.critical ? <span className="text-miss font-bold">!</span> : "—"}</td>}
                             </tr>
                           ))}

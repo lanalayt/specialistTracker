@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { makePct, emptyLongSnapStats, processLongSnap } from "@/lib/stats";
@@ -26,6 +27,8 @@ function computeFilteredSnapStats(
 }
 
 export default function LongSnapStatisticsPage() {
+  const pathname = usePathname();
+  const isAthleteMode = pathname.startsWith("/athlete");
   const { athletes, stats, history } = useLongSnap();
   const dateFilter = useDateRangeFilter();
 
@@ -83,6 +86,24 @@ export default function LongSnapStatisticsPage() {
 
   const totalLaces = Object.values(lacesStats).reduce((acc, v) => ({ total: acc.total + v.total, att: acc.att + v.att }), { total: 0, att: 0 });
 
+  // Score stats for short snaps (30-point scoring: max 3 per snap)
+  const scoreStats = useMemo(() => {
+    const result: Record<string, { totalScore: number; att: number }> = {};
+    let allScore = 0, allAtt = 0;
+    practiceHistory.forEach((session) => {
+      const snaps = (session.entries ?? []) as LongSnapEntry[];
+      snaps.forEach((s) => {
+        if (s.snapType !== "FG" && s.snapType !== "PAT") return;
+        if (!result[s.athlete]) result[s.athlete] = { totalScore: 0, att: 0 };
+        result[s.athlete].totalScore += s.score ?? 0;
+        result[s.athlete].att += 1;
+        allScore += s.score ?? 0;
+        allAtt += 1;
+      });
+    });
+    return { byAthlete: result, totalScore: allScore, totalAtt: allAtt };
+  }, [practiceHistory]);
+
   // Short snap (FG + PAT) totals
   const shortTotals = athletes.reduce(
     (acc, a) => {
@@ -122,7 +143,8 @@ export default function LongSnapStatisticsPage() {
       <div className={snapTab === "long" ? "grid grid-cols-3 gap-3" : "grid grid-cols-3 gap-3"}>
         <StatCard label="Strike %" value={onTargetPct} accent glow />
         {snapTab === "long" && <StatCard label="Avg Time" value={longTotals.att > 0 ? `${avgTime}s` : "—"} />}
-        {snapTab === "short" && <StatCard label="Laces %" value={totalLaces.att > 0 ? `${Math.round((totalLaces.total / totalLaces.att) * 100)}%` : "—"} />}
+        {snapTab === "short" && !isAthleteMode && <StatCard label="Laces %" value={totalLaces.att > 0 ? `${Math.round((totalLaces.total / totalLaces.att) * 100)}%` : "—"} />}
+        {snapTab === "short" && isAthleteMode && <StatCard label="Score %" value={scoreStats.totalAtt > 0 ? `${Math.round((scoreStats.totalScore / (scoreStats.totalAtt * 3)) * 100)}%` : "—"} />}
         <StatCard label="Total Snaps" value={activeTotals.att || "—"} />
       </div>
 
@@ -138,8 +160,9 @@ export default function LongSnapStatisticsPage() {
                 <th className="table-header">Snaps</th>
                 <th className="table-header">Strike %</th>
                 {snapTab === "long" && <th className="table-header">Avg Time</th>}
-                {snapTab === "short" && <th className="table-header">Laces %</th>}
-                <th className="table-header">Crit</th>
+                {snapTab === "short" && !isAthleteMode && <th className="table-header">Laces %</th>}
+                {snapTab === "short" && isAthleteMode && <th className="table-header">Score %</th>}
+                {!(snapTab === "short" && isAthleteMode) && <th className="table-header">Crit</th>}
               </tr>
             </thead>
             <tbody>
@@ -169,11 +192,15 @@ export default function LongSnapStatisticsPage() {
                       {bucket.totalTime && bucket.att > 0 ? `${(bucket.totalTime / bucket.att).toFixed(2)}s` : "—"}
                     </td>
                     )}
-                    {snapTab === "short" && (() => {
+                    {snapTab === "short" && !isAthleteMode && (() => {
                       const ls = lacesStats[a.name];
                       return <td className="table-cell">{ls && ls.att > 0 ? `${Math.round((ls.total / ls.att) * 100)}%` : "—"}</td>;
                     })()}
-                    <td className={`table-cell ${(bucket.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{bucket.criticals || "—"}</td>
+                    {snapTab === "short" && isAthleteMode && (() => {
+                      const sc = scoreStats.byAthlete[a.name];
+                      return <td className="table-cell font-bold text-sky-400">{sc && sc.att > 0 ? `${Math.round((sc.totalScore / (sc.att * 3)) * 100)}%` : "—"}</td>;
+                    })()}
+                    {!(snapTab === "short" && isAthleteMode) && <td className={`table-cell ${(bucket.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{bucket.criticals || "—"}</td>}
                   </tr>
                 );
               })}
