@@ -26,6 +26,7 @@ interface Props {
   previousSnaps?: SnapLogEntry[]; // snaps already logged for this kick
   onClose: () => void;
   onSaved?: (entry: SnapLogEntry) => void;
+  onHolderToggle?: (enabled: boolean) => void;
   kickList?: { idx: number; kickNum: number; athlete: string; dist: string; pos: string; hasSnap: boolean; isActive: boolean }[];
   onKickSelect?: (idx: number) => void;
 }
@@ -36,9 +37,10 @@ function getInitials(name: string): string {
   return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
-export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved, kickList, onKickSelect }: Props) {
+export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved, onHolderToggle, kickList, onKickSelect }: Props) {
   const isFG = snapType === "FG";
-  const showHolder = isFG && holderEnabled;
+  const [localHolderOn, setLocalHolderOn] = useState(holderEnabled);
+  const showHolder = isFG && localHolderOn;
   const holderList = holdersProp && holdersProp.length > 0 ? holdersProp : athletes;
 
   const [holderSide, setHolderSide] = useState<"right" | "left">("right");
@@ -173,15 +175,24 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
                   ))}
                 </div>
               </div>
-              {showHolder && <div className="w-px self-stretch bg-accent/60 mx-0.5" />}
-              {showHolder && <div>
-                <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Holder</p>
-                <div className="flex gap-1">
-                  {holderList.map((a) => (
-                    <button key={a} onClick={() => setHolder(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
-                  ))}
-                  <button onClick={() => setHolder("")} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === "" ? "bg-miss/30 text-miss border border-miss/50" : "bg-surface-2 text-miss/60 border border-border")} title="No holder">✕</button>
+              {isFG && <div className="w-px self-stretch bg-accent/60 mx-0.5" />}
+              {isFG && <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <p className="text-[8px] text-muted uppercase tracking-wider">Holder</p>
+                  <button onClick={() => { const next = !localHolderOn; setLocalHolderOn(next); onHolderToggle?.(next); }} className={clsx("w-7 h-3.5 rounded-full transition-colors relative", localHolderOn ? "bg-accent" : "bg-border")}>
+                    <span className={clsx("absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-all", localHolderOn ? "left-[14px]" : "left-0.5")} />
+                  </button>
                 </div>
+                {showHolder ? (
+                  <div className="flex gap-1">
+                    {holderList.map((a) => (
+                      <button key={a} onClick={() => setHolder(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
+                    ))}
+                    <button onClick={() => setHolder("")} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", holder === "" ? "bg-miss/30 text-miss border border-miss/50" : "bg-surface-2 text-miss/60 border border-border")} title="No holder">✕</button>
+                  </div>
+                ) : (
+                  <p className="text-[9px] text-muted/50 italic">Off</p>
+                )}
               </div>}
               <div className="ml-auto">
                 <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Side</p>

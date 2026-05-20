@@ -2385,6 +2385,15 @@ export default function KickingSessionPage() {
             athletes={snapAthletes}
             holders={holderAthletes}
             holderEnabled={holderEnabled}
+            onHolderToggle={(on) => {
+              setHolderEnabled(on);
+              try {
+                const raw = localStorage.getItem("fgSettings");
+                const settings = raw ? JSON.parse(raw) : {};
+                settings.holderEnabled = on;
+                localStorage.setItem("fgSettings", JSON.stringify(settings));
+              } catch {}
+            }}
             kickerName={snapKickRow?.athlete || undefined}
             kickDistance={snapKickRow?.dist ? parseInt(snapKickRow.dist) : undefined}
             kickHash={snapKickRow?.pos || undefined}

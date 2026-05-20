@@ -546,6 +546,7 @@ function AthleteChartInner() {
             athletes={snapAthletes}
             holders={holderAthletes}
             holderEnabled={holderEnabled}
+            onHolderToggle={(on) => { setHolderEnabled(on); try { const raw = localStorage.getItem("fgSettings"); const s = raw ? JSON.parse(raw) : {}; s.holderEnabled = on; localStorage.setItem("fgSettings", JSON.stringify(s)); } catch {} }}
             kickerName={currentPlayer}
             kickDistance={kicks[currentKickIdx]?.distance}
             kickHash={kicks[currentKickIdx]?.hash}
@@ -810,6 +811,8 @@ function AthleteChartInner() {
           snapType="FG"
           athletes={snapAthletes}
           holders={holderAthletes}
+          holderEnabled={holderEnabled}
+          onHolderToggle={(on) => { setHolderEnabled(on); try { const raw = localStorage.getItem("fgSettings"); const s = raw ? JSON.parse(raw) : {}; s.holderEnabled = on; localStorage.setItem("fgSettings", JSON.stringify(s)); } catch {} }}
           kickerName={currentPlayer}
           kickDistance={currentKick?.distance}
           kickHash={currentKick?.hash}
