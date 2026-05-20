@@ -285,6 +285,7 @@ export default function KickingSessionPage() {
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
   const [holderEnabled, setHolderEnabled] = useState(true);
+  const [snapperEnabled, setSnapperEnabled] = useState(false);
   const [showSetupPrompt, setShowSetupPrompt] = useState(false);
 
   // Load snap/holder athletes and holderEnabled setting
@@ -300,7 +301,7 @@ export default function KickingSessionPage() {
     })();
     try {
       const raw = localStorage.getItem("fgSettings");
-      if (raw) { const p = JSON.parse(raw); if (typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled); }
+      if (raw) { const p = JSON.parse(raw); if (typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled); if (typeof p.snapperEnabled === "boolean") setSnapperEnabled(p.snapperEnabled); }
     } catch {}
   }, []);
 
@@ -2374,6 +2375,7 @@ export default function KickingSessionPage() {
             athletes={snapAthletes}
             holders={holderAthletes}
             holderEnabled={holderEnabled}
+            snapperEnabled={snapperEnabled}
             kickerName={snapKickRow?.athlete || undefined}
             kickDistance={snapKickRow?.dist ? parseInt(snapKickRow.dist) : undefined}
             kickHash={snapKickRow?.pos || undefined}

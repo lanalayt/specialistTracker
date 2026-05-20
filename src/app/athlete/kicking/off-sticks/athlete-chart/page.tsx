@@ -67,12 +67,13 @@ function AthleteChartInner() {
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
   const [holderEnabled, setHolderEnabled] = useState(true);
+  const [snapperEnabled, setSnapperEnabled] = useState(false);
 
-  // Load holderEnabled from FG settings
+  // Load holderEnabled/snapperEnabled from FG settings
   useEffect(() => {
     try {
       const raw = localStorage.getItem("fgSettings");
-      if (raw) { const p = JSON.parse(raw); if (typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled); }
+      if (raw) { const p = JSON.parse(raw); if (typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled); if (typeof p.snapperEnabled === "boolean") setSnapperEnabled(p.snapperEnabled); }
     } catch {}
   }, []);
 
@@ -546,6 +547,7 @@ function AthleteChartInner() {
             athletes={snapAthletes}
             holders={holderAthletes}
             holderEnabled={holderEnabled}
+            snapperEnabled={snapperEnabled}
             kickerName={currentPlayer}
             kickDistance={kicks[currentKickIdx]?.distance}
             kickHash={kicks[currentKickIdx]?.hash}
