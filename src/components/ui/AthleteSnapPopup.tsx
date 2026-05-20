@@ -210,7 +210,6 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
               </div>
             </div>
 
-            {marker && <p className="text-center text-xs"><span className={clsx("font-bold", marker.inZone ? "text-make" : "text-miss")}>{marker.inZone ? "Strike" : "Ball"}</span></p>}
           </>
         ) : (
           <>
@@ -236,7 +235,6 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
               </div>
             </div>
 
-            {puntMarker && <p className="text-center text-xs"><span className={clsx("font-bold", puntMarker.inZone ? "text-make" : "text-miss")}>{puntMarker.inZone ? "Strike" : "Ball"}</span></p>}
 
             {/* Snap Time (optional) */}
             <div>
