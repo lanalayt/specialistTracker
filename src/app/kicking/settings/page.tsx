@@ -320,17 +320,13 @@ function FGSettingsContent() {
           <button
             onClick={() => setOpTimeEnabled((v) => !v)}
             className={clsx(
-              "relative w-11 h-6 rounded-full transition-colors",
+              "flex items-center rounded-full text-[10px] font-bold transition-colors w-14 h-6 px-0.5",
               opTimeEnabled ? "bg-accent" : "bg-border"
             )}
             aria-label="Toggle operation time"
           >
-            <span
-              className={clsx(
-                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                opTimeEnabled ? "left-[22px]" : "left-0.5"
-              )}
-            />
+            <span className={clsx("w-5 h-5 rounded-full bg-white transition-all flex-shrink-0", opTimeEnabled ? "ml-auto" : "")} />
+            <span className={clsx("absolute w-14 text-center", opTimeEnabled ? "text-slate-900" : "text-muted")}>{opTimeEnabled ? "On" : "Off"}</span>
           </button>
         </div>
         <p className="text-xs text-muted">
@@ -345,17 +341,13 @@ function FGSettingsContent() {
           <button
             onClick={() => setHolderEnabled((v) => !v)}
             className={clsx(
-              "relative w-11 h-6 rounded-full transition-colors",
+              "flex items-center rounded-full text-[10px] font-bold transition-colors w-14 h-6 px-0.5",
               holderEnabled ? "bg-accent" : "bg-border"
             )}
             aria-label="Toggle holder"
           >
-            <span
-              className={clsx(
-                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                holderEnabled ? "left-[22px]" : "left-0.5"
-              )}
-            />
+            <span className={clsx("w-5 h-5 rounded-full bg-white transition-all flex-shrink-0", holderEnabled ? "ml-auto" : "")} />
+            <span className={clsx("absolute w-14 text-center", holderEnabled ? "text-slate-900" : "text-muted")}>{holderEnabled ? "On" : "Off"}</span>
           </button>
         </div>
         <p className="text-xs text-muted">
