@@ -581,14 +581,19 @@ export default function PuntingStatisticsPage() {
   };
 
   useEffect(() => {
-    const { types, categories } = loadPuntSettings();
-    setPuntTypes(types);
-    setPuntCategories(categories);
-    const map: Record<string, string> = {};
-    const metrics: Record<string, "distance" | "yardline"> = {};
-    types.forEach((t) => { map[t.id] = t.label; metrics[t.id] = t.metric; });
-    setTypeLabels(map);
-    setTypeMetrics(metrics);
+    const reload = () => {
+      const { types, categories } = loadPuntSettings();
+      setPuntTypes(types);
+      setPuntCategories(categories);
+      const map: Record<string, string> = {};
+      const metrics: Record<string, "distance" | "yardline"> = {};
+      types.forEach((t) => { map[t.id] = t.label; metrics[t.id] = t.metric; });
+      setTypeLabels(map);
+      setTypeMetrics(metrics);
+    };
+    reload();
+    window.addEventListener("settingsChanged", reload);
+    return () => window.removeEventListener("settingsChanged", reload);
   }, []);
 
   const modeHistory = useMemo(() => {
