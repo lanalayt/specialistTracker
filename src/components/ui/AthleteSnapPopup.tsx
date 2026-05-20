@@ -250,18 +250,18 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
 
         {/* Kick list (team mode) */}
         {kickList && kickList.length > 0 && (
-          <div className="border-t border-border/50 pt-2 space-y-1">
+          <div className="border-t border-border/50 pt-2">
             <p className="text-[10px] text-muted uppercase tracking-wider font-semibold mb-1">Kicks</p>
-            {kickList.map((k) => (
-              <button key={k.idx} onClick={() => onKickSelect?.(k.idx)} className={clsx("w-full flex items-center gap-2 px-2.5 py-2 rounded-input text-[10px] transition-all text-left", k.isActive ? "bg-accent text-slate-900 font-bold ring-2 ring-accent shadow-lg shadow-accent/20" : k.hasSnap ? "bg-make/10 border border-make/40 text-make" : "border border-border/40 text-muted hover:text-white hover:border-border")}>
-                <span className={clsx("font-bold w-5 text-center", k.isActive ? "text-slate-900" : "")}>{k.kickNum}</span>
-                <span className={clsx("font-semibold flex-1", k.isActive ? "text-slate-900" : "text-slate-200")}>{k.athlete}</span>
-                <span className={k.isActive ? "text-slate-800" : "text-slate-400"}>{k.dist}yd</span>
-                <span className={k.isActive ? "text-slate-800" : "text-slate-400"}>{k.pos}</span>
-                {k.hasSnap && !k.isActive && <span className="text-make font-bold">✓</span>}
-                {k.hasSnap && k.isActive && <span className="text-slate-900 font-bold">✓</span>}
-              </button>
-            ))}
+            <div className="grid grid-cols-2 gap-1">
+              {kickList.map((k) => (
+                <button key={k.idx} onClick={() => onKickSelect?.(k.idx)} className={clsx("flex items-center gap-1 px-1.5 py-1 rounded text-[9px] transition-all text-left truncate", k.isActive ? "bg-accent text-slate-900 font-bold ring-1 ring-accent shadow-md shadow-accent/20" : k.hasSnap ? "bg-make/10 border border-make/40 text-make" : "border border-border/40 text-muted hover:text-white")}>
+                  <span className={clsx("font-bold", k.isActive ? "text-slate-900" : "")}>{k.kickNum}.</span>
+                  <span className={clsx("font-semibold truncate", k.isActive ? "text-slate-900" : "text-slate-200")}>{k.athlete}</span>
+                  <span className={clsx("ml-auto whitespace-nowrap", k.isActive ? "text-slate-800" : "text-slate-400")}>{k.dist} {k.pos}</span>
+                  {k.hasSnap && <span className={k.isActive ? "text-slate-900" : "text-make"}>✓</span>}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
