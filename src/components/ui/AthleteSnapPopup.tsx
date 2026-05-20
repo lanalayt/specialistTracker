@@ -20,7 +20,6 @@ interface Props {
   athletes: string[]; // snappers
   holders?: string[]; // holders (falls back to athletes if not provided)
   holderEnabled?: boolean; // show holder selection (default true for FG)
-  snapperEnabled?: boolean; // show snapper selection (default false for FG)
   kickerName?: string; // who's kicking
   kickDistance?: number; // distance of the kick
   kickHash?: string; // hash of the kick
@@ -37,10 +36,9 @@ function getInitials(name: string): string {
   return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
-export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, snapperEnabled = false, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved, kickList, onKickSelect }: Props) {
+export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved, kickList, onKickSelect }: Props) {
   const isFG = snapType === "FG";
   const showHolder = isFG && holderEnabled;
-  const showSnapper = isFG ? snapperEnabled : true; // always show for punt
   const holderList = holdersProp && holdersProp.length > 0 ? holdersProp : athletes;
 
   const [holderSide, setHolderSide] = useState<"right" | "left">("right");
@@ -167,15 +165,15 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
           <>
             {/* Snapper + Holder + Right/Left toggle row */}
             <div className="flex items-start gap-3">
-              {showSnapper && <div>
+              <div>
                 <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Snapper</p>
                 <div className="flex gap-1">
                   {athletes.map((a) => (
                     <button key={a} onClick={() => setSnapper(a)} className={clsx("w-8 h-8 rounded-full text-[10px] font-bold flex items-center justify-center transition-all", snapper === a ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border")} title={a}>{getInitials(a)}</button>
                   ))}
                 </div>
-              </div>}
-              {showSnapper && showHolder && <div className="w-px self-stretch bg-accent/60 mx-0.5" />}
+              </div>
+              {showHolder && <div className="w-px self-stretch bg-accent/60 mx-0.5" />}
               {showHolder && <div>
                 <p className="text-[8px] text-muted uppercase tracking-wider mb-1">Holder</p>
                 <div className="flex gap-1">

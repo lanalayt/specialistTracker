@@ -19,7 +19,6 @@ interface FGSettings {
   scoreOptions: string[];
   opTimeEnabled: boolean;
   holderEnabled?: boolean;
-  snapperEnabled?: boolean;
 }
 
 const DEFAULT_SCORE_OPTIONS = ["0", "1", "2", "3", "4"];
@@ -31,7 +30,6 @@ const DEFAULT_SETTINGS: FGSettings = {
   scoreOptions: DEFAULT_SCORE_OPTIONS,
   opTimeEnabled: true,
   holderEnabled: true,
-  snapperEnabled: false,
 };
 
 function parseScoreMode(val: unknown): ScoreMode {
@@ -75,7 +73,6 @@ function FGSettingsContent() {
   const [scoreOptions, setScoreOptions] = useState<string[]>(DEFAULT_SCORE_OPTIONS);
   const [opTimeEnabled, setOpTimeEnabled] = useState(true);
   const [holderEnabled, setHolderEnabled] = useState(true);
-  const [snapperEnabled, setSnapperEnabled] = useState(false);
   const [newScore, setNewScore] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -94,7 +91,6 @@ function FGSettingsContent() {
     setScoreOptions(local.scoreOptions);
     setOpTimeEnabled(local.opTimeEnabled);
     setHolderEnabled(local.holderEnabled !== false);
-    setSnapperEnabled(local.snapperEnabled === true);
     setSavedSettings(local);
     setLoaded(true);
 
@@ -108,7 +104,6 @@ function FGSettingsContent() {
         setScoreOptions(Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS);
         if (typeof cloud.opTimeEnabled === "boolean") setOpTimeEnabled(cloud.opTimeEnabled);
         if (typeof cloud.holderEnabled === "boolean") setHolderEnabled(cloud.holderEnabled);
-        if (typeof cloud.snapperEnabled === "boolean") setSnapperEnabled(cloud.snapperEnabled);
         setSavedSettings({
           snapDistance: cloud.snapDistance ?? "7",
           makeMode: cloud.makeMode ?? "detailed",
@@ -117,7 +112,6 @@ function FGSettingsContent() {
           scoreOptions: Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS,
           opTimeEnabled: cloud.opTimeEnabled !== false,
           holderEnabled: cloud.holderEnabled !== false,
-          snapperEnabled: cloud.snapperEnabled === true,
         });
       }
     });
@@ -133,11 +127,10 @@ function FGSettingsContent() {
       scoreEnabled !== savedSettings.scoreEnabled ||
       JSON.stringify(scoreOptions) !== JSON.stringify(savedSettings.scoreOptions) ||
       opTimeEnabled !== savedSettings.opTimeEnabled ||
-      holderEnabled !== (savedSettings.holderEnabled !== false) ||
-      snapperEnabled !== (savedSettings.snapperEnabled === true);
+      holderEnabled !== (savedSettings.holderEnabled !== false);
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, holderEnabled, snapperEnabled, savedSettings, loaded]);
+  }, [snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, holderEnabled, savedSettings, loaded]);
 
   const handleAddScore = () => {
     const trimmed = newScore.trim();
@@ -152,7 +145,7 @@ function FGSettingsContent() {
   };
 
   const handleSave = () => {
-    const settings: FGSettings = { snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, holderEnabled, snapperEnabled };
+    const settings: FGSettings = { snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, holderEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);
     setDirty(false);
@@ -370,30 +363,6 @@ function FGSettingsContent() {
         </p>
       </div>
 
-      {/* Snapper toggle */}
-      <div className="card space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="label mb-0">Include Snapper</p>
-          <button
-            onClick={() => setSnapperEnabled((v) => !v)}
-            className={clsx(
-              "relative w-11 h-6 rounded-full transition-colors",
-              snapperEnabled ? "bg-accent" : "bg-border"
-            )}
-            aria-label="Toggle snapper"
-          >
-            <span
-              className={clsx(
-                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                snapperEnabled ? "left-[22px]" : "left-0.5"
-              )}
-            />
-          </button>
-        </div>
-        <p className="text-xs text-muted">
-          When enabled, snapper selection appears in the snap log during FG charting.
-        </p>
-      </div>
       </div>
       </div>
 
