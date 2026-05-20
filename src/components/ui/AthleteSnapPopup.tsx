@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
@@ -57,6 +57,37 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
     if (!digits) return 0;
     return parseFloat(`${digits.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${digits.padStart(3, "0").slice(-2)}`);
   };
+
+  // Pre-fill inputs when switching to a kick that has previous snap data
+  useEffect(() => {
+    if (previousSnaps && previousSnaps.length > 0) {
+      const last = previousSnaps[previousSnaps.length - 1];
+      setSnapper(last.snapper || athletes[0] || "");
+      if (isFG) {
+        setHolder(last.holder || holderList[0] || "");
+        setLaces((last.dbEntry.laces as "Good" | "1/4 Turn" | "Back" | "") || "");
+        setSpiral(last.dbEntry.spiral === "Good" ? "Good" : last.dbEntry.spiral === "Bad" ? "Bad" : "");
+        if (last.dbEntry.markerX != null && last.dbEntry.markerY != null) {
+          setMarker({ x: last.dbEntry.markerX, y: last.dbEntry.markerY, num: 1, inZone: last.dbEntry.markerInZone ?? false });
+        } else {
+          setMarker(null);
+        }
+      } else {
+        setSpiral(last.dbEntry.spiral === "Good" ? "Good" : last.dbEntry.spiral === "Bad" ? "Bad" : "");
+        if (last.dbEntry.markerX != null && last.dbEntry.markerY != null) {
+          setPuntMarker({ x: last.dbEntry.markerX, y: last.dbEntry.markerY, num: 1, inZone: last.dbEntry.markerInZone ?? false });
+        } else {
+          setPuntMarker(null);
+        }
+      }
+    } else {
+      // Clear for empty kick
+      setMarker(null);
+      setPuntMarker(null);
+      setLaces("");
+      setSpiral("");
+    }
+  }, [previousSnaps]);
 
   const canSave = isFG
     ? !!marker && !!laces && !!spiral && !!snapper
@@ -224,12 +255,13 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
           <div className="border-t border-border/50 pt-2 space-y-1">
             <p className="text-[10px] text-muted uppercase tracking-wider font-semibold mb-1">Kicks</p>
             {kickList.map((k) => (
-              <button key={k.idx} onClick={() => onKickSelect?.(k.idx)} className={clsx("w-full flex items-center gap-2 px-2 py-1.5 rounded-input text-[10px] transition-all text-left", k.isActive ? "bg-accent/15 border border-accent/50 text-accent" : k.hasSnap ? "bg-make/5 border border-make/30 text-make" : "border border-border/40 text-muted hover:text-white hover:border-border")}>
-                <span className="font-bold w-4 text-center">{k.kickNum}</span>
-                <span className="font-semibold text-slate-200 flex-1">{k.athlete}</span>
-                <span className="text-slate-400">{k.dist}yd</span>
-                <span className="text-slate-400">{k.pos}</span>
-                {k.hasSnap && <span className="text-make font-bold">✓</span>}
+              <button key={k.idx} onClick={() => onKickSelect?.(k.idx)} className={clsx("w-full flex items-center gap-2 px-2.5 py-2 rounded-input text-[10px] transition-all text-left", k.isActive ? "bg-accent text-slate-900 font-bold ring-2 ring-accent shadow-lg shadow-accent/20" : k.hasSnap ? "bg-make/10 border border-make/40 text-make" : "border border-border/40 text-muted hover:text-white hover:border-border")}>
+                <span className={clsx("font-bold w-5 text-center", k.isActive ? "text-slate-900" : "")}>{k.kickNum}</span>
+                <span className={clsx("font-semibold flex-1", k.isActive ? "text-slate-900" : "text-slate-200")}>{k.athlete}</span>
+                <span className={k.isActive ? "text-slate-800" : "text-slate-400"}>{k.dist}yd</span>
+                <span className={k.isActive ? "text-slate-800" : "text-slate-400"}>{k.pos}</span>
+                {k.hasSnap && !k.isActive && <span className="text-make font-bold">✓</span>}
+                {k.hasSnap && k.isActive && <span className="text-slate-900 font-bold">✓</span>}
               </button>
             ))}
           </div>
