@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import type { FGKick } from "@/types";
+import type { FGKick, LongSnapEntry } from "@/types";
 import { makePct } from "@/lib/stats";
+import clsx from "clsx";
 
 interface SessionSummaryProps {
   kicks: FGKick[];
@@ -10,6 +11,7 @@ interface SessionSummaryProps {
   onConfirm: () => void;
   onCancel: () => void;
   snapCount?: number;
+  snapEntries?: LongSnapEntry[];
 }
 
 export function SessionSummary({
@@ -18,6 +20,7 @@ export function SessionSummary({
   onConfirm,
   onCancel,
   snapCount = 0,
+  snapEntries,
 }: SessionSummaryProps) {
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
   const misses = kicks.length - makes;
@@ -92,7 +95,47 @@ export function SessionSummary({
             ))}
           </div>
 
-          {snapCount > 0 && (
+          {snapEntries && snapEntries.length > 0 && (() => {
+            const snappers = [...new Set(snapEntries.map((s) => s.athlete))];
+            return (
+              <div className="card-2 space-y-2">
+                <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Short Snap Recap</p>
+                {snappers.map((name) => {
+                  const snaps = snapEntries.filter((s) => s.athlete === name);
+                  return (
+                    <div key={name}>
+                      <p className="text-xs font-bold text-slate-200 mb-1">{name}</p>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr>
+                            <th className="text-[10px] text-muted text-left py-0.5 px-1">#</th>
+                            <th className="text-[10px] text-muted text-center py-0.5 px-1">Result</th>
+                            <th className="text-[10px] text-muted text-center py-0.5 px-1">Laces</th>
+                            <th className="text-[10px] text-muted text-center py-0.5 px-1">Spiral</th>
+                            <th className="text-[10px] text-muted text-right py-0.5 px-1">Score</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {snaps.map((s, i) => (
+                            <tr key={i} className="border-t border-border/30">
+                              <td className="text-muted py-0.5 px-1">{i + 1}</td>
+                              <td className={clsx("text-center py-0.5 px-1 font-bold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                              <td className={clsx("text-center py-0.5 px-1", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-amber-400" : "text-miss")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
+                              <td className={clsx("text-center py-0.5 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                              <td className="text-right py-0.5 px-1 font-bold text-sky-400">{s.score}/3</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })}
+                <p className="text-[10px] text-muted">Will be saved to short snap history</p>
+              </div>
+            );
+          })()}
+
+          {snapCount > 0 && !snapEntries?.length && (
             <div className="flex items-center gap-2 p-2.5 rounded-input bg-sky-500/10 border border-sky-500/30">
               <span className="text-xs text-sky-400 font-semibold">{snapCount} snap{snapCount !== 1 ? "s" : ""} logged</span>
               <span className="text-[10px] text-muted">— will be saved to snap history</span>
