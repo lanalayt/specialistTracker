@@ -281,11 +281,22 @@ export default function KickingSessionPage() {
   const [weatherLocked, setWeatherLocked] = useState(false);
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [snapKickIdx, setSnapKickIdx] = useState(0);
-  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
+  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>(() => {
+    try { const raw = localStorage.getItem("fg_snap_draft"); if (raw) return JSON.parse(raw); } catch {}
+    return {};
+  });
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
   const [holderEnabled, setHolderEnabled] = useState(true);
   const [snapperEnabled, setSnapperEnabled] = useState(false);
+  // Persist snap logs to localStorage
+  useEffect(() => {
+    try {
+      if (Object.keys(snapLogsMap).length > 0) localStorage.setItem("fg_snap_draft", JSON.stringify(snapLogsMap));
+      else localStorage.removeItem("fg_snap_draft");
+    } catch {}
+  }, [snapLogsMap]);
+
   const [showSetupPrompt, setShowSetupPrompt] = useState(false);
 
   // Load snap/holder athletes and holderEnabled setting

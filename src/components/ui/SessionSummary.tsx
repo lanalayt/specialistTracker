@@ -96,41 +96,19 @@ export function SessionSummary({
           </div>
 
           {snapEntries && snapEntries.length > 0 && (() => {
-            const snappers = [...new Set(snapEntries.map((s) => s.athlete))];
+            const totalScore = snapEntries.reduce((s, e) => s + (e.score ?? 0), 0);
+            const maxScore = snapEntries.length * 3;
+            const pct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
             return (
-              <div className="card-2 space-y-2">
-                <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Short Snap Recap</p>
-                {snappers.map((name) => {
-                  const snaps = snapEntries.filter((s) => s.athlete === name);
-                  return (
-                    <div key={name}>
-                      <p className="text-xs font-bold text-slate-200 mb-1">{name}</p>
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr>
-                            <th className="text-[10px] text-muted text-left py-0.5 px-1">#</th>
-                            <th className="text-[10px] text-muted text-center py-0.5 px-1">Result</th>
-                            <th className="text-[10px] text-muted text-center py-0.5 px-1">Laces</th>
-                            <th className="text-[10px] text-muted text-center py-0.5 px-1">Spiral</th>
-                            <th className="text-[10px] text-muted text-right py-0.5 px-1">Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {snaps.map((s, i) => (
-                            <tr key={i} className="border-t border-border/30">
-                              <td className="text-muted py-0.5 px-1">{i + 1}</td>
-                              <td className={clsx("text-center py-0.5 px-1 font-bold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
-                              <td className={clsx("text-center py-0.5 px-1", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-amber-400" : "text-miss")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
-                              <td className={clsx("text-center py-0.5 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
-                              <td className="text-right py-0.5 px-1 font-bold text-sky-400">{s.score}/3</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })}
-                <p className="text-[10px] text-muted">Will be saved to short snap history</p>
+              <div className="card-2 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-sky-400 uppercase tracking-wider">Short Snap</p>
+                  <p className="text-[10px] text-muted">Will be saved to snap history</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-200">{snapEntries.length} snap{snapEntries.length !== 1 ? "s" : ""}</p>
+                  <p className="text-sm font-bold text-sky-400">{totalScore}/{maxScore} <span className="text-xs text-slate-300">{pct}%</span></p>
+                </div>
               </div>
             );
           })()}

@@ -263,14 +263,28 @@ export default function LongSnapHistoryPage() {
                 const totalScore = snaps.reduce((s, e) => s + (e.score ?? 0), 0);
                 const maxScore = snaps.length * 3;
                 const scorePct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+                const markers: ShortSnapMarker[] = snaps
+                  .filter((s) => s.markerX != null && s.markerY != null)
+                  .map((s, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? false }));
                 return (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-bold text-accent uppercase tracking-wider">FG / Short Snap</span>
                       <span className="text-xs text-muted">·</span>
                       <span className="text-xs text-muted">{strikes}/{snaps.length} Strikes</span>
-                      {isAthleteMode && <><span className="text-xs text-muted">·</span><span className="text-xs text-sky-400 font-semibold">{totalScore}/{maxScore} ({scorePct}%)</span></>}
+                      <span className="text-xs text-muted">·</span>
+                      <span className="text-xs text-sky-400 font-semibold">{totalScore}/{maxScore} ({scorePct}%)</span>
                     </div>
+
+                    {/* Strike zone diagram with all snap dots */}
+                    {markers.length > 0 && (
+                      <div className="card-2 flex justify-center">
+                        <div className="w-full max-w-[280px]">
+                          <HolderStrikeZone markers={markers} />
+                        </div>
+                      </div>
+                    )}
+
                     <div className="card-2 overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
@@ -280,8 +294,7 @@ export default function LongSnapHistoryPage() {
                             <th className="table-header">Acc</th>
                             <th className="table-header">Laces</th>
                             <th className="table-header">Spiral</th>
-                            {isAthleteMode && <th className="table-header">Score</th>}
-                            {!isAthleteMode && <th className="table-header">Crit</th>}
+                            <th className="table-header">Score</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -296,8 +309,7 @@ export default function LongSnapHistoryPage() {
                               </td>
                               <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
                               <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
-                              {isAthleteMode && <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>}
-                              {!isAthleteMode && <td className="table-cell">{s.critical ? <span className="text-miss font-bold">!</span> : "—"}</td>}
+                              <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>
                             </tr>
                           ))}
                         </tbody>
