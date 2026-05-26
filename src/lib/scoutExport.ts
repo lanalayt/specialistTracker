@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { ScoutSession } from "@/lib/scoutStore";
+import { addLogoToPDF } from "@/lib/exportStats";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ export function exportFGScoutExcel(sessions: ScoutSession[]) {
 
 export function exportFGScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
+  addLogoToPDF(doc as any, true);
   const rows = buildFGRows(sessions);
   rows.forEach((r, i) => {
     if (i > 0) doc.addPage();
@@ -111,6 +113,7 @@ export function exportPuntScoutExcel(sessions: ScoutSession[]) {
 
 export function exportPuntScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
+  addLogoToPDF(doc as any, true);
   const rows = buildPuntKORows(sessions, "Punt");
   rows.forEach((r, i) => {
     if (i > 0) doc.addPage();
@@ -135,6 +138,7 @@ export function exportKOScoutExcel(sessions: ScoutSession[]) {
 
 export function exportKOScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
+  addLogoToPDF(doc as any, true);
   const rows = buildPuntKORows(sessions, "KO");
   rows.forEach((r, i) => {
     if (i > 0) doc.addPage();
@@ -271,6 +275,7 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
 
 export async function exportIndividualSnapPDF(data: SnapChartData, diagramImage?: string) {
   const doc = new jsPDF();
+  addLogoToPDF(doc as any);
   doc.setFontSize(16);
   doc.text(data.name, 14, 15);
   doc.setFontSize(11);
@@ -313,6 +318,7 @@ export async function exportIndividualSnapPDF(data: SnapChartData, diagramImage?
 
 export function exportSnapScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF();
+  addLogoToPDF(doc as any);
   for (let i = 0; i < sessions.length; i++) {
     const s = sessions[i];
     if (i > 0) doc.addPage();

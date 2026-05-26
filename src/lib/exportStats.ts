@@ -26,6 +26,19 @@ import {
   emptyLongSnapStats,
 } from "@/lib/stats";
 
+// ─── Team logo helper ────────────────────────────────────────────────────────
+
+export function getTeamLogo(): string | null {
+  try { return localStorage.getItem("team_logo"); } catch { return null; }
+}
+
+export function addLogoToPDF(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; internal: { pageSize: { getWidth: () => number } } }, landscape?: boolean): void {
+  const logo = getTeamLogo();
+  if (!logo) return;
+  const pageW = landscape ? 297 : 210;
+  try { doc.addImage(logo, "PNG", pageW - 28, 5, 18, 18); } catch {}
+}
+
 // ─── Shared types ───────────────────────────────────────────────────────────
 
 type CellValue = string | number;
@@ -471,6 +484,7 @@ export function exportLongSnapStatsPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(({ default: autoTable }) => {
       const doc = new jsPDF();
+      addLogoToPDF(doc as any);
       const statsMap = computeSnapStats(athletes, history);
 
       doc.setFontSize(16);
@@ -654,6 +668,7 @@ export function exportFGStatsPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
+      addLogoToPDF(doc as any, true);
 
       const addSheet = (title: string, aoa: Row[]) => {
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
@@ -698,6 +713,7 @@ export function exportPuntStatsPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
+      addLogoToPDF(doc as any, true);
 
       const addSheet = (title: string, aoa: Row[]) => {
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
@@ -735,6 +751,7 @@ export function exportKickoffStatsPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
+      addLogoToPDF(doc as any, true);
 
       const addSheet = (title: string, aoa: Row[]) => {
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
