@@ -172,11 +172,12 @@ function PuntAthleteChartInner() {
   };
 
   // ── Computed values (must be before phase checks) ──
-  const puntSchedule: { type: string; typeLabel: string; subType: string; hash: string; yardLine?: string }[] = [];
+  const puntSchedule: { type: string; typeLabel: string; subType: string; hash: string; yardLine?: string; isYardLine: boolean }[] = [];
   if (assignedChart?.puntTypes) {
     for (const pt of assignedChart.puntTypes as any[]) {
+      const isPooch = String(pt.typeId ?? pt.type ?? "").toUpperCase().includes("POOCH") || String(pt.type ?? "").toUpperCase().includes("POOCH");
       for (let i = 0; i < (pt.count ?? 0); i++) {
-        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type ?? pt.typeLabel, subType: pt.typeLabel ?? "", hash: pt.hash ?? "M", yardLine: pt.yardLine });
+        puntSchedule.push({ type: pt.typeId ?? pt.type, typeLabel: pt.type ?? pt.typeLabel, subType: pt.typeLabel ?? "", hash: pt.hash ?? "M", yardLine: pt.yardLine, isYardLine: isPooch });
       }
     }
   }
@@ -512,8 +513,8 @@ function PuntAthleteChartInner() {
         {/* Inputs */}
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <p className="text-[10px] text-muted text-center mb-1">Distance</p>
-            <input type="text" inputMode="numeric" value={distInput} onChange={(e) => setDistInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" placeholder="yd" />
+            <p className="text-[10px] text-muted text-center mb-1">{currentScheduleItem?.isYardLine ? "Yard Line" : "Distance"}</p>
+            <input type="text" inputMode="numeric" value={distInput} onChange={(e) => setDistInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-lg font-bold py-2" placeholder={currentScheduleItem?.isYardLine ? "YL" : "yd"} />
           </div>
           <div>
             <p className="text-[10px] text-muted text-center mb-1">Hang Time</p>
