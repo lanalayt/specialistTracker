@@ -243,13 +243,14 @@ export default function LongSnapPuntSessionPage() {
   };
 
   return (
-    <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+    <main className="flex-1 flex flex-col overflow-hidden min-h-0">
       {isAthleteMode && (
-        <div className="flex gap-2 px-4 py-2 border-b border-border shrink-0 w-full">
+        <div className="flex gap-2 px-4 py-2 border-b border-border shrink-0">
           {isCoach && <Link href="/athlete/longsnap/coaches-chart" className="px-3 py-1.5 text-xs font-semibold rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all">Coaches Chart</Link>}
           <Link href="/athlete/longsnap/athlete-chart" className="px-3 py-1.5 text-xs font-semibold rounded-input border border-sky-500/40 text-sky-400 hover:bg-sky-500/10 transition-all">Athlete Chart</Link>
         </div>
       )}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
       {/* Left: Table */}
       <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
         {/* Weather */}
@@ -419,6 +420,7 @@ export default function LongSnapPuntSessionPage() {
             Undo Snap #{snapMarkers.length}
           </button>
         )}
+      </div>
       </div>
     </main>
   );
