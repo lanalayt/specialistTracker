@@ -30,8 +30,7 @@ export default function AthleteLongSnapLayout({ children }: { children: React.Re
         <SportSubNav
           basePath="/athlete/longsnap"
           tabs={[
-            { label: "FG Snaps", slug: "session-fg", coachOnly: false },
-            { label: "Punt Snaps", slug: "session-punt", coachOnly: false },
+            { label: "Session", slug: "session", coachOnly: false },
             { label: "Statistics", slug: "statistics", coachOnly: false },
             { label: "History", slug: "history", coachOnly: false },
             { label: "Charting", slug: "charting", coachOnly: false },

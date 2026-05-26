@@ -1,3 +1,36 @@
 "use client";
-import { redirect } from "next/navigation";
-export default function SnapSessionRedirect() { redirect("/athlete/longsnap/session-fg"); }
+
+import Link from "next/link";
+
+export default function SnapSessionChooser() {
+  return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="space-y-6 w-full max-w-md">
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-slate-100">Snap Session</h2>
+          <p className="text-sm text-muted mt-1">Choose snap type.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            href="/athlete/longsnap/session-short"
+            className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
+          >
+            <div className="text-4xl mb-3">🏈</div>
+            <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Short Snap</h3>
+            <p className="text-xs text-muted mt-1">FG & PAT snaps</p>
+          </Link>
+
+          <Link
+            href="/athlete/longsnap/session-long"
+            className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
+          >
+            <div className="text-4xl mb-3">📏</div>
+            <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Long Snap</h3>
+            <p className="text-xs text-muted mt-1">Punt snaps</p>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
