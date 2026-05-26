@@ -219,7 +219,6 @@ export default function ScoutSnapPage() {
                         <th className="text-[10px] text-muted text-center py-1 px-2"></th>
                         <th className="text-[10px] text-muted text-center py-1 px-2">Score</th>
                         <th className="text-[10px] text-muted text-right py-1 px-2">%</th>
-                        <th className="text-[10px] text-muted text-center py-1 px-2">Export</th>
                         <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
                       </tr>
                     </thead>
@@ -236,9 +235,6 @@ export default function ScoutSnapPage() {
                           </td>
                           <td className="text-center py-1 px-2 font-bold text-slate-200">{r.total}/{r.maxScore}</td>
                           <td className="text-right py-1 px-2 font-black text-amber-400">{r.pct}%</td>
-                          <td className="text-center py-1 px-2">
-                            <button onClick={() => setExportRow(r)} className="text-[10px] px-2 py-0.5 rounded-input border border-accent/40 text-accent hover:bg-accent/10 transition-colors font-semibold">Export</button>
-                          </td>
                           <td className="text-center py-1 px-1">
                             <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                           </td>
@@ -271,7 +267,10 @@ export default function ScoutSnapPage() {
                 <h3 className="text-sm font-bold text-slate-100">{detailOpen.name}</h3>
                 <p className="text-[10px] text-muted">{detailOpen.is30Point ? "Short Snaps" : "Long Snaps"} — {new Date(detailOpen.date).toLocaleDateString()}</p>
               </div>
-              <button onClick={() => setDetailOpen(null)} className="text-muted hover:text-white text-xs transition-colors">Close</button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setExportRow(detailOpen)} className="text-[10px] px-2.5 py-1 rounded-input border border-accent/40 text-accent hover:bg-accent/10 transition-colors font-semibold">Export</button>
+                <button onClick={() => setDetailOpen(null)} className="text-muted hover:text-white text-xs transition-colors">Close</button>
+              </div>
             </div>
 
             {/* Score */}
