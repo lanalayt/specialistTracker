@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
-import { exportSnapScoutExcel, exportSnapScoutPDF } from "@/lib/scoutExport";
+import { exportSnapScoutExcel, exportSnapScoutPDF, exportIndividualSnapExcel, exportIndividualSnapPDF } from "@/lib/scoutExport";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { HolderStrikeZone } from "@/components/ui/HolderStrikeZone";
 import { PunterStrikeZone } from "@/components/ui/PunterStrikeZone";
@@ -47,6 +47,7 @@ export default function ScoutSnapPage() {
   const [detailOpen, setDetailOpen] = useState<RankedRow | null>(null);
   const [rankingTab, setRankingTab] = useState<"short" | "long">("short");
   const [editSnapIdx, setEditSnapIdx] = useState<number | null>(null);
+  const [exportRow, setExportRow] = useState<RankedRow | null>(null);
   const [editAccuracy, setEditAccuracy] = useState<"Strike" | "Ball" | "">("");
   const [editLaces, setEditLaces] = useState("");
   const [editSpiral, setEditSpiral] = useState("");
@@ -218,6 +219,7 @@ export default function ScoutSnapPage() {
                         <th className="text-[10px] text-muted text-center py-1 px-2"></th>
                         <th className="text-[10px] text-muted text-center py-1 px-2">Score</th>
                         <th className="text-[10px] text-muted text-right py-1 px-2">%</th>
+                        <th className="text-[10px] text-muted text-center py-1 px-2">Export</th>
                         <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
                       </tr>
                     </thead>
@@ -234,6 +236,9 @@ export default function ScoutSnapPage() {
                           </td>
                           <td className="text-center py-1 px-2 font-bold text-slate-200">{r.total}/{r.maxScore}</td>
                           <td className="text-right py-1 px-2 font-black text-amber-400">{r.pct}%</td>
+                          <td className="text-center py-1 px-2">
+                            <button onClick={() => setExportRow(r)} className="text-[10px] px-2 py-0.5 rounded-input border border-accent/40 text-accent hover:bg-accent/10 transition-colors font-semibold">Export</button>
+                          </td>
                           <td className="text-center py-1 px-1">
                             <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                           </td>
@@ -364,6 +369,40 @@ export default function ScoutSnapPage() {
                 <button onClick={(ev) => { ev.stopPropagation(); saveSnapEdit(); }} className="btn-primary w-full py-2 text-xs font-bold">Save</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Export format popup */}
+      {exportRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExportRow(null)} />
+          <div className="relative bg-surface border border-border rounded-xl w-full max-w-xs mx-4 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-100">Export — {exportRow.name}</h3>
+              <button onClick={() => setExportRow(null)} className="text-muted hover:text-white text-xs">Close</button>
+            </div>
+            <p className="text-xs text-muted">{exportRow.count} snaps · {exportRow.total}/{exportRow.maxScore} ({exportRow.pct}%)</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  exportIndividualSnapExcel({ name: exportRow.name, date: exportRow.date, label: exportRow.sessionLabel, is30Point: exportRow.is30Point, count: exportRow.count, total: exportRow.total, maxScore: exportRow.maxScore, pct: exportRow.pct, entries: exportRow.entries });
+                  setExportRow(null);
+                }}
+                className="btn-primary flex-1 py-3 text-sm font-bold"
+              >
+                Excel
+              </button>
+              <button
+                onClick={() => {
+                  exportIndividualSnapPDF({ name: exportRow.name, date: exportRow.date, label: exportRow.sessionLabel, is30Point: exportRow.is30Point, count: exportRow.count, total: exportRow.total, maxScore: exportRow.maxScore, pct: exportRow.pct, entries: exportRow.entries });
+                  setExportRow(null);
+                }}
+                className="btn-ghost flex-1 py-3 text-sm font-bold border border-border"
+              >
+                PDF
+              </button>
+            </div>
           </div>
         </div>
       )}

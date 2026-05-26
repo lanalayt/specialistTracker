@@ -149,7 +149,7 @@ export function exportKOScoutPDF(sessions: ScoutSession[]) {
 
 // ── Snap Export ─────────────────────────────────────────────────────────────
 
-interface SnapEntry { athlete: string; points?: number; score?: number; accuracy?: string }
+interface SnapEntry { athlete: string; points?: number; score?: number; accuracy?: string; laces?: string; spiral?: string; time?: string; markerX?: number; markerY?: number; markerInZone?: boolean }
 
 export function exportSnapScoutExcel(sessions: ScoutSession[]) {
   const wb = XLSX.utils.book_new();
@@ -167,6 +167,99 @@ export function exportSnapScoutExcel(sessions: ScoutSession[]) {
     XLSX.utils.book_append_sheet(wb, ws, new Date(s.date).toLocaleDateString().replace(/\//g, "-").slice(0, 28));
   }
   XLSX.writeFile(wb, "Snap_Scout_Rankings.xlsx");
+}
+
+// ── Individual snap chart export ──────────────────────────────────────────
+
+interface SnapChartData {
+  name: string;
+  date: string;
+  label: string;
+  is30Point: boolean;
+  count: number;
+  total: number;
+  maxScore: number;
+  pct: number;
+  entries: SnapEntry[];
+}
+
+export function exportIndividualSnapExcel(data: SnapChartData) {
+  const wb = XLSX.utils.book_new();
+  const header = data.is30Point
+    ? ["#", "Accuracy", "Laces", "Spiral", "Score"]
+    : ["#", "Accuracy", "Spiral", "Time", "Score"];
+  const rows = data.entries.map((e, i) => {
+    if (data.is30Point) {
+      return [String(i + 1), e.accuracy ?? "", e.laces === "Good" ? "Perfect" : e.laces ?? "", e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "", String(e.points ?? e.score ?? 0)];
+    }
+    return [String(i + 1), e.accuracy ?? "", e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "", e.time ?? "", String(e.points ?? e.score ?? 0)];
+  });
+  const summary = [[], ["Total", "", "", data.is30Point ? "" : "", `${data.total}/${data.maxScore} (${data.pct}%)`]];
+  const aoa = [[`${data.name} — ${data.label}`], [new Date(data.date).toLocaleDateString()], [], header, ...rows, ...summary];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  XLSX.utils.book_append_sheet(wb, ws, data.name.slice(0, 28));
+  XLSX.writeFile(wb, `${data.name}_Snap_Chart.xlsx`);
+}
+
+function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: number, w: number, h: number) {
+  // Draw border
+  doc.setDrawColor(100, 100, 100);
+  doc.setLineWidth(0.5);
+  doc.rect(x, y, w, h);
+  // Draw strike zone (approximate)
+  const zoneLeft = x + w * 0.25;
+  const zoneTop = y + h * 0.34;
+  const zoneW = w * 0.5;
+  const zoneH = h * 0.38;
+  doc.setDrawColor(200, 50, 50);
+  doc.setLineWidth(0.3);
+  doc.rect(zoneLeft, zoneTop, zoneW, zoneH);
+  // Draw markers
+  entries.forEach((e, i) => {
+    if (e.markerX == null || e.markerY == null) return;
+    const mx = x + (e.markerX / 100) * w;
+    const my = y + (e.markerY / 100) * h;
+    const inZone = e.markerInZone ?? false;
+    doc.setFillColor(inZone ? 0 : 220, inZone ? 180 : 60, inZone ? 140 : 60);
+    doc.circle(mx, my, 3, "F");
+    doc.setFontSize(6);
+    doc.setTextColor(255, 255, 255);
+    doc.text(String(i + 1), mx, my + 1.5, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+  });
+}
+
+export function exportIndividualSnapPDF(data: SnapChartData) {
+  const doc = new jsPDF();
+  doc.setFontSize(16);
+  doc.text(data.name, 14, 15);
+  doc.setFontSize(11);
+  doc.text(data.label, 14, 22);
+  doc.setFontSize(9);
+  doc.text(new Date(data.date).toLocaleDateString(), 14, 28);
+  doc.setFontSize(12);
+  doc.text(`Score: ${data.total}/${data.maxScore} (${data.pct}%)`, 14, 36);
+
+  // Draw snap diagram
+  const hasMarkers = data.entries.some((e) => e.markerX != null && e.markerY != null);
+  let tableStartY = 42;
+  if (hasMarkers) {
+    drawSnapDiagram(doc, data.entries, 50, 42, 110, 80);
+    tableStartY = 128;
+  }
+
+  // Table
+  const head = data.is30Point
+    ? [["#", "Accuracy", "Laces", "Spiral", "Score"]]
+    : [["#", "Accuracy", "Spiral", "Time", "Score"]];
+  const body = data.entries.map((e, i) => {
+    if (data.is30Point) {
+      return [String(i + 1), e.accuracy ?? "", e.laces === "Good" ? "Perfect" : e.laces ?? "", e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "", `${e.points ?? e.score ?? 0}/${data.is30Point ? 3 : 1}`];
+    }
+    return [String(i + 1), e.accuracy ?? "", e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "", e.time ?? "", `${e.points ?? e.score ?? 0}/1`];
+  });
+  autoTable(doc, { head, body, startY: tableStartY, styles: { fontSize: 9 } });
+  doc.save(`${data.name}_Snap_Chart.pdf`);
 }
 
 export function exportSnapScoutPDF(sessions: ScoutSession[]) {
