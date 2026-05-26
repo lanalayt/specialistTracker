@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
 import Link from "next/link";
@@ -20,6 +21,8 @@ interface BsSnap {
 }
 
 export default function BallsStrikesPage() {
+  const pathname = usePathname();
+  const chartingBase = pathname.startsWith("/athlete/") ? "/athlete/longsnap/charting" : "/longsnap/charting";
   const { athletes, commitPractice } = useLongSnap();
   const athleteNames = athletes.map((a) => a.name);
 
@@ -132,7 +135,7 @@ export default function BallsStrikesPage() {
             <button onClick={() => setMode("single")} className="btn-primary flex-1 py-3 text-sm">Single Player</button>
             <button onClick={() => setMode("multi")} className="btn-ghost flex-1 py-3 text-sm">Multiplayer</button>
           </div>
-          <Link href="/longsnap/charting" className="text-xs text-muted hover:text-white transition-colors">← Back to Charting</Link>
+          <Link href={chartingBase} className="text-xs text-muted hover:text-white transition-colors">← Back to Charting</Link>
         </div>
       </div>
     );

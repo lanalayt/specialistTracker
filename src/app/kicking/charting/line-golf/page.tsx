@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useFG } from "@/lib/fgContext";
 import Link from "next/link";
 import type { FGKick, FGPosition, FGResult } from "@/types";
@@ -18,6 +19,8 @@ interface KickResult {
 }
 
 export default function LineGolfPage() {
+  const pathname = usePathname();
+  const chartingBase = pathname.startsWith("/athlete/") ? "/athlete/kicking/charting" : "/kicking/charting";
   const { athletes, commitPractice } = useFG();
   const athleteNames = athletes.map((a) => a.name);
 
@@ -110,7 +113,7 @@ export default function LineGolfPage() {
             <button onClick={() => setMode("single")} className="btn-primary flex-1 py-3 text-sm">Single Player</button>
             <button onClick={() => setMode("multi")} className="btn-ghost flex-1 py-3 text-sm">Multiplayer</button>
           </div>
-          <Link href="/kicking/charting" className="text-xs text-muted hover:text-white transition-colors">← Back to Charting Games</Link>
+          <Link href={chartingBase} className="text-xs text-muted hover:text-white transition-colors">← Back to Charting Games</Link>
         </div>
       </div>
     );

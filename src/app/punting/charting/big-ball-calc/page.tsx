@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
 
@@ -12,6 +13,8 @@ interface CalcEntry {
 }
 
 export default function BigBallCalcPage() {
+  const pathname = usePathname();
+  const chartingBase = pathname.startsWith("/athlete/") ? "/athlete/punting/charting" : "/punting/charting";
   const [distInput, setDistInput] = useState("");
   const [hangInput, setHangInput] = useState("");
   const [dirGood, setDirGood] = useState(true);
@@ -49,7 +52,7 @@ export default function BigBallCalcPage() {
     <div className="flex-1 overflow-y-auto p-4">
       <div className="max-w-md mx-auto space-y-5">
         <div className="text-center">
-          <Link href="/punting/charting" className="text-xs text-muted hover:text-white transition-colors">← Back to Charting Games</Link>
+          <Link href={chartingBase} className="text-xs text-muted hover:text-white transition-colors">← Back to Charting Games</Link>
           <h2 className="text-xl font-bold text-slate-100 mt-2">Big Ball Calculator</h2>
           <p className="text-xs text-muted mt-1">Distance + (Hang Time x 15) + Direction</p>
         </div>

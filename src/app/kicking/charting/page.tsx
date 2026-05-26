@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function FGChartingChooser() {
+  const pathname = usePathname();
+  const base = pathname.startsWith("/athlete/") ? "/athlete/kicking" : "/kicking";
+
   return (
     <div className="flex-1 flex items-center justify-center p-8">
       <div className="space-y-6 w-full max-w-md">
@@ -13,7 +17,7 @@ export default function FGChartingChooser() {
 
         <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
           <Link
-            href="/kicking/charting/line-golf"
+            href={`${base}/charting/line-golf`}
             className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
           >
             <div className="text-4xl mb-3">⛳</div>

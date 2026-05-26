@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
 import Link from "next/link";
 import type { PuntEntry, PuntHash } from "@/types";
@@ -30,6 +31,8 @@ interface PuntResult {
 }
 
 export default function PuntBattlePage() {
+  const pathname = usePathname();
+  const chartingBase = pathname.startsWith("/athlete/") ? "/athlete/punting/charting" : "/punting/charting";
   const { athletes, commitPractice } = usePunt();
   const athleteNames = athletes.map((a) => a.name);
 
@@ -164,7 +167,7 @@ export default function PuntBattlePage() {
             <button onClick={() => setMode("single")} className="btn-primary flex-1 py-3 text-sm">Single Player</button>
             <button onClick={() => setMode("multi")} className="btn-ghost flex-1 py-3 text-sm">Multiplayer</button>
           </div>
-          <Link href="/punting/charting" className="text-xs text-muted hover:text-white transition-colors">← Back to Charting Games</Link>
+          <Link href={chartingBase} className="text-xs text-muted hover:text-white transition-colors">← Back to Charting Games</Link>
         </div>
       </div>
     );
