@@ -97,19 +97,31 @@ export default function ScoutFGPage() {
   useEffect(() => { loadData(); }, []);
 
   // Build per-session-per-athlete rows
-  const athleteData: { name: string; sessionId: string; date: string; entries: FGEntry[]; total: number; makes: number; att: number }[] = [];
+  const athleteData: { name: string; sessionId: string; date: string; entries: FGEntry[]; total: number; makes: number; att: number; isPreset: boolean }[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as FGEntry[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
+    // Detect preset: all athletes have same kick sequence (distance+hash)
+    const firstAthlete = athletes[0];
+    const firstKicks = entries.filter((e) => e.athlete === firstAthlete).map((e) => `${e.distance}-${e.hash}`);
+    const isPreset = athletes.length > 0 && athletes.every((a) => {
+      const kicks = entries.filter((e) => e.athlete === a).map((e) => `${e.distance}-${e.hash}`);
+      return kicks.length === firstKicks.length && kicks.every((k, i) => k === firstKicks[i]);
+    });
     for (const name of athletes) {
       const ae = entries.filter((e) => e.athlete === name);
       const total = ae.reduce((sum, e) => sum + e.score, 0);
       const makes = ae.filter((e) => e.result === "make").length;
-      athleteData.push({ name, sessionId: s.id, date: s.date, entries: ae, total, makes, att: ae.length });
+      athleteData.push({ name, sessionId: s.id, date: s.date, entries: ae, total, makes, att: ae.length, isPreset });
     }
   }
   athleteData.sort((a, b) => b.total - a.total);
-  const maxKicks = athleteData.length > 0 ? Math.max(...athleteData.map((a) => a.entries.length)) : 0;
+  const presetData = athleteData.filter((a) => a.isPreset);
+  const liveData = athleteData.filter((a) => !a.isPreset);
+  const presetMaxKicks = presetData.length > 0 ? Math.max(...presetData.map((a) => a.entries.length)) : 0;
+  const liveMaxKicks = liveData.length > 0 ? Math.max(...liveData.map((a) => a.entries.length)) : 0;
+  // Get preset kick headers (distance + hash from first athlete's entries)
+  const presetKickHeaders: { dist: number; hash: string }[] = presetData.length > 0 ? presetData[0].entries.map((e) => ({ dist: e.distance, hash: e.hash })) : [];
 
   const handleToggleKick = async (sessionId: string, athleteName: string, kickIdx: number) => {
     const tid = getTeamId();
@@ -241,7 +253,7 @@ export default function ScoutFGPage() {
         )}
 
         {tab === "rankings" && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {!loading && athleteData.length > 0 && (
               <div className="flex gap-2">
                 <ExportButton onExcel={() => exportFGScoutExcel(sessions)} onPDF={() => exportFGScoutPDF(sessions)} />
@@ -252,46 +264,101 @@ export default function ScoutFGPage() {
             ) : athleteData.length === 0 ? (
               <p className="text-sm text-muted py-8 text-center">No scout sessions yet. Start a chart to begin.</p>
             ) : (
-              <div className="card space-y-3">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr>
-                        <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
-                        {Array.from({ length: maxKicks }, (_, i) => (
-                          <th key={i} className="text-[10px] text-muted text-center py-1 px-2">K{i + 1}</th>
-                        ))}
-                        <th className="text-[10px] text-muted text-right py-1 px-2">Total</th>
-                        <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {athleteData.map((r, i) => (
-                        <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
-                          <td className="py-1 px-2 font-semibold text-slate-200">
-                            <span className="text-muted mr-1">{i + 1}.</span>
-                            <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
-                          </td>
-                          {r.entries.map((e, j) => (
-                            <td key={j} className="text-center py-1 px-2">
-                              <button onClick={() => handleToggleKick(r.sessionId, r.name, j)} className={clsx("font-bold hover:opacity-70 transition-opacity", e.result === "make" ? "text-make" : "text-miss")}>
-                                {e.score}
-                              </button>
-                            </td>
-                          ))}
-                          {Array.from({ length: maxKicks - r.entries.length }, (_, j) => (
-                            <td key={`e-${j}`} className="text-center py-1 px-2 text-muted">—</td>
-                          ))}
-                          <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
-                          <td className="text-center py-1 px-1">
-                            <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <>
+                {/* Preset Chart Rankings */}
+                {presetData.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Preset Chart</p>
+                    <div className="card space-y-3">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr>
+                              <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
+                              {presetKickHeaders.map((k, i) => (
+                                <th key={i} className="text-[10px] text-muted text-center py-1 px-1 whitespace-nowrap">{k.dist}yd<br/><span className="text-[8px]">{k.hash}</span></th>
+                              ))}
+                              <th className="text-[10px] text-muted text-right py-1 px-2">Total</th>
+                              <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {presetData.map((r, i) => (
+                              <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
+                                <td className="py-1 px-2 font-semibold text-slate-200">
+                                  <span className="text-muted mr-1">{i + 1}.</span>
+                                  <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
+                                </td>
+                                {r.entries.map((e, j) => (
+                                  <td key={j} className="text-center py-1 px-1">
+                                    <button onClick={() => handleToggleKick(r.sessionId, r.name, j)} className={clsx("font-bold hover:opacity-70 transition-opacity", e.result === "make" ? "text-make" : "text-miss")}>
+                                      {e.score}
+                                    </button>
+                                  </td>
+                                ))}
+                                {Array.from({ length: presetMaxKicks - r.entries.length }, (_, j) => (
+                                  <td key={`e-${j}`} className="text-center py-1 px-1 text-muted">—</td>
+                                ))}
+                                <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
+                                <td className="text-center py-1 px-1">
+                                  <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Live/Manual Chart Rankings */}
+                {liveData.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-sky-400 uppercase tracking-wider">Manual Chart</p>
+                    <div className="card space-y-3">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr>
+                              <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
+                              {Array.from({ length: liveMaxKicks }, (_, i) => (
+                                <th key={i} className="text-[10px] text-muted text-center py-1 px-1">K{i + 1}</th>
+                              ))}
+                              <th className="text-[10px] text-muted text-right py-1 px-2">Total</th>
+                              <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {liveData.map((r, i) => (
+                              <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
+                                <td className="py-1 px-2 font-semibold text-slate-200">
+                                  <span className="text-muted mr-1">{i + 1}.</span>
+                                  <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
+                                </td>
+                                {r.entries.map((e, j) => (
+                                  <td key={j} className="text-center py-1 px-1" title={`${e.distance}yd ${e.hash}`}>
+                                    <button onClick={() => handleToggleKick(r.sessionId, r.name, j)} className={clsx("font-bold hover:opacity-70 transition-opacity", e.result === "make" ? "text-make" : "text-miss")}>
+                                      {e.score}
+                                    </button>
+                                  </td>
+                                ))}
+                                {Array.from({ length: liveMaxKicks - r.entries.length }, (_, j) => (
+                                  <td key={`e-${j}`} className="text-center py-1 px-1 text-muted">—</td>
+                                ))}
+                                <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
+                                <td className="text-center py-1 px-1">
+                                  <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
