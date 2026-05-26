@@ -197,6 +197,7 @@ export function exportIndividualSnapExcel(data: SnapChartData) {
   const summary = [[], ["Total", "", "", data.is30Point ? "" : "", `${data.total}/${data.maxScore} (${data.pct}%)`]];
   const aoa = [[`${data.name} — ${data.label}`], [new Date(data.date).toLocaleDateString()], [], header, ...rows, ...summary];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [{ wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, ws, data.name.slice(0, 28));
   XLSX.writeFile(wb, `${data.name}_Snap_Chart.xlsx`);
 }
