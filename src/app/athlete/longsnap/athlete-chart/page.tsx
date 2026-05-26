@@ -6,16 +6,18 @@ import { useAuth } from "@/lib/auth";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
-import { loadAthletes } from "@/lib/athleteStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
-import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
+import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
+import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import Link from "next/link";
 import clsx from "clsx";
-import type { LongSnapEntry } from "@/types";
+import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 
 function SnapAthleteChartInner() {
   const searchParams = useSearchParams();
   const assignedId = searchParams.get("assigned");
+  const snapType = (searchParams.get("type") ?? "short") as "short" | "long";
+  const isFG = snapType === "short";
   const { user } = useAuth();
   const { athletes, commitPractice } = useLongSnap();
 
@@ -34,31 +36,28 @@ function SnapAthleteChartInner() {
   const [saved, setSaved] = useState(false);
   const [assignedChart, setAssignedChart] = useState<AssignedChart | null>(null);
 
-  const [snapResults, setSnapResults] = useState<SnapLogEntry[]>([]);
+  const [entries, setEntries] = useState<LongSnapEntry[]>([]);
   const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
   const currentPlayer = selectedPlayers[currentPlayerIdx] ?? "";
-  const [showSnap, setShowSnap] = useState(false);
-  const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
-  const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
+
+  // Inline chart state (no popup)
+  const [marker, setMarker] = useState<ShortSnapMarker | null>(null);
+  const [puntMarker, setPuntMarker] = useState<SnapMarker | null>(null);
+  const [laces, setLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
+  const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
+  const [snapTime, setSnapTime] = useState("");
 
   const athleteNames = athletes.map((a) => a.name);
-  const getPlayerResults = (name: string) => snapResults.filter((r) => r.dbEntry.athlete === name);
+  const getPlayerEntries = (name: string) => entries.filter((e) => e.athlete === name);
   const totalReps = parseInt(reps) || 0;
 
-  useUnsavedWarning(snapResults.length > 0 && !saved);
+  const parseTimeRaw = (raw: string): number => {
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return 0;
+    return parseFloat(`${digits.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${digits.padStart(3, "0").slice(-2)}`);
+  };
 
-  useEffect(() => {
-    (async () => {
-      let tid = getTeamId();
-      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
-      if (!tid) return;
-      const ls = await loadAthletes(tid, "ATHLETE_LONGSNAP");
-      const teamLs = ls.length > 0 ? ls : await loadAthletes(tid, "LONGSNAP");
-      setSnapAthletes(teamLs.map((a) => a.name));
-      const h = await loadAthletes(tid, "HOLDING");
-      setHolderAthletes(h.map((a) => a.name));
-    })();
-  }, []);
+  useUnsavedWarning(entries.length > 0 && !saved);
 
   useEffect(() => {
     if (chartNowData?.snapRows) {
@@ -66,9 +65,7 @@ function SnapAthleteChartInner() {
       setAssignedChart({
         id: "chart-now", sport: "ATHLETE_LONGSNAP", createdBy: "Coach",
         createdAt: new Date().toISOString(), dueDate: "", athletes: chartNowData.players,
-        kicks: [], reps: totalR,
-        puntTypes: chartNowData.snapRows.map((r: any) => ({ type: r.snapType, typeId: r.snapType, typeLabel: r.snapType === "FG" ? "FG / Short Snap" : "Punt / Long Snap", count: r.count, hash: "" })),
-        completedBy: {},
+        kicks: [], reps: totalR, completedBy: {},
       } as AssignedChart);
       setReps(String(totalR));
     }
@@ -88,28 +85,52 @@ function SnapAthleteChartInner() {
 
   const togglePlayer = (name: string) => setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
 
-  // Build snap schedule from assigned chart
-  const snapSchedule: { snapType: "FG" | "PUNT"; label: string }[] = [];
-  if (assignedChart?.puntTypes) {
-    for (const pt of assignedChart.puntTypes as any[]) {
-      const st = (pt.typeId ?? pt.type) as "FG" | "PUNT";
-      for (let i = 0; i < (pt.count ?? 0); i++) {
-        snapSchedule.push({ snapType: st, label: st === "FG" ? "Short" : "Long" });
-      }
+  const canLog = isFG ? !!marker && !!laces && !!spiral : !!puntMarker && !!spiral;
+
+  const handleLog = () => {
+    if (!canLog) return;
+    const acc: SnapAccuracy = isFG ? (marker?.inZone ? "ON_TARGET" : "HIGH") : (puntMarker?.inZone ? "ON_TARGET" : "HIGH");
+    let score = 0;
+    if (isFG) {
+      if (acc === "ON_TARGET") score += 1;
+      if (laces === "Good") score += 1;
+      else if (laces === "1/4 Turn") score += 0.5;
+      if (spiral === "Good") score += 1;
+    } else {
+      score = acc === "ON_TARGET" ? 1 : 0;
     }
-  }
+    const entry: LongSnapEntry = {
+      athleteId: currentPlayer, athlete: currentPlayer,
+      snapType: (isFG ? "FG" : "PUNT") as SnapType,
+      time: snapTime ? parseTimeRaw(snapTime) : 0,
+      accuracy: acc, laces: isFG ? laces || undefined : undefined,
+      spiral: spiral || undefined, score,
+      markerX: isFG ? marker?.x : puntMarker?.x,
+      markerY: isFG ? marker?.y : puntMarker?.y,
+      markerInZone: isFG ? marker?.inZone : puntMarker?.inZone,
+    };
+    setEntries((prev) => [...prev, entry]);
+    // Reset
+    setMarker(null); setPuntMarker(null); setLaces(""); setSpiral(""); setSnapTime("");
+    // Advance
+    if (selectedPlayers.length > 1) setCurrentPlayerIdx((currentPlayerIdx + 1) % selectedPlayers.length);
+    // Check done
+    if (entries.length + 1 >= totalReps * selectedPlayers.length) setPhase("results");
+  };
 
-  const playerSnaps = getPlayerResults(currentPlayer);
-  const currentSnapIdx = playerSnaps.length;
-  const currentScheduleItem = snapSchedule[currentSnapIdx];
-  const currentSnapType = assignedChart ? (currentScheduleItem?.snapType ?? "FG") : "FG";
-
-  const allDbEntries: LongSnapEntry[] = snapResults.map((r) => r.dbEntry);
+  const handleUndo = () => {
+    if (entries.length === 0) return;
+    const last = entries[entries.length - 1];
+    setEntries((prev) => prev.slice(0, -1));
+    const idx = selectedPlayers.indexOf(last.athlete);
+    if (idx >= 0) setCurrentPlayerIdx(idx);
+    if (phase === "results") setPhase("live");
+  };
 
   const handleSave = async () => {
-    if (allDbEntries.length === 0) return;
-    const label = `Snap Chart — ${selectedPlayers.map((p) => `${p}: ${getPlayerResults(p).length}`).join(", ")}${assignedChart ? " (Assigned)" : ""}`;
-    commitPractice(allDbEntries, label);
+    if (entries.length === 0) return;
+    const label = `Snap Chart — ${selectedPlayers.map((p) => `${p}: ${getPlayerEntries(p).length}`).join(", ")}${assignedChart ? " (Assigned)" : ""}`;
+    commitPractice(entries, label);
     if (assignedChart) {
       const tid = getTeamId();
       if (tid) {
@@ -123,21 +144,14 @@ function SnapAthleteChartInner() {
     setSaved(true);
   };
 
-  const handleUndo = () => {
-    if (snapResults.length === 0) return;
-    const last = snapResults[snapResults.length - 1];
-    setSnapResults((prev) => prev.slice(0, -1));
-    const playerIdx = selectedPlayers.indexOf(last.dbEntry.athlete);
-    if (playerIdx >= 0) setCurrentPlayerIdx(playerIdx);
-    if (phase === "results") setPhase("live");
-  };
+  const backPath = isFG ? "/athlete/longsnap/session-short" : "/athlete/longsnap/session-long";
 
   // Setup
   if (phase === "setup") {
     return (
       <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
-        <Link href="/athlete/longsnap" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
-        <h2 className="text-lg font-bold text-slate-100">Athlete Chart</h2>
+        <Link href={backPath} className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+        <h2 className="text-lg font-bold text-slate-100">{isFG ? "Short" : "Long"} Snap Chart</h2>
         <div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Snapper(s)</p>
           <div className="flex flex-wrap gap-1.5">
@@ -150,7 +164,7 @@ function SnapAthleteChartInner() {
           <p className="text-xs text-muted mb-1">Snaps per player</p>
           <input type="text" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
         </div>
-        <button onClick={() => { setPhase("live"); setCurrentPlayerIdx(0); setSnapResults([]); }} disabled={selectedPlayers.length === 0 || !totalReps} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Chart</button>
+        <button onClick={() => { setPhase("live"); setCurrentPlayerIdx(0); setEntries([]); }} disabled={selectedPlayers.length === 0 || !totalReps} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Chart</button>
       </main>
     );
   }
@@ -159,20 +173,10 @@ function SnapAthleteChartInner() {
   if (phase === "preview") {
     return (
       <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
-        <Link href="/athlete/longsnap" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
-        <h2 className="text-lg font-bold text-slate-100">Assigned Snap Chart</h2>
+        <Link href={backPath} className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+        <h2 className="text-lg font-bold text-slate-100">Assigned {isFG ? "Short" : "Long"} Snap Chart</h2>
         {assignedChart && <p className="text-xs text-muted">From {assignedChart.createdBy} — Due {new Date(assignedChart.dueDate).toLocaleDateString()}</p>}
-        {snapSchedule.length > 0 && (
-          <div className="card-2 space-y-1">
-            {(assignedChart?.puntTypes as any[] ?? []).map((r: any, i: number) => (
-              <div key={i} className="flex items-center gap-3 text-xs text-slate-300">
-                <span className="text-muted w-4">{i + 1}.</span>
-                <span className="font-semibold text-slate-200">{r.typeLabel || r.type}</span>
-                <span>x{r.count}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-sm text-slate-200">{reps} snaps per player</p>
         <div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Snapper(s)</p>
           <div className="flex flex-wrap gap-1.5">
@@ -181,7 +185,7 @@ function SnapAthleteChartInner() {
             ))}
           </div>
         </div>
-        <button onClick={() => { setPhase("live"); setCurrentPlayerIdx(0); setSnapResults([]); }} disabled={selectedPlayers.length === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Chart</button>
+        <button onClick={() => { setPhase("live"); setCurrentPlayerIdx(0); setEntries([]); }} disabled={selectedPlayers.length === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Chart</button>
       </main>
     );
   }
@@ -193,46 +197,43 @@ function SnapAthleteChartInner() {
         <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
         <div className="flex flex-wrap gap-3 justify-center">
           {selectedPlayers.map((p) => {
-            const pr = getPlayerResults(p);
-            const strikes = pr.filter((r) => r.accuracy === "Strike").length;
-            const totalScore = pr.reduce((s, r) => s + (r.dbEntry.score ?? 0), 0);
-            const maxScore = pr.length * 3;
+            const pe = getPlayerEntries(p);
+            const strikes = pe.filter((e) => e.accuracy === "ON_TARGET").length;
+            const totalScore = pe.reduce((s, e) => s + (e.score ?? 0), 0);
+            const maxScore = isFG ? pe.length * 3 : pe.length;
             return (
               <div key={p} className="card-2 px-4 py-3 text-center">
                 <p className="text-sm font-bold text-slate-200">{p}</p>
-                <p className="text-xl font-black text-sky-400">{pr.length} snaps</p>
-                <p className="text-[10px] text-muted">{strikes}/{pr.length} strikes</p>
-                {pr.some((r) => r.dbEntry.snapType === "FG") && <p className="text-[10px] text-sky-400 font-semibold">{totalScore}/{maxScore} ({maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0}%)</p>}
+                <p className="text-xl font-black text-sky-400">{pe.length} snaps</p>
+                <p className="text-[10px] text-muted">{strikes}/{pe.length} strikes</p>
+                <p className="text-[10px] text-sky-400 font-semibold">{totalScore}/{maxScore} ({maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0}%)</p>
               </div>
             );
           })}
         </div>
-        {/* Per-snapper breakdown */}
         {selectedPlayers.map((p) => {
-          const pr = getPlayerResults(p);
+          const pe = getPlayerEntries(p);
           return (
             <div key={p} className="card-2 text-left text-xs">
               <p className="text-xs font-bold text-slate-200 mb-2">{p}</p>
               <table className="w-full">
-                <thead>
-                  <tr>
-                    <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
-                    <th className="text-[10px] text-muted text-center py-1 px-2">Type</th>
-                    <th className="text-[10px] text-muted text-center py-1 px-2">Result</th>
-                    {pr.some((r) => r.laces) && <th className="text-[10px] text-muted text-center py-1 px-2">Laces</th>}
-                    <th className="text-[10px] text-muted text-center py-1 px-2">Spiral</th>
-                    <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
-                  </tr>
-                </thead>
+                <thead><tr>
+                  <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
+                  <th className="text-[10px] text-muted text-center py-1 px-2">Result</th>
+                  {isFG && <th className="text-[10px] text-muted text-center py-1 px-2">Laces</th>}
+                  <th className="text-[10px] text-muted text-center py-1 px-2">Spiral</th>
+                  {!isFG && <th className="text-[10px] text-muted text-center py-1 px-2">Time</th>}
+                  <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
+                </tr></thead>
                 <tbody>
-                  {pr.map((r, i) => (
+                  {pe.map((e, i) => (
                     <tr key={i} className="border-t border-border/30">
                       <td className="text-muted py-1 px-2">{i + 1}</td>
-                      <td className="text-center py-1 px-2 text-slate-300">{r.dbEntry.snapType === "FG" ? "Short" : "Long"}</td>
-                      <td className={clsx("text-center py-1 px-2 font-bold", r.accuracy === "Strike" ? "text-make" : "text-miss")}>{r.accuracy}</td>
-                      {pr.some((r) => r.laces) && <td className={clsx("text-center py-1 px-2", r.laces === "Good" ? "text-make" : r.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{r.laces === "Good" ? "Perfect" : r.laces || "—"}</td>}
-                      <td className={clsx("text-center py-1 px-2", r.spiral === "Tight" ? "text-make" : "text-miss")}>{r.spiral}</td>
-                      <td className="text-right py-1 px-2 font-bold text-sky-400">{r.dbEntry.score}/{r.dbEntry.snapType === "FG" ? 3 : 1}</td>
+                      <td className={clsx("text-center py-1 px-2 font-bold", e.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                      {isFG && <td className={clsx("text-center py-1 px-2", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{e.laces === "Good" ? "Perfect" : e.laces || "—"}</td>}
+                      <td className={clsx("text-center py-1 px-2", e.spiral === "Good" ? "text-make" : "text-miss")}>{e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "—"}</td>
+                      {!isFG && <td className="text-center py-1 px-2 text-slate-300">{e.time > 0 ? `${e.time.toFixed(2)}s` : "—"}</td>}
+                      <td className="text-right py-1 px-2 font-bold text-sky-400">{e.score}/{isFG ? 3 : 1}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -248,31 +249,27 @@ function SnapAthleteChartInner() {
     );
   }
 
-  // Live
+  // Live — diagram always visible, no popup
+  const playerEntries = getPlayerEntries(currentPlayer);
   return (
     <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
-      <Link href="/athlete/longsnap" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+      <Link href={backPath} className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
 
-      {/* Per-athlete snap circles */}
+      {/* Per-athlete circles */}
       {selectedPlayers.map((player) => {
-        const pr = getPlayerResults(player);
+        const pe = getPlayerEntries(player);
         const isActive = player === currentPlayer;
         return (
           <div key={player} className={clsx("space-y-1", !isActive && selectedPlayers.length > 1 && "opacity-50")}>
             <button onClick={() => setCurrentPlayerIdx(selectedPlayers.indexOf(player))} className="text-xs font-bold text-slate-200 hover:text-accent transition-colors">{player}</button>
             <div className="flex flex-wrap gap-1.5">
-              {pr.map((r, i) => (
-                <div key={i} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border", r.accuracy === "Strike" ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss")} title={`${r.dbEntry.snapType} | ${r.accuracy} | ${r.spiral}`}>
-                  {r.dbEntry.snapType === "FG" ? "S" : "L"}
-                </div>
+              {pe.map((e, i) => (
+                <div key={i} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border", e.accuracy === "ON_TARGET" ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss")}>{i + 1}</div>
               ))}
-              {snapSchedule.length > 0 && Array.from({ length: Math.max(0, snapSchedule.length - pr.length) }).map((_, i) => {
-                const schedIdx = pr.length + i;
-                const isNext = schedIdx === currentSnapIdx && isActive;
+              {Array.from({ length: Math.max(0, totalReps - pe.length) }).map((_, i) => {
+                const isNext = i === 0 && isActive;
                 return (
-                  <div key={`e-${i}`} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border", isNext ? "border-accent/60 text-accent bg-accent/10" : "border-border/40 text-muted/40")}>
-                    {snapSchedule[schedIdx]?.snapType === "FG" ? "S" : "L"}
-                  </div>
+                  <div key={`e-${i}`} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border", isNext ? "border-accent/60 text-accent bg-accent/10" : "border-border/40 text-muted/40")}>{pe.length + i + 1}</div>
                 );
               })}
             </div>
@@ -280,70 +277,81 @@ function SnapAthleteChartInner() {
         );
       })}
 
-      {/* Current snap info */}
+      {/* Current snap */}
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-slate-100">{currentPlayer}</p>
-          <p className="text-xs text-muted">Snap {playerSnaps.length + 1}{snapSchedule.length > 0 ? ` / ${snapSchedule.length}` : ""}</p>
+          <p className="text-xs text-muted">Snap {playerEntries.length + 1} / {totalReps}</p>
         </div>
-        {assignedChart && currentScheduleItem && (
-          <p className="text-xs text-muted">Type: <span className="text-slate-200 font-semibold">{currentScheduleItem.label}</span></p>
+
+        {/* Diagram + controls inline */}
+        {isFG ? (
+          <div className="flex items-center gap-1">
+            <div className="flex flex-col gap-1 shrink-0">
+              <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Laces</p>
+              <button onClick={() => setLaces("Good")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Perfect</button>
+              <button onClick={() => setLaces("1/4 Turn")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4</button>
+              <button onClick={() => setLaces("Back")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
+            </div>
+            <div className="flex-1 min-w-0">
+              <HolderStrikeZone markers={marker ? [{ ...marker, num: playerEntries.length + 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={playerEntries.length + 1} chartMode="simple" missMode="simple" editable />
+            </div>
+            <div className="flex flex-col gap-1 shrink-0">
+              <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
+              <button onClick={() => setSpiral("Good")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+              <button onClick={() => setSpiral("Bad")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-1">
+              <div className="flex-1 min-w-0">
+                <PunterStrikeZone markers={puntMarker ? [{ ...puntMarker, num: playerEntries.length + 1 }] : []} onSnap={(m) => setPuntMarker(m)} nextNum={playerEntries.length + 1} chartMode="simple" missMode="simple" editable />
+              </div>
+              <div className="flex flex-col gap-1 shrink-0">
+                <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
+                <button onClick={() => setSpiral("Good")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", spiral === "Good" ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Tight</button>
+                <button onClick={() => setSpiral("Bad")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", spiral === "Bad" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Open</button>
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted mb-1">Snap Time <span className="text-muted/50">(optional)</span></p>
+              <input type="text" inputMode="numeric" value={snapTime ? parseTimeRaw(snapTime).toFixed(2) : ""} onChange={(e) => setSnapTime(e.target.value.replace(/\D/g, ""))} placeholder="0.75" className="input w-24 text-center text-sm font-bold py-1.5" />
+            </div>
+          </>
         )}
-        <button onClick={() => setShowSnap(true)} className="btn-primary w-full py-3 text-sm font-bold">Log Snap</button>
+
+        <button onClick={handleLog} disabled={!canLog} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Log Snap</button>
       </div>
 
       {/* Undo + Finish */}
       <div className="flex gap-2">
-        {snapResults.length > 0 && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
-        {snapResults.length > 0 && <button onClick={() => setPhase("results")} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish ({snapResults.length}{snapSchedule.length > 0 ? `/${snapSchedule.length * selectedPlayers.length}` : ""})</button>}
+        {entries.length > 0 && <button onClick={handleUndo} className="text-xs px-4 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
+        {entries.length > 0 && <button onClick={() => setPhase("results")} className="btn-ghost flex-1 py-2 text-xs font-bold border border-sky-500/40 text-sky-400">Finish ({entries.length}/{totalReps * selectedPlayers.length})</button>}
       </div>
 
       {/* Running log */}
-      {snapResults.length > 0 && (
+      {entries.length > 0 && (
         <div className="card-2 text-xs">
           <table className="w-full">
             <thead><tr>
               <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
               <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
-              <th className="text-[10px] text-muted text-center py-1 px-2">Type</th>
               <th className="text-[10px] text-muted text-center py-1 px-2">Result</th>
-              <th className="text-[10px] text-muted text-right py-1 px-2">Spiral</th>
+              <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
             </tr></thead>
             <tbody>
-              {[...snapResults].reverse().map((r, i) => (
+              {[...entries].reverse().map((e, i) => (
                 <tr key={i} className="border-t border-border/30">
-                  <td className="text-muted py-1 px-2">{snapResults.length - i}</td>
-                  <td className="py-1 px-2 text-slate-200">{r.dbEntry.athlete}</td>
-                  <td className="text-center py-1 px-2 text-slate-300">{r.dbEntry.snapType === "FG" ? "Short" : "Long"}</td>
-                  <td className={clsx("text-center py-1 px-2 font-bold", r.accuracy === "Strike" ? "text-make" : "text-miss")}>{r.accuracy}</td>
-                  <td className={clsx("text-right py-1 px-2", r.spiral === "Tight" ? "text-make" : "text-miss")}>{r.spiral}</td>
+                  <td className="text-muted py-1 px-2">{entries.length - i}</td>
+                  <td className="py-1 px-2 text-slate-200">{e.athlete}</td>
+                  <td className={clsx("text-center py-1 px-2 font-bold", e.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                  <td className="text-right py-1 px-2 font-bold text-sky-400">{e.score}/{isFG ? 3 : 1}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      )}
-
-      {showSnap && (
-        <AthleteSnapPopup
-          snapType={currentSnapType}
-          athletes={snapAthletes}
-          holders={holderAthletes}
-          onClose={() => setShowSnap(false)}
-          onSaved={(entry) => {
-            setSnapResults((prev) => [...prev, entry]);
-            setShowSnap(false);
-            // Auto-advance
-            if (selectedPlayers.length > 1) {
-              setCurrentPlayerIdx((currentPlayerIdx + 1) % selectedPlayers.length);
-            }
-            // Check if done
-            if (snapSchedule.length > 0) {
-              const newTotal = snapResults.length + 1;
-              if (newTotal >= snapSchedule.length * selectedPlayers.length) setPhase("results");
-            }
-          }}
-        />
       )}
     </main>
   );
