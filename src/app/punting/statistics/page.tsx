@@ -11,6 +11,7 @@ import clsx from "clsx";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportPuntStats, exportPuntStatsPDF } from "@/lib/exportStats";
+import { ExportButton } from "@/components/ui/ExportButton";
 
 interface PuntTypeConfig { id: string; label: string; category: string; metric: "distance" | "yardline"; hangTime: boolean }
 interface PuntCategoryConfig { id: string; label: string; enabled: boolean }
@@ -665,18 +666,7 @@ export default function PuntingStatisticsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
         <div className="flex gap-2">
-          <button
-            onClick={() => exportPuntStats(athletes.map((a) => a.name), history as { date?: string; entries?: PuntEntry[] }[], hasStarred)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
-          >
-            Export Excel
-          </button>
-          <button
-            onClick={() => exportPuntStatsPDF(athletes.map((a) => a.name), history as { date?: string; entries?: PuntEntry[] }[], puntTypes.map((t) => ({ id: t.id, label: t.label })))}
-            className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
-          >
-            Export PDF
-          </button>
+          <ExportButton onExcel={() => exportPuntStats(athletes.map((a) => a.name), history as { date?: string; entries?: PuntEntry[] }[], hasStarred)} onPDF={() => exportPuntStatsPDF(athletes.map((a) => a.name), history as { date?: string; entries?: PuntEntry[] }[], puntTypes.map((t) => ({ id: t.id, label: t.label })))} />
         </div>
       </div>
 

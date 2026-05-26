@@ -5,6 +5,7 @@ import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
 import { exportPuntScoutExcel, exportPuntScoutPDF } from "@/lib/scoutExport";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -157,8 +158,7 @@ export default function ScoutPuntPage() {
             </div>
             {!loading && ranked.length > 0 && (
               <div className="flex gap-2">
-                <button onClick={() => exportPuntScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
-                <button onClick={() => exportPuntScoutPDF(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export PDF</button>
+                <ExportButton onExcel={() => exportPuntScoutExcel(sessions)} onPDF={() => exportPuntScoutPDF(sessions)} />
               </div>
             )}
             {loading ? (

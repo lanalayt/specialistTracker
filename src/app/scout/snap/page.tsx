@@ -5,6 +5,7 @@ import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
 import { exportSnapScoutExcel, exportSnapScoutPDF, exportIndividualSnapExcel, exportIndividualSnapPDF } from "@/lib/scoutExport";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { HolderStrikeZone } from "@/components/ui/HolderStrikeZone";
 import { PunterStrikeZone } from "@/components/ui/PunterStrikeZone";
@@ -200,8 +201,7 @@ export default function ScoutSnapPage() {
             </div>
             {!loading && activeRanked.length > 0 && (
               <div className="flex gap-2">
-                <button onClick={() => exportSnapScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
-                <button onClick={() => exportSnapScoutPDF(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export PDF</button>
+                <ExportButton onExcel={() => exportSnapScoutExcel(sessions)} onPDF={() => exportSnapScoutPDF(sessions)} />
               </div>
             )}
             {loading ? (

@@ -9,6 +9,7 @@ import type { FGPosition, DistRange, AthleteStats, FGKick } from "@/types";
 import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportFGStats, exportFGStatsPDF } from "@/lib/exportStats";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 
 const POS_LABELS: Record<FGPosition, string> = {
@@ -432,18 +433,7 @@ export default function KickingStatisticsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
         <div className="flex gap-2">
-          <button
-            onClick={() => exportFGStats(athletes.map((a) => a.name), history as { date?: string; entries?: FGKick[] }[], hasStarred)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
-          >
-            Export Excel
-          </button>
-          <button
-            onClick={() => exportFGStatsPDF(athletes.map((a) => a.name), history as { date?: string; entries?: FGKick[] }[], hasStarred)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
-          >
-            Export PDF
-          </button>
+          <ExportButton onExcel={() => exportFGStats(athletes.map((a) => a.name), history as { date?: string; entries?: FGKick[] }[], hasStarred)} onPDF={() => exportFGStatsPDF(athletes.map((a) => a.name), history as { date?: string; entries?: FGKick[] }[], hasStarred)} />
         </div>
       </div>
 

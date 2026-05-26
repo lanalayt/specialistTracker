@@ -5,6 +5,7 @@ import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -243,8 +244,7 @@ export default function ScoutFGPage() {
           <div className="space-y-4">
             {!loading && athleteData.length > 0 && (
               <div className="flex gap-2">
-                <button onClick={() => exportFGScoutExcel(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export Excel</button>
-                <button onClick={() => exportFGScoutPDF(sessions)} className="text-xs px-3 py-1.5 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Export PDF</button>
+                <ExportButton onExcel={() => exportFGScoutExcel(sessions)} onPDF={() => exportFGScoutPDF(sessions)} />
               </div>
             )}
             {loading ? (
