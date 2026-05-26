@@ -29,7 +29,7 @@ export default function AthletePuntingLayout({ children }: { children: React.Rea
       {!isHub && (
         <SportSubNav
           basePath="/athlete/punting"
-          extraTabs={[{ label: "Charting Games", slug: "charting" }, { label: "Punt Settings", slug: "settings" }]}
+          extraTabs={[{ label: "Charting Games", slug: "charting" }, { label: "Athletes", slug: "athletes" }, { label: "Punt Settings", slug: "settings" }]}
         />
       )}
       {children}

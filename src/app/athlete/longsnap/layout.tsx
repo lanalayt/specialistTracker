@@ -35,6 +35,7 @@ export default function AthleteLongSnapLayout({ children }: { children: React.Re
             { label: "Statistics", slug: "statistics", coachOnly: false },
             { label: "History", slug: "history", coachOnly: false },
             { label: "Charting", slug: "charting", coachOnly: false },
+            { label: "Athletes", slug: "athletes", coachOnly: false },
             { label: "Settings", slug: "settings", coachOnly: false },
           ]}
         />
