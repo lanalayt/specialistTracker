@@ -9,7 +9,8 @@ import { StatCard } from "@/components/ui/StatCard";
 import { SNAP_TYPES } from "@/types";
 import type { LongSnapEntry, LongSnapAthleteStats } from "@/types";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
-import { exportLongSnapStats } from "@/lib/exportStats";
+import { exportLongSnapStats, exportLongSnapStatsPDF } from "@/lib/exportStats";
+import { ExportButton } from "@/components/ui/ExportButton";
 
 function computeFilteredSnapStats(
   athletes: { id: string; name: string }[],
@@ -126,12 +127,10 @@ export default function LongSnapStatisticsPage() {
     <main className="p-4 lg:p-6 space-y-6 max-w-4xl overflow-y-auto">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <DateRangeFilter {...dateFilter} />
-        <button
-          onClick={() => exportLongSnapStats(athletes.map((a) => a.name), history as { date?: string; entries?: LongSnapEntry[] }[])}
-          className="px-3 py-1.5 text-xs font-semibold rounded-input border border-border text-slate-300 hover:text-white hover:border-accent/50 hover:bg-accent/10 transition-all"
-        >
-          Export
-        </button>
+        <ExportButton
+          onExcel={() => exportLongSnapStats(athletes.map((a) => a.name), history as { date?: string; entries?: LongSnapEntry[] }[])}
+          onPDF={() => exportLongSnapStatsPDF(athletes.map((a) => a.name), history as { date?: string; entries?: LongSnapEntry[] }[])}
+        />
       </div>
 
       {/* Long / Short toggle */}

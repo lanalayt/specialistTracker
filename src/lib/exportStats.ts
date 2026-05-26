@@ -464,6 +464,55 @@ export function exportLongSnapStats(
   XLSX.writeFile(wb, "Long_Snap_Stats.xlsx");
 }
 
+export function exportLongSnapStatsPDF(
+  athletes: string[],
+  history: { date?: string; entries?: LongSnapEntry[] }[]
+) {
+  import("jspdf").then(({ default: jsPDF }) => {
+    import("jspdf-autotable").then(({ default: autoTable }) => {
+      const doc = new jsPDF();
+      const statsMap = computeSnapStats(athletes, history);
+
+      doc.setFontSize(16);
+      doc.text("Long Snap Statistics", 14, 15);
+
+      const overallHead = [["Athlete", "Snaps", "On Target %", "Avg Time"]];
+      const overallBody: string[][] = [];
+      athletes.forEach((a) => {
+        const s = statsMap[a];
+        if (!s || s.overall.att === 0) return;
+        const b = s.overall;
+        overallBody.push([a, String(b.att), b.att > 0 ? `${Math.round((b.onTarget / b.att) * 100)}%` : "—", b.att > 0 && b.totalTime > 0 ? `${(b.totalTime / b.att).toFixed(2)}s` : "—"]);
+      });
+      if (overallBody.length > 0) {
+        doc.setFontSize(12);
+        doc.text("Overall", 14, 24);
+        autoTable(doc, { head: overallHead, body: overallBody, startY: 28, styles: { fontSize: 9 } });
+      }
+
+      const snapTypes = ["FG", "PAT", "PUNT"] as const;
+      snapTypes.forEach((t) => {
+        const typeBody: string[][] = [];
+        athletes.forEach((a) => {
+          const s = statsMap[a];
+          if (!s) return;
+          const b = s.byType[t];
+          if (!b || b.att === 0) return;
+          typeBody.push([a, String(b.att), b.att > 0 ? `${Math.round((b.onTarget / b.att) * 100)}%` : "—", b.att > 0 && b.totalTime > 0 ? `${(b.totalTime / b.att).toFixed(2)}s` : "—"]);
+        });
+        if (typeBody.length > 0) {
+          const finalY = (doc as any).lastAutoTable?.finalY ?? 40;
+          doc.setFontSize(11);
+          doc.text(t === "FG" ? "FG / Short Snap" : t === "PAT" ? "PAT" : "Punt / Long Snap", 14, finalY + 10);
+          autoTable(doc, { head: overallHead, body: typeBody, startY: finalY + 14, styles: { fontSize: 9 } });
+        }
+      });
+
+      doc.save("Long_Snap_Stats.pdf");
+    });
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Individual Session Exports (Excel + PDF)
 // ═══════════════════════════════════════════════════════════════════════
