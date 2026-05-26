@@ -201,30 +201,41 @@ export function exportIndividualSnapExcel(data: SnapChartData) {
   XLSX.writeFile(wb, `${data.name}_Snap_Chart.xlsx`);
 }
 
-function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: number, w: number, h: number) {
-  // Draw border
-  doc.setDrawColor(100, 100, 100);
+function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: number, w: number, h: number, isShort: boolean) {
+  // Background
+  doc.setFillColor(20, 20, 20);
+  doc.rect(x, y, w, h, "F");
+  // Border
+  doc.setDrawColor(140, 140, 140);
   doc.setLineWidth(0.5);
   doc.rect(x, y, w, h);
-  // Draw strike zone (approximate)
-  const zoneLeft = x + w * 0.25;
-  const zoneTop = y + h * 0.34;
-  const zoneW = w * 0.5;
-  const zoneH = h * 0.38;
-  doc.setDrawColor(200, 50, 50);
-  doc.setLineWidth(0.3);
-  doc.rect(zoneLeft, zoneTop, zoneW, zoneH);
+  // Strike zone — use holder zone for short, punter zone for long
+  const zone = isShort
+    ? { top: 0.45, bottom: 0.78, left: 0.42, right: 0.76 }
+    : { top: 0.34, bottom: 0.68, left: 0.25, right: 0.75 };
+  const zLeft = x + w * zone.left;
+  const zTop = y + h * zone.top;
+  const zW = w * (zone.right - zone.left);
+  const zH = h * (zone.bottom - zone.top);
+  doc.setDrawColor(220, 60, 60);
+  doc.setLineWidth(0.4);
+  doc.rect(zLeft, zTop, zW, zH);
+  // Light fill inside zone
+  doc.setFillColor(220, 60, 60);
+  doc.setGState(new (doc as any).GState({ opacity: 0.06 }));
+  doc.rect(zLeft, zTop, zW, zH, "F");
+  doc.setGState(new (doc as any).GState({ opacity: 1 }));
   // Draw markers
   entries.forEach((e, i) => {
     if (e.markerX == null || e.markerY == null) return;
     const mx = x + (e.markerX / 100) * w;
     const my = y + (e.markerY / 100) * h;
     const inZone = e.markerInZone ?? false;
-    doc.setFillColor(inZone ? 0 : 220, inZone ? 180 : 60, inZone ? 140 : 60);
-    doc.circle(mx, my, 3, "F");
-    doc.setFontSize(6);
+    doc.setFillColor(inZone ? 0 : 220, inZone ? 200 : 60, inZone ? 160 : 60);
+    doc.circle(mx, my, 3.5, "F");
+    doc.setFontSize(7);
     doc.setTextColor(255, 255, 255);
-    doc.text(String(i + 1), mx, my + 1.5, { align: "center" });
+    doc.text(String(i + 1), mx, my + 1.8, { align: "center" });
     doc.setTextColor(0, 0, 0);
   });
 }
@@ -244,7 +255,7 @@ export function exportIndividualSnapPDF(data: SnapChartData) {
   const hasMarkers = data.entries.some((e) => e.markerX != null && e.markerY != null);
   let tableStartY = 42;
   if (hasMarkers) {
-    drawSnapDiagram(doc, data.entries, 50, 42, 110, 80);
+    drawSnapDiagram(doc, data.entries, 50, 42, 110, 85, data.is30Point);
     tableStartY = 128;
   }
 
