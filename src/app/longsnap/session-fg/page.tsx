@@ -8,6 +8,8 @@ import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 import clsx from "clsx";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
 
 const DRAFT_SUFFIX = "fg";
@@ -36,8 +38,10 @@ interface LogRow {
 const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", accuracy: "", laces: "", spiral: "", critical: false });
 
 export default function LongSnapFGSessionPage() {
+  const pathname = usePathname();
+  const isAthleteMode = pathname.startsWith("/athlete");
   const { athletes, stats, commitPractice } = useLongSnap();
-  const { isAthlete, canEdit } = useAuth();
+  const { isAthlete, isCoach, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
 
   const [rows, setRows] = useState<LogRow[]>(Array.from({ length: INIT_ROWS }, emptyRow));
@@ -161,6 +165,12 @@ export default function LongSnapFGSessionPage() {
 
   return (
     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+      {isAthleteMode && (
+        <div className="flex gap-2 px-4 py-2 border-b border-border shrink-0 w-full">
+          {isCoach && <Link href="/athlete/longsnap/coaches-chart" className="px-3 py-1.5 text-xs font-semibold rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all">Coaches Chart</Link>}
+          <Link href="/athlete/longsnap/athlete-chart" className="px-3 py-1.5 text-xs font-semibold rounded-input border border-sky-500/40 text-sky-400 hover:bg-sky-500/10 transition-all">Athlete Chart</Link>
+        </div>
+      )}
       <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
         {/* Weather */}
         <div className="px-4 py-2 border-b border-border shrink-0">
