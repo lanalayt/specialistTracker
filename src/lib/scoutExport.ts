@@ -268,7 +268,7 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
   });
 }
 
-export async function exportIndividualSnapPDF(data: SnapChartData) {
+export async function exportIndividualSnapPDF(data: SnapChartData, diagramImage?: string) {
   const doc = new jsPDF();
   doc.setFontSize(16);
   doc.text(data.name, 14, 15);
@@ -279,12 +279,21 @@ export async function exportIndividualSnapPDF(data: SnapChartData) {
   doc.setFontSize(12);
   doc.text(`Score: ${data.total}/${data.maxScore} (${data.pct}%)`, 14, 36);
 
-  // Draw snap diagram
-  const hasMarkers = data.entries.some((e) => e.markerX != null && e.markerY != null);
   let tableStartY = 42;
-  if (hasMarkers) {
-    await drawSnapDiagram(doc, data.entries, 50, 42, 110, 85, data.is30Point);
-    tableStartY = 133;
+  if (diagramImage) {
+    // Use captured DOM screenshot
+    const imgW = 120;
+    const imgH = 100;
+    const imgX = (210 - imgW) / 2;
+    doc.addImage(diagramImage, "PNG", imgX, 42, imgW, imgH);
+    tableStartY = 148;
+  } else {
+    // Fallback: draw manually
+    const hasMarkers = data.entries.some((e) => e.markerX != null && e.markerY != null);
+    if (hasMarkers) {
+      await drawSnapDiagram(doc, data.entries, 50, 42, 110, 85, data.is30Point);
+      tableStartY = 133;
+    }
   }
 
   // Table

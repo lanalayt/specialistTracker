@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
@@ -49,6 +49,7 @@ export default function ScoutSnapPage() {
   const [rankingTab, setRankingTab] = useState<"short" | "long">("short");
   const [editSnapIdx, setEditSnapIdx] = useState<number | null>(null);
   const [exportRow, setExportRow] = useState<RankedRow | null>(null);
+  const diagramRef = useRef<HTMLDivElement>(null);
   const [editAccuracy, setEditAccuracy] = useState<"Strike" | "Ball" | "">("");
   const [editLaces, setEditLaces] = useState("");
   const [editSpiral, setEditSpiral] = useState("");
@@ -280,7 +281,7 @@ export default function ScoutSnapPage() {
             </div>
 
             {/* Strike zone diagram */}
-            <div className="max-w-[250px] mx-auto">
+            <div className="max-w-[250px] mx-auto" ref={diagramRef}>
               {detailOpen.is30Point ? (
                 <HolderStrikeZone
                   markers={detailOpen.entries
@@ -393,8 +394,16 @@ export default function ScoutSnapPage() {
                 Excel
               </button>
               <button
-                onClick={() => {
-                  exportIndividualSnapPDF({ name: exportRow.name, date: exportRow.date, label: exportRow.sessionLabel, is30Point: exportRow.is30Point, count: exportRow.count, total: exportRow.total, maxScore: exportRow.maxScore, pct: exportRow.pct, entries: exportRow.entries });
+                onClick={async () => {
+                  let diagramImage: string | undefined;
+                  if (diagramRef.current) {
+                    try {
+                      const html2canvas = (await import("html2canvas")).default;
+                      const canvas = await html2canvas(diagramRef.current, { backgroundColor: "#ffffff", scale: 2 });
+                      diagramImage = canvas.toDataURL("image/png");
+                    } catch {}
+                  }
+                  await exportIndividualSnapPDF({ name: exportRow.name, date: exportRow.date, label: exportRow.sessionLabel, is30Point: exportRow.is30Point, count: exportRow.count, total: exportRow.total, maxScore: exportRow.maxScore, pct: exportRow.pct, entries: exportRow.entries }, diagramImage);
                   setExportRow(null);
                 }}
                 className="btn-ghost flex-1 py-3 text-sm font-bold border border-border"
