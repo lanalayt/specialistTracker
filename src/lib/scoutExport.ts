@@ -201,7 +201,20 @@ export function exportIndividualSnapExcel(data: SnapChartData) {
   XLSX.writeFile(wb, `${data.name}_Snap_Chart.xlsx`);
 }
 
-function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: number, w: number, h: number, isShort: boolean) {
+async function loadImageAsDataUrl(src: string): Promise<string | null> {
+  try {
+    const resp = await fetch(src);
+    const blob = await resp.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
+async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: number, w: number, h: number, isShort: boolean) {
   // Background
   doc.setFillColor(20, 20, 20);
   doc.rect(x, y, w, h, "F");
@@ -209,6 +222,21 @@ function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: number,
   doc.setDrawColor(140, 140, 140);
   doc.setLineWidth(0.5);
   doc.rect(x, y, w, h);
+
+  // Holder silhouette for short snaps
+  if (isShort) {
+    const imgData = await loadImageAsDataUrl("/holder-silhouette.png?v=7");
+    if (imgData) {
+      try {
+        const imgH = h * 1.3;
+        const imgW = imgH * 0.58;
+        doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
+        doc.addImage(imgData, "PNG", x - imgW * 0.07, y + h - imgH * 0.77, imgW, imgH);
+        doc.setGState(new (doc as any).GState({ opacity: 1 }));
+      } catch {}
+    }
+  }
+
   // Strike zone — use holder zone for short, punter zone for long
   const zone = isShort
     ? { top: 0.45, bottom: 0.78, left: 0.42, right: 0.76 }
@@ -240,7 +268,7 @@ function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: number,
   });
 }
 
-export function exportIndividualSnapPDF(data: SnapChartData) {
+export async function exportIndividualSnapPDF(data: SnapChartData) {
   const doc = new jsPDF();
   doc.setFontSize(16);
   doc.text(data.name, 14, 15);
@@ -255,8 +283,8 @@ export function exportIndividualSnapPDF(data: SnapChartData) {
   const hasMarkers = data.entries.some((e) => e.markerX != null && e.markerY != null);
   let tableStartY = 42;
   if (hasMarkers) {
-    drawSnapDiagram(doc, data.entries, 50, 42, 110, 85, data.is30Point);
-    tableStartY = 128;
+    await drawSnapDiagram(doc, data.entries, 50, 42, 110, 85, data.is30Point);
+    tableStartY = 133;
   }
 
   // Table
