@@ -17,7 +17,7 @@ export function InvitePopup({ teamName, teamCode, onClose }: InvitePopupProps) {
   const signupUrl = role ? `${baseUrl}/signup?role=${role}&team=${teamCode}` : "";
   const roleLabel = role === "coach" ? "Coach" : "Athlete";
   const message = role
-    ? `You've been invited to join ${teamName || "the team"} on Specialist Tracker as a ${roleLabel}.\n\nSign up here: ${signupUrl}\n\nTeam Code: ${teamCode}`
+    ? `You've been invited to join ${teamName || "the team"} on Specialist Tracker as a ${roleLabel}!\n\nClick here to create your account:\n${signupUrl}\n\nYour Team Code: ${teamCode}\n\nYou'll need this code during sign up to link to the team.`
     : "";
 
   const handleEmail = () => {

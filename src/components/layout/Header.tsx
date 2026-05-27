@@ -64,16 +64,20 @@ export function Header({ title }: { title?: string }) {
   const [teamName, setTeamName] = useState("");
 
   useEffect(() => {
-    import("@/lib/teamData").then(({ getTeamId }) => {
-      const tid = getTeamId();
+    async function loadTeamInfo() {
+      const { getTeamId } = await import("@/lib/teamData");
+      const { getTeamSettings } = await import("@/lib/teamSettingsStore");
+      let tid = getTeamId();
+      for (let i = 0; i < 20 && !tid; i++) { await new Promise((r) => setTimeout(r, 200)); tid = getTeamId(); }
+      if (!tid && user?.id) tid = user.id;
       if (tid) {
         setTeamCode(tid);
-        import("@/lib/teamSettingsStore").then(({ getTeamSettings }) => {
-          getTeamSettings(tid).then((s) => { if (s?.name) setTeamName(s.name); });
-        });
+        const s = await getTeamSettings(tid);
+        if (s?.name) setTeamName(s.name);
       }
-    });
-  }, []);
+    }
+    loadTeamInfo();
+  }, [user?.id]);
 
   const isScoutRoute = pathname.startsWith("/scout");
   const isAthleteRoute = pathname.startsWith("/athlete/") || pathname === "/athlete";

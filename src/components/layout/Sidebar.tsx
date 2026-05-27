@@ -61,12 +61,18 @@ export function Sidebar() {
   const [teamName, setTeamName] = useState("");
 
   useEffect(() => {
-    const tid = getTeamId();
-    if (tid) {
-      setTeamCode(tid);
-      getTeamSettings(tid).then((s) => { if (s?.name) setTeamName(s.name); });
+    async function loadTeamInfo() {
+      let tid = getTeamId();
+      for (let i = 0; i < 20 && !tid; i++) { await new Promise((r) => setTimeout(r, 200)); tid = getTeamId(); }
+      if (!tid && user?.id) tid = user.id;
+      if (tid) {
+        setTeamCode(tid);
+        const s = await getTeamSettings(tid);
+        if (s?.name) setTeamName(s.name);
+      }
     }
-  }, []);
+    loadTeamInfo();
+  }, [user?.id]);
 
   const isScoutRoute = pathname.startsWith("/scout");
   const isAthleteRoute = pathname.startsWith("/athlete/") || pathname === "/athlete";
