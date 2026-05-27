@@ -648,48 +648,44 @@ export function exportSessionPDF(
   summary: Record<string, string>,
   athleteBreakdowns?: { name: string; stats: Record<string, string> }[]
 ): void {
-  const style = `
-    body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
-    h1 { font-size: 18px; margin-bottom: 4px; }
-    h2 { font-size: 14px; color: #666; margin-bottom: 12px; margin-top: 20px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    th { background: #1a1a2e; color: white; text-align: left; padding: 8px 10px; font-size: 12px; }
-    td { padding: 6px 10px; border-bottom: 1px solid #ddd; font-size: 12px; }
-    tr:nth-child(even) { background: #f9f9f9; }
-    .summary { margin-top: 16px; }
-    .summary dt { font-weight: bold; display: inline; }
-    .summary dd { display: inline; margin-left: 4px; margin-right: 16px; }
-    .athlete-card { border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 10px; page-break-inside: avoid; }
-    .athlete-card h3 { font-size: 14px; margin: 0 0 8px 0; }
-    .athlete-stats { display: flex; flex-wrap: wrap; gap: 12px; }
-    .athlete-stat { font-size: 12px; }
-    .athlete-stat .label { color: #888; font-size: 10px; text-transform: uppercase; }
-    .athlete-stat .value { font-weight: bold; font-size: 14px; }
-  `;
-  const summaryHTML = Object.entries(summary).map(([k, v]) => `<dt>${k}:</dt><dd>${v}</dd>`).join("");
-  let athleteHTML = "";
-  if (athleteBreakdowns && athleteBreakdowns.length > 0) {
-    athleteHTML = `<h2>By Athlete</h2>` + athleteBreakdowns.map((a) =>
-      `<div class="athlete-card"><h3>${a.name}</h3><div class="athlete-stats">${
-        Object.entries(a.stats).map(([k, v]) => `<div class="athlete-stat"><div class="label">${k}</div><div class="value">${v}</div></div>`).join("")
-      }</div></div>`
-    ).join("");
-  }
-  const html = `<!DOCTYPE html><html><head><title>${title}</title><style>${style}</style></head><body>
-    <h1>${title}</h1>
-    <table>
-      <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
-    </table>
-    <div class="summary"><h2>Summary</h2><dl>${summaryHTML}</dl></div>
-    ${athleteHTML}
-  </body></html>`;
-  const win = window.open("", "_blank");
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => win.print(), 300);
-  }
+  import("jspdf").then(({ default: jsPDF }) => {
+    import("jspdf-autotable").then(({ default: autoTable }) => {
+      const doc = new jsPDF();
+      addLogoToPDF(doc as any);
+
+      doc.setFontSize(14);
+      doc.text(title, 14, 15);
+
+      // Summary line
+      const summaryText = Object.entries(summary).map(([k, v]) => `${k}: ${v}`).join("  |  ");
+      doc.setFontSize(9);
+      doc.text(summaryText, 14, 22);
+
+      // Main table
+      autoTable(doc, { head: [headers], body: rows, startY: 26, styles: { fontSize: 9 } });
+
+      // Athlete breakdowns
+      if (athleteBreakdowns && athleteBreakdowns.length > 0) {
+        let y = (doc as any).lastAutoTable?.finalY ?? 40;
+        y += 8;
+        doc.setFontSize(12);
+        doc.text("By Athlete", 14, y);
+        y += 4;
+        for (const a of athleteBreakdowns) {
+          const statHead = [Object.keys(a.stats)];
+          const statBody = [Object.values(a.stats)];
+          doc.setFontSize(10);
+          y += 4;
+          doc.text(a.name, 14, y);
+          y += 2;
+          autoTable(doc, { head: statHead, body: statBody, startY: y, styles: { fontSize: 9 }, margin: { left: 14 } });
+          y = (doc as any).lastAutoTable?.finalY ?? y + 10;
+        }
+      }
+
+      doc.save(`${title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
+    });
+  });
 }
 
 // ─── PDF Stats Export ──────────────────────────────────────────────────────
