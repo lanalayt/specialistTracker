@@ -157,20 +157,39 @@ export function exportKOScoutPDF(sessions: ScoutSession[]) {
 
 interface SnapEntry { athlete: string; points?: number; score?: number; accuracy?: string; laces?: string; spiral?: string; time?: string; markerX?: number; markerY?: number; markerInZone?: boolean }
 
-export function exportSnapScoutExcel(sessions: ScoutSession[]) {
-  const wb = XLSX.utils.book_new();
+function buildSnapRanked(sessions: ScoutSession[]) {
+  const all: { name: string; count: number; total: number; maxScore: number; pct: number; is30Point: boolean }[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as SnapEntry[];
+    const is30Point = s.label.startsWith("30 Point") || s.label.startsWith("Short Snap");
     const athletes = [...new Set(entries.map((e) => e.athlete))];
-    const ranked = athletes
-      .map((name) => {
-        const ae = entries.filter((e) => e.athlete === name);
-        return { name, count: ae.length, total: ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0) };
-      })
-      .sort((a, b) => b.total - a.total);
-    const aoa = [["Rank", "Name", "Snaps", "Score"], ...ranked.map((r, i) => [String(i + 1), r.name, String(r.count), String(r.total)])];
+    for (const name of athletes) {
+      const ae = entries.filter((e) => e.athlete === name);
+      const total = ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0);
+      const maxScore = is30Point ? ae.length * 3 : ae.length;
+      const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
+      all.push({ name, count: ae.length, total, maxScore, pct, is30Point });
+    }
+  }
+  const short = all.filter((r) => r.is30Point).sort((a, b) => b.pct - a.pct);
+  const long = all.filter((r) => !r.is30Point).sort((a, b) => b.pct - a.pct);
+  return { short, long };
+}
+
+export function exportSnapScoutExcel(sessions: ScoutSession[]) {
+  const wb = XLSX.utils.book_new();
+  const { short, long } = buildSnapRanked(sessions);
+  if (short.length > 0) {
+    const aoa = [["Rank", "Name", "Snaps", "Score", "%"], ...short.map((r, i) => [String(i + 1), r.name, String(r.count), `${r.total}/${r.maxScore}`, `${r.pct}%`])];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    XLSX.utils.book_append_sheet(wb, ws, new Date(s.date).toLocaleDateString().replace(/\//g, "-").slice(0, 28));
+    ws["!cols"] = [{ wch: 6 }, { wch: 18 }, { wch: 8 }, { wch: 12 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, ws, "Short Snaps");
+  }
+  if (long.length > 0) {
+    const aoa = [["Rank", "Name", "Snaps", "Score", "%"], ...long.map((r, i) => [String(i + 1), r.name, String(r.count), `${r.total}/${r.maxScore}`, `${r.pct}%`])];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 6 }, { wch: 18 }, { wch: 8 }, { wch: 12 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, ws, "Long Snaps");
   }
   XLSX.writeFile(wb, "Snap_Scout_Rankings.xlsx");
 }
@@ -330,25 +349,27 @@ export async function exportIndividualSnapPDF(data: SnapChartData, diagramImage?
 export function exportSnapScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF();
   addLogoToPDF(doc as any);
-  for (let i = 0; i < sessions.length; i++) {
-    const s = sessions[i];
-    if (i > 0) doc.addPage();
-    const entries = s.entries as unknown as SnapEntry[];
-    const athletes = [...new Set(entries.map((e) => e.athlete))];
-    const ranked = athletes
-      .map((name) => {
-        const ae = entries.filter((e) => e.athlete === name);
-        return { name, count: ae.length, total: ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0) };
-      })
-      .sort((a, b) => b.total - a.total);
+  const { short, long } = buildSnapRanked(sessions);
+
+  if (short.length > 0) {
     doc.setFontSize(14);
-    doc.text(s.label.replace(/ — .*$/, ""), 14, 15);
-    doc.setFontSize(10);
-    doc.text(new Date(s.date).toLocaleDateString(), 14, 22);
+    doc.text("Short Snap Rankings", 14, 15);
     autoTable(doc, {
-      head: [["Rank", "Name", "Snaps", "Score"]],
-      body: ranked.map((r, j) => [String(j + 1), r.name, String(r.count), String(r.total)]),
-      startY: 26,
+      head: [["Rank", "Name", "Snaps", "Score", "%"]],
+      body: short.map((r, i) => [String(i + 1), r.name, String(r.count), `${r.total}/${r.maxScore}`, `${r.pct}%`]),
+      startY: 22,
+      styles: { fontSize: 10 },
+    });
+  }
+
+  if (long.length > 0) {
+    if (short.length > 0) doc.addPage();
+    doc.setFontSize(14);
+    doc.text("Long Snap Rankings", 14, 15);
+    autoTable(doc, {
+      head: [["Rank", "Name", "Snaps", "Score", "%"]],
+      body: long.map((r, i) => [String(i + 1), r.name, String(r.count), `${r.total}/${r.maxScore}`, `${r.pct}%`]),
+      startY: 22,
       styles: { fontSize: 10 },
     });
   }
