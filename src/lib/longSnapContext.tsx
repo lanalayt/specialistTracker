@@ -62,7 +62,7 @@ export function LongSnapProvider({ children, sportKey = "LONGSNAP" }: { children
       }
 
       if (tid && tid !== "local-dev") {
-        if (sportKey.startsWith("ATHLETE_")) await syncAthleteKeys(tid);
+        // Sync disabled — athletes page handles both keys on add/remove
         const dbAthletes = await loadAthletes(tid, sportKey);
         if (dbAthletes.length > 0) setAthletes(dbAthletes);
       }

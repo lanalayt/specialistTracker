@@ -8,7 +8,7 @@ import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider, useLongSnap } from "@/lib/longSnapContext";
-import { loadAthletes, insertAthlete, removeAthlete as removeAthleteById, syncAthleteKeys, type StoredAthlete } from "@/lib/athleteStore";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteById, type StoredAthlete } from "@/lib/athleteStore";
 import { getTeamId } from "@/lib/teamData";
 import { useState as useStateReact, useEffect } from "react";
 import clsx from "clsx";
@@ -34,7 +34,7 @@ function AthletesContent() {
       if (!tid) return;
       const h = await loadAthletes(tid, "HOLDING");
       setHolders(h);
-      await syncAthleteKeys(tid);
+      // Sync disabled — athletes page handles both keys on add/remove
     }
     loadHoldersAndSync();
   }, []);
