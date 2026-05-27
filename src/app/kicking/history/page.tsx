@@ -532,6 +532,7 @@ function KickingHistoryContent() {
                 </div>
               );
             })()}
+            {(() => { const sessionHasOT = kicks.some((k) => k.opTime && k.opTime > 0) || editing; return (
             <div className="card-2 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -542,7 +543,7 @@ function KickingHistoryContent() {
                     <th className="table-header">Pos</th>
                     <th className="table-header">Result</th>
                     {!hideScore && <th className="table-header">Score</th>}
-                    <th className="table-header">OT</th>
+                    {sessionHasOT && <th className="table-header">OT</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -564,7 +565,7 @@ function KickingHistoryContent() {
                             </select>
                           </td>
                           {!hideScore && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}
-                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.opTime || ""} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); updateEntry(i, "opTime", d ? parseFloat(`${d.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${d.padStart(3, "0").slice(-2)}`) : 0); }} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          {sessionHasOT && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.opTime || ""} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); updateEntry(i, "opTime", d ? parseFloat(`${d.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${d.padStart(3, "0").slice(-2)}`) : 0); }} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}
                         </>
                       ) : (
                         <>
@@ -576,7 +577,7 @@ function KickingHistoryContent() {
                             </span>
                           </td>
                           {!hideScore && <td className="table-cell">{k.score}</td>}
-                          <td className="table-cell text-muted">{k.opTime && k.opTime > 0 ? `${k.opTime.toFixed(2)}s` : "—"}</td>
+                          {sessionHasOT && <td className="table-cell text-muted">{k.opTime && k.opTime > 0 ? `${k.opTime.toFixed(2)}s` : "—"}</td>}
                         </>
                       )}
                     </tr>
@@ -584,6 +585,7 @@ function KickingHistoryContent() {
                 </tbody>
               </table>
             </div>
+            ); })()}
           </>)}
           </>
         )}
