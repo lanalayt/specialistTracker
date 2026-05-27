@@ -6,20 +6,36 @@ import { getTeamId } from "@/lib/teamData";
 import { createClient } from "@/lib/supabase";
 
 const MIRROR_KEY = "KICKOFF";
+const BLOCK_KEY = "blocked_athletes_ATHLETE_KICKOFF";
 
 export default function AthleteKickoffAthletesPage() {
   const { athletes, addAthletes, removeAthlete } = useKickoff();
   const [input, setInput] = useState("");
+  const [blocked, setBlocked] = useState<Set<string>>(() => {
+    try { const b = JSON.parse(localStorage.getItem(BLOCK_KEY) ?? "[]"); return new Set(b); } catch { return new Set(); }
+  });
+
+  const visibleAthletes = athletes.filter((a) => !blocked.has(a.name));
 
   const handleAdd = () => {
     const name = input.trim();
     if (!name) return;
+    if (blocked.has(name)) {
+      const next = new Set(blocked);
+      next.delete(name);
+      setBlocked(next);
+      try { localStorage.setItem(BLOCK_KEY, JSON.stringify([...next])); } catch {}
+    }
     addAthletes([name]);
     setInput("");
   };
 
   const handleRemove = async (id: string, name: string) => {
     removeAthlete(id);
+    const next = new Set(blocked);
+    next.add(name);
+    setBlocked(next);
+    try { localStorage.setItem(BLOCK_KEY, JSON.stringify([...next])); } catch {}
     const tid = getTeamId();
     if (tid) {
       const supabase = createClient();
@@ -36,10 +52,10 @@ export default function AthleteKickoffAthletesPage() {
       </div>
 
       <div className="space-y-2">
-        {athletes.length === 0 && (
+        {visibleAthletes.length === 0 && (
           <p className="text-xs text-muted">No athletes added yet.</p>
         )}
-        {athletes.map((a) => (
+        {visibleAthletes.map((a) => (
           <div key={a.id} className="card-2 flex items-center justify-between px-4 py-2.5">
             <span className="text-sm font-medium text-slate-200">{a.name}</span>
             <button
