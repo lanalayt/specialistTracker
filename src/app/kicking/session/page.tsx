@@ -1544,6 +1544,16 @@ export default function KickingSessionPage() {
                   >
                     {draftSaved ? "Saved!" : "Save Draft"}
                   </button>
+                  <button
+                    onClick={() => {
+                      const firstUnlogged = filledRows.findIndex(({ i }) => !snapLogsMap[String(i)]?.length);
+                      setSnapKickIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
+                      setShowSnapOverlay(true);
+                    }}
+                    className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                  >
+                    Log Snap
+                  </button>
                   <div className="flex-1" />
                   <button
                     onClick={handleCommitReady}
