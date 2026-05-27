@@ -38,7 +38,8 @@ function buildFGRows(sessions: ScoutSession[]) {
       ...kicks.map((k) => { const e = r.entries.find((en) => en.kickNum === k); return e ? String(e.score) : "—"; }),
       String(r.total),
     ]);
-    allRows.push({ session: s.label, date: new Date(s.date).toLocaleDateString(), head, body });
+    const cleanLabel = s.label.replace(/ — .*$/, "");
+    allRows.push({ session: cleanLabel, date: new Date(s.date).toLocaleDateString(), head, body });
   }
   return allRows;
 }
@@ -96,7 +97,8 @@ function buildPuntKORows(sessions: ScoutSession[], sport: "Punt" | "KO") {
       ...Array.from({ length: maxKicks - r.entries.length }, () => "—"),
       r.avg.toFixed(2),
     ]);
-    allRows.push({ session: s.label, date: new Date(s.date).toLocaleDateString(), head, body });
+    const cleanLabel = s.label.replace(/ — .*$/, "");
+    allRows.push({ session: cleanLabel, date: new Date(s.date).toLocaleDateString(), head, body });
   }
   return allRows;
 }
@@ -279,26 +281,35 @@ export async function exportIndividualSnapPDF(data: SnapChartData, diagramImage?
   doc.setFontSize(16);
   doc.text(data.name, 14, 15);
   doc.setFontSize(11);
-  doc.text(data.label, 14, 22);
+  doc.text(data.is30Point ? "Short Snaps" : "Long Snaps", 14, 22);
   doc.setFontSize(9);
   doc.text(new Date(data.date).toLocaleDateString(), 14, 28);
   doc.setFontSize(12);
-  doc.text(`Score: ${data.total}/${data.maxScore} (${data.pct}%)`, 14, 36);
+  let infoY = 36;
+  doc.text(`Score: ${data.total}/${data.maxScore} (${data.pct}%)`, 14, infoY);
+  // Avg snap time for long snaps
+  if (!data.is30Point) {
+    const times = data.entries.filter((e) => e.time && parseFloat(e.time) > 0).map((e) => parseFloat(e.time!));
+    if (times.length > 0) {
+      const avgTime = (times.reduce((s, t) => s + t, 0) / times.length).toFixed(2);
+      infoY += 7;
+      doc.text(`Avg Snap Time: ${avgTime}s`, 14, infoY);
+    }
+  }
 
-  let tableStartY = 42;
+  const diagramY = infoY + 8;
+  let tableStartY = diagramY;
   if (diagramImage) {
-    // Use captured DOM screenshot
     const imgW = 120;
     const imgH = 100;
     const imgX = (210 - imgW) / 2;
-    doc.addImage(diagramImage, "PNG", imgX, 42, imgW, imgH);
-    tableStartY = 148;
+    doc.addImage(diagramImage, "PNG", imgX, diagramY, imgW, imgH);
+    tableStartY = diagramY + imgH + 6;
   } else {
-    // Fallback: draw manually
     const hasMarkers = data.entries.some((e) => e.markerX != null && e.markerY != null);
     if (hasMarkers) {
-      await drawSnapDiagram(doc, data.entries, 50, 42, 110, 85, data.is30Point);
-      tableStartY = 133;
+      await drawSnapDiagram(doc, data.entries, 50, diagramY, 110, 85, data.is30Point);
+      tableStartY = diagramY + 91;
     }
   }
 
@@ -331,7 +342,7 @@ export function exportSnapScoutPDF(sessions: ScoutSession[]) {
       })
       .sort((a, b) => b.total - a.total);
     doc.setFontSize(14);
-    doc.text(s.label, 14, 15);
+    doc.text(s.label.replace(/ — .*$/, ""), 14, 15);
     doc.setFontSize(10);
     doc.text(new Date(s.date).toLocaleDateString(), 14, 22);
     autoTable(doc, {
