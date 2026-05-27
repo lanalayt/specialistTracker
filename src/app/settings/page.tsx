@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
@@ -12,6 +12,7 @@ import { createArchive } from "@/lib/archiveManager";
 import { getTeamId } from "@/lib/teamData";
 import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
 import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, loadCustomThemes, saveCustomThemes, loadCustomThemesFromCloud, type ThemeColors, type SavedTheme } from "@/lib/themeColors";
+import { useTeamLogo } from "@/lib/useTeamLogo";
 import clsx from "clsx";
 
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
@@ -29,6 +30,8 @@ function SettingsContent() {
   const fg = useFG();
   const punt = usePunt();
   const kickoff = useKickoff();
+  const { logo, uploadLogo, removeLogo } = useTeamLogo();
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [teamName, setTeamName] = useState("Special Teams");
   const [school, setSchool] = useState("My School");
   const [enabledSports, setEnabledSports] = useState<string[]>(["KICKING", "PUNTING", "KICKOFF", "LONGSNAP"]);
@@ -210,6 +213,32 @@ function SettingsContent() {
                   value={school}
                   onChange={(e) => setSchool(e.target.value)}
                 />
+              </div>
+            </div>
+
+            {/* Team Logo */}
+            <div>
+              <label className="label">Team Logo</label>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-lg border border-border overflow-hidden flex items-center justify-center bg-surface-2 shrink-0">
+                  {logo ? (
+                    <img src={logo} alt="Team logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <img src="/logo-mark.svg" alt="No logo" className="w-10 h-10 opacity-30" />
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); }} />
+                  <button onClick={() => logoInputRef.current?.click()} className="text-xs px-3 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all">
+                    {logo ? "Change Logo" : "Upload Logo"}
+                  </button>
+                  {logo && (
+                    <button onClick={removeLogo} className="text-xs px-3 py-1.5 rounded-input border border-miss/40 text-miss hover:bg-miss/10 font-semibold transition-all">
+                      Remove Logo
+                    </button>
+                  )}
+                  <p className="text-[10px] text-muted">Appears in sidebar, header, and all PDF exports</p>
+                </div>
               </div>
             </div>
           </div>
