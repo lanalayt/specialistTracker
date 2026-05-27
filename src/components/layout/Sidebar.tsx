@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTeamLogo } from "@/lib/useTeamLogo";
+import { getTeamId } from "@/lib/teamData";
+import { getTeamSettings } from "@/lib/teamSettingsStore";
 import { useTutorial } from "@/components/ui/Tutorial";
 import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
@@ -21,6 +23,7 @@ const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.Re
 
 const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/athletes", label: "Athletes", icon: "👥" },
+  { href: "#invite", label: "Invite", icon: "✉️" },
   { href: "/trash", label: "Deleted Sessions", icon: "🗑" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
@@ -52,6 +55,36 @@ export function Sidebar() {
   const { show: showTutorial } = useTutorial();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [teamCode, setTeamCode] = useState("");
+  const [teamName, setTeamName] = useState("");
+
+  useEffect(() => {
+    const tid = getTeamId();
+    if (tid) {
+      setTeamCode(tid);
+      getTeamSettings(tid).then((s) => { if (s?.name) setTeamName(s.name); });
+    }
+  }, []);
+
+  const sendInvite = (role: "coach" | "athlete") => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const signupUrl = `${baseUrl}/signup?role=${role}&team=${teamCode}`;
+    const roleLabel = role === "coach" ? "Coach" : "Athlete";
+    const subject = encodeURIComponent(`You're invited to ${teamName || "Specialist Tracker"}`);
+    const body = encodeURIComponent(
+`You've been invited to join ${teamName || "the team"} on Specialist Tracker as a ${roleLabel}.
+
+Click the link below to create your account:
+${signupUrl}
+
+${role === "athlete" ? `Your Team Code: ${teamCode}\n\nYou'll need this code during signup.\n` : `Your Team Code: ${teamCode}\n\nUse this to join the existing team as a coach.\n`}
+— ${teamName || "Specialist Tracker"}`
+    );
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_self");
+    setInviteOpen(false);
+  };
+
   const isScoutRoute = pathname.startsWith("/scout");
   const isAthleteRoute = pathname.startsWith("/athlete/") || pathname === "/athlete";
 
@@ -65,6 +98,7 @@ export function Sidebar() {
   };
 
   return (
+    <>
     <aside className="fixed left-0 top-0 h-screen w-56 bg-surface border-r border-border flex flex-col z-40 hidden lg:flex">
       {/* Logo */}
       <div className="p-5 border-b border-border">
@@ -160,16 +194,27 @@ export function Sidebar() {
                   Management
                 </p>
                 {COACH_ITEMS.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={clsx(
-                      isActive(item.href) ? "nav-link-active" : "nav-link"
-                    )}
-                  >
-                    {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
-                    {item.label}
-                  </Link>
+                  item.href === "#invite" ? (
+                    <button
+                      key={item.href}
+                      onClick={() => setInviteOpen(true)}
+                      className="nav-link w-full text-left"
+                    >
+                      <span className="text-base leading-none">{item.icon}</span>
+                      {item.label}
+                    </button>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={clsx(
+                        isActive(item.href) ? "nav-link-active" : "nav-link"
+                      )}
+                    >
+                      {item.iconEl ?? <span className="text-base leading-none">{item.icon}</span>}
+                      {item.label}
+                    </Link>
+                  )
                 ))}
               </>
             )}
@@ -205,5 +250,38 @@ export function Sidebar() {
         </Link>
       </div>
     </aside>
+
+    {/* Invite popup */}
+    {inviteOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setInviteOpen(false)} />
+        <div className="relative bg-surface border border-border rounded-xl w-full max-w-xs mx-4 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-100">Invite to {teamName || "Team"}</h3>
+            <button onClick={() => setInviteOpen(false)} className="text-muted hover:text-white text-xs">Close</button>
+          </div>
+          <p className="text-xs text-muted">Choose who you want to invite. This will open your email app with a pre-written message.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => sendInvite("coach")}
+              className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6 px-3"
+            >
+              <span className="text-2xl mb-2">🏈</span>
+              <span className="text-sm font-bold text-slate-100 group-hover:text-accent">Coach</span>
+              <span className="text-[10px] text-muted mt-1">Full access</span>
+            </button>
+            <button
+              onClick={() => sendInvite("athlete")}
+              className="card hover:bg-surface-2 hover:border-sky-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6 px-3"
+            >
+              <span className="text-2xl mb-2">🏃</span>
+              <span className="text-sm font-bold text-slate-100 group-hover:text-sky-400">Athlete</span>
+              <span className="text-[10px] text-muted mt-1">View & chart</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

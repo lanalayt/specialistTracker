@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { UserRole } from "@/types";
 import clsx from "clsx";
@@ -10,8 +10,13 @@ import clsx from "clsx";
 export default function SignupPage() {
   const { signUp } = useAuth();
   const router = useRouter();
-  const [roleChoice, setRoleChoice] = useState<"coach" | "athlete">("coach");
-  const [teamChoice, setTeamChoice] = useState<"new" | "existing">("new");
+  const searchParams = useSearchParams();
+  const inviteRole = searchParams.get("role") as "coach" | "athlete" | null;
+  const inviteTeam = searchParams.get("team");
+  const isInvite = !!inviteRole;
+
+  const [roleChoice, setRoleChoice] = useState<"coach" | "athlete">(inviteRole ?? "coach");
+  const [teamChoice, setTeamChoice] = useState<"new" | "existing">(inviteTeam ? "existing" : "new");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -25,7 +30,7 @@ export default function SignupPage() {
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const [teamCode, setTeamCode] = useState("");
+  const [teamCode, setTeamCode] = useState(inviteTeam ?? "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +92,8 @@ export default function SignupPage() {
           <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             {/* Role selector */}
             <div>
-              <label className="label">I am a</label>
+              <label className="label">{isInvite ? `Invited as ${inviteRole === "coach" ? "Coach" : "Athlete"}` : "I am a"}</label>
+              {!isInvite && (
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -114,6 +120,7 @@ export default function SignupPage() {
                   Athlete
                 </button>
               </div>
+              )}
             </div>
 
             {roleChoice === "coach" && (
