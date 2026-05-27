@@ -25,17 +25,26 @@ function SignupInner() {
 
   const [resolvedInvite, setResolvedInvite] = useState<{ teamId: string; role: "coach" | "athlete" } | null>(null);
   const [resolving, setResolving] = useState(!!inviteCode);
+  const [inviteSchool, setInviteSchool] = useState("");
+  const [inviteColors, setInviteColors] = useState<{ primary: string; secondary: string } | null>(null);
 
   useEffect(() => {
     if (inviteCode) {
       import("@/components/ui/InvitePopup").then(({ resolveInviteCode }) => {
-        resolveInviteCode(inviteCode).then((result) => {
+        resolveInviteCode(inviteCode).then(async (result) => {
           setResolvedInvite(result);
           setResolving(false);
           if (result) {
             setRoleChoice(result.role);
             setTeamChoice("existing");
             setTeamCode(result.teamId);
+            // Load team info for branding
+            const { getTeamSettings } = await import("@/lib/teamSettingsStore");
+            const settings = await getTeamSettings(result.teamId);
+            if (settings) {
+              setInviteSchool(settings.school || settings.name || "");
+              if (settings.colorPrimary) setInviteColors({ primary: settings.colorPrimary, secondary: settings.colorSecondary });
+            }
           }
         });
       });
@@ -74,11 +83,11 @@ function SignupInner() {
       return;
     }
     if (roleChoice === "athlete" && !teamCode.trim()) {
-      setError("Athletes must enter a Team Code from their coach");
+      setError("Athletes must enter an invite code from their coach");
       return;
     }
     if (roleChoice === "coach" && teamChoice === "existing" && !teamCode.trim()) {
-      setError("Enter the Team Code from the head coach");
+      setError("Enter the invite code from the head coach");
       return;
     }
     setLoading(true);
@@ -119,18 +128,33 @@ function SignupInner() {
     }
   };
 
+  if (resolving) {
+    return <div className="min-h-screen bg-bg flex items-center justify-center"><p className="text-muted">Verifying invite...</p></div>;
+  }
+
+  const accentColor = inviteColors?.primary || "#00d4a0";
+
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/logo-mark.svg" alt="Specialist Tracker" className="w-12 h-12 mx-auto mb-3" />
-          <h1 className="text-2xl font-extrabold text-slate-100">
-            Create account
-          </h1>
-          <p className="text-sm text-muted mt-1">Set up your team</p>
+          {inviteSchool ? (
+            <>
+              <h1 className="text-2xl font-extrabold text-slate-100">Join {inviteSchool}</h1>
+              <p className="text-sm mt-1" style={{ color: accentColor }}>
+                {inviteRole === "coach" ? "Coach Invite" : "Athlete Invite"}
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-extrabold text-slate-100">Create account</h1>
+              <p className="text-sm text-muted mt-1">Set up your team</p>
+            </>
+          )}
         </div>
 
-        <div className="card shadow-accent-lg">
+        <div className="card" style={inviteColors ? { borderColor: `${accentColor}40`, boxShadow: `0 0 30px ${accentColor}15` } : undefined}>
           {error && (
             <div className="bg-miss/10 border border-miss/30 text-miss text-sm rounded-input px-3 py-2 mb-4">
               {error}
@@ -203,17 +227,17 @@ function SignupInner() {
               </div>
             )}
 
-            {(roleChoice === "athlete" || (roleChoice === "coach" && teamChoice === "existing")) && (
+            {!isInvite && (roleChoice === "athlete" || (roleChoice === "coach" && teamChoice === "existing")) && (
               <div>
-                <label className="label">Team Code</label>
+                <label className="label">Invite Code</label>
                 <input
-                  className="input"
+                  className="input uppercase tracking-widest"
                   placeholder="Enter code from your coach"
                   value={teamCode}
-                  onChange={(e) => setTeamCode(e.target.value)}
+                  onChange={(e) => setTeamCode(e.target.value.toUpperCase())}
                   required
                 />
-                <p className="text-[10px] text-muted mt-1">{roleChoice === "athlete" ? "Ask your coach for the Team Code (found in Settings)" : "Get the Team Code from the head coach (found in Settings)"}</p>
+                <p className="text-[10px] text-muted mt-1">Ask your coach for the invite code (found in Settings → Invite Codes)</p>
               </div>
             )}
 
