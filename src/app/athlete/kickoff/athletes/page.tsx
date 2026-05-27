@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
 import { useKickoff } from "@/lib/kickoffContext";
 import { getTeamId } from "@/lib/teamData";
-import { loadAthletes, removeAthlete as removeAthleteById } from "@/lib/athleteStore";
+import { createClient } from "@/lib/supabase";
 
 const MIRROR_KEY = "KICKOFF";
 
@@ -21,12 +20,11 @@ export default function AthleteKickoffAthletesPage() {
 
   const handleRemove = async (id: string, name: string) => {
     removeAthlete(id);
-    // Also remove from team roster so sync doesn't re-add
     const tid = getTeamId();
     if (tid) {
-      const teamList = await loadAthletes(tid, MIRROR_KEY);
-      const found = teamList.find((a) => a.name === name);
-      if (found) await removeAthleteById(tid, found.id);
+      const supabase = createClient();
+      await supabase.from("athletes").delete().eq("team_id", tid).eq("sport", MIRROR_KEY).eq("name", name);
+      await supabase.from("athletes").delete().eq("team_id", tid).eq("sport", "ATHLETE_KICKOFF").eq("name", name);
     }
   };
 

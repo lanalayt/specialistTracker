@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { getTeamId } from "@/lib/teamData";
-import { loadAthletes, removeAthlete as removeAthleteById } from "@/lib/athleteStore";
+import { createClient } from "@/lib/supabase";
 
 const MIRROR_KEY = "LONGSNAP";
 
@@ -22,9 +22,9 @@ export default function AthleteLongSnapAthletesPage() {
     removeAthlete(id);
     const tid = getTeamId();
     if (tid) {
-      const teamList = await loadAthletes(tid, MIRROR_KEY);
-      const found = teamList.find((a) => a.name === name);
-      if (found) await removeAthleteById(tid, found.id);
+      const supabase = createClient();
+      await supabase.from("athletes").delete().eq("team_id", tid).eq("sport", MIRROR_KEY).eq("name", name);
+      await supabase.from("athletes").delete().eq("team_id", tid).eq("sport", "ATHLETE_LONGSNAP").eq("name", name);
     }
   };
 

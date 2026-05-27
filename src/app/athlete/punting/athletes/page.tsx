@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { usePunt } from "@/lib/puntContext";
 import { getTeamId } from "@/lib/teamData";
-import { loadAthletes, removeAthlete as removeAthleteById } from "@/lib/athleteStore";
+import { createClient } from "@/lib/supabase";
 
 const MIRROR_KEY = "PUNTING";
 
@@ -22,9 +22,10 @@ export default function AthletePuntingAthletesPage() {
     removeAthlete(id);
     const tid = getTeamId();
     if (tid) {
-      const teamList = await loadAthletes(tid, MIRROR_KEY);
-      const found = teamList.find((a) => a.name === name);
-      if (found) await removeAthleteById(tid, found.id);
+      const supabase = createClient();
+      // Remove from team PUNTING and ATHLETE_PUNTING by name to ensure cleanup
+      await supabase.from("athletes").delete().eq("team_id", tid).eq("sport", MIRROR_KEY).eq("name", name);
+      await supabase.from("athletes").delete().eq("team_id", tid).eq("sport", "ATHLETE_PUNTING").eq("name", name);
     }
   };
 
