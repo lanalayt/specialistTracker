@@ -187,7 +187,7 @@ Your Team Code: ${teamCode}
 
     </header>
     {/* Mode toggle row — below the border */}
-    <div className="sticky top-14 z-20 bg-surface/80 backdrop-blur px-3 sm:px-4 py-1.5">
+    <div className="sticky top-14 z-20 bg-surface/80 backdrop-blur px-3 sm:px-4 py-3">
       <div className="flex rounded-full border border-border overflow-hidden w-fit">
         <button
           onClick={() => handleModeChange("team")}
