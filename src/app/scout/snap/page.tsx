@@ -123,13 +123,21 @@ export default function ScoutSnapPage() {
   for (const s of sessions) {
     const entries = s.entries as unknown as SnapEntry[];
     const is30Point = s.label.startsWith("30 Point") || s.label.startsWith("Short Snap");
-    const athletes = [...new Set(entries.map((e) => e.athlete))];
-    for (const name of athletes) {
-      const ae = entries.filter((e) => e.athlete === name);
-      const total = ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0);
-      const maxScore = is30Point ? ae.length * 3 : ae.length;
+    // Split entries into contiguous blocks by athlete name to keep separate charts apart
+    const blocks: { name: string; entries: SnapEntry[] }[] = [];
+    for (const e of entries) {
+      const last = blocks[blocks.length - 1];
+      if (last && last.name === e.athlete) {
+        last.entries.push(e);
+      } else {
+        blocks.push({ name: e.athlete, entries: [e] });
+      }
+    }
+    for (const block of blocks) {
+      const total = block.entries.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0);
+      const maxScore = is30Point ? block.entries.length * 3 : block.entries.length;
       const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
-      ranked.push({ name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: ae.length, total, entries: ae, is30Point, maxScore, pct });
+      ranked.push({ name: block.name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: block.entries.length, total, entries: block.entries, is30Point, maxScore, pct });
     }
   }
   ranked.sort((a, b) => b.pct - a.pct);
