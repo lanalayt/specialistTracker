@@ -9,12 +9,11 @@ import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZ
 import type { LongSnapEntry, SnapBenchmark, Session } from "@/types";
 import clsx from "clsx";
 
-// Compute miss direction from marker position relative to holder zone
-function getMissLabel(s: LongSnapEntry): string {
+// Compute miss direction from marker position relative to zone
+function getMissLabel(s: LongSnapEntry, isShort = true): string {
   if (s.markerInZone || s.accuracy === "ON_TARGET") return "";
   if (s.markerX == null || s.markerY == null) return "";
-  // Holder zone defaults: top:45, bottom:78, left:42, right:76
-  const zone = { top: 45, bottom: 78, left: 42, right: 76 };
+  const zone = isShort ? { top: 45, bottom: 78, left: 42, right: 76 } : { top: 34, bottom: 68, left: 25, right: 75 };
   const x = s.markerX; const y = s.markerY;
   const vLabel = y < zone.top ? "HIGH" : y > zone.bottom ? "LOW" : "";
   const hLabel = x < zone.left ? "LEFT" : x > zone.right ? "RIGHT" : "";
@@ -331,7 +330,6 @@ export default function LongSnapHistoryPage() {
                             <th className="table-header text-left">#</th>
                             <th className="table-header text-left">Athlete</th>
                             <th className="table-header">Acc</th>
-                            {snaps.some((s) => getMissLabel(s)) && <th className="table-header">Miss Dir</th>}
                             <th className="table-header">Laces</th>
                             <th className="table-header">Spiral</th>
                             <th className="table-header">Score</th>
@@ -344,10 +342,9 @@ export default function LongSnapHistoryPage() {
                               <td className="table-name">{s.athlete}</td>
                               <td className="table-cell">
                                 <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                  {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
+                                  {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
                                 </span>
                               </td>
-                              {snaps.some((ss) => getMissLabel(ss)) && (() => { const ml = getMissLabel(s); return <td className="table-cell text-miss">{ml ? `${MISS_ARROWS[ml] ?? ""} ${ml}` : "—"}</td>; })()}
                               <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
                               <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
                               <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>
@@ -397,7 +394,7 @@ export default function LongSnapHistoryPage() {
                             <td className="table-cell font-bold">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
                             <td className="table-cell">
                               <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
+                                {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s, false); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
                               </span>
                             </td>
                             <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>

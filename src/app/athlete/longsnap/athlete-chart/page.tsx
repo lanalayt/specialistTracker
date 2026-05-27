@@ -13,6 +13,18 @@ import Link from "next/link";
 import clsx from "clsx";
 import type { LongSnapEntry, SnapType, SnapAccuracy } from "@/types";
 
+const MISS_ARROWS: Record<string, string> = { "HIGH LEFT": "↖", "HIGH": "↑", "HIGH RIGHT": "↗", "LEFT": "←", "RIGHT": "→", "LOW LEFT": "↙", "LOW": "↓", "LOW RIGHT": "↘" };
+
+function getAccLabel(e: LongSnapEntry, isShort: boolean): string {
+  if (e.accuracy === "ON_TARGET") return "Strike";
+  if (e.markerX == null || e.markerY == null || e.markerInZone) return "Ball";
+  const zone = isShort ? { top: 45, bottom: 78, left: 42, right: 76 } : { top: 34, bottom: 68, left: 25, right: 75 };
+  const v = e.markerY < zone.top ? "HIGH" : e.markerY > zone.bottom ? "LOW" : "";
+  const h = e.markerX < zone.left ? "LEFT" : e.markerX > zone.right ? "RIGHT" : "";
+  const dir = v && h ? `${v} ${h}` : v || h;
+  return dir ? `Ball ${MISS_ARROWS[dir] ?? ""}` : "Ball";
+}
+
 function SnapAthleteChartInner() {
   const searchParams = useSearchParams();
   const assignedId = searchParams.get("assigned");
@@ -277,7 +289,7 @@ function SnapAthleteChartInner() {
                   {pe.map((e, i) => (
                     <tr key={i} className="border-t border-border/30">
                       <td className="text-muted py-1 px-2">{i + 1}</td>
-                      <td className={clsx("text-center py-1 px-2 font-bold", e.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                      <td className={clsx("text-center py-1 px-2 font-bold", e.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{getAccLabel(e, isFG)}</td>
                       {isFG && <td className={clsx("text-center py-1 px-2", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{e.laces === "Good" ? "Perfect" : e.laces || "—"}</td>}
                       <td className={clsx("text-center py-1 px-2", e.spiral === "Good" ? "text-make" : "text-miss")}>{e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "—"}</td>
                       {!isFG && <td className="text-center py-1 px-2 text-slate-300">{e.time > 0 ? `${e.time.toFixed(2)}s` : "—"}</td>}
@@ -413,7 +425,7 @@ function SnapAthleteChartInner() {
                 <tr key={i} className="border-t border-border/30">
                   <td className="text-muted py-1 px-2">{entries.length - i}</td>
                   <td className="py-1 px-2 text-slate-200">{e.athlete}</td>
-                  <td className={clsx("text-center py-1 px-2 font-bold", e.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                  <td className={clsx("text-center py-1 px-2 font-bold", e.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{getAccLabel(e, isFG)}</td>
                   {isFG && <td className={clsx("text-center py-1 px-2", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{e.laces === "Good" ? "Perfect" : e.laces === "1/4 Turn" ? "1/4" : e.laces || "—"}</td>}
                   <td className={clsx("text-center py-1 px-2", e.spiral === "Good" ? "text-make" : "text-miss")}>{e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "—"}</td>
                   <td className="text-right py-1 px-2 font-bold text-sky-400">{e.score}/{isFG ? 3 : 1}</td>
