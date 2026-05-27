@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useAuth } from "@/lib/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -8,6 +8,14 @@ import type { UserRole } from "@/types";
 import clsx from "clsx";
 
 export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-bg flex items-center justify-center"><p className="text-muted">Loading...</p></div>}>
+      <SignupInner />
+    </Suspense>
+  );
+}
+
+function SignupInner() {
   const { signUp } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
