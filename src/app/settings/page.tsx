@@ -488,28 +488,6 @@ function SettingsContent() {
             </div>
           </div>
 
-          {/* Device / Sync diagnostics */}
-          <div className="card space-y-2">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Device Sync</p>
-            <p className="text-xs text-muted">
-              Both devices need to be signed in to the <span className="text-accent font-semibold">same account</span> to share data. If one device isn&apos;t showing the same stats, verify the email below matches on both devices.
-            </p>
-            <div className="bg-surface-2 border border-border rounded-input p-3 space-y-1.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted">Signed in as</span>
-                <span className="text-slate-200 font-medium truncate ml-2">{user?.email ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Role</span>
-                <span className="text-slate-200 capitalize">{user?.role ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Team ID</span>
-                <code className="text-accent text-[10px] truncate ml-2 max-w-[180px]">{getTeamId() ?? "not set"}</code>
-              </div>
-            </div>
-          </div>
-
           {/* Save */}
           <div className="flex justify-end">
             <button
