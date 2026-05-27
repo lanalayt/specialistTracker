@@ -46,6 +46,10 @@ function SnapAthleteChartInner() {
   const [laces, setLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
   const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
   const [snapTime, setSnapTime] = useState("");
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => {
+    try { const raw = localStorage.getItem("snapSettings"); if (raw) { const p = JSON.parse(raw); return p.missMode === "detailed" ? "detailed" : "simple"; } } catch {}
+    return "simple";
+  });
   const [selectedSnapIdx, setSelectedSnapIdx] = useState<number | null>(null);
 
   const athleteNames = athletes.map((a) => a.name);
@@ -338,6 +342,15 @@ function SnapAthleteChartInner() {
         </div>
 
         {/* Diagram + controls inline */}
+        {/* Miss mode toggle */}
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-muted">Miss Detail:</p>
+          <div className="flex rounded-input border border-border overflow-hidden">
+            <button onClick={() => setMissMode("simple")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+            <button onClick={() => setMissMode("detailed")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+          </div>
+        </div>
+
         {isFG ? (
           <div className="flex items-center gap-1">
             <div className="flex flex-col gap-1 shrink-0">
@@ -347,7 +360,7 @@ function SnapAthleteChartInner() {
               <button onClick={() => setLaces("Back")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
             </div>
             <div className="flex-1 min-w-0">
-              <HolderStrikeZone markers={marker ? [{ ...marker, num: selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} chartMode="simple" missMode="simple" editable />
+              <HolderStrikeZone markers={marker ? [{ ...marker, num: selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} chartMode="simple" missMode={missMode} editable />
             </div>
             <div className="flex flex-col gap-1 shrink-0">
               <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
@@ -359,7 +372,7 @@ function SnapAthleteChartInner() {
           <>
             <div className="flex items-center gap-1">
               <div className="flex-1 min-w-0">
-                <PunterStrikeZone markers={puntMarker ? [{ ...puntMarker, num: selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1 }] : []} onSnap={(m) => setPuntMarker(m)} nextNum={selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} chartMode="simple" missMode="simple" editable />
+                <PunterStrikeZone markers={puntMarker ? [{ ...puntMarker, num: selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1 }] : []} onSnap={(m) => setPuntMarker(m)} nextNum={selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} chartMode="simple" missMode={missMode} editable />
               </div>
               <div className="flex flex-col gap-1 shrink-0">
                 <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>

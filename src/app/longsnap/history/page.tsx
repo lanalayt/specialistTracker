@@ -9,6 +9,26 @@ import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZ
 import type { LongSnapEntry, SnapBenchmark, Session } from "@/types";
 import clsx from "clsx";
 
+// Compute miss direction from marker position relative to holder zone
+function getMissLabel(s: LongSnapEntry): string {
+  if (s.markerInZone || s.accuracy === "ON_TARGET") return "";
+  if (s.markerX == null || s.markerY == null) return "";
+  // Holder zone defaults: top:45, bottom:78, left:42, right:76
+  const zone = { top: 45, bottom: 78, left: 42, right: 76 };
+  const x = s.markerX; const y = s.markerY;
+  const vLabel = y < zone.top ? "HIGH" : y > zone.bottom ? "LOW" : "";
+  const hLabel = x < zone.left ? "LEFT" : x > zone.right ? "RIGHT" : "";
+  if (vLabel && hLabel) return `${vLabel} ${hLabel}`;
+  return vLabel || hLabel || "MISS";
+}
+
+const MISS_ARROWS: Record<string, string> = {
+  "HIGH LEFT": "↖", "HIGH": "↑", "HIGH RIGHT": "↗",
+  "LEFT": "←", "RIGHT": "→",
+  "LOW LEFT": "↙", "LOW": "↓", "LOW RIGHT": "↘",
+  "MISS": "✗",
+};
+
 const ACC_LABEL: Record<string, string> = {
   ON_TARGET: "✓ On Target",
   HIGH: "↑ High",
@@ -292,6 +312,7 @@ export default function LongSnapHistoryPage() {
                             <th className="table-header text-left">#</th>
                             <th className="table-header text-left">Athlete</th>
                             <th className="table-header">Acc</th>
+                            {snaps.some((s) => getMissLabel(s)) && <th className="table-header">Miss Dir</th>}
                             <th className="table-header">Laces</th>
                             <th className="table-header">Spiral</th>
                             <th className="table-header">Score</th>
@@ -307,6 +328,7 @@ export default function LongSnapHistoryPage() {
                                   {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
                                 </span>
                               </td>
+                              {snaps.some((ss) => getMissLabel(ss)) && (() => { const ml = getMissLabel(s); return <td className="table-cell text-miss">{ml ? `${MISS_ARROWS[ml] ?? ""} ${ml}` : "—"}</td>; })()}
                               <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
                               <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
                               <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>

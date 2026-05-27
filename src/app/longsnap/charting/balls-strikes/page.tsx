@@ -27,6 +27,10 @@ export default function BallsStrikesPage() {
   const athleteNames = athletes.map((a) => a.name);
 
   const [mode, setMode] = useState<"single" | "multi" | null>(null);
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => {
+    try { const raw = localStorage.getItem("snapSettings"); if (raw) { const p = JSON.parse(raw); return p.missMode === "detailed" ? "detailed" : "simple"; } } catch {}
+    return "simple";
+  });
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [maxTime, setMaxTime] = useState("0.75");
   const [started, setStarted] = useState(false);
@@ -263,9 +267,16 @@ export default function BallsStrikesPage() {
           <div className="h-full bg-accent transition-all" style={{ width: `${(snaps.length / totalSnaps) * 100}%` }} />
         </div>
 
+        <div className="flex items-center justify-center gap-2">
+          <p className="text-[10px] text-muted">Miss Detail:</p>
+          <div className="flex rounded-input border border-border overflow-hidden">
+            <button onClick={() => setMissMode("simple")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+            <button onClick={() => setMissMode("detailed")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+          </div>
+        </div>
         <p className="text-[10px] sm:text-xs text-muted text-center">Click the diagram to chart snap location</p>
         <div className="flex justify-center">
-          <PunterStrikeZone markers={getPlayerMarkers(currentPlayer)} onSnap={handleSnapClick} nextNum={getPlayerSnaps(currentPlayer).length + 1} editable />
+          <PunterStrikeZone markers={getPlayerMarkers(currentPlayer)} onSnap={handleSnapClick} nextNum={getPlayerSnaps(currentPlayer).length + 1} missMode={missMode} editable />
         </div>
 
         <div className="flex gap-2">

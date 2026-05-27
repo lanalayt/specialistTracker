@@ -35,6 +35,12 @@ export default function ThirtyPointGamePage() {
   const { athletes, commitPractice } = useLongSnap();
   const athleteNames = athletes.map((a) => a.name);
 
+  // Load miss mode from snap settings
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => {
+    try { const raw = localStorage.getItem("snapSettings"); if (raw) { const p = JSON.parse(raw); return p.missMode === "detailed" ? "detailed" : "simple"; } } catch {}
+    return "simple";
+  });
+
   // Mode selection
   const [mode, setMode] = useState<"single" | "multi" | null>(null);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
@@ -262,6 +268,15 @@ export default function ThirtyPointGamePage() {
           </div>
         )}
 
+        {/* Miss mode toggle */}
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-muted">Miss Detail:</p>
+          <div className="flex rounded-input border border-border overflow-hidden">
+            <button onClick={() => setMissMode("simple")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+            <button onClick={() => setMissMode("detailed")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+          </div>
+        </div>
+
         {/* Diagram with Laces left, Spiral right */}
         <div className="flex items-center gap-1 sm:gap-3">
           <div className="flex flex-col gap-1 sm:gap-1.5 shrink-0">
@@ -271,7 +286,7 @@ export default function ThirtyPointGamePage() {
             <button onClick={() => setLaces("Back")} className={clsx("px-2 sm:px-3 py-2 sm:py-2.5 rounded-input text-[10px] sm:text-xs font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
           </div>
           <div className="flex-1 min-w-0">
-            <HolderStrikeZone markers={[...getPlayerMarkers(currentPlayer), ...(pendingMarker ? [{ ...pendingMarker, num: getPlayerResults(currentPlayer).length + 1 }] : [])]} onSnap={handleSnapClick} nextNum={getPlayerResults(currentPlayer).length + 1} chartMode="simple" missMode="simple" editable />
+            <HolderStrikeZone markers={[...getPlayerMarkers(currentPlayer), ...(pendingMarker ? [{ ...pendingMarker, num: getPlayerResults(currentPlayer).length + 1 }] : [])]} onSnap={handleSnapClick} nextNum={getPlayerResults(currentPlayer).length + 1} chartMode="simple" missMode={missMode} editable />
           </div>
           <div className="flex flex-col gap-1 sm:gap-1.5 shrink-0">
             <p className="text-[8px] sm:text-[10px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
