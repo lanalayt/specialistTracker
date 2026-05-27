@@ -6,6 +6,7 @@ import { useFG } from "@/lib/fgContext";
 import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import { exportFGSession, exportSessionPDF } from "@/lib/exportStats";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { FGFieldView } from "@/components/ui/FGFieldView";
 import type { FGKick, Session } from "@/types";
@@ -380,12 +381,9 @@ function KickingHistoryContent() {
                   ) : (
                     <>
                       <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>
-                      <button
-                        onClick={() => exportFGSession(selected.label, kicks)}
-                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
-                      >Excel</button>
-                      <button
-                        onClick={() => {
+                      <ExportButton
+                        onExcel={() => exportFGSession(selected.label, kicks)}
+                        onPDF={() => {
                           const fgK = kicks.filter((k) => !k.isPAT);
                           const m = fgK.filter((k) => k.result.startsWith("Y")).length;
                           const athleteNames = [...new Set(kicks.map((k) => k.athlete))];
@@ -413,8 +411,7 @@ function KickingHistoryContent() {
                             athleteBreakdowns
                           );
                         }}
-                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
-                      >PDF</button>
+                      />
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {

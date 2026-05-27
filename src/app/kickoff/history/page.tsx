@@ -5,6 +5,7 @@ import { useSearchParams, usePathname } from "next/navigation";
 import { useKickoff } from "@/lib/kickoffContext";
 import { useAuth } from "@/lib/auth";
 import { exportKOSession, exportSessionPDF } from "@/lib/exportStats";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { KickoffFieldView } from "@/components/ui/KickoffFieldView";
 import type { KickoffEntry, Session } from "@/types";
 import clsx from "clsx";
@@ -219,12 +220,9 @@ function KickoffHistoryContent() {
                   ) : (
                     <>
                       <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>
-                      <button
-                        onClick={() => exportKOSession(selected.label, entries)}
-                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
-                      >Excel</button>
-                      <button
-                        onClick={() => {
+                      <ExportButton
+                        onExcel={() => exportKOSession(selected.label, entries)}
+                        onPDF={() => {
                           const dE = entries.filter((k) => k.distance > 0);
                           const hE = entries.filter((k) => k.hangTime > 0);
                           const athleteNames = [...new Set(entries.map((k) => k.athlete))];
@@ -249,8 +247,7 @@ function KickoffHistoryContent() {
                             athleteBreakdowns
                           );
                         }}
-                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
-                      >PDF</button>
+                      />
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {

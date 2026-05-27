@@ -5,6 +5,7 @@ import { useSearchParams, usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
 import { useAuth } from "@/lib/auth";
 import { exportPuntSession, exportSessionPDF } from "@/lib/exportStats";
+import { ExportButton } from "@/components/ui/ExportButton";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, Session } from "@/types";
 import clsx from "clsx";
@@ -372,14 +373,9 @@ function PuntHistoryContent() {
                       <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">
                         Edit
                       </button>
-                      <button
-                        onClick={() => exportPuntSession(selected.label, punts)}
-                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
-                      >
-                        Excel
-                      </button>
-                      <button
-                        onClick={() => {
+                      <ExportButton
+                        onExcel={() => exportPuntSession(selected.label, punts)}
+                        onPDF={() => {
                           const ydsE = punts.filter((p) => p.yards > 0);
                           const htE = punts.filter((p) => p.hangTime > 0);
                           const hasYL = punts.some((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
@@ -432,10 +428,7 @@ function PuntHistoryContent() {
                             athleteBreakdowns
                           );
                         }}
-                        className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 transition-all"
-                      >
-                        PDF
-                      </button>
+                      />
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
