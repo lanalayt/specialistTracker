@@ -121,45 +121,6 @@ export function Header({ title }: { title?: string }) {
 
         <div className="flex-1" />
 
-        {/* Mode toggle */}
-        <div className="flex rounded-full border border-border overflow-hidden flex-shrink-0">
-          <button
-            onClick={() => handleModeChange("team")}
-            className={clsx(
-              "px-2.5 py-1 text-[10px] font-semibold transition-colors",
-              appMode === "team"
-                ? "bg-accent text-slate-900"
-                : "text-muted hover:text-white"
-            )}
-          >
-            Team
-          </button>
-          {isCoach && (
-            <button
-              onClick={() => handleModeChange("scout")}
-              className={clsx(
-                "px-2.5 py-1 text-[10px] font-semibold transition-colors border-l border-border",
-                appMode === "scout"
-                  ? "bg-amber-500 text-slate-900"
-                  : "text-muted hover:text-white"
-              )}
-            >
-              Scout
-            </button>
-          )}
-          <button
-            onClick={() => handleModeChange("athlete")}
-            className={clsx(
-              "px-2.5 py-1 text-[10px] font-semibold transition-colors border-l border-border",
-              appMode === "athlete"
-                ? "bg-sky-500 text-slate-900"
-                : "text-muted hover:text-white"
-            )}
-          >
-            Athlete
-          </button>
-        </div>
-
         {/* User */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted hidden sm:block capitalize">
@@ -190,7 +151,46 @@ export function Header({ title }: { title?: string }) {
         </div>
       </div>
 
-      {/* Mobile bottom nav (rendered via CSS fixed positioning in MobileNav) */}
+      {/* Mode toggle row */}
+      <div className="flex items-center px-3 sm:px-4 py-1.5 border-t border-border/50">
+        <div className="flex rounded-full border border-border overflow-hidden">
+          <button
+            onClick={() => handleModeChange("team")}
+            className={clsx(
+              "px-3 py-1 text-[10px] font-semibold transition-colors",
+              appMode === "team"
+                ? "bg-accent text-slate-900"
+                : "text-muted hover:text-white"
+            )}
+          >
+            Team
+          </button>
+          {isCoach && (
+            <button
+              onClick={() => handleModeChange("scout")}
+              className={clsx(
+                "px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+                appMode === "scout"
+                  ? "bg-amber-500 text-slate-900"
+                  : "text-muted hover:text-white"
+              )}
+            >
+              Scout
+            </button>
+          )}
+          <button
+            onClick={() => handleModeChange("athlete")}
+            className={clsx(
+              "px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+              appMode === "athlete"
+                ? "bg-sky-500 text-slate-900"
+                : "text-muted hover:text-white"
+            )}
+          >
+            Athlete
+          </button>
+        </div>
+      </div>
     </header>
     {/* Mobile drawer — portaled to body so backdrop-blur on header doesn't break fixed positioning */}
     {menuOpen && typeof document !== "undefined" && createPortal(
