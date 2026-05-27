@@ -101,7 +101,7 @@ ${role === "athlete" ? `Your Team Code: ${teamCode}\n\nYou'll need this code dur
     <>
     <aside className="fixed left-0 top-0 h-screen w-56 bg-surface border-r border-border flex flex-col z-40 hidden lg:flex">
       {/* Logo */}
-      <div className="p-5 border-b border-border">
+      <div className="px-4 border-b border-border h-14 flex items-center">
         <div className="flex items-center gap-2.5">
           <input
             ref={fileRef}
