@@ -412,7 +412,7 @@ function KickingHistoryContent() {
                             `FG Session — ${selected.label}`,
                             hdrs,
                             kicks.map((k, i) => {
-                              const row = [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result.startsWith("Y") ? "✓" : "✗"];
+                              const row = [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result.startsWith("Y") ? "GOOD" : "MISS"];
                               if (hasScore) row.push(String(k.score));
                               if (hasOT) row.push(k.opTime && k.opTime > 0 ? k.opTime.toFixed(2) : "—");
                               return row;

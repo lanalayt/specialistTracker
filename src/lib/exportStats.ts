@@ -573,7 +573,7 @@ export function exportFGSession(label: string, kicks: FGKick[]): void {
         k.athlete,
         k.isPAT ? "PAT" : k.dist,
         k.isPAT ? "—" : k.pos,
-        k.result.startsWith("Y") ? "✓" : "✗",
+        k.result.startsWith("Y") ? "GOOD" : "MISS",
       ];
       if (hasScore) row.push(k.score);
       if (hasOT) row.push(k.opTime && k.opTime > 0 ? Number(k.opTime.toFixed(2)) : "—");
