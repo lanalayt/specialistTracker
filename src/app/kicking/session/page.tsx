@@ -1410,11 +1410,11 @@ export default function KickingSessionPage() {
                       </div>
                     </div>
 
-                    {/* Score + Op Time */}
+                    {/* Score + Op Time + Log Snap */}
                     {(scoreEnabled || opTimeEnabled) && (
-                    <div className="flex gap-3 items-end">
+                    <div className="flex gap-2 items-end">
                       {scoreEnabled && (
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0">
                         <p className="label text-slate-100">Score</p>
                         <div className="flex gap-1.5 flex-wrap">
                           {scoreOptions.map((opt) => {
@@ -1439,7 +1439,7 @@ export default function KickingSessionPage() {
                       </div>
                       )}
                       {opTimeEnabled && (
-                      <div className="w-20 shrink-0">
+                      <div className="w-16 shrink-0">
                         <p className="label text-slate-100">OT</p>
                         <input
                           type="text"
@@ -1451,6 +1451,19 @@ export default function KickingSessionPage() {
                         />
                       </div>
                       )}
+                      <div className="shrink-0 ml-auto">
+                        <p className="label text-slate-100">&nbsp;</p>
+                        <button
+                          onClick={() => {
+                            const firstUnlogged = filledRows.findIndex(({ i }) => !snapLogsMap[String(i)]?.length);
+                            setSnapKickIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
+                            setShowSnapOverlay(true);
+                          }}
+                          className="px-3 py-2 rounded-input border border-accent/50 text-accent hover:bg-accent/10 text-xs font-semibold transition-all"
+                        >
+                          Log Snap
+                        </button>
+                      </div>
                     </div>
                     )}
 
@@ -1543,16 +1556,6 @@ export default function KickingSessionPage() {
                     className={`btn-ghost text-xs py-1.5 px-3 ${draftSaved ? "text-make" : ""}`}
                   >
                     {draftSaved ? "Saved!" : "Save Draft"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const firstUnlogged = filledRows.findIndex(({ i }) => !snapLogsMap[String(i)]?.length);
-                      setSnapKickIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
-                      setShowSnapOverlay(true);
-                    }}
-                    className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
-                  >
-                    Log Snap
                   </button>
                   <div className="flex-1" />
                   <button
