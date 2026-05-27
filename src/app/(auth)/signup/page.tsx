@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/lib/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -19,12 +19,35 @@ function SignupInner() {
   const { signUp } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const inviteRole = searchParams.get("role") as "coach" | "athlete" | null;
-  const inviteTeam = searchParams.get("team");
+  const inviteCode = searchParams.get("code");
+  const legacyRole = searchParams.get("role") as "coach" | "athlete" | null;
+  const legacyTeam = searchParams.get("team");
+
+  const [resolvedInvite, setResolvedInvite] = useState<{ teamId: string; role: "coach" | "athlete" } | null>(null);
+  const [resolving, setResolving] = useState(!!inviteCode);
+
+  useEffect(() => {
+    if (inviteCode) {
+      import("@/components/ui/InvitePopup").then(({ resolveInviteCode }) => {
+        resolveInviteCode(inviteCode).then((result) => {
+          setResolvedInvite(result);
+          setResolving(false);
+          if (result) {
+            setRoleChoice(result.role);
+            setTeamChoice("existing");
+            setTeamCode(result.teamId);
+          }
+        });
+      });
+    }
+  }, [inviteCode]);
+
+  const inviteRole = resolvedInvite?.role ?? legacyRole;
+  const inviteTeam = resolvedInvite?.teamId ?? legacyTeam;
   const isInvite = !!inviteRole;
 
-  const [roleChoice, setRoleChoice] = useState<"coach" | "athlete">(inviteRole ?? "coach");
-  const [teamChoice, setTeamChoice] = useState<"new" | "existing">(inviteTeam ? "existing" : "new");
+  const [roleChoice, setRoleChoice] = useState<"coach" | "athlete">(legacyRole ?? "coach");
+  const [teamChoice, setTeamChoice] = useState<"new" | "existing">(legacyTeam ? "existing" : "new");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -38,7 +61,7 @@ function SignupInner() {
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const [teamCode, setTeamCode] = useState(inviteTeam ?? "");
+  const [teamCode, setTeamCode] = useState(legacyTeam ?? "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,9 +84,26 @@ function SignupInner() {
     setLoading(true);
     setError("");
     try {
-      const role: UserRole = roleChoice === "athlete" ? "athlete" : "admin";
       const needsTeamCode = roleChoice === "athlete" || (roleChoice === "coach" && teamChoice === "existing");
-      await signUp(form.email, form.password, form.name, role, needsTeamCode ? teamCode.trim() : undefined);
+      let resolvedTeamId = teamCode.trim();
+      let resolvedRole: "coach" | "athlete" = roleChoice;
+
+      // If the code is short (not a UUID), try to resolve it as an invite code
+      if (needsTeamCode && resolvedTeamId && resolvedTeamId.length < 20) {
+        const { resolveInviteCode } = await import("@/components/ui/InvitePopup");
+        const result = await resolveInviteCode(resolvedTeamId);
+        if (result) {
+          resolvedTeamId = result.teamId;
+          resolvedRole = result.role;
+        } else {
+          setError("Invalid invite code. Check with your coach.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      const role: UserRole = resolvedRole === "athlete" ? "athlete" : "admin";
+      await signUp(form.email, form.password, form.name, role, needsTeamCode ? resolvedTeamId : undefined);
       // Notify about new signup
       await fetch("/api/notify-signup", {
         method: "POST",

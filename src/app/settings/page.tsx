@@ -432,31 +432,38 @@ function SettingsContent() {
             </p>
           </div>
 
-          {/* Team Code */}
-          {isCoach && user?.id && user.id !== "local-dev" && (
-            <div className="card space-y-3">
-              <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-                Team Code
-              </p>
-              <p className="text-xs text-muted">
-                Share this code with your athletes so they can link to your team during sign up.
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-surface-2 border border-border rounded-input px-3 py-2 text-sm font-mono text-accent select-all">
-                  {user.id}
-                </code>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(user.id);
-                    alert("Team code copied!");
-                  }}
-                  className="btn-ghost text-xs py-2 px-4"
-                >
-                  Copy
-                </button>
+          {/* Invite Codes */}
+          {isCoach && user?.id && user.id !== "local-dev" && (() => {
+            const [codes, setCodes] = useState<{ coachCode: string; athleteCode: string } | null>(null);
+            useEffect(() => {
+              import("@/components/ui/InvitePopup").then(({ getOrCreateInviteCodes }) => {
+                getOrCreateInviteCodes(user.id).then(setCodes);
+              });
+            }, []);
+            return (
+              <div className="card space-y-3">
+                <p className="text-xs font-semibold text-muted uppercase tracking-wider">Invite Codes</p>
+                <p className="text-xs text-muted">Share these codes so others can join your team during sign up.</p>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Coach Code</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-surface-2 border border-border rounded-input px-3 py-2 text-sm font-mono text-accent select-all tracking-widest">{codes?.coachCode ?? "..."}</code>
+                      <button onClick={() => { if (codes) { navigator.clipboard.writeText(codes.coachCode); } }} className="btn-ghost text-xs py-2 px-4">Copy</button>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Athlete Code</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-surface-2 border border-sky-500/30 rounded-input px-3 py-2 text-sm font-mono text-sky-400 select-all tracking-widest">{codes?.athleteCode ?? "..."}</code>
+                      <button onClick={() => { if (codes) { navigator.clipboard.writeText(codes.athleteCode); } }} className="btn-ghost text-xs py-2 px-4">Copy</button>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted">The old team ID code still works for existing users.</p>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Archive Stats */}
           <div className="card space-y-3">
