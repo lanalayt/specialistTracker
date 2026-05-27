@@ -49,6 +49,7 @@ export default function ScoutSnapPage() {
   const [rankingTab, setRankingTab] = useState<"short" | "long">("short");
   const [editSnapIdx, setEditSnapIdx] = useState<number | null>(null);
   const [exportRow, setExportRow] = useState<RankedRow | null>(null);
+  const [mergePrompt, setMergePrompt] = useState<{ profile: ScoutProfile; originalName: string } | null>(null);
   const diagramRef = useRef<HTMLDivElement>(null);
   const [editAccuracy, setEditAccuracy] = useState<"Strike" | "Ball" | "">("");
   const [editLaces, setEditLaces] = useState("");
@@ -148,13 +149,46 @@ export default function ScoutSnapPage() {
   const handleSaveProfile = async (profile: ScoutProfile, originalName?: string) => {
     const tid = getTeamId();
     if (!tid) return;
+    if (originalName && originalName !== profile.name) {
+      // Check if new name already exists in any session that also has the old name
+      const hasConflict = sessions.some((s) => {
+        const entries = s.entries as unknown as { athlete?: string }[];
+        return entries.some((e) => e.athlete === originalName) && entries.some((e) => e.athlete === profile.name);
+      });
+      if (hasConflict) {
+        setMergePrompt({ profile, originalName });
+        setProfileOpen(null);
+        return;
+      }
+    }
+    await executeRename(profile, originalName, "rename");
+  };
+
+  const executeRename = async (profile: ScoutProfile, originalName: string | undefined, mode: "merge" | "rename" | "new") => {
+    const tid = getTeamId();
+    if (!tid) return;
     const updated = { ...profiles };
     if (originalName && originalName !== profile.name) {
       delete updated[originalName];
       const supabase = createClient();
       for (const s of sessions) {
         const entries = s.entries as unknown as { athlete?: string }[];
-        if (entries.some((e) => e.athlete === originalName)) {
+        if (!entries.some((e) => e.athlete === originalName)) continue;
+        if (mode === "merge") {
+          // Merge: rename old entries to new name (combines charts)
+          const renamed = entries.map((e) => e.athlete === originalName ? { ...e, athlete: profile.name } : e);
+          await supabase.from("sessions").update({ entries: renamed, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", s.id);
+        } else if (mode === "new") {
+          // Keep separate: move old entries to a new session
+          const oldEntries = entries.filter((e) => e.athlete === originalName).map((e) => ({ ...e, athlete: profile.name }));
+          const remainingEntries = entries.filter((e) => e.athlete !== originalName);
+          // Update original session without the old athlete
+          await supabase.from("sessions").update({ entries: remainingEntries, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", s.id);
+          // Create new session for the renamed entries
+          const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          await supabase.from("sessions").insert({ id: newId, team_id: tid, sport: s.sport, label: s.label, date: s.date, mode: "practice", entries: oldEntries, updated_at: new Date().toISOString() });
+        } else {
+          // No conflict — just rename
           const renamed = entries.map((e) => e.athlete === originalName ? { ...e, athlete: profile.name } : e);
           await supabase.from("sessions").update({ entries: renamed, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", s.id);
         }
@@ -164,6 +198,7 @@ export default function ScoutSnapPage() {
     setProfiles(updated);
     await saveScoutProfiles(tid, updated);
     setProfileOpen(null);
+    setMergePrompt(null);
     if (originalName && originalName !== profile.name) await loadData();
   };
 
@@ -411,6 +446,35 @@ export default function ScoutSnapPage() {
                 PDF
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge prompt */}
+      {mergePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMergePrompt(null)} />
+          <div className="relative bg-surface border border-border rounded-xl w-full max-w-sm mx-4 p-5 space-y-4">
+            <h3 className="text-sm font-bold text-slate-100">Name Conflict</h3>
+            <p className="text-xs text-muted">
+              <span className="text-slate-200 font-semibold">{mergePrompt.profile.name}</span> already has a chart in the same session as <span className="text-slate-200 font-semibold">{mergePrompt.originalName}</span>.
+            </p>
+            <p className="text-xs text-muted">Do you want to merge into one chart or keep them as separate charts?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => executeRename(mergePrompt.profile, mergePrompt.originalName, "merge")}
+                className="btn-primary flex-1 py-2.5 text-sm font-bold"
+              >
+                Merge Charts
+              </button>
+              <button
+                onClick={() => executeRename(mergePrompt.profile, mergePrompt.originalName, "new")}
+                className="btn-ghost flex-1 py-2.5 text-sm font-bold border border-border"
+              >
+                Keep Separate
+              </button>
+            </div>
+            <button onClick={() => setMergePrompt(null)} className="w-full text-center text-xs text-muted hover:text-white transition-colors">Cancel</button>
           </div>
         </div>
       )}
