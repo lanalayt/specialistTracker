@@ -54,10 +54,21 @@ export default function LongSnapHistoryPage() {
   );
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
   const [tab, setTab] = useState<"practice" | "charting">("practice");
+  const [snapTypeTab, setSnapTypeTab] = useState<"short" | "long">("short");
 
-  const filteredHistory = tab === "charting"
+  const baseFiltered = tab === "charting"
     ? history.filter((s) => s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes"))
     : history.filter((s) => !s.label?.startsWith("30 Point Game") && !s.label?.startsWith("Balls & Strikes"));
+
+  // In athlete mode, further filter by snap type
+  const filteredHistory = isAthleteMode
+    ? baseFiltered.filter((s) => {
+        const entries = (s.entries ?? []) as LongSnapEntry[];
+        if (entries.length === 0) return true;
+        const isShort = entries.every((e) => e.snapType === "FG" || e.snapType === "PAT");
+        return snapTypeTab === "short" ? isShort : !isShort;
+      })
+    : baseFiltered;
 
   const selected = selectedId ? filteredHistory.find((s) => s.id === selectedId) ?? null : null;
   const snaps = (selected?.entries ?? []) as LongSnapEntry[];
@@ -67,9 +78,17 @@ export default function LongSnapHistoryPage() {
       {/* Session list — hidden on mobile when a session is selected */}
       <div className={clsx("lg:w-64 border-b lg:border-b-0 lg:border-r border-border overflow-y-auto shrink-0", selected && "hidden lg:block")}>
         <div className="p-4 border-b border-border space-y-2">
-          <div className="flex rounded-input border border-border overflow-hidden w-fit">
-            <button onClick={() => { setTab("practice"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", tab === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Practice</button>
-            <button onClick={() => { setTab("charting"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", tab === "charting" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Charting</button>
+          <div className="flex gap-2 flex-wrap">
+            <div className="flex rounded-input border border-border overflow-hidden w-fit">
+              <button onClick={() => { setTab("practice"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", tab === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Practice</button>
+              <button onClick={() => { setTab("charting"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", tab === "charting" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Charting</button>
+            </div>
+            {isAthleteMode && (
+              <div className="flex rounded-input border border-border overflow-hidden w-fit">
+                <button onClick={() => { setSnapTypeTab("short"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", snapTypeTab === "short" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Short</button>
+                <button onClick={() => { setSnapTypeTab("long"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", snapTypeTab === "long" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Long</button>
+              </div>
+            )}
           </div>
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">
             Sessions ({filteredHistory.length})
@@ -341,9 +360,22 @@ export default function LongSnapHistoryPage() {
                 );
               }
               // Long snap or mixed
-              return (
+              {
+                const longMarkers = snaps
+                  .filter((s) => s.markerX != null && s.markerY != null)
+                  .map((s, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? false }));
+                return (
                 <div className="space-y-3">
                   {isLong && <span className="text-xs font-bold text-accent uppercase tracking-wider">Punt / Long Snap</span>}
+
+                  {longMarkers.length > 0 && (
+                    <div className="card-2 flex justify-center">
+                      <div className="w-full max-w-[280px]">
+                        <PunterStrikeZone markers={longMarkers} />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="card-2 overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -353,6 +385,7 @@ export default function LongSnapHistoryPage() {
                           {!isLong && <th className="table-header">Type</th>}
                           <th className="table-header">Time</th>
                           <th className="table-header">Accuracy</th>
+                          <th className="table-header">Spiral</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -367,13 +400,15 @@ export default function LongSnapHistoryPage() {
                                 {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
                               </span>
                             </td>
+                            <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
-              );
+                );
+              }
             })()}
           </>
         )}

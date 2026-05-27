@@ -291,7 +291,7 @@ function SnapAthleteChartInner() {
         })}
         <div className="flex gap-3 max-w-sm mx-auto">
           {!saved ? <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to History</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
-          <Link href="/athlete/longsnap" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
+          <Link href="/athlete/longsnap" className="btn-ghost flex-1 py-3 text-sm text-center text-miss">Discard</Link>
         </div>
       </main>
     );
@@ -359,7 +359,7 @@ function SnapAthleteChartInner() {
               <button onClick={() => setLaces("1/4 Turn")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "1/4 Turn" ? "bg-warn/20 text-warn border-warn/50" : "bg-surface-2 text-muted border-border")}>1/4</button>
               <button onClick={() => setLaces("Back")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 max-w-[300px]">
               <HolderStrikeZone markers={marker ? [{ ...marker, num: selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} chartMode="simple" missMode={missMode} editable />
             </div>
             <div className="flex flex-col gap-1 shrink-0">
