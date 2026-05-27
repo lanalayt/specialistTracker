@@ -308,7 +308,12 @@ function SnapAthleteChartInner() {
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-slate-100">{currentPlayer}</p>
-          <p className="text-xs text-muted">Snap {selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} / {totalReps}{selectedSnapIdx != null ? " (viewing)" : ""}</p>
+          <div className="text-right">
+            <p className="text-xs text-muted">Snap {selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} / {totalReps}{selectedSnapIdx != null ? " (viewing)" : ""}</p>
+            {isFG && playerEntries.length > 0 && (
+              <p className="text-xs font-bold text-sky-400">{playerEntries.reduce((s, e) => s + (e.score ?? 0), 0)}/{playerEntries.length * 3}</p>
+            )}
+          </div>
         </div>
 
         {/* Diagram + controls inline */}
