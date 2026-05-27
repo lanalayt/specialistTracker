@@ -132,11 +132,32 @@ function SnapAthleteChartInner() {
       markerY: isFG ? marker?.y : puntMarker?.y,
       markerInZone: isFG ? marker?.inZone : puntMarker?.inZone,
     };
-    setEntries((prev) => [...prev, entry]);
+    if (selectedSnapIdx != null) {
+      // Update existing snap
+      const playerEntriesAll = entries.filter((e) => e.athlete === currentPlayer);
+      if (selectedSnapIdx < playerEntriesAll.length) {
+        // Find the actual index in the flat entries array
+        let count = 0;
+        const flatIdx = entries.findIndex((e) => {
+          if (e.athlete === currentPlayer) {
+            if (count === selectedSnapIdx) return true;
+            count++;
+          }
+          return false;
+        });
+        if (flatIdx >= 0) {
+          setEntries((prev) => prev.map((e, i) => i === flatIdx ? entry : e));
+        }
+      }
+      setSelectedSnapIdx(null);
+    } else {
+      // New snap
+      setEntries((prev) => [...prev, entry]);
+    }
     // Reset
     setMarker(null); setPuntMarker(null); setLaces(""); setSpiral(""); setSnapTime(""); setSelectedSnapIdx(null);
-    // Advance
-    if (selectedPlayers.length > 1) setCurrentPlayerIdx((currentPlayerIdx + 1) % selectedPlayers.length);
+    // Advance (only for new snaps)
+    if (selectedSnapIdx == null && selectedPlayers.length > 1) setCurrentPlayerIdx((currentPlayerIdx + 1) % selectedPlayers.length);
     // Check done
     if (entries.length + 1 >= totalReps * selectedPlayers.length) setPhase("results");
   };
@@ -289,7 +310,7 @@ function SnapAthleteChartInner() {
               {pe.map((e, i) => {
                 const isSelected = isActive && selectedSnapIdx === i;
                 return (
-                  <button key={i} onClick={() => selectSnap(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold cursor-pointer transition-all", "bg-white text-bg border-2 border-white", isSelected && "ring-2 ring-accent shadow-md")} title={`${e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}${e.laces ? " | " + e.laces : ""}${e.spiral ? " | " + (e.spiral === "Good" ? "Tight" : "Open") : ""}`}>{i + 1}</button>
+                  <button key={i} onClick={() => selectSnap(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold cursor-pointer transition-all", isSelected ? "bg-accent text-slate-900 ring-2 ring-accent shadow-lg shadow-accent/30 scale-110" : "bg-white text-bg border-2 border-white")} title={`${e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}${e.laces ? " | " + e.laces : ""}${e.spiral ? " | " + (e.spiral === "Good" ? "Tight" : "Open") : ""}`}>{i + 1}</button>
                 );
               })}
               {Array.from({ length: Math.max(0, totalReps - pe.length) }).map((_, i) => {
@@ -353,7 +374,7 @@ function SnapAthleteChartInner() {
           </>
         )}
 
-        <button onClick={handleLog} disabled={!canLog} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Log Snap</button>
+        <button onClick={handleLog} disabled={!canLog} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">{selectedSnapIdx != null ? "Update Snap" : "Log Snap"}</button>
       </div>
 
       {/* Undo + Finish */}
