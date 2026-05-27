@@ -46,6 +46,7 @@ function SnapAthleteChartInner() {
   const [laces, setLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
   const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
   const [snapTime, setSnapTime] = useState("");
+  const [selectedSnapIdx, setSelectedSnapIdx] = useState<number | null>(null);
 
   const athleteNames = athletes.map((a) => a.name);
   const getPlayerEntries = (name: string) => entries.filter((e) => e.athlete === name);
@@ -85,6 +86,28 @@ function SnapAthleteChartInner() {
 
   const togglePlayer = (name: string) => setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
 
+  const selectSnap = (playerIdx: number, snapIdx: number) => {
+    setCurrentPlayerIdx(playerIdx);
+    const pe = getPlayerEntries(selectedPlayers[playerIdx]);
+    if (snapIdx < pe.length) {
+      // Completed snap — load data
+      const e = pe[snapIdx];
+      setSelectedSnapIdx(snapIdx);
+      if (isFG && e.markerX != null && e.markerY != null) {
+        setMarker({ x: e.markerX, y: e.markerY, num: snapIdx + 1, inZone: e.markerInZone ?? false });
+      } else if (!isFG && e.markerX != null && e.markerY != null) {
+        setPuntMarker({ x: e.markerX, y: e.markerY, num: snapIdx + 1, inZone: e.markerInZone ?? false });
+      }
+      setLaces((e.laces as "Good" | "1/4 Turn" | "Back" | "") || "");
+      setSpiral(e.spiral === "Good" ? "Good" : e.spiral === "Bad" ? "Bad" : "");
+      setSnapTime(e.time > 0 ? String(Math.round(e.time * 100)) : "");
+    } else {
+      // Empty snap — clear inputs
+      setSelectedSnapIdx(null);
+      setMarker(null); setPuntMarker(null); setLaces(""); setSpiral(""); setSnapTime("");
+    }
+  };
+
   const canLog = isFG ? !!marker && !!laces && !!spiral : !!puntMarker && !!spiral;
 
   const handleLog = () => {
@@ -111,7 +134,7 @@ function SnapAthleteChartInner() {
     };
     setEntries((prev) => [...prev, entry]);
     // Reset
-    setMarker(null); setPuntMarker(null); setLaces(""); setSpiral(""); setSnapTime("");
+    setMarker(null); setPuntMarker(null); setLaces(""); setSpiral(""); setSnapTime(""); setSelectedSnapIdx(null);
     // Advance
     if (selectedPlayers.length > 1) setCurrentPlayerIdx((currentPlayerIdx + 1) % selectedPlayers.length);
     // Check done
@@ -263,13 +286,17 @@ function SnapAthleteChartInner() {
           <div key={player} className={clsx("space-y-1", !isActive && selectedPlayers.length > 1 && "opacity-50")}>
             <button onClick={() => setCurrentPlayerIdx(selectedPlayers.indexOf(player))} className="text-xs font-bold text-slate-200 hover:text-accent transition-colors">{player}</button>
             <div className="flex flex-wrap gap-1.5">
-              {pe.map((e, i) => (
-                <div key={i} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border", e.accuracy === "ON_TARGET" ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss")}>{i + 1}</div>
-              ))}
-              {Array.from({ length: Math.max(0, totalReps - pe.length) }).map((_, i) => {
-                const isNext = i === 0 && isActive;
+              {pe.map((e, i) => {
+                const isSelected = isActive && selectedSnapIdx === i;
                 return (
-                  <div key={`e-${i}`} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border", isNext ? "border-accent/60 text-accent bg-accent/10" : "border-border/40 text-muted/40")}>{pe.length + i + 1}</div>
+                  <button key={i} onClick={() => selectSnap(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold border cursor-pointer transition-all", e.accuracy === "ON_TARGET" ? "bg-make/20 border-make/40 text-make" : "bg-miss/20 border-miss/40 text-miss", isSelected && "ring-2 ring-accent shadow-md")} title={`${e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}${e.laces ? " | " + e.laces : ""}${e.spiral ? " | " + (e.spiral === "Good" ? "Tight" : "Open") : ""}`}>{i + 1}</button>
+                );
+              })}
+              {Array.from({ length: Math.max(0, totalReps - pe.length) }).map((_, i) => {
+                const snapIdx = pe.length + i;
+                const isNext = i === 0 && isActive && selectedSnapIdx === null;
+                return (
+                  <button key={`e-${i}`} onClick={() => selectSnap(selectedPlayers.indexOf(player), snapIdx)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-semibold border cursor-pointer transition-all", isNext ? "border-accent text-accent bg-accent/15 ring-2 ring-accent" : "border-border/40 text-muted/40 hover:border-accent/40")}>{snapIdx + 1}</button>
                 );
               })}
             </div>
@@ -281,7 +308,7 @@ function SnapAthleteChartInner() {
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-slate-100">{currentPlayer}</p>
-          <p className="text-xs text-muted">Snap {playerEntries.length + 1} / {totalReps}</p>
+          <p className="text-xs text-muted">Snap {selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} / {totalReps}{selectedSnapIdx != null ? " (viewing)" : ""}</p>
         </div>
 
         {/* Diagram + controls inline */}
@@ -294,7 +321,7 @@ function SnapAthleteChartInner() {
               <button onClick={() => setLaces("Back")} className={clsx("px-2 py-2 rounded-input text-[10px] font-bold border transition-all", laces === "Back" ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Back</button>
             </div>
             <div className="flex-1 min-w-0">
-              <HolderStrikeZone markers={marker ? [{ ...marker, num: playerEntries.length + 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={playerEntries.length + 1} chartMode="simple" missMode="simple" editable />
+              <HolderStrikeZone markers={marker ? [{ ...marker, num: selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1 }] : []} onSnap={(m) => setMarker(m)} nextNum={selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} chartMode="simple" missMode="simple" editable />
             </div>
             <div className="flex flex-col gap-1 shrink-0">
               <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
@@ -306,7 +333,7 @@ function SnapAthleteChartInner() {
           <>
             <div className="flex items-center gap-1">
               <div className="flex-1 min-w-0">
-                <PunterStrikeZone markers={puntMarker ? [{ ...puntMarker, num: playerEntries.length + 1 }] : []} onSnap={(m) => setPuntMarker(m)} nextNum={playerEntries.length + 1} chartMode="simple" missMode="simple" editable />
+                <PunterStrikeZone markers={puntMarker ? [{ ...puntMarker, num: selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1 }] : []} onSnap={(m) => setPuntMarker(m)} nextNum={selectedSnapIdx != null ? selectedSnapIdx + 1 : playerEntries.length + 1} chartMode="simple" missMode="simple" editable />
               </div>
               <div className="flex flex-col gap-1 shrink-0">
                 <p className="text-[8px] font-semibold text-muted uppercase tracking-wider text-center mb-0.5">Spiral</p>
@@ -338,6 +365,8 @@ function SnapAthleteChartInner() {
               <th className="text-[10px] text-muted text-left py-1 px-2">#</th>
               <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
               <th className="text-[10px] text-muted text-center py-1 px-2">Result</th>
+              {isFG && <th className="text-[10px] text-muted text-center py-1 px-2">Laces</th>}
+              <th className="text-[10px] text-muted text-center py-1 px-2">Spiral</th>
               <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
             </tr></thead>
             <tbody>
@@ -346,6 +375,8 @@ function SnapAthleteChartInner() {
                   <td className="text-muted py-1 px-2">{entries.length - i}</td>
                   <td className="py-1 px-2 text-slate-200">{e.athlete}</td>
                   <td className={clsx("text-center py-1 px-2 font-bold", e.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
+                  {isFG && <td className={clsx("text-center py-1 px-2", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{e.laces === "Good" ? "Perfect" : e.laces === "1/4 Turn" ? "1/4" : e.laces || "—"}</td>}
+                  <td className={clsx("text-center py-1 px-2", e.spiral === "Good" ? "text-make" : "text-miss")}>{e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "—"}</td>
                   <td className="text-right py-1 px-2 font-bold text-sky-400">{e.score}/{isFG ? 3 : 1}</td>
                 </tr>
               ))}
