@@ -507,7 +507,7 @@ export function exportLongSnapStatsPDF(
   history: { date?: string; entries?: LongSnapEntry[] }[]
 ) {
   import("jspdf").then(({ default: jsPDF }) => {
-    import("jspdf-autotable").then(({ default: autoTable }) => {
+    import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF();
       addLogoToPDF(doc as any);
       const statsMap = computeSnapStats(athletes, history);
@@ -547,6 +547,7 @@ export function exportLongSnapStatsPDF(
         }
       });
 
+      await addAppLogoToPDFFooter(doc as any, false);
       doc.save("Long_Snap_Stats.pdf");
     });
   });
@@ -649,7 +650,7 @@ export function exportSessionPDF(
   athleteBreakdowns?: { name: string; stats: Record<string, string> }[]
 ): void {
   import("jspdf").then(({ default: jsPDF }) => {
-    import("jspdf-autotable").then(({ default: autoTable }) => {
+    import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF();
       addLogoToPDF(doc as any);
 
@@ -683,6 +684,7 @@ export function exportSessionPDF(
         }
       }
 
+      await addAppLogoToPDFFooter(doc as any, false);
       doc.save(`${title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
     });
   });
@@ -696,7 +698,7 @@ export function exportFGStatsPDF(
   hasStarred: boolean
 ) {
   import("jspdf").then(({ default: jsPDF }) => {
-    import("jspdf-autotable").then(({ default: autoTable }) => {
+    import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
       addLogoToPDF(doc as any, true);
 
@@ -730,6 +732,7 @@ export function exportFGStatsPDF(
         addSheet("Live Reps", fgStatsToAOA(athletes, computeFGStats(athletes, history, (k) => !!k.starred)));
       }
 
+      await addAppLogoToPDFFooter(doc as any, false);
       doc.save("FG_Kicking_Stats.pdf");
     });
   });
@@ -741,7 +744,7 @@ export function exportPuntStatsPDF(
   puntTypes: { id: string; label: string }[]
 ) {
   import("jspdf").then(({ default: jsPDF }) => {
-    import("jspdf-autotable").then(({ default: autoTable }) => {
+    import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
       addLogoToPDF(doc as any, true);
 
@@ -769,6 +772,7 @@ export function exportPuntStatsPDF(
 
       addSheet("Monthly", puntStatsToAOA(athletes, computePuntStats(athletes, filterSessions(history, getMonthStart(now), getMonthEnd(now)), () => true), puntTypes));
 
+      await addAppLogoToPDFFooter(doc as any, true);
       doc.save("Punting_Stats.pdf");
     });
   });
@@ -779,7 +783,7 @@ export function exportKickoffStatsPDF(
   history: { date?: string; entries?: KickoffEntry[] }[]
 ) {
   import("jspdf").then(({ default: jsPDF }) => {
-    import("jspdf-autotable").then(({ default: autoTable }) => {
+    import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
       addLogoToPDF(doc as any, true);
 
@@ -807,6 +811,7 @@ export function exportKickoffStatsPDF(
 
       addSheet("Monthly", koStatsToAOA(athletes, computeKOStats(athletes, filterSessions(history, getMonthStart(now), getMonthEnd(now)))));
 
+      await addAppLogoToPDFFooter(doc as any, true);
       doc.save("Kickoff_Stats.pdf");
     });
   });

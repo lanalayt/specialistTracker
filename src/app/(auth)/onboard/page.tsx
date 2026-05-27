@@ -49,9 +49,7 @@ export default function OnboardPage() {
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-accent rounded-xl flex items-center justify-center text-bg font-black text-xl mx-auto mb-3">
-            ST
-          </div>
+          <img src="/logo-mark.svg" alt="Specialist Tracker" className="w-12 h-12 mx-auto mb-3" />
           <h1 className="text-2xl font-extrabold text-slate-100">
             Set up your team
           </h1>

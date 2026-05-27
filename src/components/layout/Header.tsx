@@ -106,7 +106,7 @@ export function Header({ title }: { title?: string }) {
             {logo ? (
               <img src={logo} alt="Team logo" className="w-full h-full object-cover" />
             ) : (
-              "ST"
+              <img src="/logo-mark.svg" alt="Specialist Tracker" className="w-full h-full" />
             )}
           </button>
           <span className="text-[11px] xs:text-sm sm:text-lg font-extrabold text-slate-100 leading-tight min-w-0 break-words">

@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { ScoutSession } from "@/lib/scoutStore";
-import { addLogoToPDF } from "@/lib/exportStats";
+import { addLogoToPDF, addAppLogoToPDFFooter } from "@/lib/exportStats";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ export function exportFGScoutExcel(sessions: ScoutSession[]) {
   XLSX.writeFile(wb, "FG_Scout_Rankings.xlsx");
 }
 
-export function exportFGScoutPDF(sessions: ScoutSession[]) {
+export async function exportFGScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
   addLogoToPDF(doc as any, true);
   const rows = buildFGRows(sessions);
@@ -68,6 +68,7 @@ export function exportFGScoutPDF(sessions: ScoutSession[]) {
     doc.text(r.date, 14, 22);
     autoTable(doc, { head: [r.head], body: r.body, startY: 26, styles: { fontSize: 9 } });
   });
+  await addAppLogoToPDFFooter(doc as any, true);
   doc.save("FG_Scout_Rankings.pdf");
 }
 
@@ -113,7 +114,7 @@ export function exportPuntScoutExcel(sessions: ScoutSession[]) {
   XLSX.writeFile(wb, "Punt_Scout_Rankings.xlsx");
 }
 
-export function exportPuntScoutPDF(sessions: ScoutSession[]) {
+export async function exportPuntScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
   addLogoToPDF(doc as any, true);
   const rows = buildPuntKORows(sessions, "Punt");
@@ -125,6 +126,7 @@ export function exportPuntScoutPDF(sessions: ScoutSession[]) {
     doc.text(r.date, 14, 22);
     autoTable(doc, { head: [r.head], body: r.body, startY: 26, styles: { fontSize: 8 } });
   });
+  await addAppLogoToPDFFooter(doc as any, true);
   doc.save("Punt_Scout_Rankings.pdf");
 }
 
@@ -138,7 +140,7 @@ export function exportKOScoutExcel(sessions: ScoutSession[]) {
   XLSX.writeFile(wb, "KO_Scout_Rankings.xlsx");
 }
 
-export function exportKOScoutPDF(sessions: ScoutSession[]) {
+export async function exportKOScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
   addLogoToPDF(doc as any, true);
   const rows = buildPuntKORows(sessions, "KO");
@@ -150,6 +152,7 @@ export function exportKOScoutPDF(sessions: ScoutSession[]) {
     doc.text(r.date, 14, 22);
     autoTable(doc, { head: [r.head], body: r.body, startY: 26, styles: { fontSize: 8 } });
   });
+  await addAppLogoToPDFFooter(doc as any, true);
   doc.save("KO_Scout_Rankings.pdf");
 }
 
@@ -343,10 +346,11 @@ export async function exportIndividualSnapPDF(data: SnapChartData, diagramImage?
     return [String(i + 1), e.accuracy ?? "", e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "", e.time ?? "", `${e.points ?? e.score ?? 0}/1`];
   });
   autoTable(doc, { head, body, startY: tableStartY, styles: { fontSize: 9 } });
+  await addAppLogoToPDFFooter(doc as any, false);
   doc.save(`${data.name}_Snap_Chart.pdf`);
 }
 
-export function exportSnapScoutPDF(sessions: ScoutSession[]) {
+export async function exportSnapScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF();
   addLogoToPDF(doc as any);
   const { short, long } = buildSnapRanked(sessions);
@@ -373,5 +377,6 @@ export function exportSnapScoutPDF(sessions: ScoutSession[]) {
       styles: { fontSize: 10 },
     });
   }
+  await addAppLogoToPDFFooter(doc as any, false);
   doc.save("Snap_Scout_Rankings.pdf");
 }

@@ -21,7 +21,7 @@ const config: Config = {
         muted: "var(--muted)",
       },
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
+        sans: ["Geist", "Inter", "system-ui", "sans-serif"],
       },
       borderRadius: {
         card: "16px",

@@ -92,12 +92,12 @@ export function Sidebar() {
             {logo ? (
               <img src={logo} alt="Team logo" className="w-full h-full object-cover" />
             ) : (
-              "ST"
+              <img src="/logo-mark.svg" alt="Specialist Tracker" className="w-full h-full" />
             )}
           </button>
           <div>
-            <p className="text-sm font-bold text-slate-100 leading-none">{isScoutRoute ? "Scout" : isAthleteRoute ? "Athlete" : "Specialist"}</p>
-            <p className={clsx("text-xs leading-none mt-0.5", isScoutRoute ? "text-amber-400" : isAthleteRoute ? "text-sky-400" : "text-muted")}>{isScoutRoute ? "Mode" : isAthleteRoute ? "Mode" : "Tracker"}</p>
+            <p className="text-sm font-extrabold text-white leading-none uppercase" style={{ letterSpacing: "-0.04em" }}>{isScoutRoute ? "Scout" : isAthleteRoute ? "Athlete" : "Specialist"}</p>
+            <p className={clsx("text-[10px] font-medium leading-none mt-1 uppercase", isScoutRoute ? "text-amber-400" : isAthleteRoute ? "text-sky-400" : "text-accent")} style={{ letterSpacing: "0.18em" }}>{isScoutRoute ? "Mode" : isAthleteRoute ? "Mode" : "Tracker"}</p>
           </div>
         </div>
       </div>
