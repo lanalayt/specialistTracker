@@ -39,6 +39,31 @@ export function addLogoToPDF(doc: { addImage: (data: string, format: string, x: 
   try { doc.addImage(logo, "PNG", pageW - 28, 5, 18, 18); } catch {}
 }
 
+let _appLogoCache: string | null = null;
+export async function addAppLogoToPDFFooter(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; internal: { pageSize: { getHeight: () => number; getWidth: () => number } } }, landscape?: boolean): Promise<void> {
+  try {
+    if (!_appLogoCache) {
+      const resp = await fetch("/logo-mark.svg");
+      const svgText = await resp.text();
+      const canvas = document.createElement("canvas");
+      canvas.width = 96; canvas.height = 96;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject();
+        img.src = "data:image/svg+xml;base64," + btoa(svgText);
+      });
+      ctx.drawImage(img, 0, 0, 96, 96);
+      _appLogoCache = canvas.toDataURL("image/png");
+    }
+    const pageW = landscape ? 297 : 210;
+    const pageH = landscape ? 210 : 297;
+    doc.addImage(_appLogoCache, "PNG", (pageW - 10) / 2, pageH - 18, 10, 10);
+  } catch {}
+}
+
 // ─── Shared types ───────────────────────────────────────────────────────────
 
 type CellValue = string | number;
@@ -533,18 +558,27 @@ export function exportLongSnapStatsPDF(
 
 /** Export a single FG session to Excel */
 export function exportFGSession(label: string, kicks: FGKick[]): void {
+  const hasScore = kicks.some((k) => k.score > 0);
+  const hasOT = kicks.some((k) => k.opTime && k.opTime > 0);
+  const header: Row = ["#", "Athlete", "Distance", "Position", "Result"];
+  if (hasScore) header.push("Score");
+  if (hasOT) header.push("OT");
   const rows: Row[] = [
     ["FG Session — " + label],
     [],
-    ["#", "Athlete", "Distance", "Position", "Result", "Score"],
-    ...kicks.map((k, i) => [
-      k.kickNum ?? i + 1,
-      k.athlete,
-      k.isPAT ? "PAT" : k.dist,
-      k.isPAT ? "—" : k.pos,
-      k.result,
-      k.score,
-    ]),
+    header,
+    ...kicks.map((k, i) => {
+      const row: Row = [
+        k.kickNum ?? i + 1,
+        k.athlete,
+        k.isPAT ? "PAT" : k.dist,
+        k.isPAT ? "—" : k.pos,
+        k.result.startsWith("Y") ? "✓" : "✗",
+      ];
+      if (hasScore) row.push(k.score);
+      if (hasOT) row.push(k.opTime && k.opTime > 0 ? Number(k.opTime.toFixed(2)) : "—");
+      return row;
+    }),
   ];
   // Summary
   const fgKicks = kicks.filter((k) => !k.isPAT);

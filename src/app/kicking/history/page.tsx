@@ -403,10 +403,20 @@ function KickingHistoryContent() {
                             if (pats.length > 0) stats["PAT"] = `${patMade}/${pats.length}`;
                             return { name, stats };
                           });
+                          const hasScore = kicks.some((k) => k.score > 0);
+                          const hasOT = kicks.some((k) => k.opTime && k.opTime > 0);
+                          const hdrs = ["#", "Athlete", "Dist", "Pos", "Result"];
+                          if (hasScore) hdrs.push("Score");
+                          if (hasOT) hdrs.push("OT");
                           exportSessionPDF(
                             `FG Session — ${selected.label}`,
-                            ["#", "Athlete", "Dist", "Pos", "Result", "Score"],
-                            kicks.map((k, i) => [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result, String(k.score)]),
+                            hdrs,
+                            kicks.map((k, i) => {
+                              const row = [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result.startsWith("Y") ? "✓" : "✗"];
+                              if (hasScore) row.push(String(k.score));
+                              if (hasOT) row.push(k.opTime && k.opTime > 0 ? k.opTime.toFixed(2) : "—");
+                              return row;
+                            }),
                             { Made: `${m}/${fgK.length}`, Pct: fgK.length > 0 ? `${Math.round((m / fgK.length) * 100)}%` : "—" },
                             athleteBreakdowns
                           );
