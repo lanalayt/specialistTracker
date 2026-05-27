@@ -1848,6 +1848,7 @@ export default function KickingSessionPage() {
             </h2>
             {!viewOnly && (
               <div className="flex gap-2">
+                {(manualEntry || sessionActive) && (
                 <button
                   onClick={() => {
                     // Start at first filled row without a snap logged
@@ -1859,6 +1860,7 @@ export default function KickingSessionPage() {
                 >
                   Log Snap
                 </button>
+                )}
                 <button
                   onClick={addRow}
                   className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
