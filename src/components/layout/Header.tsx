@@ -152,7 +152,7 @@ export function Header({ title }: { title?: string }) {
       </div>
 
       {/* Mode toggle row */}
-      <div className="flex items-center px-3 sm:px-4 py-1.5 border-t border-border/50">
+      <div className="flex items-center px-3 sm:px-4 py-1.5">
         <div className="flex rounded-full border border-border overflow-hidden">
           <button
             onClick={() => handleModeChange("team")}
