@@ -210,44 +210,44 @@ function KickoffHistoryContent() {
               )}
               <p className="text-xs text-muted mt-0.5">{entries.length} kickoff{entries.length !== 1 ? "s" : ""}</p>
               </div>
-              {!viewOnly && (
-                <div className="flex gap-2 ml-3 shrink-0">
-                  {editing ? (
-                    <>
-                      <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">Save Changes</button>
-                      <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">Cancel</button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>
-                      <ExportButton
-                        onExcel={() => exportKOSession(selected.label, entries)}
-                        onPDF={() => {
-                          const dE = entries.filter((k) => k.distance > 0);
-                          const hE = entries.filter((k) => k.hangTime > 0);
-                          const athleteNames = [...new Set(entries.map((k) => k.athlete))];
-                          const athleteBreakdowns = athleteNames.map((name) => {
-                            const ak = entries.filter((k) => k.athlete === name);
-                            const aD = ak.filter((k) => k.distance > 0);
-                            const aH = ak.filter((k) => k.hangTime > 0);
-                            return {
-                              name,
-                              stats: {
-                                KOs: String(ak.length),
-                                "Avg Dist": aD.length > 0 ? (aD.reduce((s, k) => s + k.distance, 0) / aD.length).toFixed(1) : "—",
-                                "Avg Hang": aH.length > 0 ? (aH.reduce((s, k) => s + k.hangTime, 0) / aH.length).toFixed(2) + "s" : "—",
-                              },
-                            };
-                          });
-                          exportSessionPDF(
-                            `Kickoff Session — ${selected.label}`,
-                            ["#", "Athlete", "Type", "Dist", "Hang", "Dir"],
-                            entries.map((k, i) => [String(k.kickNum ?? i + 1), k.athlete, k.type, k.distance > 0 ? `${k.distance}` : "—", k.hangTime > 0 ? k.hangTime.toFixed(2) : "—", k.direction || "—"]),
-                            { Kickoffs: String(entries.length), "Avg Dist": dE.length > 0 ? (dE.reduce((s, k) => s + k.distance, 0) / dE.length).toFixed(1) : "—", "Avg Hang": hE.length > 0 ? (hE.reduce((s, k) => s + k.hangTime, 0) / hE.length).toFixed(2) + "s" : "—" },
-                            athleteBreakdowns
-                          );
-                        }}
-                      />
+              <div className="flex gap-2 ml-3 shrink-0">
+                {!viewOnly && editing ? (
+                  <>
+                    <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">Save Changes</button>
+                    <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    {!viewOnly && <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>}
+                    <ExportButton
+                      onExcel={() => exportKOSession(selected.label, entries)}
+                      onPDF={() => {
+                        const dE = entries.filter((k) => k.distance > 0);
+                        const hE = entries.filter((k) => k.hangTime > 0);
+                        const athleteNames = [...new Set(entries.map((k) => k.athlete))];
+                        const athleteBreakdowns = athleteNames.map((name) => {
+                          const ak = entries.filter((k) => k.athlete === name);
+                          const aD = ak.filter((k) => k.distance > 0);
+                          const aH = ak.filter((k) => k.hangTime > 0);
+                          return {
+                            name,
+                            stats: {
+                              KOs: String(ak.length),
+                              "Avg Dist": aD.length > 0 ? (aD.reduce((s, k) => s + k.distance, 0) / aD.length).toFixed(1) : "—",
+                              "Avg Hang": aH.length > 0 ? (aH.reduce((s, k) => s + k.hangTime, 0) / aH.length).toFixed(2) + "s" : "—",
+                            },
+                          };
+                        });
+                        exportSessionPDF(
+                          `Kickoff Session — ${selected.label}`,
+                          ["#", "Athlete", "Type", "Dist", "Hang", "Dir"],
+                          entries.map((k, i) => [String(k.kickNum ?? i + 1), k.athlete, k.type, k.distance > 0 ? `${k.distance}` : "—", k.hangTime > 0 ? k.hangTime.toFixed(2) : "—", k.direction || "—"]),
+                          { Kickoffs: String(entries.length), "Avg Dist": dE.length > 0 ? (dE.reduce((s, k) => s + k.distance, 0) / dE.length).toFixed(1) : "—", "Avg Hang": hE.length > 0 ? (hE.reduce((s, k) => s + k.hangTime, 0) / hE.length).toFixed(2) + "s" : "—" },
+                          athleteBreakdowns
+                        );
+                      }}
+                    />
+                    {!viewOnly && (
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
@@ -257,10 +257,10 @@ function KickoffHistoryContent() {
                         }}
                         className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
                       >Delete</button>
-                    </>
-                  )}
-                </div>
-              )}
+                    )}
+                  </>
+                )}
+              </div>
             </div>
             {/* Weather display / edit */}
             <div className="mb-4">

@@ -6,6 +6,8 @@ import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
+import { ExportButton } from "@/components/ui/ExportButton";
+import { exportLongSnapSession, exportSessionPDF } from "@/lib/exportStats";
 import type { LongSnapEntry, SnapBenchmark, Session } from "@/types";
 import clsx from "clsx";
 
@@ -197,8 +199,8 @@ export default function LongSnapHistoryPage() {
                 <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>
                 <p className="text-xs text-muted mt-0.5">{snaps.length} snap{snaps.length !== 1 ? "s" : ""}</p>
               </div>
-              {!viewOnly && (
-                <div className="flex items-center gap-2 ml-3 shrink-0">
+              <div className="flex items-center gap-2 ml-3 shrink-0">
+                {!viewOnly && (
                   <button
                     onClick={() => setEditing(!editing)}
                     className={clsx(
@@ -210,6 +212,51 @@ export default function LongSnapHistoryPage() {
                   >
                     {editing ? "Done" : "Edit"}
                   </button>
+                )}
+                <ExportButton
+                  onExcel={() => exportLongSnapSession(selected.label, snaps)}
+                  onPDF={() => {
+                    const isShort = snaps.every((s) => s.snapType === "FG" || s.snapType === "PAT");
+                    const strikes = snaps.filter((s) => s.accuracy === "ON_TARGET").length;
+                    const athleteNames = [...new Set(snaps.map((s) => s.athlete))];
+                    const athleteBreakdowns = athleteNames.map((name) => {
+                      const as = snaps.filter((s) => s.athlete === name);
+                      const aStr = as.filter((s) => s.accuracy === "ON_TARGET").length;
+                      const stats: Record<string, string> = {
+                        Snaps: String(as.length),
+                        Strikes: `${aStr}/${as.length}`,
+                        "%": as.length > 0 ? `${Math.round((aStr / as.length) * 100)}%` : "—",
+                      };
+                      if (isShort) {
+                        const sc = as.reduce((sum, s) => sum + (s.score ?? 0), 0);
+                        stats["Score"] = `${sc}/${as.length * 3}`;
+                      } else {
+                        const timed = as.filter((s) => s.time > 0);
+                        if (timed.length > 0) stats["Avg Time"] = `${(timed.reduce((sum, s) => sum + s.time, 0) / timed.length).toFixed(2)}s`;
+                      }
+                      return { name, stats };
+                    });
+                    const hdrs = isShort
+                      ? ["#", "Athlete", "Accuracy", "Laces", "Spiral", "Score"]
+                      : ["#", "Athlete", "Time", "Accuracy", "Spiral"];
+                    const summary: Record<string, string> = {
+                      Snaps: String(snaps.length),
+                      Strikes: `${strikes}/${snaps.length}`,
+                      "%": snaps.length > 0 ? `${Math.round((strikes / snaps.length) * 100)}%` : "—",
+                    };
+                    exportSessionPDF(
+                      `Snap Session — ${selected.label}`,
+                      hdrs,
+                      snaps.map((s, i) => isShort
+                        ? [String(i + 1), s.athlete, s.accuracy === "ON_TARGET" ? "Strike" : "Ball", s.laces === "Good" ? "Perfect" : s.laces || "—", s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—", `${s.score ?? 0}/3`]
+                        : [String(i + 1), s.athlete, s.time > 0 ? s.time.toFixed(2) : "—", s.accuracy === "ON_TARGET" ? "Strike" : "Ball", s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"]
+                      ),
+                      summary,
+                      athleteBreakdowns
+                    );
+                  }}
+                />
+                {!viewOnly && (
                   <button
                     onClick={() => {
                       if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
@@ -222,8 +269,8 @@ export default function LongSnapHistoryPage() {
                   >
                     Delete Session
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             {/* Weather display / edit */}
             <div className="mb-4">

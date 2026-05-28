@@ -357,78 +357,80 @@ function PuntHistoryContent() {
               )}
               <p className="text-xs text-muted mt-0.5">{punts.length} punt{punts.length !== 1 ? "s" : ""}</p>
               </div>
-              {!viewOnly && (
-                <div className="flex gap-2 ml-3 shrink-0">
-                  {editing ? (
-                    <>
-                      <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">
-                        Save Changes
-                      </button>
-                      <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
+              <div className="flex gap-2 ml-3 shrink-0">
+                {!viewOnly && editing ? (
+                  <>
+                    <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">
+                      Save Changes
+                    </button>
+                    <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {!viewOnly && (
                       <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">
                         Edit
                       </button>
-                      <ExportButton
-                        onExcel={() => exportPuntSession(selected.label, punts)}
-                        onPDF={() => {
-                          const ydsE = punts.filter((p) => p.yards > 0);
-                          const htE = punts.filter((p) => p.hangTime > 0);
-                          const hasYL = punts.some((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
-                          const hdrs = ["#", "Athlete", "Type", "Yards"];
-                          if (hasYL) hdrs.push("YL");
-                          hdrs.push("Hang", "OT", "Dir");
-                          const athleteNames = [...new Set(punts.map((p) => p.athlete))];
-                          const athleteBreakdowns = athleteNames.map((name) => {
-                            const ap = punts.filter((p) => p.athlete === name);
-                            const aYds = ap.filter((p) => p.yards > 0);
-                            const aHt = ap.filter((p) => p.hangTime > 0);
-                            const aOt = ap.filter((p) => (p.opTime || 0) > 0);
-                            const aDa = ap.filter((p) => typeof p.directionalAccuracy === "number");
-                            const stats: Record<string, string> = {
-                              Punts: String(ap.length),
-                              "Avg Dist": aYds.length > 0 ? (aYds.reduce((s, p) => s + p.yards, 0) / aYds.length).toFixed(1) : "—",
-                              "Avg Hang": aHt.length > 0 ? (aHt.reduce((s, p) => s + p.hangTime, 0) / aHt.length).toFixed(2) + "s" : "—",
-                              "Avg OT": aOt.length > 0 ? (aOt.reduce((s, p) => s + (p.opTime || 0), 0) / aOt.length).toFixed(2) + "s" : "—",
-                              "Dir %": aDa.length > 0 ? Math.round((aDa.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / aDa.length) * 100) + "%" : "—",
-                            };
-                            const poochYL = ap.filter((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
-                            if (poochYL.length > 0) {
-                              stats["Pooch Avg YL"] = (poochYL.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / poochYL.length).toFixed(1);
-                            }
-                            return { name, stats };
-                          });
-                          exportSessionPDF(
-                            `Punt Session — ${selected.label}`,
-                            hdrs,
-                            punts.map((p, i) => {
-                              const row = [
-                                String(p.kickNum ?? i + 1),
-                                p.athlete,
-                                p.type || "—",
-                                p.yards > 0 ? `${p.yards}` : "—",
-                              ];
-                              if (hasYL) row.push(p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? String(p.poochLandingYardLine) : "—");
-                              row.push(
-                                p.hangTime > 0 ? p.hangTime.toFixed(2) : "—",
-                                (p.opTime || 0) > 0 ? p.opTime.toFixed(2) : "—",
-                                String(p.directionalAccuracy ?? "—"),
-                              );
-                              return row;
-                            }),
-                            {
-                              Punts: String(punts.length),
-                              "Avg Dist": ydsE.length > 0 ? (ydsE.reduce((s, p) => s + p.yards, 0) / ydsE.length).toFixed(1) : "—",
-                              "Avg Hang": htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) + "s" : "—",
-                            },
-                            athleteBreakdowns
-                          );
-                        }}
-                      />
+                    )}
+                    <ExportButton
+                      onExcel={() => exportPuntSession(selected.label, punts)}
+                      onPDF={() => {
+                        const ydsE = punts.filter((p) => p.yards > 0);
+                        const htE = punts.filter((p) => p.hangTime > 0);
+                        const hasYL = punts.some((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+                        const hdrs = ["#", "Athlete", "Type", "Yards"];
+                        if (hasYL) hdrs.push("YL");
+                        hdrs.push("Hang", "OT", "Dir");
+                        const athleteNames = [...new Set(punts.map((p) => p.athlete))];
+                        const athleteBreakdowns = athleteNames.map((name) => {
+                          const ap = punts.filter((p) => p.athlete === name);
+                          const aYds = ap.filter((p) => p.yards > 0);
+                          const aHt = ap.filter((p) => p.hangTime > 0);
+                          const aOt = ap.filter((p) => (p.opTime || 0) > 0);
+                          const aDa = ap.filter((p) => typeof p.directionalAccuracy === "number");
+                          const stats: Record<string, string> = {
+                            Punts: String(ap.length),
+                            "Avg Dist": aYds.length > 0 ? (aYds.reduce((s, p) => s + p.yards, 0) / aYds.length).toFixed(1) : "—",
+                            "Avg Hang": aHt.length > 0 ? (aHt.reduce((s, p) => s + p.hangTime, 0) / aHt.length).toFixed(2) + "s" : "—",
+                            "Avg OT": aOt.length > 0 ? (aOt.reduce((s, p) => s + (p.opTime || 0), 0) / aOt.length).toFixed(2) + "s" : "—",
+                            "Dir %": aDa.length > 0 ? Math.round((aDa.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / aDa.length) * 100) + "%" : "—",
+                          };
+                          const poochYL = ap.filter((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+                          if (poochYL.length > 0) {
+                            stats["Pooch Avg YL"] = (poochYL.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / poochYL.length).toFixed(1);
+                          }
+                          return { name, stats };
+                        });
+                        exportSessionPDF(
+                          `Punt Session — ${selected.label}`,
+                          hdrs,
+                          punts.map((p, i) => {
+                            const row = [
+                              String(p.kickNum ?? i + 1),
+                              p.athlete,
+                              p.type || "—",
+                              p.yards > 0 ? `${p.yards}` : "—",
+                            ];
+                            if (hasYL) row.push(p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? String(p.poochLandingYardLine) : "—");
+                            row.push(
+                              p.hangTime > 0 ? p.hangTime.toFixed(2) : "—",
+                              (p.opTime || 0) > 0 ? p.opTime.toFixed(2) : "—",
+                              String(p.directionalAccuracy ?? "—"),
+                            );
+                            return row;
+                          }),
+                          {
+                            Punts: String(punts.length),
+                            "Avg Dist": ydsE.length > 0 ? (ydsE.reduce((s, p) => s + p.yards, 0) / ydsE.length).toFixed(1) : "—",
+                            "Avg Hang": htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) + "s" : "—",
+                          },
+                          athleteBreakdowns
+                        );
+                      }}
+                    />
+                    {!viewOnly && (
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
@@ -440,10 +442,10 @@ function PuntHistoryContent() {
                       >
                         Delete
                       </button>
-                    </>
-                  )}
-                </div>
-              )}
+                    )}
+                  </>
+                )}
+              </div>
             </div>
             {/* Weather display / edit */}
             <div className="mb-4">

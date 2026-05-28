@@ -39,28 +39,31 @@ export function addLogoToPDF(doc: { addImage: (data: string, format: string, x: 
   try { doc.addImage(logo, "PNG", pageW - 28, 5, 18, 18); } catch {}
 }
 
-const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96"><rect x="0" y="0" width="96" height="96" rx="22" fill="#0E1318" stroke="rgba(46,224,168,0.25)" stroke-width="1"/><g fill="none" stroke="#2EE0A8" stroke-width="3.5" stroke-linecap="round"><path d="M11 24 L11 11 L24 11"/><path d="M85 24 L85 11 L72 11"/><path d="M11 72 L11 85 L24 85"/><path d="M85 72 L85 85 L72 85"/></g><text x="29" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#FFFFFF">S</text><text x="67" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#FFFFFF">T</text><circle cx="48" cy="50" r="7" fill="#E5B649" opacity="0.18"/><circle cx="48" cy="50" r="4" fill="#E5B649"/></svg>`;
+const LOGO_LOCKUP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="640" height="240"><g transform="translate(12 12)"><rect x="0" y="0" width="96" height="96" rx="22" fill="#0E1318" stroke="rgba(46,224,168,0.25)" stroke-width="1"/><g fill="none" stroke="#2EE0A8" stroke-width="3.5" stroke-linecap="round"><path d="M11 24 L11 11 L24 11"/><path d="M85 24 L85 11 L72 11"/><path d="M11 72 L11 85 L24 85"/><path d="M85 72 L85 85 L72 85"/></g><text x="29" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#FFFFFF">S</text><text x="67" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#FFFFFF">T</text><circle cx="48" cy="50" r="7" fill="#E5B649" opacity="0.18"/><circle cx="48" cy="50" r="4" fill="#E5B649"/></g><text x="124" y="56" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#FFFFFF">SPECIALIST</text><text x="124" y="86" font-family="Arial,sans-serif" font-weight="500" font-size="30" letter-spacing="3.6" fill="#2EE0A8">TRACKER</text></svg>`;
 
 let _appLogoCache: string | null = null;
 export async function addAppLogoToPDFFooter(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; internal: { pageSize: { getHeight: () => number; getWidth: () => number } } }, landscape?: boolean): Promise<void> {
   try {
     if (!_appLogoCache) {
       const canvas = document.createElement("canvas");
-      canvas.width = 96; canvas.height = 96;
+      canvas.width = 640; canvas.height = 240;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       const img = new Image();
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = () => reject(new Error("Logo image failed to load"));
-        img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(LOGO_SVG);
+        img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(LOGO_LOCKUP_SVG);
       });
-      ctx.drawImage(img, 0, 0, 96, 96);
+      ctx.drawImage(img, 0, 0, 640, 240);
       _appLogoCache = canvas.toDataURL("image/png");
     }
     const pageW = landscape ? 297 : 210;
     const pageH = landscape ? 210 : 297;
-    doc.addImage(_appLogoCache, "PNG", (pageW - 10) / 2, pageH - 18, 10, 10);
+    // Full lockup: ~40mm wide x 15mm tall, centered at bottom
+    const logoW = 40;
+    const logoH = 15;
+    doc.addImage(_appLogoCache, "PNG", (pageW - logoW) / 2, pageH - 20, logoW, logoH);
   } catch (err) { console.error("PDF footer logo failed:", err); }
 }
 
@@ -639,6 +642,51 @@ export function exportKOSession(label: string, kicks: KickoffEntry[]): void {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, aoaToSheet(rows), "Session");
   XLSX.writeFile(wb, `KO_${label.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`);
+}
+
+export function exportLongSnapSession(label: string, snaps: LongSnapEntry[]): void {
+  const isShort = snaps.every((s) => s.snapType === "FG" || s.snapType === "PAT");
+  const header: Row = isShort
+    ? ["#", "Athlete", "Type", "Accuracy", "Laces", "Spiral", "Score"]
+    : ["#", "Athlete", "Type", "Time", "Accuracy", "Spiral"];
+  const rows: Row[] = [
+    ["Long Snap Session — " + label],
+    [],
+    header,
+    ...snaps.map((s, i) => {
+      if (isShort) {
+        return [
+          i + 1,
+          s.athlete,
+          s.snapType,
+          s.accuracy === "ON_TARGET" ? "Strike" : "Ball",
+          s.laces === "Good" ? "Perfect" : s.laces || "—",
+          s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—",
+          s.score ?? 0,
+        ] as Row;
+      }
+      return [
+        i + 1,
+        s.athlete,
+        s.snapType,
+        s.time > 0 ? Number(s.time.toFixed(2)) : "—",
+        s.accuracy === "ON_TARGET" ? "Strike" : "Ball",
+        s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—",
+      ] as Row;
+    }),
+  ];
+  const strikes = snaps.filter((s) => s.accuracy === "ON_TARGET").length;
+  rows.push([], ["Summary"], ["Snaps", snaps.length], ["Strikes", strikes], ["Pct", snaps.length > 0 ? `${Math.round((strikes / snaps.length) * 100)}%` : "—"]);
+  if (isShort) {
+    const totalScore = snaps.reduce((sum, s) => sum + (s.score ?? 0), 0);
+    rows.push(["Score", `${totalScore}/${snaps.length * 3}`]);
+  } else {
+    const timed = snaps.filter((s) => s.time > 0);
+    if (timed.length > 0) rows.push(["Avg Time", `${(timed.reduce((sum, s) => sum + s.time, 0) / timed.length).toFixed(2)}s`]);
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, aoaToSheet(rows), "Session");
+  XLSX.writeFile(wb, `Snap_${label.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`);
 }
 
 /** Export a single session to a printable PDF (opens browser print dialog) */

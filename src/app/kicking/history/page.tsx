@@ -371,57 +371,57 @@ function KickingHistoryContent() {
                   <span className="text-accent font-semibold">{makePct(kicks.length, makes)}</span>
                 </p>
               </div>
-              {!viewOnly && (
-                <div className="flex gap-2 ml-3 shrink-0">
-                  {editing ? (
-                    <>
-                      <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">Save Changes</button>
-                      <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">Cancel</button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>
-                      <ExportButton
-                        onExcel={() => exportFGSession(selected.label, kicks)}
-                        onPDF={() => {
-                          const fgK = kicks.filter((k) => !k.isPAT);
-                          const m = fgK.filter((k) => k.result.startsWith("Y")).length;
-                          const athleteNames = [...new Set(kicks.map((k) => k.athlete))];
-                          const athleteBreakdowns = athleteNames.map((name) => {
-                            const ak = kicks.filter((k) => k.athlete === name);
-                            const fg = ak.filter((k) => !k.isPAT);
-                            const made = fg.filter((k) => k.result.startsWith("Y")).length;
-                            const madeK = fg.filter((k) => k.result.startsWith("Y"));
-                            const long = madeK.length > 0 ? Math.max(...madeK.map((k) => k.dist)) : 0;
-                            const pats = ak.filter((k) => k.isPAT);
-                            const patMade = pats.filter((k) => k.result.startsWith("Y")).length;
-                            const stats: Record<string, string> = {
-                              "FG": `${made}/${fg.length}`,
-                              "%": fg.length > 0 ? `${Math.round((made / fg.length) * 100)}%` : "—",
-                              "Long": long > 0 ? `${long}` : "—",
-                            };
-                            if (pats.length > 0) stats["PAT"] = `${patMade}/${pats.length}`;
-                            return { name, stats };
-                          });
-                          const hasScore = kicks.some((k) => k.score > 0);
-                          const hasOT = kicks.some((k) => k.opTime && k.opTime > 0);
-                          const hdrs = ["#", "Athlete", "Dist", "Pos", "Result"];
-                          if (hasScore) hdrs.push("Score");
-                          if (hasOT) hdrs.push("OT");
-                          exportSessionPDF(
-                            `FG Session — ${selected.label}`,
-                            hdrs,
-                            kicks.map((k, i) => {
-                              const row = [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result.startsWith("Y") ? "GOOD" : k.result === "XL" ? "MISS LEFT" : k.result === "XR" ? "MISS RIGHT" : k.result === "XS" ? "MISS SHORT" : "MISS"];
-                              if (hasScore) row.push(String(k.score));
-                              if (hasOT) row.push(k.opTime && k.opTime > 0 ? k.opTime.toFixed(2) : "—");
-                              return row;
-                            }),
-                            { Made: `${m}/${fgK.length}`, Pct: fgK.length > 0 ? `${Math.round((m / fgK.length) * 100)}%` : "—" },
-                            athleteBreakdowns
-                          );
-                        }}
-                      />
+              <div className="flex gap-2 ml-3 shrink-0">
+                {!viewOnly && editing ? (
+                  <>
+                    <button onClick={saveEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-make/50 text-make hover:bg-make/10 transition-all font-semibold">Save Changes</button>
+                    <button onClick={cancelEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-border text-muted hover:text-white transition-all">Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    {!viewOnly && <button onClick={startEditing} className="text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">Edit</button>}
+                    <ExportButton
+                      onExcel={() => exportFGSession(selected.label, kicks)}
+                      onPDF={() => {
+                        const fgK = kicks.filter((k) => !k.isPAT);
+                        const m = fgK.filter((k) => k.result.startsWith("Y")).length;
+                        const athleteNames = [...new Set(kicks.map((k) => k.athlete))];
+                        const athleteBreakdowns = athleteNames.map((name) => {
+                          const ak = kicks.filter((k) => k.athlete === name);
+                          const fg = ak.filter((k) => !k.isPAT);
+                          const made = fg.filter((k) => k.result.startsWith("Y")).length;
+                          const madeK = fg.filter((k) => k.result.startsWith("Y"));
+                          const long = madeK.length > 0 ? Math.max(...madeK.map((k) => k.dist)) : 0;
+                          const pats = ak.filter((k) => k.isPAT);
+                          const patMade = pats.filter((k) => k.result.startsWith("Y")).length;
+                          const stats: Record<string, string> = {
+                            "FG": `${made}/${fg.length}`,
+                            "%": fg.length > 0 ? `${Math.round((made / fg.length) * 100)}%` : "—",
+                            "Long": long > 0 ? `${long}` : "—",
+                          };
+                          if (pats.length > 0) stats["PAT"] = `${patMade}/${pats.length}`;
+                          return { name, stats };
+                        });
+                        const hasScore = kicks.some((k) => k.score > 0);
+                        const hasOT = kicks.some((k) => k.opTime && k.opTime > 0);
+                        const hdrs = ["#", "Athlete", "Dist", "Pos", "Result"];
+                        if (hasScore) hdrs.push("Score");
+                        if (hasOT) hdrs.push("OT");
+                        exportSessionPDF(
+                          `FG Session — ${selected.label}`,
+                          hdrs,
+                          kicks.map((k, i) => {
+                            const row = [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result.startsWith("Y") ? "GOOD" : k.result === "XL" ? "MISS LEFT" : k.result === "XR" ? "MISS RIGHT" : k.result === "XS" ? "MISS SHORT" : "MISS"];
+                            if (hasScore) row.push(String(k.score));
+                            if (hasOT) row.push(k.opTime && k.opTime > 0 ? k.opTime.toFixed(2) : "—");
+                            return row;
+                          }),
+                          { Made: `${m}/${fgK.length}`, Pct: fgK.length > 0 ? `${Math.round((m / fgK.length) * 100)}%` : "—" },
+                          athleteBreakdowns
+                        );
+                      }}
+                    />
+                    {!viewOnly && (
                       <button
                         onClick={() => {
                           if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
@@ -431,10 +431,10 @@ function KickingHistoryContent() {
                         }}
                         className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
                       >Delete</button>
-                    </>
-                  )}
-                </div>
-              )}
+                    )}
+                  </>
+                )}
+              </div>
             </div>
             {/* Weather display / edit */}
             <div className="mb-4">
