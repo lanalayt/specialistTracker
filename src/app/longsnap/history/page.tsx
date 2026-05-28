@@ -42,18 +42,6 @@ const BM_COLORS: Record<SnapBenchmark, string> = {
   needsWork: "text-miss",
 };
 
-// Cycle laces: Good -> 1/4 Turn -> Back -> Good
-function cycleLaces(current?: string): string {
-  if (current === "Good") return "1/4 Turn";
-  if (current === "1/4 Turn") return "Back";
-  return "Good";
-}
-
-// Cycle spiral: Good -> Bad -> Good
-function cycleSpiral(current?: string): string {
-  return current === "Good" ? "Bad" : "Good";
-}
-
 // Recalculate 30-point score: 1pt location + 1pt laces + 1pt spiral
 function calc30PtScore(s: LongSnapEntry): number {
   let score = 0;
@@ -62,6 +50,27 @@ function calc30PtScore(s: LongSnapEntry): number {
   if (s.spiral === "Good") score += 1;
   return score;
 }
+
+const SEL = "bg-surface-2 border border-border text-slate-200 text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60 appearance-none cursor-pointer";
+
+const ACC_OPTIONS: { value: string; label: string }[] = [
+  { value: "ON_TARGET", label: "Strike" },
+  { value: "HIGH", label: "Ball ↑ High" },
+  { value: "LOW", label: "Ball ↓ Low" },
+  { value: "LEFT", label: "Ball ← Left" },
+  { value: "RIGHT", label: "Ball → Right" },
+];
+
+const LACES_OPTIONS: { value: string; label: string }[] = [
+  { value: "Good", label: "Perfect" },
+  { value: "1/4 Turn", label: "1/4 Turn" },
+  { value: "Back", label: "Back" },
+];
+
+const SPIRAL_OPTIONS: { value: string; label: string }[] = [
+  { value: "Good", label: "Tight" },
+  { value: "Bad", label: "Open" },
+];
 
 // Pencil icon SVG
 const PencilIcon = () => (
@@ -293,23 +302,23 @@ export default function LongSnapHistoryPage() {
                                       <td className="text-muted py-1 px-1">{i + 1}</td>
                                       <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
                                         {editing ? (
-                                          <button onClick={() => { const acc = s.accuracy === "ON_TARGET" ? "HIGH" : "ON_TARGET"; const updated = { ...s, accuracy: acc as LongSnapEntry["accuracy"], markerInZone: acc === "ON_TARGET" }; updateSnap(snapIdx, { ...updated, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
-                                            {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
-                                          </button>
+                                          <select value={s.accuracy} onChange={(e) => { const acc = e.target.value as LongSnapEntry["accuracy"]; const updated = { ...s, accuracy: acc, markerInZone: acc === "ON_TARGET" }; updateSnap(snapIdx, { accuracy: acc, markerInZone: acc === "ON_TARGET", score: calc30PtScore(updated) }); }} className={SEL}>
+                                            {ACC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                          </select>
                                         ) : (s.accuracy === "ON_TARGET" ? "Strike" : "Ball")}
                                       </td>
                                       <td className={clsx("text-center py-1 px-1", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>
                                         {editing ? (
-                                          <button onClick={() => { const laces = cycleLaces(s.laces); const updated = { ...s, laces }; updateSnap(snapIdx, { laces, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
-                                            {s.laces === "Good" ? "Perfect" : s.laces || "—"}
-                                          </button>
+                                          <select value={s.laces || "Good"} onChange={(e) => { const laces = e.target.value; const updated = { ...s, laces }; updateSnap(snapIdx, { laces, score: calc30PtScore(updated) }); }} className={SEL}>
+                                            {LACES_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                          </select>
                                         ) : (s.laces === "Good" ? "Perfect" : s.laces || "—")}
                                       </td>
                                       <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>
                                         {editing ? (
-                                          <button onClick={() => { const spiral = cycleSpiral(s.spiral); const updated = { ...s, spiral }; updateSnap(snapIdx, { spiral, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
-                                            {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
-                                          </button>
+                                          <select value={s.spiral || "Good"} onChange={(e) => { const spiral = e.target.value; const updated = { ...s, spiral }; updateSnap(snapIdx, { spiral, score: calc30PtScore(updated) }); }} className={SEL}>
+                                            {SPIRAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                          </select>
                                         ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
                                       </td>
                                       <td className="text-right py-1 px-1 font-bold text-accent">{s.score ?? "—"}</td>
@@ -387,16 +396,16 @@ export default function LongSnapHistoryPage() {
                                       </td>
                                       <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>
                                         {editing ? (
-                                          <button onClick={() => updateSnap(snapIdx, { spiral: cycleSpiral(s.spiral) })} className="underline decoration-dotted underline-offset-2">
-                                            {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
-                                          </button>
+                                          <select value={s.spiral || "Good"} onChange={(e) => updateSnap(snapIdx, { spiral: e.target.value })} className={SEL}>
+                                            {SPIRAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                          </select>
                                         ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
                                       </td>
                                       <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
                                         {editing ? (
-                                          <button onClick={() => updateSnap(snapIdx, { accuracy: s.accuracy === "ON_TARGET" ? "HIGH" as LongSnapEntry["accuracy"] : "ON_TARGET", markerInZone: s.accuracy !== "ON_TARGET" })} className="underline decoration-dotted underline-offset-2">
-                                            {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
-                                          </button>
+                                          <select value={s.accuracy} onChange={(e) => { const acc = e.target.value as LongSnapEntry["accuracy"]; updateSnap(snapIdx, { accuracy: acc, markerInZone: acc === "ON_TARGET" }); }} className={SEL}>
+                                            {ACC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                          </select>
                                         ) : (s.accuracy === "ON_TARGET" ? "Strike" : "Ball")}
                                       </td>
                                     </tr>
@@ -468,9 +477,9 @@ export default function LongSnapHistoryPage() {
                               <td className="table-name">{s.athlete}</td>
                               <td className="table-cell">
                                 {editing ? (
-                                  <button onClick={() => { const acc = s.accuracy === "ON_TARGET" ? "HIGH" : "ON_TARGET"; const updated = { ...s, accuracy: acc as LongSnapEntry["accuracy"], markerInZone: acc === "ON_TARGET" }; updateSnap(i, { ...updated, score: calc30PtScore(updated) }); }} className={clsx("text-xs font-semibold underline decoration-dotted underline-offset-2", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                    {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
-                                  </button>
+                                  <select value={s.accuracy} onChange={(e) => { const acc = e.target.value as LongSnapEntry["accuracy"]; const updated = { ...s, accuracy: acc, markerInZone: acc === "ON_TARGET" }; updateSnap(i, { accuracy: acc, markerInZone: acc === "ON_TARGET", score: calc30PtScore(updated) }); }} className={SEL}>
+                                    {ACC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                  </select>
                                 ) : (
                                   <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
                                     {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
@@ -479,16 +488,16 @@ export default function LongSnapHistoryPage() {
                               </td>
                               <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>
                                 {editing ? (
-                                  <button onClick={() => { const laces = cycleLaces(s.laces); const updated = { ...s, laces }; updateSnap(i, { laces, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
-                                    {s.laces === "Good" ? "Perfect" : s.laces || "—"}
-                                  </button>
+                                  <select value={s.laces || "Good"} onChange={(e) => { const laces = e.target.value; const updated = { ...s, laces }; updateSnap(i, { laces, score: calc30PtScore(updated) }); }} className={SEL}>
+                                    {LACES_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                  </select>
                                 ) : (s.laces === "Good" ? "Perfect" : s.laces || "—")}
                               </td>
                               <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
                                 {editing ? (
-                                  <button onClick={() => { const spiral = cycleSpiral(s.spiral); const updated = { ...s, spiral }; updateSnap(i, { spiral, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
-                                    {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
-                                  </button>
+                                  <select value={s.spiral || "Good"} onChange={(e) => { const spiral = e.target.value; const updated = { ...s, spiral }; updateSnap(i, { spiral, score: calc30PtScore(updated) }); }} className={SEL}>
+                                    {SPIRAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                  </select>
                                 ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
                               </td>
                               <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>
@@ -557,9 +566,9 @@ export default function LongSnapHistoryPage() {
                             </td>
                             <td className="table-cell">
                               {editing ? (
-                                <button onClick={() => updateSnap(i, { accuracy: s.accuracy === "ON_TARGET" ? "HIGH" as LongSnapEntry["accuracy"] : "ON_TARGET", markerInZone: s.accuracy !== "ON_TARGET" })} className={clsx("text-xs font-semibold underline decoration-dotted underline-offset-2", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                  {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s, false); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
-                                </button>
+                                <select value={s.accuracy} onChange={(e) => { const acc = e.target.value as LongSnapEntry["accuracy"]; updateSnap(i, { accuracy: acc, markerInZone: acc === "ON_TARGET" }); }} className={SEL}>
+                                  {ACC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                </select>
                               ) : (
                                 <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
                                   {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s, false); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
@@ -568,9 +577,9 @@ export default function LongSnapHistoryPage() {
                             </td>
                             <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
                               {editing ? (
-                                <button onClick={() => updateSnap(i, { spiral: cycleSpiral(s.spiral) })} className="underline decoration-dotted underline-offset-2">
-                                  {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
-                                </button>
+                                <select value={s.spiral || "Good"} onChange={(e) => updateSnap(i, { spiral: e.target.value })} className={SEL}>
+                                  {SPIRAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                </select>
                               ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
                             </td>
                           </tr>
