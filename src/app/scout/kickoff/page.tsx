@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
 import { exportKOScoutExcel, exportKOScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -22,8 +22,15 @@ function calcAvg(scores: number[], dropWorst: boolean): number {
   return parseFloat((best.reduce((s, v) => s + v, 0) / best.length).toFixed(2));
 }
 
+const parseHangRaw = (raw: string): number => {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return 0;
+  return parseFloat(`${digits.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${digits.padStart(3, "0").slice(-2)}`);
+};
+
 export default function ScoutKOPage() {
   const [tab, setTab] = useState<"chart" | "rankings">("chart");
+  const [liveMode, setLiveMode] = useState(false);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
@@ -33,6 +40,15 @@ export default function ScoutKOPage() {
   const [editDist, setEditDist] = useState("");
   const [editHang, setEditHang] = useState("");
   const [editDir, setEditDir] = useState(true);
+
+  // Live input state
+  const [liveAthletes, setLiveAthletes] = useState<string[]>([]);
+  const [liveAthlete, setLiveAthlete] = useState("");
+  const [newLiveAthlete, setNewLiveAthlete] = useState("");
+  const [liveDistInput, setLiveDistInput] = useState("");
+  const [liveHangInput, setLiveHangInput] = useState("");
+  const [liveDirGood, setLiveDirGood] = useState(true);
+  const [liveKicks, setLiveKicks] = useState<{ athlete: string; distance: number; hangTime: number; directionGood: boolean; score: number }[]>([]);
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -45,6 +61,57 @@ export default function ScoutKOPage() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    async function loadLiveAthletes() {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const names = await loadScoutAthletes(tid, "kickoff");
+      setLiveAthletes(names);
+      if (names.length > 0 && !liveAthlete) setLiveAthlete(names[0]);
+    }
+    loadLiveAthletes();
+  }, []);
+
+  const addLiveAthlete = async () => {
+    const trimmed = newLiveAthlete.trim();
+    if (!trimmed || liveAthletes.includes(trimmed)) return;
+    const updated = [...liveAthletes, trimmed];
+    setLiveAthletes(updated);
+    setNewLiveAthlete("");
+    if (!liveAthlete) setLiveAthlete(trimmed);
+    const tid = getTeamId();
+    if (tid) await saveScoutAthletes(tid, "kickoff", updated);
+  };
+
+  const handleLiveLog = () => {
+    const dist = parseInt(liveDistInput);
+    const hang = parseHangRaw(liveHangInput);
+    if (isNaN(dist) || dist <= 0 || !hang || !liveAthlete) return;
+    const score = parseFloat((dist + hang * 10 + (liveDirGood ? 0 : -10)).toFixed(2));
+    setLiveKicks((prev) => [...prev, { athlete: liveAthlete, distance: dist, hangTime: hang, directionGood: liveDirGood, score }]);
+    setLiveDistInput("");
+    setLiveHangInput("");
+    setLiveDirGood(true);
+  };
+
+  const handleLiveSave = async () => {
+    if (liveKicks.length === 0) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const athletes = [...new Set(liveKicks.map((k) => k.athlete))];
+    const label = `KO Scout — ${athletes.map((a) => { const ak = liveKicks.filter((k) => k.athlete === a); return `${a}: ${calcAvg(ak.map((k) => k.score), true).toFixed(2)}`; }).join(", ")}`;
+    await insertScoutSession(tid, {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      sport: "SCOUT_KO",
+      label,
+      date: new Date().toISOString(),
+      entries: liveKicks.map((k, i) => ({ ...k, kickNum: i + 1, dropWorst: true })) as unknown as Record<string, unknown>[],
+    });
+    setLiveKicks([]);
+    await loadData();
+  };
 
   // Build per-session-per-athlete rows
   const ranked: { name: string; sessionId: string; date: string; entries: KOEntry[]; avg: number; worst: number | null }[] = [];
@@ -132,16 +199,73 @@ export default function ScoutKOPage() {
           <button onClick={() => setTab("rankings")} className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors border-l border-border", tab === "rankings" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Rankings</button>
         </div>
 
-        {tab === "chart" && (
+        {tab === "chart" && !liveMode && (
           <div className="space-y-4">
             <p className="text-sm text-muted">Start a new kickoff evaluation.</p>
-            <Link href="/scout/kickoff/chart" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex items-center gap-4 py-4 px-5 max-w-md">
-              <span className="text-2xl">📋</span>
-              <div>
-                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Start KO Chart</h3>
-                <p className="text-[10px] text-muted">Select athletes, set number of kicks</p>
+            <div className="grid grid-cols-3 gap-3 max-w-lg">
+              <Link href="/scout/kickoff/chart" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
+                <p className="text-2xl mb-2">📋</p>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Preset Chart</h3>
+                <p className="text-[10px] text-muted mt-1">Set kicks per player</p>
+              </Link>
+              <Link href="/scout/kickoff/chart?mode=manual" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
+                <p className="text-2xl mb-2">✏️</p>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Manual Chart</h3>
+                <p className="text-[10px] text-muted mt-1">Enter kicks on the fly</p>
+              </Link>
+              <button onClick={() => setLiveMode(true)} className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
+                <p className="text-2xl mb-2">⚡</p>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Live Input</h3>
+                <p className="text-[10px] text-muted mt-1">One kick at a time</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab === "chart" && liveMode && (
+          <div className="space-y-4">
+            <button onClick={() => setLiveMode(false)} className="text-xs text-muted hover:text-white transition-colors">&larr; Back to Chart Options</button>
+            <div className="card space-y-3">
+              <p className="text-sm font-bold text-slate-100">Live Input</p>
+              <p className="text-[10px] text-muted">Enter distance, hang time, direction — one kick at a time.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {liveAthletes.map((a) => (
+                  <button key={a} onClick={() => setLiveAthlete(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", liveAthlete === a ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                ))}
               </div>
-            </Link>
+              <div className="flex gap-1.5">
+                <input type="text" value={newLiveAthlete} onChange={(e) => setNewLiveAthlete(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="Add athlete..." className="input flex-1 text-xs py-1" />
+                <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim()} className="text-[10px] text-amber-400 hover:underline disabled:opacity-40">Add</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+                  <input type="text" inputMode="numeric" value={liveDistInput} onChange={(e) => setLiveDistInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted text-center mb-1">Hang Time</p>
+                  <input type="text" inputMode="numeric" value={liveHangInput ? parseHangRaw(liveHangInput).toFixed(2) : ""} onChange={(e) => setLiveHangInput(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+                </div>
+              </div>
+              <div className="flex rounded-input border border-border overflow-hidden">
+                <button onClick={() => setLiveDirGood(true)} className={clsx("flex-1 py-2 text-sm font-semibold transition-colors", liveDirGood ? "bg-make text-slate-900" : "text-muted hover:text-white")}>Good Dir</button>
+                <button onClick={() => setLiveDirGood(false)} className={clsx("flex-1 py-2 text-sm font-semibold transition-colors border-l border-border", !liveDirGood ? "bg-miss text-white" : "text-muted hover:text-white")}>Bad Dir (-10)</button>
+              </div>
+              <button onClick={handleLiveLog} disabled={!liveDistInput || !liveHangInput || !liveAthlete} className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-40">Log Kick</button>
+              {liveKicks.length > 0 && (
+                <div className="space-y-1 pt-2 border-t border-border/50">
+                  {[...liveKicks].reverse().map((k, i) => (
+                    <div key={liveKicks.length - 1 - i} className="flex items-center text-xs gap-2">
+                      <span className="text-muted w-5">#{liveKicks.length - i}</span>
+                      <span className="text-slate-400 w-16 truncate">{k.athlete}</span>
+                      <span className={clsx(k.directionGood ? "text-make" : "text-miss")}>{k.distance}yd {k.hangTime.toFixed(2)}s</span>
+                      <span className="text-amber-400 font-bold ml-auto">{k.score.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <button onClick={handleLiveSave} className="btn-primary w-full py-2 text-xs font-bold mt-2">Save {liveKicks.length} Kick{liveKicks.length !== 1 ? "s" : ""} to Rankings</button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

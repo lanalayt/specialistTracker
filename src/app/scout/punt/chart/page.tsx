@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
 import { insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
@@ -27,12 +28,14 @@ function calcAvg(scores: number[], dropWorst: boolean): number {
   return parseFloat((best.reduce((s, v) => s + v, 0) / best.length).toFixed(2));
 }
 
-export default function ScoutPuntChartPage() {
+function ScoutPuntChartInner() {
+  const searchParams = useSearchParams();
+  const isManual = searchParams.get("mode") === "manual";
   const [phase, setPhase] = useState<"setup" | "live" | "results">("setup");
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
-  const [puntsPerPlayer, setPuntsPerPlayer] = useState("5");
+  const [puntsPerPlayer, setPuntsPerPlayer] = useState(isManual ? "0" : "5");
   const [dropWorst, setDropWorst] = useState(true);
   const [saved, setSaved] = useState(false);
 
@@ -138,11 +141,11 @@ export default function ScoutPuntChartPage() {
   if (phase === "setup") {
     return (
       <>
-        <Header title="Punt Scout" />
+        <Header title={isManual ? "Punt Manual Chart" : "Punt Preset Chart"} />
         <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
           <Link href="/scout/punt" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
-          <h2 className="text-lg font-bold text-slate-100">Punt Chart Setup</h2>
-          <p className="text-xs text-muted">Select or add punters, then set number of punts.</p>
+          <h2 className="text-lg font-bold text-slate-100">{isManual ? "Manual Chart Setup" : "Punt Chart Setup"}</h2>
+          <p className="text-xs text-muted">Select or add punters{isManual ? "" : ", then set number of punts"}.</p>
           <div className="flex flex-wrap gap-1.5">
             {athleteNames.map((a) => (
               <div key={a} className="flex items-center gap-0.5">
@@ -156,10 +159,12 @@ export default function ScoutPuntChartPage() {
             <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
           </div>
           {selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
-          <div>
-            <p className="text-xs text-muted mb-1">Punts per player</p>
-            <input type="text" inputMode="numeric" value={puntsPerPlayer} onChange={(e) => setPuntsPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
-          </div>
+          {!isManual && (
+            <div>
+              <p className="text-xs text-muted mb-1">Punts per player</p>
+              <input type="text" inputMode="numeric" value={puntsPerPlayer} onChange={(e) => setPuntsPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
+            </div>
+          )}
           <div className="flex items-center justify-between card-2 px-4 py-3">
             <div>
               <p className="text-xs font-semibold text-slate-200">Drop Worst Kick</p>
@@ -177,7 +182,7 @@ export default function ScoutPuntChartPage() {
             <p>Punt score = Distance + (Hang Time x 15). Bad direction = -10.</p>
             <p>Final = average of all punts{dropWorst ? ", dropping the worst one" : ""}.</p>
           </div>
-          <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || !parseInt(puntsPerPlayer)} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
+          <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || (!isManual && !parseInt(puntsPerPlayer))} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
         </main>
       </>
     );
@@ -246,7 +251,7 @@ export default function ScoutPuntChartPage() {
   }
 
   // ── Live ──
-  const kpp = parseInt(puntsPerPlayer) || 0;
+  const kpp = isManual ? 0 : (parseInt(puntsPerPlayer) || 0);
   const playerKickCount = getPlayerResults(activePlayer).length;
 
   return (
@@ -269,7 +274,7 @@ export default function ScoutPuntChartPage() {
               >
                 <p className="text-xs font-bold text-slate-200">{p}</p>
                 <p className="text-lg font-black text-amber-400">{count > 0 ? avg.toFixed(2) : "—"}</p>
-                <p className="text-[10px] text-muted">{count}/{kpp} punts</p>
+                <p className="text-[10px] text-muted">{count}{kpp > 0 ? `/${kpp}` : ""} punts</p>
               </button>
             );
           })}
@@ -280,7 +285,7 @@ export default function ScoutPuntChartPage() {
         </p>
 
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{activePlayer} — Punt {playerKickCount + 1} of {kpp}</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{activePlayer} — Punt {playerKickCount + 1}{kpp > 0 ? ` of ${kpp}` : ""}</p>
         </div>
 
         <div className="card space-y-3">
@@ -330,5 +335,13 @@ export default function ScoutPuntChartPage() {
         )}
       </main>
     </>
+  );
+}
+
+export default function ScoutPuntChartPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted">Loading...</div>}>
+      <ScoutPuntChartInner />
+    </Suspense>
   );
 }

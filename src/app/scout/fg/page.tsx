@@ -22,6 +22,7 @@ interface FGEntry { athlete: string; kickNum: number; distance: number; hash: st
 
 export default function ScoutFGPage() {
   const [tab, setTab] = useState<"chart" | "rankings">("chart");
+  const [liveMode, setLiveMode] = useState(false);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
@@ -182,10 +183,10 @@ export default function ScoutFGPage() {
           <button onClick={() => setTab("rankings")} className={clsx("px-5 py-1.5 text-xs font-semibold transition-colors border-l border-border", tab === "rankings" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Rankings</button>
         </div>
 
-        {tab === "chart" && (
+        {tab === "chart" && !liveMode && (
           <div className="space-y-4">
             <p className="text-sm text-muted">Start a new FG evaluation chart.</p>
-            <div className="grid grid-cols-2 gap-3 max-w-md">
+            <div className="grid grid-cols-3 gap-3 max-w-lg">
               <Link href="/scout/fg/chart?mode=preset" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">📋</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Preset Chart</h3>
@@ -196,9 +197,18 @@ export default function ScoutFGPage() {
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Manual Chart</h3>
                 <p className="text-[10px] text-muted mt-1">Enter kicks on the fly</p>
               </Link>
+              <button onClick={() => setLiveMode(true)} className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
+                <p className="text-2xl mb-2">⚡</p>
+                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Live Input</h3>
+                <p className="text-[10px] text-muted mt-1">One kick at a time</p>
+              </button>
             </div>
+          </div>
+        )}
 
-            {/* Live Input Chart */}
+        {tab === "chart" && liveMode && (
+          <div className="space-y-4">
+            <button onClick={() => setLiveMode(false)} className="text-xs text-muted hover:text-white transition-colors">&larr; Back to Chart Options</button>
             <div className="card space-y-3">
               <p className="text-sm font-bold text-slate-100">Live Input</p>
               <p className="text-[10px] text-muted">Enter distance, hash, athlete, result — submit one kick at a time.</p>
