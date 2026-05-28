@@ -59,6 +59,22 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     });
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Athletes: load team colors on first login
+  useEffect(() => {
+    if (!user || user.id === "local-dev" || user.role !== "athlete") return;
+    const tid = getTeamId();
+    if (!tid || tid === "local-dev") return;
+    import("@/lib/teamSettingsStore").then(({ getTeamSettings }) => {
+      getTeamSettings(tid).then((settings) => {
+        if (settings) {
+          const colors = { primary: settings.colorPrimary, secondary: settings.colorSecondary, tertiary: settings.colorTertiary };
+          applyTheme(colors);
+          try { localStorage.setItem("st_theme", JSON.stringify(colors)); } catch {}
+        }
+      });
+    });
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useTeamSettingsSync(
     user && user.id !== "local-dev" ? getTeamId() : null,
     (settings: TeamSettings) => {
