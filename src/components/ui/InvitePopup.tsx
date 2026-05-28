@@ -34,10 +34,10 @@ export async function resolveInviteCode(code: string): Promise<{ teamId: string;
   // Search all teams for a matching invite code
   const { createClient } = await import("@/lib/supabase");
   const supabase = createClient();
-  const { data } = await supabase.from("team_data").select("team_id, value").eq("key", "invite_codes");
+  const { data } = await supabase.from("team_data").select("team_id, data").eq("data_key", "invite_codes");
   if (!data) return null;
   for (const row of data) {
-    const codes = row.value as InviteCodes;
+    const codes = row.data as InviteCodes;
     if (codes.coachCode === code.toUpperCase()) return { teamId: row.team_id, role: "coach" };
     if (codes.athleteCode === code.toUpperCase()) return { teamId: row.team_id, role: "athlete" };
   }
