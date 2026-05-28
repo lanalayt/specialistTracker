@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
@@ -42,10 +42,38 @@ const BM_COLORS: Record<SnapBenchmark, string> = {
   needsWork: "text-miss",
 };
 
+// Cycle laces: Good -> 1/4 Turn -> Back -> Good
+function cycleLaces(current?: string): string {
+  if (current === "Good") return "1/4 Turn";
+  if (current === "1/4 Turn") return "Back";
+  return "Good";
+}
+
+// Cycle spiral: Good -> Bad -> Good
+function cycleSpiral(current?: string): string {
+  return current === "Good" ? "Bad" : "Good";
+}
+
+// Recalculate 30-point score: 1pt location + 1pt laces + 1pt spiral
+function calc30PtScore(s: LongSnapEntry): number {
+  let score = 0;
+  if (s.accuracy === "ON_TARGET") score += 1;
+  if (s.laces === "Good") score += 1;
+  if (s.spiral === "Good") score += 1;
+  return score;
+}
+
+// Pencil icon SVG
+const PencilIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+    <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+  </svg>
+);
+
 export default function LongSnapHistoryPage() {
   const pathname = usePathname();
   const isAthleteMode = pathname.startsWith("/athlete");
-  const { history, updateSessionWeather, deleteSession } = useLongSnap();
+  const { history, updateSessionWeather, updateSessionEntries, deleteSession } = useLongSnap();
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -54,6 +82,7 @@ export default function LongSnapHistoryPage() {
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
   const [tab, setTab] = useState<"practice" | "charting">("practice");
   const [snapTypeTab, setSnapTypeTab] = useState<"short" | "long">("short");
+  const [editing, setEditing] = useState(false);
 
   const baseFiltered = tab === "charting"
     ? history.filter((s) => s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes"))
@@ -72,6 +101,20 @@ export default function LongSnapHistoryPage() {
   const selected = selectedId ? filteredHistory.find((s) => s.id === selectedId) ?? null : null;
   const snaps = (selected?.entries ?? []) as LongSnapEntry[];
 
+  // Helper to update a single snap field and persist
+  function updateSnap(snapIndex: number, updates: Partial<LongSnapEntry>) {
+    if (!selected) return;
+    const updated = snaps.map((s, i) => i === snapIndex ? { ...s, ...updates } : s);
+    updateSessionEntries(selected.id, updated);
+  }
+
+  // Helper to delete a snap by index and persist
+  function deleteSnap(snapIndex: number) {
+    if (!selected) return;
+    const updated = snaps.filter((_, i) => i !== snapIndex);
+    updateSessionEntries(selected.id, updated);
+  }
+
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
       {/* Session list — hidden on mobile when a session is selected */}
@@ -79,13 +122,13 @@ export default function LongSnapHistoryPage() {
         <div className="p-4 border-b border-border space-y-2">
           <div className="flex gap-2 flex-wrap">
             <div className="flex rounded-input border border-border overflow-hidden w-fit">
-              <button onClick={() => { setTab("practice"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", tab === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Practice</button>
-              <button onClick={() => { setTab("charting"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", tab === "charting" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Charting</button>
+              <button onClick={() => { setTab("practice"); setSelectedId(null); setEditing(false); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", tab === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Practice</button>
+              <button onClick={() => { setTab("charting"); setSelectedId(null); setEditing(false); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", tab === "charting" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Charting</button>
             </div>
             {isAthleteMode && (
               <div className="flex rounded-input border border-border overflow-hidden w-fit">
-                <button onClick={() => { setSnapTypeTab("short"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", snapTypeTab === "short" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Short</button>
-                <button onClick={() => { setSnapTypeTab("long"); setSelectedId(null); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", snapTypeTab === "long" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Long</button>
+                <button onClick={() => { setSnapTypeTab("short"); setSelectedId(null); setEditing(false); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", snapTypeTab === "short" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Short</button>
+                <button onClick={() => { setSnapTypeTab("long"); setSelectedId(null); setEditing(false); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", snapTypeTab === "long" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Long</button>
               </div>
             )}
           </div>
@@ -102,7 +145,7 @@ export default function LongSnapHistoryPage() {
               return (
                 <button
                   key={s.id}
-                  onClick={() => setSelectedId(s.id)}
+                  onClick={() => { setSelectedId(s.id); setEditing(false); }}
                   className={clsx(
                     "w-full text-left px-4 py-3 transition-colors hover:bg-surface-2",
                     selectedId === s.id && "bg-accent/10 border-l-2 border-accent"
@@ -135,7 +178,7 @@ export default function LongSnapHistoryPage() {
           <>
             {/* Mobile back button */}
             <button
-              onClick={() => setSelectedId(null)}
+              onClick={() => { setSelectedId(null); setEditing(false); }}
               className="lg:hidden flex items-center gap-1 text-xs text-accent font-semibold mb-3 hover:underline"
             >
               ← All Sessions
@@ -146,17 +189,31 @@ export default function LongSnapHistoryPage() {
                 <p className="text-xs text-muted mt-0.5">{snaps.length} snap{snaps.length !== 1 ? "s" : ""}</p>
               </div>
               {!viewOnly && (
-                <button
-                  onClick={() => {
-                    if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
-                      deleteSession(selected.id);
-                      setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
-                    }
-                  }}
-                  className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all ml-3 shrink-0"
-                >
-                  Delete Session
-                </button>
+                <div className="flex items-center gap-2 ml-3 shrink-0">
+                  <button
+                    onClick={() => setEditing(!editing)}
+                    className={clsx(
+                      "text-xs px-2.5 py-1.5 rounded-input border transition-all",
+                      editing
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-border text-muted hover:text-white hover:border-slate-500"
+                    )}
+                  >
+                    {editing ? "Done" : "Edit"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Delete session "${selected.label}"? You can restore it from Deleted Sessions within 7 days.`)) {
+                        deleteSession(selected.id);
+                        setSelectedId(history.find((s) => s.id !== selected.id)?.id ?? null);
+                        setEditing(false);
+                      }
+                    }}
+                    className="text-xs px-2.5 py-1.5 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 hover:bg-miss/10 transition-all"
+                  >
+                    Delete Session
+                  </button>
+                </div>
               )}
             </div>
             {/* Weather display / edit */}
@@ -187,9 +244,7 @@ export default function LongSnapHistoryPage() {
                       className="text-muted hover:text-white transition-colors p-1"
                       title="Edit weather"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                        <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-                      </svg>
+                      <PencilIcon />
                     </button>
                   )}
                 </div>
@@ -216,6 +271,7 @@ export default function LongSnapHistoryPage() {
                           <div className="card-2 overflow-x-auto text-xs">
                             <table className="w-full">
                               <thead><tr>
+                                {editing && <th className="text-[10px] text-muted py-1 px-1 w-6"></th>}
                                 <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
                                 <th className="text-[10px] text-muted text-center py-1 px-1">Loc</th>
                                 <th className="text-[10px] text-muted text-center py-1 px-1">Laces</th>
@@ -223,15 +279,43 @@ export default function LongSnapHistoryPage() {
                                 <th className="text-[10px] text-muted text-right py-1 px-1">Pts</th>
                               </tr></thead>
                               <tbody>
-                                {ps.map((s, i) => (
-                                  <tr key={i} className="border-t border-border/30">
-                                    <td className="text-muted py-1 px-1">{i + 1}</td>
-                                    <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
-                                    <td className={clsx("text-center py-1 px-1", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
-                                    <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
-                                    <td className="text-right py-1 px-1 font-bold text-accent">{s.score ?? "—"}</td>
-                                  </tr>
-                                ))}
+                                {ps.map((s, i) => {
+                                  const snapIdx = snaps.indexOf(s);
+                                  return (
+                                    <tr key={i} className="border-t border-border/30">
+                                      {editing && (
+                                        <td className="py-1 px-1">
+                                          <button onClick={() => { if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                          </button>
+                                        </td>
+                                      )}
+                                      <td className="text-muted py-1 px-1">{i + 1}</td>
+                                      <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                        {editing ? (
+                                          <button onClick={() => { const acc = s.accuracy === "ON_TARGET" ? "HIGH" : "ON_TARGET"; const updated = { ...s, accuracy: acc as LongSnapEntry["accuracy"], markerInZone: acc === "ON_TARGET" }; updateSnap(snapIdx, { ...updated, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
+                                            {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
+                                          </button>
+                                        ) : (s.accuracy === "ON_TARGET" ? "Strike" : "Ball")}
+                                      </td>
+                                      <td className={clsx("text-center py-1 px-1", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>
+                                        {editing ? (
+                                          <button onClick={() => { const laces = cycleLaces(s.laces); const updated = { ...s, laces }; updateSnap(snapIdx, { laces, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
+                                            {s.laces === "Good" ? "Perfect" : s.laces || "—"}
+                                          </button>
+                                        ) : (s.laces === "Good" ? "Perfect" : s.laces || "—")}
+                                      </td>
+                                      <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>
+                                        {editing ? (
+                                          <button onClick={() => { const spiral = cycleSpiral(s.spiral); const updated = { ...s, spiral }; updateSnap(snapIdx, { spiral, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
+                                            {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
+                                          </button>
+                                        ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
+                                      </td>
+                                      <td className="text-right py-1 px-1 font-bold text-accent">{s.score ?? "—"}</td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
@@ -270,20 +354,54 @@ export default function LongSnapHistoryPage() {
                           <div className="card-2 overflow-x-auto text-xs">
                             <table className="w-full">
                               <thead><tr>
+                                {editing && <th className="text-[10px] text-muted py-1 px-1 w-6"></th>}
                                 <th className="text-[10px] text-muted text-left py-1 px-1">#</th>
                                 <th className="text-[10px] text-muted text-center py-1 px-1">Time</th>
                                 <th className="text-[10px] text-muted text-center py-1 px-1">Spiral</th>
                                 <th className="text-[10px] text-muted text-center py-1 px-1">Result</th>
                               </tr></thead>
                               <tbody>
-                                {ps.map((s, i) => (
-                                  <tr key={i} className="border-t border-border/30">
-                                    <td className="text-muted py-1 px-1">{i + 1}</td>
-                                    <td className="text-center py-1 px-1">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
-                                    <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
-                                    <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}</td>
-                                  </tr>
-                                ))}
+                                {ps.map((s, i) => {
+                                  const snapIdx = snaps.indexOf(s);
+                                  return (
+                                    <tr key={i} className="border-t border-border/30">
+                                      {editing && (
+                                        <td className="py-1 px-1">
+                                          <button onClick={() => { if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                          </button>
+                                        </td>
+                                      )}
+                                      <td className="text-muted py-1 px-1">{i + 1}</td>
+                                      <td className="text-center py-1 px-1">
+                                        {editing ? (
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            value={s.time > 0 ? s.time : ""}
+                                            onChange={(e) => updateSnap(snapIdx, { time: parseFloat(e.target.value) || 0 })}
+                                            className="w-16 bg-surface-2 border border-border text-slate-200 text-center text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60"
+                                            placeholder="0.00"
+                                          />
+                                        ) : (s.time > 0 ? `${s.time.toFixed(2)}s` : "—")}
+                                      </td>
+                                      <td className={clsx("text-center py-1 px-1", s.spiral === "Good" ? "text-make" : "text-miss")}>
+                                        {editing ? (
+                                          <button onClick={() => updateSnap(snapIdx, { spiral: cycleSpiral(s.spiral) })} className="underline decoration-dotted underline-offset-2">
+                                            {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
+                                          </button>
+                                        ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
+                                      </td>
+                                      <td className={clsx("text-center py-1 px-1 font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                        {editing ? (
+                                          <button onClick={() => updateSnap(snapIdx, { accuracy: s.accuracy === "ON_TARGET" ? "HIGH" as LongSnapEntry["accuracy"] : "ON_TARGET", markerInZone: s.accuracy !== "ON_TARGET" })} className="underline decoration-dotted underline-offset-2">
+                                            {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
+                                          </button>
+                                        ) : (s.accuracy === "ON_TARGET" ? "Strike" : "Ball")}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
@@ -327,6 +445,7 @@ export default function LongSnapHistoryPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr>
+                            {editing && <th className="table-header w-8"></th>}
                             <th className="table-header text-left">#</th>
                             <th className="table-header text-left">Athlete</th>
                             <th className="table-header">Acc</th>
@@ -338,15 +457,40 @@ export default function LongSnapHistoryPage() {
                         <tbody>
                           {snaps.map((s, i) => (
                             <tr key={i} className="hover:bg-surface/30">
+                              {editing && (
+                                <td className="table-cell">
+                                  <button onClick={() => { if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                  </button>
+                                </td>
+                              )}
                               <td className="table-cell text-left text-muted">{i + 1}</td>
                               <td className="table-name">{s.athlete}</td>
                               <td className="table-cell">
-                                <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                  {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
-                                </span>
+                                {editing ? (
+                                  <button onClick={() => { const acc = s.accuracy === "ON_TARGET" ? "HIGH" : "ON_TARGET"; const updated = { ...s, accuracy: acc as LongSnapEntry["accuracy"], markerInZone: acc === "ON_TARGET" }; updateSnap(i, { ...updated, score: calc30PtScore(updated) }); }} className={clsx("text-xs font-semibold underline decoration-dotted underline-offset-2", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                    {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
+                                  </button>
+                                ) : (
+                                  <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                    {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
+                                  </span>
+                                )}
                               </td>
-                              <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>{s.laces === "Good" ? "Perfect" : s.laces || "—"}</td>
-                              <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                              <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>
+                                {editing ? (
+                                  <button onClick={() => { const laces = cycleLaces(s.laces); const updated = { ...s, laces }; updateSnap(i, { laces, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
+                                    {s.laces === "Good" ? "Perfect" : s.laces || "—"}
+                                  </button>
+                                ) : (s.laces === "Good" ? "Perfect" : s.laces || "—")}
+                              </td>
+                              <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
+                                {editing ? (
+                                  <button onClick={() => { const spiral = cycleSpiral(s.spiral); const updated = { ...s, spiral }; updateSnap(i, { spiral, score: calc30PtScore(updated) }); }} className="underline decoration-dotted underline-offset-2">
+                                    {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
+                                  </button>
+                                ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
+                              </td>
                               <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>
                             </tr>
                           ))}
@@ -377,6 +521,7 @@ export default function LongSnapHistoryPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr>
+                          {editing && <th className="table-header w-8"></th>}
                           <th className="table-header text-left">#</th>
                           <th className="table-header text-left">Athlete</th>
                           {!isLong && <th className="table-header">Type</th>}
@@ -388,16 +533,46 @@ export default function LongSnapHistoryPage() {
                       <tbody>
                         {snaps.map((s, i) => (
                           <tr key={i} className="hover:bg-surface/30">
+                            {editing && (
+                              <td className="table-cell">
+                                <button onClick={() => { if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                </button>
+                              </td>
+                            )}
                             <td className="table-cell text-left text-muted">{i + 1}</td>
                             <td className="table-name">{s.athlete}</td>
                             {!isLong && <td className="table-cell text-muted">{s.snapType}</td>}
-                            <td className="table-cell font-bold">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>
-                            <td className="table-cell">
-                              <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s, false); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
-                              </span>
+                            <td className="table-cell font-bold">
+                              {editing ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={s.time > 0 ? s.time : ""}
+                                  onChange={(e) => updateSnap(i, { time: parseFloat(e.target.value) || 0 })}
+                                  className="w-16 bg-surface-2 border border-border text-slate-200 text-center text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60"
+                                  placeholder="0.00"
+                                />
+                              ) : (s.time > 0 ? `${s.time.toFixed(2)}s` : "—")}
                             </td>
-                            <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>{s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}</td>
+                            <td className="table-cell">
+                              {editing ? (
+                                <button onClick={() => updateSnap(i, { accuracy: s.accuracy === "ON_TARGET" ? "HIGH" as LongSnapEntry["accuracy"] : "ON_TARGET", markerInZone: s.accuracy !== "ON_TARGET" })} className={clsx("text-xs font-semibold underline decoration-dotted underline-offset-2", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                  {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s, false); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
+                                </button>
+                              ) : (
+                                <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                  {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s, false); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
+                                </span>
+                              )}
+                            </td>
+                            <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
+                              {editing ? (
+                                <button onClick={() => updateSnap(i, { spiral: cycleSpiral(s.spiral) })} className="underline decoration-dotted underline-offset-2">
+                                  {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
+                                </button>
+                              ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

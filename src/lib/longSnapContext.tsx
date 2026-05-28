@@ -27,6 +27,7 @@ interface LongSnapContextValue {
   removeAthlete: (athleteId: string) => void;
   commitPractice: (entries: LongSnapEntry[], label?: string, weather?: string, mode?: "practice" | "game", opponent?: string, gameTime?: string) => Session;
   updateSessionWeather: (sessionId: string, weather: string) => void;
+  updateSessionEntries: (sessionId: string, entries: LongSnapEntry[]) => void;
   deleteSession: (sessionId: string) => void;
 }
 
@@ -171,6 +172,12 @@ export function LongSnapProvider({ children, sportKey = "LONGSNAP" }: { children
     if (tid && tid !== "local-dev") { stampSessionWrite(tid); updateSessionRow(tid, sessionId, { weather: weather || undefined }); }
   }, []);
 
+  const updateSessionEntries = useCallback((sessionId: string, entries: LongSnapEntry[]) => {
+    setSessions((prev) => prev.map((s) => s.id === sessionId ? { ...s, entries } : s));
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); updateSessionRow(tid, sessionId, { entries }); }
+  }, []);
+
   const deleteSession = useCallback((sessionId: string) => {
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     const tid = getTeamId();
@@ -179,7 +186,7 @@ export function LongSnapProvider({ children, sportKey = "LONGSNAP" }: { children
 
   return (
     <LongSnapContext.Provider value={{
-      athletes, stats, history, addAthletes, removeAthlete: removeAthleteAction, commitPractice, updateSessionWeather, deleteSession,
+      athletes, stats, history, addAthletes, removeAthlete: removeAthleteAction, commitPractice, updateSessionWeather, updateSessionEntries, deleteSession,
     }}>
       {children}
     </LongSnapContext.Provider>

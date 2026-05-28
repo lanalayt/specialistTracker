@@ -39,12 +39,12 @@ export function addLogoToPDF(doc: { addImage: (data: string, format: string, x: 
   try { doc.addImage(logo, "PNG", pageW - 28, 5, 18, 18); } catch {}
 }
 
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96"><rect x="0" y="0" width="96" height="96" rx="22" fill="#0E1318" stroke="rgba(46,224,168,0.25)" stroke-width="1"/><g fill="none" stroke="#2EE0A8" stroke-width="3.5" stroke-linecap="round"><path d="M11 24 L11 11 L24 11"/><path d="M85 24 L85 11 L72 11"/><path d="M11 72 L11 85 L24 85"/><path d="M85 72 L85 85 L72 85"/></g><text x="29" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#FFFFFF">S</text><text x="67" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#FFFFFF">T</text><circle cx="48" cy="50" r="7" fill="#E5B649" opacity="0.18"/><circle cx="48" cy="50" r="4" fill="#E5B649"/></svg>`;
+
 let _appLogoCache: string | null = null;
 export async function addAppLogoToPDFFooter(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; internal: { pageSize: { getHeight: () => number; getWidth: () => number } } }, landscape?: boolean): Promise<void> {
   try {
     if (!_appLogoCache) {
-      const resp = await fetch("/logo-mark.svg");
-      const svgText = await resp.text();
       const canvas = document.createElement("canvas");
       canvas.width = 96; canvas.height = 96;
       const ctx = canvas.getContext("2d");
@@ -52,8 +52,8 @@ export async function addAppLogoToPDFFooter(doc: { addImage: (data: string, form
       const img = new Image();
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
-        img.onerror = () => reject();
-        img.src = "data:image/svg+xml;base64," + btoa(svgText);
+        img.onerror = () => reject(new Error("Logo image failed to load"));
+        img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(LOGO_SVG);
       });
       ctx.drawImage(img, 0, 0, 96, 96);
       _appLogoCache = canvas.toDataURL("image/png");
@@ -61,7 +61,7 @@ export async function addAppLogoToPDFFooter(doc: { addImage: (data: string, form
     const pageW = landscape ? 297 : 210;
     const pageH = landscape ? 210 : 297;
     doc.addImage(_appLogoCache, "PNG", (pageW - 10) / 2, pageH - 18, 10, 10);
-  } catch {}
+  } catch (err) { console.error("PDF footer logo failed:", err); }
 }
 
 // ─── Shared types ───────────────────────────────────────────────────────────
