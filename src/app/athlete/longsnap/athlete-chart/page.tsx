@@ -293,7 +293,7 @@ function SnapAthleteChartInner() {
                       {isFG && <td className={clsx("text-center py-1 px-2", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{e.laces === "Good" ? "Perfect" : e.laces || "—"}</td>}
                       <td className={clsx("text-center py-1 px-2", e.spiral === "Good" ? "text-make" : "text-miss")}>{e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "—"}</td>
                       {!isFG && <td className="text-center py-1 px-2 text-slate-300">{e.time > 0 ? `${e.time.toFixed(2)}s` : "—"}</td>}
-                      <td className="text-right py-1 px-2 font-bold text-sky-400">{e.score}/{isFG ? 3 : 1}</td>
+                      <td className={clsx("text-right py-1 px-2 font-bold", isFG ? "text-sky-400" : e.score > 0 ? "text-make" : "text-miss")}>{isFG ? `${e.score}/3` : e.score}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -418,6 +418,7 @@ function SnapAthleteChartInner() {
               <th className="text-[10px] text-muted text-center py-1 px-2">Result</th>
               {isFG && <th className="text-[10px] text-muted text-center py-1 px-2">Laces</th>}
               <th className="text-[10px] text-muted text-center py-1 px-2">Spiral</th>
+              {!isFG && <th className="text-[10px] text-muted text-center py-1 px-2">Time</th>}
               <th className="text-[10px] text-muted text-right py-1 px-2">Score</th>
             </tr></thead>
             <tbody>
@@ -428,7 +429,8 @@ function SnapAthleteChartInner() {
                   <td className={clsx("text-center py-1 px-2 font-bold", e.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>{getAccLabel(e, isFG)}</td>
                   {isFG && <td className={clsx("text-center py-1 px-2", e.laces === "Good" ? "text-make" : e.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{e.laces === "Good" ? "Perfect" : e.laces === "1/4 Turn" ? "1/4" : e.laces || "—"}</td>}
                   <td className={clsx("text-center py-1 px-2", e.spiral === "Good" ? "text-make" : "text-miss")}>{e.spiral === "Good" ? "Tight" : e.spiral === "Bad" ? "Open" : "—"}</td>
-                  <td className="text-right py-1 px-2 font-bold text-sky-400">{e.score}/{isFG ? 3 : 1}</td>
+                  {!isFG && <td className="text-center py-1 px-2">{e.time > 0 ? `${e.time.toFixed(2)}s` : "—"}</td>}
+                  <td className={clsx("text-right py-1 px-2 font-bold", isFG ? "text-sky-400" : e.score > 0 ? "text-make" : "text-miss")}>{isFG ? `${e.score}/3` : e.score}</td>
                 </tr>
               ))}
             </tbody>
