@@ -462,7 +462,7 @@ function AthleteChartInner() {
           <div className="flex items-center gap-3">
             <div className="flex rounded-input border border-border overflow-hidden w-fit">
               <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
-              <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
+              <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live Op</button>
             </div>
             {kickMode === "live" && (
               <button onClick={() => setShowSnap(true)} className={clsx("px-3 py-1.5 rounded-input border text-[10px] font-semibold transition-colors", (snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "bg-make/20 border-make/50 text-make hover:bg-make/30" : "border-sky-500/30 text-sky-400 hover:bg-sky-500/10")}>{(snapLogsMap[`${currentPlayer}-${currentKickIdx}`]?.length ?? 0) > 0 ? "Snap Logged ✓" : "Log Snap"}</button>
@@ -713,7 +713,7 @@ function AthleteChartInner() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex rounded-input border border-border overflow-hidden w-fit">
             <button onClick={() => setKickMode("sticks")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", kickMode === "sticks" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Sticks</button>
-            <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live</button>
+            <button onClick={() => setKickMode("live")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", kickMode === "live" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Live Op</button>
           </div>
           {kickMode === "live" && (
             <>
