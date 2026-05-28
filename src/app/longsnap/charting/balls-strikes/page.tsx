@@ -164,6 +164,13 @@ export default function BallsStrikesPage() {
             <p className="label">Max Snap Time (seconds)</p>
             <input type="text" inputMode="numeric" value={maxTime} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); setMaxTime(d ? formatAutoDecimal(d) : ""); }} className="input w-32 mx-auto text-center text-xl font-bold" placeholder="0.75" />
           </div>
+          <div>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Miss Detail</p>
+            <div className="flex rounded-input border border-border overflow-hidden w-fit mx-auto">
+              <button onClick={() => setMissMode("simple")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+              <button onClick={() => setMissMode("detailed")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+            </div>
+          </div>
           <button onClick={() => setStarted(true)} disabled={!canStart || !maxTime} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Round</button>
           <button onClick={() => { setMode(null); setSelectedPlayers([]); }} className="text-xs text-muted hover:text-white transition-colors">← Back</button>
         </div>
@@ -267,13 +274,6 @@ export default function BallsStrikesPage() {
           <div className="h-full bg-accent transition-all" style={{ width: `${(snaps.length / totalSnaps) * 100}%` }} />
         </div>
 
-        <div className="flex items-center justify-center gap-2">
-          <p className="text-[10px] text-muted">Miss Detail:</p>
-          <div className="flex rounded-input border border-border overflow-hidden">
-            <button onClick={() => setMissMode("simple")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
-            <button onClick={() => setMissMode("detailed")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
-          </div>
-        </div>
         <p className="text-[10px] sm:text-xs text-muted text-center">Click the diagram to chart snap location</p>
         <div className="flex justify-center">
           <PunterStrikeZone markers={getPlayerMarkers(currentPlayer)} onSnap={handleSnapClick} nextNum={getPlayerSnaps(currentPlayer).length + 1} missMode={missMode} editable />

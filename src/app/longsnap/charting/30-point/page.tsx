@@ -165,6 +165,13 @@ export default function ThirtyPointGamePage() {
           {mode === "multi" && selectedPlayers.length > 0 && (
             <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>
           )}
+          <div>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Miss Detail</p>
+            <div className="flex rounded-input border border-border overflow-hidden w-fit mx-auto">
+              <button onClick={() => setMissMode("simple")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+              <button onClick={() => setMissMode("detailed")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+            </div>
+          </div>
           <button onClick={() => setGameStarted(true)} disabled={!canStart} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
           <button onClick={() => { setMode(null); setSelectedPlayers([]); }} className="text-xs text-muted hover:text-white transition-colors">← Back</button>
         </div>
@@ -267,15 +274,6 @@ export default function ThirtyPointGamePage() {
             ))}
           </div>
         )}
-
-        {/* Miss mode toggle */}
-        <div className="flex items-center gap-2">
-          <p className="text-[10px] text-muted">Miss Detail:</p>
-          <div className="flex rounded-input border border-border overflow-hidden">
-            <button onClick={() => setMissMode("simple")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
-            <button onClick={() => setMissMode("detailed")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
-          </div>
-        </div>
 
         {/* Diagram with Laces left, Spiral right */}
         <div className="flex items-center gap-1 sm:gap-3">

@@ -224,6 +224,14 @@ function SnapAthleteChartInner() {
           <p className="text-xs text-muted mb-1">Snaps per player</p>
           <input type="text" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
         </div>
+        <div>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Miss Detail</p>
+          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+            <button onClick={() => setMissMode("simple")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+            <button onClick={() => setMissMode("detailed")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+          </div>
+          <p className="text-[10px] text-muted mt-1">{missMode === "simple" ? "Tap zone for Strike or Ball" : "Tap exact location for miss direction"}</p>
+        </div>
         <button onClick={() => { setPhase("live"); setCurrentPlayerIdx(0); setEntries([]); }} disabled={selectedPlayers.length === 0 || !totalReps} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Chart</button>
       </main>
     );
@@ -244,6 +252,14 @@ function SnapAthleteChartInner() {
               <button key={a} onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-sky-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
             ))}
           </div>
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Miss Detail</p>
+          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+            <button onClick={() => setMissMode("simple")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
+            <button onClick={() => setMissMode("detailed")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
+          </div>
+          <p className="text-[10px] text-muted mt-1">{missMode === "simple" ? "Tap zone for Strike or Ball" : "Tap exact location for miss direction"}</p>
         </div>
         <button onClick={() => { setPhase("live"); setCurrentPlayerIdx(0); setEntries([]); }} disabled={selectedPlayers.length === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start Chart</button>
       </main>
@@ -354,15 +370,6 @@ function SnapAthleteChartInner() {
         </div>
 
         {/* Diagram + controls inline */}
-        {/* Miss mode toggle */}
-        <div className="flex items-center gap-2">
-          <p className="text-[10px] text-muted">Miss Detail:</p>
-          <div className="flex rounded-input border border-border overflow-hidden">
-            <button onClick={() => setMissMode("simple")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", missMode === "simple" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Simple</button>
-            <button onClick={() => setMissMode("detailed")} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", missMode === "detailed" ? "bg-accent text-slate-900" : "text-muted hover:text-white")}>Detailed</button>
-          </div>
-        </div>
-
         {isFG ? (
           <div className="flex items-center gap-1">
             <div className="flex flex-col gap-1 shrink-0">
