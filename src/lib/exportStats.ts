@@ -32,17 +32,23 @@ export function getTeamLogo(): string | null {
   try { return localStorage.getItem("team_logo"); } catch { return null; }
 }
 
-export function addLogoToPDF(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; internal: { pageSize: { getWidth: () => number } } }, landscape?: boolean): void {
+export function addLogoToPDF(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; getNumberOfPages: () => number; setPage: (n: number) => void; internal: { pageSize: { getWidth: () => number } } }, landscape?: boolean): void {
   const logo = getTeamLogo();
   if (!logo) return;
   const pageW = landscape ? 297 : 210;
-  try { doc.addImage(logo, "PNG", pageW - 28, 5, 18, 18); } catch {}
+  const totalPages = doc.getNumberOfPages();
+  try {
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.addImage(logo, "PNG", pageW - 28, 5, 18, 18);
+    }
+  } catch {}
 }
 
 const LOGO_LOCKUP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="640" height="240"><g transform="translate(12 12)"><g fill="none" stroke="#16BD8A" stroke-width="3.5" stroke-linecap="round"><path d="M11 24 L11 11 L24 11"/><path d="M85 24 L85 11 L72 11"/><path d="M11 72 L11 85 L24 85"/><path d="M85 72 L85 85 L72 85"/></g><text x="29" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#0A0E12">S</text><text x="67" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#0A0E12">T</text><circle cx="48" cy="50" r="4" fill="#B98A2E"/></g><text x="124" y="56" font-family="Arial,sans-serif" font-weight="800" font-size="30" letter-spacing="-1.2" fill="#0A0E12">SPECIALIST</text><text x="124" y="86" font-family="Arial,sans-serif" font-weight="500" font-size="30" letter-spacing="3.6" fill="#16BD8A">TRACKER</text></svg>`;
 
 let _appLogoCache: string | null = null;
-export async function addAppLogoToPDFFooter(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; internal: { pageSize: { getHeight: () => number; getWidth: () => number } } }, landscape?: boolean): Promise<void> {
+export async function addAppLogoToPDFFooter(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; getNumberOfPages: () => number; setPage: (n: number) => void; internal: { pageSize: { getHeight: () => number; getWidth: () => number } } }, landscape?: boolean): Promise<void> {
   try {
     if (!_appLogoCache) {
       const canvas = document.createElement("canvas");
@@ -60,10 +66,13 @@ export async function addAppLogoToPDFFooter(doc: { addImage: (data: string, form
     }
     const pageW = landscape ? 297 : 210;
     const pageH = landscape ? 210 : 297;
-    // Full lockup: ~40mm wide x 15mm tall, centered at bottom
     const logoW = 40;
     const logoH = 15;
-    doc.addImage(_appLogoCache, "PNG", (pageW - logoW) / 2, pageH - 20, logoW, logoH);
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.addImage(_appLogoCache, "PNG", (pageW - logoW) / 2, pageH - 20, logoW, logoH);
+    }
   } catch (err) { console.error("PDF footer logo failed:", err); }
 }
 
@@ -512,7 +521,6 @@ export function exportLongSnapStatsPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF();
-      addLogoToPDF(doc as any);
       const statsMap = computeSnapStats(athletes, history);
 
       doc.setFontSize(16);
@@ -550,6 +558,7 @@ export function exportLongSnapStatsPDF(
         }
       });
 
+      addLogoToPDF(doc as any);
       await addAppLogoToPDFFooter(doc as any, false);
       doc.save("Long_Snap_Stats.pdf");
     });
@@ -700,7 +709,6 @@ export function exportSessionPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF();
-      addLogoToPDF(doc as any);
 
       doc.setFontSize(14);
       doc.text(title, 14, 15);
@@ -732,6 +740,7 @@ export function exportSessionPDF(
         }
       }
 
+      addLogoToPDF(doc as any);
       await addAppLogoToPDFFooter(doc as any, false);
       doc.save(`${title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
     });
@@ -748,7 +757,6 @@ export function exportFGStatsPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
-      addLogoToPDF(doc as any, true);
 
       const addSheet = (title: string, aoa: Row[]) => {
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
@@ -780,6 +788,7 @@ export function exportFGStatsPDF(
         addSheet("Live Reps", fgStatsToAOA(athletes, computeFGStats(athletes, history, (k) => !!k.starred)));
       }
 
+      addLogoToPDF(doc as any, true);
       await addAppLogoToPDFFooter(doc as any, false);
       doc.save("FG_Kicking_Stats.pdf");
     });
@@ -794,7 +803,6 @@ export function exportPuntStatsPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
-      addLogoToPDF(doc as any, true);
 
       const addSheet = (title: string, aoa: Row[]) => {
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
@@ -820,6 +828,7 @@ export function exportPuntStatsPDF(
 
       addSheet("Monthly", puntStatsToAOA(athletes, computePuntStats(athletes, filterSessions(history, getMonthStart(now), getMonthEnd(now)), () => true), puntTypes));
 
+      addLogoToPDF(doc as any, true);
       await addAppLogoToPDFFooter(doc as any, true);
       doc.save("Punting_Stats.pdf");
     });
@@ -833,7 +842,6 @@ export function exportKickoffStatsPDF(
   import("jspdf").then(({ default: jsPDF }) => {
     import("jspdf-autotable").then(async ({ default: autoTable }) => {
       const doc = new jsPDF({ orientation: "landscape" });
-      addLogoToPDF(doc as any, true);
 
       const addSheet = (title: string, aoa: Row[]) => {
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
@@ -859,6 +867,7 @@ export function exportKickoffStatsPDF(
 
       addSheet("Monthly", koStatsToAOA(athletes, computeKOStats(athletes, filterSessions(history, getMonthStart(now), getMonthEnd(now)))));
 
+      addLogoToPDF(doc as any, true);
       await addAppLogoToPDFFooter(doc as any, true);
       doc.save("Kickoff_Stats.pdf");
     });
