@@ -326,7 +326,7 @@ function SnapAthleteChartInner() {
               {pe.map((e, i) => {
                 const isSelected = isActive && selectedSnapIdx === i;
                 return (
-                  <button key={i} onClick={() => selectSnap(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold cursor-pointer transition-all", isSelected ? "bg-accent text-slate-900 ring-2 ring-accent shadow-lg shadow-accent/30 scale-110" : "bg-white text-bg border-2 border-white")} title={`${e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}${e.laces ? " | " + e.laces : ""}${e.spiral ? " | " + (e.spiral === "Good" ? "Tight" : "Open") : ""}`}>{i + 1}</button>
+                  <button key={i} onClick={() => selectSnap(selectedPlayers.indexOf(player), i)} className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-bold cursor-pointer transition-all", isSelected ? "ring-2 ring-accent shadow-lg shadow-accent/30 scale-110" : "", e.accuracy === "ON_TARGET" ? "bg-make text-slate-900 border-2 border-make" : "bg-miss text-white border-2 border-miss")} title={`${e.accuracy === "ON_TARGET" ? "Strike" : "Ball"}${e.laces ? " | " + e.laces : ""}${e.spiral ? " | " + (e.spiral === "Good" ? "Tight" : "Open") : ""}`}>{i + 1}</button>
                 );
               })}
               {Array.from({ length: Math.max(0, totalReps - pe.length) }).map((_, i) => {
