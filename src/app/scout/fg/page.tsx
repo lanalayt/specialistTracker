@@ -79,7 +79,7 @@ export default function ScoutFGPage() {
       sport: "SCOUT_FG",
       label,
       date: new Date().toISOString(),
-      entries: liveKicks.map((k, i) => ({ ...k, kickNum: i + 1 })) as unknown as Record<string, unknown>[],
+      entries: liveKicks.map((k, i) => ({ ...k, kickNum: i + 1, ...(i === 0 ? { chartMode: "live" } : {}) })) as unknown as Record<string, unknown>[],
     });
     setLiveKicks([]);
     await loadData();
@@ -100,15 +100,21 @@ export default function ScoutFGPage() {
   // Build per-session-per-athlete rows
   const athleteData: { name: string; sessionId: string; date: string; entries: FGEntry[]; total: number; makes: number; att: number; isPreset: boolean }[] = [];
   for (const s of sessions) {
-    const entries = s.entries as unknown as FGEntry[];
+    const entries = s.entries as unknown as (FGEntry & { chartMode?: string })[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
-    // Detect preset: all athletes have same kick sequence (distance+hash)
-    const firstAthlete = athletes[0];
-    const firstKicks = entries.filter((e) => e.athlete === firstAthlete).map((e) => `${e.distance}-${e.hash}`);
-    const isPreset = athletes.length > 0 && athletes.every((a) => {
-      const kicks = entries.filter((e) => e.athlete === a).map((e) => `${e.distance}-${e.hash}`);
-      return kicks.length === firstKicks.length && kicks.every((k, i) => k === firstKicks[i]);
-    });
+    // Use chartMode tag if present, otherwise fallback: preset requires 2+ athletes with identical kick sequences
+    const mode = entries[0]?.chartMode;
+    let isPreset: boolean;
+    if (mode) {
+      isPreset = mode === "preset";
+    } else {
+      const firstAthlete = athletes[0];
+      const firstKicks = entries.filter((e) => e.athlete === firstAthlete).map((e) => `${e.distance}-${e.hash}`);
+      isPreset = athletes.length >= 2 && athletes.every((a) => {
+        const kicks = entries.filter((e) => e.athlete === a).map((e) => `${e.distance}-${e.hash}`);
+        return kicks.length === firstKicks.length && kicks.every((k, i) => k === firstKicks[i]);
+      });
+    }
     for (const name of athletes) {
       const ae = entries.filter((e) => e.athlete === name);
       const total = ae.reduce((sum, e) => sum + e.score, 0);

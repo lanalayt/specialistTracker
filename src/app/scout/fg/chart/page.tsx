@@ -219,7 +219,7 @@ function ScoutFGChartInner() {
       sport: "SCOUT_FG",
       label,
       date: new Date().toISOString(),
-      entries: results as unknown as Record<string, unknown>[],
+      entries: results.map((r, i) => i === 0 ? { ...r, chartMode: chartMode } : r) as unknown as Record<string, unknown>[],
     });
     setSaved(true);
   };
