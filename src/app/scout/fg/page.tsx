@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -35,14 +35,17 @@ export default function ScoutFGPage() {
   const [liveAthlete, setLiveAthlete] = useState("");
   const [liveKicks, setLiveKicks] = useState<{ athlete: string; distance: number; hash: string; result: string; score: number }[]>([]);
   const [newLiveAthlete, setNewLiveAthlete] = useState("");
+  const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
+  const [newAthleteNum, setNewAthleteNum] = useState("");
 
   useEffect(() => {
     async function loadAthletes() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid) return;
-      const names = await loadScoutAthletes(tid, "fg");
+      const [names, nums] = await Promise.all([loadScoutAthletes(tid, "fg"), loadScoutNumbers(tid, "fg")]);
       setLiveAthletes(names);
+      setScoutNumbers(nums);
       if (names.length > 0 && !liveAthlete) setLiveAthlete(names[0]);
     }
     loadAthletes();
@@ -57,6 +60,12 @@ export default function ScoutFGPage() {
     if (!liveAthlete) setLiveAthlete(trimmed);
     const tid = getTeamId();
     if (tid) await saveScoutAthletes(tid, "fg", updated);
+    if (newAthleteNum.trim()) {
+      const updatedNums = { ...scoutNumbers, [trimmed]: newAthleteNum.trim() };
+      setScoutNumbers(updatedNums);
+      if (tid) await saveScoutNumbers(tid, "fg", updatedNums);
+    }
+    setNewAthleteNum("");
   };
 
   const handleLiveResult = async (result: string) => {
@@ -89,9 +98,10 @@ export default function ScoutFGPage() {
     let tid = getTeamId();
     for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
     if (!tid) return;
-    const [sess, prof] = await Promise.all([loadScoutSessions(tid, "SCOUT_FG"), loadScoutProfiles(tid)]);
+    const [sess, prof, nums] = await Promise.all([loadScoutSessions(tid, "SCOUT_FG"), loadScoutProfiles(tid), loadScoutNumbers(tid, "fg")]);
     setSessions(sess);
     setProfiles(prof);
+    setScoutNumbers(nums);
     setLoading(false);
   };
 
@@ -222,12 +232,13 @@ export default function ScoutFGPage() {
               {/* Athlete selector */}
               <div className="flex flex-wrap gap-1.5">
                 {liveAthletes.map((a) => (
-                  <button key={a} onClick={() => setLiveAthlete(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", liveAthlete === a ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                  <button key={a} onClick={() => setLiveAthlete(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", liveAthlete === a ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{scoutDisplayName(a, scoutNumbers)}</button>
                 ))}
               </div>
-              <div className="flex gap-1.5">
-                <input type="text" value={newLiveAthlete} onChange={(e) => setNewLiveAthlete(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="Add athlete..." className="input flex-1 text-xs py-1" />
-                <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim()} className="text-[10px] text-amber-400 hover:underline disabled:opacity-40">Add</button>
+              <div className="flex gap-2">
+                <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
+                <input type="text" value={newLiveAthlete} onChange={(e) => setNewLiveAthlete(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
+                <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
               </div>
 
               {/* Inputs */}
@@ -256,7 +267,7 @@ export default function ScoutFGPage() {
                   {[...liveKicks].reverse().map((k, i) => (
                     <div key={liveKicks.length - 1 - i} className="flex items-center text-xs gap-2">
                       <span className="text-muted w-5">#{liveKicks.length - i}</span>
-                      <span className="text-slate-400 w-16 truncate">{k.athlete}</span>
+                      <span className="text-slate-400 w-16 truncate">{scoutDisplayName(k.athlete, scoutNumbers)}</span>
                       <span className="text-slate-300">{k.distance}yd {k.hash}</span>
                       <span className={clsx("font-bold ml-auto", k.result === "make" ? "text-make" : "text-miss")}>{k.result === "make" ? "GOOD" : "MISS"}</span>
                     </div>
@@ -303,7 +314,7 @@ export default function ScoutFGPage() {
                               <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
                                 <td className="py-1 px-2 font-semibold text-slate-200">
                                   <span className="text-muted mr-1">{i + 1}.</span>
-                                  <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
+                                  <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                                 </td>
                                 {r.entries.map((e, j) => (
                                   <td key={j} className="text-center py-1 px-1">
@@ -352,7 +363,7 @@ export default function ScoutFGPage() {
                                 <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
                                   <td className="py-1 px-2 font-semibold text-slate-200">
                                     <span className="text-muted mr-1">{i + 1}.</span>
-                                    <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
+                                    <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                                   </td>
                                   {r.entries.map((e, j) => (
                                     <td key={j} className="text-center py-1 px-1">

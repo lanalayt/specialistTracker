@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
+import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -38,6 +38,8 @@ function ScoutKOChartInner() {
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
+  const [newAthleteNum, setNewAthleteNum] = useState("");
   const [kicksPerPlayer, setKicksPerPlayer] = useState(isManual ? "0" : "5");
   const [dropWorst, setDropWorst] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -64,8 +66,8 @@ function ScoutKOChartInner() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid || !active) return;
-      const names = await loadScoutAthletes(tid, "kickoff");
-      if (active) setAthleteNames(names);
+      const [names, nums] = await Promise.all([loadScoutAthletes(tid, "kickoff"), loadScoutNumbers(tid, "kickoff")]);
+      if (active) { setAthleteNames(names); setScoutNumbers(nums); }
     }
     load();
     return () => { active = false; };
@@ -83,6 +85,12 @@ function ScoutKOChartInner() {
     setNewAthleteName("");
     const tid = getTeamId();
     if (tid) await saveScoutAthletes(tid, "kickoff", updated);
+    if (newAthleteNum.trim()) {
+      const updatedNums = { ...scoutNumbers, [trimmed]: newAthleteNum.trim() };
+      setScoutNumbers(updatedNums);
+      if (tid) await saveScoutNumbers(tid, "kickoff", updatedNums);
+    }
+    setNewAthleteNum("");
   };
 
   const removeAthlete = async (name: string) => {
@@ -147,16 +155,17 @@ function ScoutKOChartInner() {
           <div className="flex flex-wrap gap-1.5">
             {athleteNames.map((a) => (
               <div key={a} className="flex items-center gap-0.5">
-                <button onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-l-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                <button onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-l-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{scoutDisplayName(a, scoutNumbers)}</button>
                 <button onClick={() => removeAthlete(a)} className="px-1.5 py-1.5 rounded-r-input text-[10px] bg-surface-2 text-muted border border-border border-l-0 hover:text-miss transition-colors">&times;</button>
               </div>
             ))}
           </div>
           <div className="flex gap-2">
+            <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
             <input type="text" value={newAthleteName} onChange={(e) => setNewAthleteName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAthlete(newAthleteName); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
             <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
           </div>
-          {selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
+          {selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.map((p) => scoutDisplayName(p, scoutNumbers)).join(" → ")}</p>}
           {!isManual && (
             <div>
               <p className="text-xs text-muted mb-1">Kicks per player</p>
@@ -219,7 +228,7 @@ function ScoutKOChartInner() {
               <tbody>
                 {ranked.map((r, i) => (
                   <tr key={r.name} className="border-t border-border/30">
-                    <td className="py-1 px-2 font-semibold text-slate-200 text-left"><span className="text-muted mr-1">{i + 1}.</span>{r.name}</td>
+                    <td className="py-1 px-2 font-semibold text-slate-200 text-left"><span className="text-muted mr-1">{i + 1}.</span>{scoutDisplayName(r.name, scoutNumbers)}</td>
                     {r.entries.map((e, j) => {
                       const isWorst = r.worst !== null && e.score === r.worst && r.entries.filter((x) => x.score === r.worst).length > 0;
                       const isDropped = isWorst && j === r.entries.findIndex((x) => x.score === r.worst);
@@ -271,7 +280,7 @@ function ScoutKOChartInner() {
                   p === activePlayer ? "ring-2 ring-amber-500" : "opacity-60 hover:opacity-100"
                 )}
               >
-                <p className="text-xs font-bold text-slate-200">{p}</p>
+                <p className="text-xs font-bold text-slate-200">{scoutDisplayName(p, scoutNumbers)}</p>
                 <p className="text-lg font-black text-amber-400">{count > 0 ? avg.toFixed(2) : "—"}</p>
                 <p className="text-[10px] text-muted">{count}{kpp > 0 ? `/${kpp}` : ""} kicks</p>
               </button>
@@ -285,7 +294,7 @@ function ScoutKOChartInner() {
 
         {/* Active player header */}
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{activePlayer} — Kick {playerKickCount + 1}{kpp > 0 ? ` of ${kpp}` : ""}</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{scoutDisplayName(activePlayer, scoutNumbers)} — Kick {playerKickCount + 1}{kpp > 0 ? ` of ${kpp}` : ""}</p>
         </div>
 
         {/* Inputs */}
@@ -324,7 +333,7 @@ function ScoutKOChartInner() {
             {[...results].reverse().map((r, i) => (
               <div key={results.length - 1 - i} className="flex items-center text-xs gap-2">
                 <span className="text-muted w-5">#{results.length - i}</span>
-                <span className="text-slate-400 w-20 truncate">{r.athlete}</span>
+                <span className="text-slate-400 w-20 truncate">{scoutDisplayName(r.athlete, scoutNumbers)}</span>
                 <span className={clsx(r.directionGood ? "text-make" : "text-miss")}>{r.distance}yd</span>
                 <span className={clsx(r.directionGood ? "text-make" : "text-miss")}>{r.hangTime.toFixed(2)}s</span>
                 <span className="text-amber-400 font-bold ml-auto">{r.score.toFixed(2)}</span>

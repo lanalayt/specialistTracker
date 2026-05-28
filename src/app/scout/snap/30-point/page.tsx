@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { getTeamId } from "@/lib/teamData";
-import { insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
+import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -43,6 +43,8 @@ export default function ScoutShortSnapsPage() {
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
+  const [newAthleteNum, setNewAthleteNum] = useState("");
   const [snapsPerPlayer, setSnapsPerPlayer] = useState("10");
   const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -70,8 +72,8 @@ export default function ScoutShortSnapsPage() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid || !active) return;
-      const names = await loadScoutAthletes(tid, "snap");
-      if (active) setAthleteNames(names);
+      const [names, nums] = await Promise.all([loadScoutAthletes(tid, "snap"), loadScoutNumbers(tid, "snap")]);
+      if (active) { setAthleteNames(names); setScoutNumbers(nums); }
     }
     load();
     return () => { active = false; };
@@ -89,6 +91,12 @@ export default function ScoutShortSnapsPage() {
     setNewAthleteName("");
     const tid = getTeamId();
     if (tid) await saveScoutAthletes(tid, "snap", updated);
+    if (newAthleteNum.trim()) {
+      const updatedNums = { ...scoutNumbers, [trimmed]: newAthleteNum.trim() };
+      setScoutNumbers(updatedNums);
+      if (tid) await saveScoutNumbers(tid, "snap", updatedNums);
+    }
+    setNewAthleteNum("");
   };
 
   const removeAthlete = async (name: string) => {
@@ -182,16 +190,17 @@ export default function ScoutShortSnapsPage() {
           <div className="flex flex-wrap gap-1.5">
             {athleteNames.map((a) => (
               <div key={a} className="flex items-center gap-0.5">
-                <button onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-l-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                <button onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-l-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{scoutDisplayName(a, scoutNumbers)}</button>
                 <button onClick={() => removeAthlete(a)} className="px-1.5 py-1.5 rounded-r-input text-[10px] bg-surface-2 text-muted border border-border border-l-0 hover:text-miss transition-colors">&times;</button>
               </div>
             ))}
           </div>
           <div className="flex gap-2">
+            <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
             <input type="text" value={newAthleteName} onChange={(e) => setNewAthleteName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAthlete(newAthleteName); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
             <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
           </div>
-          {selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>}
+          {selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.map((p) => scoutDisplayName(p, scoutNumbers)).join(" → ")}</p>}
           <div>
             <p className="text-xs text-muted mb-1">Snaps per player</p>
             <input type="text" inputMode="numeric" value={snapsPerPlayer} onChange={(e) => setSnapsPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
@@ -238,7 +247,7 @@ export default function ScoutShortSnapsPage() {
             <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(ranked.length, 3)}, minmax(0, 1fr))` }}>
               {ranked.map((r) => (
                 <div key={r.name} className="space-y-3">
-                  <p className="text-sm font-bold text-slate-200">{r.name}</p>
+                  <p className="text-sm font-bold text-slate-200">{scoutDisplayName(r.name, scoutNumbers)}</p>
                   <HolderStrikeZone markers={r.markers} />
                   <div className="card-2 py-3">
                     <p className="text-3xl font-black text-amber-400">{r.avg.toFixed(2)}</p>
@@ -296,7 +305,7 @@ export default function ScoutShortSnapsPage() {
               const count = getPlayerResults(p).length;
               return (
                 <button key={p} onClick={() => setActivePlayer(p)} className={clsx("card-2 px-3 py-2 text-center transition-all min-w-[80px]", p === activePlayer ? "ring-2 ring-amber-500" : "opacity-60 hover:opacity-100")}>
-                  <p className="text-xs font-bold text-slate-200">{p}</p>
+                  <p className="text-xs font-bold text-slate-200">{scoutDisplayName(p, scoutNumbers)}</p>
                   <p className="text-lg font-black text-amber-400">{count > 0 ? getPlayerAvg(p).toFixed(2) : "—"}</p>
                   <p className="text-[10px] text-muted">{count}/{spp}</p>
                 </button>
@@ -307,7 +316,7 @@ export default function ScoutShortSnapsPage() {
           <p className="text-[10px] text-muted text-center">Strike (1) + Laces (1/0.5) + Spiral (1) = 3 max. Avg{dropWorst ? ", drop worst" : ""}.</p>
 
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{activePlayer} — Snap {playerSnapCount + 1} of {spp}</p>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">{scoutDisplayName(activePlayer, scoutNumbers)} — Snap {playerSnapCount + 1} of {spp}</p>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-3">
@@ -349,7 +358,7 @@ export default function ScoutShortSnapsPage() {
                   <div key={idx}>
                     <button onClick={() => isEditing ? setEditIdx(null) : startEdit(idx)} className="w-full flex items-center text-xs gap-2 py-1 hover:bg-surface-2 rounded transition-colors px-1">
                       <span className="text-muted w-5">#{idx + 1}</span>
-                      <span className="text-slate-400 w-16 truncate">{r.athlete}</span>
+                      <span className="text-slate-400 w-16 truncate">{scoutDisplayName(r.athlete, scoutNumbers)}</span>
                       <span className={clsx("font-semibold", r.accuracy === "Strike" ? "text-make" : "text-miss")}>{r.accuracy}</span>
                       <span className={clsx(r.laces === "Good" ? "text-make" : r.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>{r.laces === "Good" ? "Perf" : r.laces}</span>
                       <span className={clsx(r.spiral === "Good" ? "text-make" : "text-miss")}>{r.spiral === "Good" ? "Tight" : "Open"}</span>
@@ -357,7 +366,7 @@ export default function ScoutShortSnapsPage() {
                     </button>
                     {isEditing && (
                       <div className="card space-y-2 mt-1 mb-2">
-                        <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Edit Snap #{idx + 1} — {r.athlete}</p>
+                        <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Edit Snap #{idx + 1} — {scoutDisplayName(r.athlete, scoutNumbers)}</p>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <p className="text-[8px] text-muted text-center mb-1">Location</p>

@@ -258,6 +258,59 @@ export async function saveScoutAthletes(teamId: string, sport: string, names: st
   } catch {}
 }
 
+// ── Scout athlete jersey numbers ─────────────────────────────────────────────
+
+export async function loadScoutNumbers(teamId: string, sport: string): Promise<Record<string, string>> {
+  const key = `scout_numbers_${sport}`;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw) as Record<string, string>;
+  } catch {}
+  if (!teamId || teamId === "local-dev") return {};
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("team_data")
+      .select("data")
+      .eq("team_id", teamId)
+      .eq("data_key", key)
+      .single();
+    if (error || !data) return {};
+    const nums = data.data as unknown as Record<string, string>;
+    if (nums && typeof nums === "object") {
+      localStorage.setItem(key, JSON.stringify(nums));
+      return nums;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveScoutNumbers(teamId: string, sport: string, numbers: Record<string, string>): Promise<void> {
+  const key = `scout_numbers_${sport}`;
+  localStorage.setItem(key, JSON.stringify(numbers));
+  if (!teamId || teamId === "local-dev") return;
+  try {
+    const supabase = createClient();
+    await supabase.from("team_data").upsert(
+      {
+        team_id: teamId,
+        data_key: key,
+        data: numbers as unknown as Record<string, unknown>,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "team_id,data_key" }
+    );
+  } catch {}
+}
+
+/** Display name with optional jersey number prefix */
+export function scoutDisplayName(name: string, numbers?: Record<string, string>): string {
+  const num = numbers?.[name];
+  return num ? `#${num} ${name}` : name;
+}
+
 // ── Assigned Charts (stored in team_data) ────────────────────────────────────
 
 export interface AssignedChart {

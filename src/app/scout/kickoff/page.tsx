@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
 import { exportKOScoutExcel, exportKOScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -45,6 +45,8 @@ export default function ScoutKOPage() {
   const [liveAthletes, setLiveAthletes] = useState<string[]>([]);
   const [liveAthlete, setLiveAthlete] = useState("");
   const [newLiveAthlete, setNewLiveAthlete] = useState("");
+  const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
+  const [newAthleteNum, setNewAthleteNum] = useState("");
   const [liveDistInput, setLiveDistInput] = useState("");
   const [liveHangInput, setLiveHangInput] = useState("");
   const [liveDirGood, setLiveDirGood] = useState(true);
@@ -54,9 +56,10 @@ export default function ScoutKOPage() {
     let tid = getTeamId();
     for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
     if (!tid) return;
-    const [sess, prof] = await Promise.all([loadScoutSessions(tid, "SCOUT_KO"), loadScoutProfiles(tid)]);
+    const [sess, prof, nums] = await Promise.all([loadScoutSessions(tid, "SCOUT_KO"), loadScoutProfiles(tid), loadScoutNumbers(tid, "kickoff")]);
     setSessions(sess);
     setProfiles(prof);
+    setScoutNumbers(nums);
     setLoading(false);
   };
 
@@ -67,8 +70,9 @@ export default function ScoutKOPage() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid) return;
-      const names = await loadScoutAthletes(tid, "kickoff");
+      const [names, nums] = await Promise.all([loadScoutAthletes(tid, "kickoff"), loadScoutNumbers(tid, "kickoff")]);
       setLiveAthletes(names);
+      setScoutNumbers(nums);
       if (names.length > 0 && !liveAthlete) setLiveAthlete(names[0]);
     }
     loadLiveAthletes();
@@ -83,6 +87,12 @@ export default function ScoutKOPage() {
     if (!liveAthlete) setLiveAthlete(trimmed);
     const tid = getTeamId();
     if (tid) await saveScoutAthletes(tid, "kickoff", updated);
+    if (newAthleteNum.trim()) {
+      const updatedNums = { ...scoutNumbers, [trimmed]: newAthleteNum.trim() };
+      setScoutNumbers(updatedNums);
+      if (tid) await saveScoutNumbers(tid, "kickoff", updatedNums);
+    }
+    setNewAthleteNum("");
   };
 
   const handleLiveLog = () => {
@@ -230,12 +240,13 @@ export default function ScoutKOPage() {
               <p className="text-[10px] text-muted">Enter distance, hang time, direction — one kick at a time.</p>
               <div className="flex flex-wrap gap-1.5">
                 {liveAthletes.map((a) => (
-                  <button key={a} onClick={() => setLiveAthlete(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", liveAthlete === a ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{a}</button>
+                  <button key={a} onClick={() => setLiveAthlete(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", liveAthlete === a ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{scoutDisplayName(a, scoutNumbers)}</button>
                 ))}
               </div>
-              <div className="flex gap-1.5">
-                <input type="text" value={newLiveAthlete} onChange={(e) => setNewLiveAthlete(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="Add athlete..." className="input flex-1 text-xs py-1" />
-                <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim()} className="text-[10px] text-amber-400 hover:underline disabled:opacity-40">Add</button>
+              <div className="flex gap-2">
+                <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
+                <input type="text" value={newLiveAthlete} onChange={(e) => setNewLiveAthlete(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
+                <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -257,7 +268,7 @@ export default function ScoutKOPage() {
                   {[...liveKicks].reverse().map((k, i) => (
                     <div key={liveKicks.length - 1 - i} className="flex items-center text-xs gap-2">
                       <span className="text-muted w-5">#{liveKicks.length - i}</span>
-                      <span className="text-slate-400 w-16 truncate">{k.athlete}</span>
+                      <span className="text-slate-400 w-16 truncate">{scoutDisplayName(k.athlete, scoutNumbers)}</span>
                       <span className={clsx(k.directionGood ? "text-make" : "text-miss")}>{k.distance}yd {k.hangTime.toFixed(2)}s</span>
                       <span className="text-amber-400 font-bold ml-auto">{k.score.toFixed(2)}</span>
                     </div>
@@ -308,7 +319,7 @@ export default function ScoutKOPage() {
                         <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
                           <td className="py-1 px-2 font-semibold text-slate-200">
                             <span className="text-muted mr-1">{i + 1}.</span>
-                            <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
+                            <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                           </td>
                           {r.entries.map((e, j) => {
                             const isDropped = r.worst !== null && e.score === r.worst && j === r.entries.findIndex((x) => x.score === r.worst);

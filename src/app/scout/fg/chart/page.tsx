@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutPreset, saveScoutPreset, insertScoutSession, loadScoutAthletes, saveScoutAthletes } from "@/lib/scoutStore";
+import { loadScoutPreset, saveScoutPreset, insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -39,6 +39,8 @@ function ScoutFGChartInner() {
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
+  const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
+  const [newAthleteNum, setNewAthleteNum] = useState("");
 
   // Preset
   const [presetKicks, setPresetKicks] = useState<PresetKick[]>([]);
@@ -118,9 +120,10 @@ function ScoutFGChartInner() {
         tid = getTeamId();
       }
       if (!tid || !active) return;
-      const names = await loadScoutAthletes(tid, "fg");
+      const [names, nums] = await Promise.all([loadScoutAthletes(tid, "fg"), loadScoutNumbers(tid, "fg")]);
       if (!active) return;
       setAthleteNames(names);
+      setScoutNumbers(nums);
       const preset = await loadScoutPreset<PresetKick[]>(tid, PRESET_KEY);
       if (preset && active) setPresetKicks(preset);
       setPresetLoaded(true);
@@ -300,6 +303,12 @@ function ScoutFGChartInner() {
     setNewAthleteName("");
     const tid = getTeamId();
     if (tid) await saveScoutAthletes(tid, "fg", updated);
+    if (newAthleteNum.trim()) {
+      const updatedNums = { ...scoutNumbers, [trimmed]: newAthleteNum.trim() };
+      setScoutNumbers(updatedNums);
+      if (tid) await saveScoutNumbers(tid, "fg", updatedNums);
+    }
+    setNewAthleteNum("");
   };
 
   const removeAthlete = async (name: string) => {
@@ -380,18 +389,19 @@ function ScoutFGChartInner() {
             {athleteNames.map((a) => (
               <div key={a} className="flex items-center gap-0.5">
                 <button onClick={() => togglePlayer(a)} className={clsx("px-3 py-1.5 rounded-l-input text-xs font-medium transition-all", selectedPlayers.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>
-                  {a}
+                  {scoutDisplayName(a, scoutNumbers)}
                 </button>
                 <button onClick={() => removeAthlete(a)} className="px-1.5 py-1.5 rounded-r-input text-[10px] bg-surface-2 text-muted border border-border border-l-0 hover:text-miss transition-colors">&times;</button>
               </div>
             ))}
           </div>
           <div className="flex gap-2">
+            <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
             <input type="text" value={newAthleteName} onChange={(e) => setNewAthleteName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAthlete(newAthleteName); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
             <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
           </div>
           {selectedPlayers.length > 0 && (
-            <p className="text-xs text-muted">Order: {selectedPlayers.join(" → ")}</p>
+            <p className="text-xs text-muted">Order: {selectedPlayers.map((p) => scoutDisplayName(p, scoutNumbers)).join(" → ")}</p>
           )}
           {chartMode === "preset" && presetKicks.length > 0 && (
             <div className="card-2 text-xs space-y-1">
@@ -449,7 +459,7 @@ function ScoutFGChartInner() {
                 {ranked.map((r, i) => (
                   <tr key={r.name} className="border-t border-border/30">
                     <td className="py-1.5 px-2 font-semibold text-slate-200 text-left">
-                      <span className="text-muted mr-1">{i + 1}.</span>{r.name}
+                      <span className="text-muted mr-1">{i + 1}.</span>{scoutDisplayName(r.name, scoutNumbers)}
                     </td>
                     {kickInfo.map((k) => {
                       const e = r.entries.find((en) => en.kickNum === k.num);
@@ -503,7 +513,7 @@ function ScoutFGChartInner() {
             <tbody>
               {selectedPlayers.map((athlete) => (
                 <tr key={athlete} className="border-t border-border/30">
-                  <td className="py-2 px-1 font-semibold text-slate-200 text-xs">{athlete}</td>
+                  <td className="py-2 px-1 font-semibold text-slate-200 text-xs">{scoutDisplayName(athlete, scoutNumbers)}</td>
                   {kicks.map((_, kickIdx) => {
                     const res = resultMap[athlete]?.[kickIdx];
                     const isActive = activeCell?.athlete === athlete && activeCell?.kickIdx === kickIdx;
@@ -536,7 +546,7 @@ function ScoutFGChartInner() {
           {selectedPlayers.map((athlete) => (
             <div key={athlete} className="card-2 p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-slate-200">{athlete}</p>
+                <p className="text-xs font-semibold text-slate-200">{scoutDisplayName(athlete, scoutNumbers)}</p>
                 <p className="text-sm font-black text-amber-400">{getPlayerScore(athlete)}</p>
               </div>
               <div className="grid grid-cols-5 gap-1.5">
@@ -570,7 +580,7 @@ function ScoutFGChartInner() {
         {activeCell && activeKick && !editingKick && (
           <div className="card-2 py-3 px-4 flex items-center justify-between">
             <div>
-              <p className="text-sm font-bold text-slate-100">{activeCell.athlete}</p>
+              <p className="text-sm font-bold text-slate-100">{scoutDisplayName(activeCell.athlete, scoutNumbers)}</p>
               <p className="text-xs text-slate-300">{activeKick.distance}yd {activeKick.hash} — {activeKick.pointValue}pt</p>
             </div>
             <button onClick={() => startEditKick(activeCell.athlete, activeCell.kickIdx)} className="text-[10px] text-muted hover:text-amber-400 transition-colors">Change Kick</button>
@@ -580,7 +590,7 @@ function ScoutFGChartInner() {
         {/* Edit kick overlay */}
         {editingKick && (
           <div className="card space-y-3">
-            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Edit Kick for {editingKick.athlete}</p>
+            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Edit Kick for {scoutDisplayName(editingKick.athlete, scoutNumbers)}</p>
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <p className="text-[10px] text-muted text-center mb-1">Distance</p>
