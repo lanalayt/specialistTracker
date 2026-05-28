@@ -94,7 +94,7 @@ function SignupInner() {
     setError("");
     try {
       const needsTeamCode = roleChoice === "athlete" || (roleChoice === "coach" && teamChoice === "existing");
-      let resolvedTeamId = teamCode.trim();
+      let resolvedTeamId = teamCode.trim().replace(/[^a-zA-Z0-9-]/g, "");
       let resolvedRole: "coach" | "athlete" = roleChoice;
 
       // If the code is short (not a UUID), try to resolve it as an invite code
