@@ -268,6 +268,27 @@ function ScoutFGChartInner() {
     setManualKicks((prev) => [...prev, { distance: d, hash: manualHash, pointValue: p }]);
   };
 
+  const addExtraKick = () => {
+    const d = parseInt(manualDist) || 30;
+    const p = parseInt(manualPoints) || 1;
+    const newKick: PresetKick = { distance: d, hash: manualHash, pointValue: p };
+    if (chartMode === "preset") {
+      setPresetKicks((prev) => [...prev, newKick]);
+      setAthleteKicks((prev) => {
+        const next = { ...prev };
+        for (const player of selectedPlayers) {
+          next[player] = [...(next[player] ?? [...presetKicks]), newKick];
+        }
+        return next;
+      });
+    } else {
+      setManualKicks((prev) => [...prev, newKick]);
+    }
+    setManualDist("30");
+    setManualHash("M");
+    setManualPoints("1");
+  };
+
   // Warn before leaving if there's unsaved data
   useUnsavedWarning(getResultCount() > 0 && !saved);
 
@@ -606,29 +627,27 @@ function ScoutFGChartInner() {
           )}
         </div>
 
-        {/* Manual mode — add kick */}
-        {chartMode === "manual" && (
-          <div className="card space-y-3">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Add Kick Column</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <p className="text-[10px] text-muted text-center mb-1">Distance</p>
-                <input type="text" inputMode="numeric" value={manualDist} onChange={(e) => setManualDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
-              </div>
-              <div>
-                <p className="text-[10px] text-muted text-center mb-1">Hash</p>
-                <select value={manualHash} onChange={(e) => setManualHash(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5">
-                  {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted text-center mb-1">Points</p>
-                <input type="text" inputMode="numeric" value={manualPoints} onChange={(e) => setManualPoints(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
-              </div>
+        {/* Add extra kick — available in both preset and manual mode */}
+        <div className="card space-y-3">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">Add Extra Kick</p>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+              <input type="text" inputMode="numeric" value={manualDist} onChange={(e) => setManualDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
             </div>
-            <button onClick={addManualKick} disabled={!manualDist} className="btn-primary w-full py-2 text-xs font-bold disabled:opacity-40">Add Kick</button>
+            <div>
+              <p className="text-[10px] text-muted text-center mb-1">Hash</p>
+              <select value={manualHash} onChange={(e) => setManualHash(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5">
+                {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted text-center mb-1">Points</p>
+              <input type="text" inputMode="numeric" value={manualPoints} onChange={(e) => setManualPoints(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+            </div>
           </div>
-        )}
+          <button onClick={addExtraKick} disabled={!manualDist} className="btn-primary w-full py-2 text-xs font-bold disabled:opacity-40">Add Kick</button>
+        </div>
       </main>
     </>
   );

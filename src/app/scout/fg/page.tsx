@@ -335,33 +335,36 @@ export default function ScoutFGPage() {
                               {Array.from({ length: liveMaxKicks }, (_, i) => (
                                 <th key={i} className="text-[10px] text-muted text-center py-1 px-1">K{i + 1}</th>
                               ))}
-                              <th className="text-[10px] text-muted text-right py-1 px-2">Total</th>
+                              <th className="text-[10px] text-muted text-right py-1 px-2">%</th>
                               <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
                             </tr>
                           </thead>
                           <tbody>
-                            {liveData.map((r, i) => (
-                              <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
-                                <td className="py-1 px-2 font-semibold text-slate-200">
-                                  <span className="text-muted mr-1">{i + 1}.</span>
-                                  <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
-                                </td>
-                                {r.entries.map((e, j) => (
-                                  <td key={j} className="text-center py-1 px-1" title={`${e.distance}yd ${e.hash}`}>
-                                    <button onClick={() => handleToggleKick(r.sessionId, r.name, j)} className={clsx("font-bold hover:opacity-70 transition-opacity", e.result === "make" ? "text-make" : "text-miss")}>
-                                      {e.score}
-                                    </button>
+                            {liveData.map((r, i) => {
+                              const pct = r.att > 0 ? Math.round((r.makes / r.att) * 100) : 0;
+                              return (
+                                <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
+                                  <td className="py-1 px-2 font-semibold text-slate-200">
+                                    <span className="text-muted mr-1">{i + 1}.</span>
+                                    <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
                                   </td>
-                                ))}
-                                {Array.from({ length: liveMaxKicks - r.entries.length }, (_, j) => (
-                                  <td key={`e-${j}`} className="text-center py-1 px-1 text-muted">—</td>
-                                ))}
-                                <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
-                                <td className="text-center py-1 px-1">
-                                  <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
-                                </td>
-                              </tr>
-                            ))}
+                                  {r.entries.map((e, j) => (
+                                    <td key={j} className="text-center py-1 px-1">
+                                      <button onClick={() => handleToggleKick(r.sessionId, r.name, j)} className={clsx("font-bold hover:opacity-70 transition-opacity text-[10px] whitespace-nowrap", e.result === "make" ? "text-make" : "text-miss")}>
+                                        {e.distance}{e.hash}
+                                      </button>
+                                    </td>
+                                  ))}
+                                  {Array.from({ length: liveMaxKicks - r.entries.length }, (_, j) => (
+                                    <td key={`e-${j}`} className="text-center py-1 px-1 text-muted">—</td>
+                                  ))}
+                                  <td className="text-right py-1 px-2 font-black text-amber-400">{r.makes}/{r.att} <span className="text-[10px]">({pct}%)</span></td>
+                                  <td className="text-center py-1 px-1">
+                                    <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
