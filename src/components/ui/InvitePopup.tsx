@@ -26,22 +26,27 @@ export async function getOrCreateInviteCodes(teamId: string): Promise<InviteCode
     coachCode: existing?.coachCode || generateCode(),
     athleteCode: existing?.athleteCode || generateCode(),
   };
-  teamSet(teamId, "invite_codes", codes);
+  // Write immediately — invite codes are critical and must be in the DB
+  // before an athlete tries to use them
+  const { teamSetImmediate } = await import("@/lib/teamData");
+  await teamSetImmediate(teamId, "invite_codes", codes);
   return codes;
 }
 
 export async function resolveInviteCode(code: string): Promise<{ teamId: string; role: "coach" | "athlete" } | null> {
-  // Search all teams for a matching invite code
-  const { createClient } = await import("@/lib/supabase");
-  const supabase = createClient();
-  const { data } = await supabase.from("team_data").select("team_id, data").eq("data_key", "invite_codes");
-  if (!data) return null;
-  for (const row of data) {
-    const codes = row.data as InviteCodes;
-    if (codes.coachCode === code.toUpperCase()) return { teamId: row.team_id, role: "coach" };
-    if (codes.athleteCode === code.toUpperCase()) return { teamId: row.team_id, role: "athlete" };
+  try {
+    const res = await fetch("/api/resolve-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.teamId && data.role) return { teamId: data.teamId, role: data.role };
+    return null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export function InvitePopup({ teamName, teamCode, onClose }: InvitePopupProps) {
