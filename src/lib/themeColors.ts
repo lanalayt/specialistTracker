@@ -134,7 +134,7 @@ export function applyTheme(colors: ThemeColors): void {
   const root = document.documentElement;
   root.style.setProperty("--accent", colors.primary);
   root.style.setProperty("--accent-dim", hexToRgba(colors.primary, 0.15));
-  root.style.setProperty("--make", colors.primary);
+  root.style.setProperty("--make", "#00d4a0");
   root.style.setProperty("--bg", colors.secondary);
   root.style.setProperty("--surface", lighten(colors.secondary, 0.06));
   root.style.setProperty("--surface-2", lighten(colors.secondary, 0.10));
