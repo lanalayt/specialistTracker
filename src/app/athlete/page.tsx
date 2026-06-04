@@ -13,7 +13,7 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
   { href: "/athlete/kicking", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
   { href: "/athlete/punting", iconEl: <PuntFootIcon size={36} />, label: "Punting" },
   { href: "/athlete/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
-  { href: "/athlete/longsnap", icon: "📏", label: "Snapping" },
+  { href: "/athlete/longsnap", icon: "🏈", label: "Snapping" },
 ];
 
 export default function AthleteDashboardPage() {
