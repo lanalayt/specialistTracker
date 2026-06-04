@@ -46,6 +46,8 @@ export default function ScoutLongSnapsPage() {
   const [dropWorst, setDropWorst] = useState(false);
   const [openSpiralIsBall, setOpenSpiralIsBall] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
+  const [weather, setWeather] = useState("");
 
   const [snaps, setSnaps] = useState<BsSnap[]>([]);
   const [activePlayer, setActivePlayer] = useState("");
@@ -170,6 +172,14 @@ export default function ScoutLongSnapsPage() {
       score: s.accuracy === "Strike" ? 1 : 0,
       markerX: s.marker?.x, markerY: s.marker?.y, dropWorst,
     }));
+    const entriesWithNotes = entries.map((r, i) => {
+      const note = athleteNotes[r.athlete];
+      if (note) {
+        const isFirstForAthlete = entries.findIndex((x) => x.athlete === r.athlete) === i;
+        if (isFirstForAthlete) return { ...r, notes: note };
+      }
+      return r;
+    });
     const allAthletes = [...new Set(snaps.map((s) => s.athlete))];
     const label = `Long Snaps — ${allAthletes.map((a) => `${a}: ${getPlayerAvg(a).toFixed(2)} avg`).join(", ")}`;
     await insertScoutSession(tid, {
@@ -177,7 +187,8 @@ export default function ScoutLongSnapsPage() {
       sport: "SCOUT_SNAP",
       label,
       date: new Date().toISOString(),
-      entries: entries as unknown as Record<string, unknown>[],
+      weather: weather || undefined,
+      entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
     setSaved(true);
   };
@@ -259,6 +270,9 @@ export default function ScoutLongSnapsPage() {
           <div className="max-w-2xl mx-auto space-y-6 text-center">
             <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
             <p className="text-xs text-muted">Avg: Strike=1, Ball=0{dropWorst ? ", worst dropped" : ""}.</p>
+            <div className="max-w-sm mx-auto">
+              <input type="text" value={weather} onChange={(e) => setWeather(e.target.value)} placeholder="Weather conditions (optional)" className="input w-full text-sm py-1.5 text-center" />
+            </div>
             <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(ranked.length, 3)}, minmax(0, 1fr))` }}>
               {ranked.map((r) => (
                 <div key={r.name} className="space-y-3">
@@ -268,6 +282,16 @@ export default function ScoutLongSnapsPage() {
                     <p className="text-3xl font-black text-amber-400">{r.strikes}/{r.snaps.length}</p>
                     <p className="text-xs text-muted">strikes</p>
                   </div>
+                  <button
+                    onClick={() => {
+                      const note = window.prompt(`Notes for ${r.name}:`, athleteNotes[r.name] ?? "");
+                      if (note !== null) setAthleteNotes((prev) => ({ ...prev, [r.name]: note }));
+                    }}
+                    className={clsx("text-[10px] px-1.5 py-0.5 rounded transition-colors mx-auto", athleteNotes[r.name] ? "text-amber-400 bg-amber-500/10 border border-amber-500/30" : "text-muted hover:text-amber-400")}
+                    title={athleteNotes[r.name] || "Add notes"}
+                  >
+                    {athleteNotes[r.name] ? "Notes" : "+Note"}
+                  </button>
                   <div className="card-2 text-left text-xs max-h-[200px] overflow-y-auto">
                     <table className="w-full">
                       <thead><tr>
@@ -296,7 +320,7 @@ export default function ScoutLongSnapsPage() {
             </div>
             <div className="flex gap-3 max-w-sm mx-auto">
               {!saved ? <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to Rankings</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
-              <Link href="/scout/snap" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
+              <Link href="/scout/snap?tab=rankings" className="btn-ghost flex-1 py-3 text-sm text-center">Go to Rankings</Link>
             </div>
           </div>
         </main>

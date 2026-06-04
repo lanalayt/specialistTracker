@@ -48,6 +48,8 @@ export default function ScoutShortSnapsPage() {
   const [snapsPerPlayer, setSnapsPerPlayer] = useState("10");
   const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
+  const [weather, setWeather] = useState("");
 
   const [results, setResults] = useState<SnapResult[]>([]);
   const [activePlayer, setActivePlayer] = useState("");
@@ -166,6 +168,14 @@ export default function ScoutShortSnapsPage() {
       athlete: r.athlete, accuracy: r.accuracy, laces: r.laces, spiral: r.spiral, points: r.points,
       markerX: r.marker?.x, markerY: r.marker?.y, markerInZone: r.marker?.inZone, dropWorst,
     }));
+    const entriesWithNotes = entries.map((r, i) => {
+      const note = athleteNotes[r.athlete];
+      if (note) {
+        const isFirstForAthlete = entries.findIndex((x) => x.athlete === r.athlete) === i;
+        if (isFirstForAthlete) return { ...r, notes: note };
+      }
+      return r;
+    });
     const allAthletes = [...new Set(results.map((r) => r.athlete))];
     const label = `Short Snaps — ${allAthletes.map((a) => `${a}: ${getPlayerAvg(a).toFixed(2)} avg`).join(", ")}`;
     await insertScoutSession(tid, {
@@ -173,7 +183,8 @@ export default function ScoutShortSnapsPage() {
       sport: "SCOUT_SNAP",
       label,
       date: new Date().toISOString(),
-      entries: entries as unknown as Record<string, unknown>[],
+      weather: weather || undefined,
+      entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
     setSaved(true);
   };
@@ -245,6 +256,9 @@ export default function ScoutShortSnapsPage() {
           <div className="max-w-2xl mx-auto space-y-6 text-center">
             <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
             <p className="text-xs text-muted">Avg per snap{dropWorst ? ", worst dropped" : ""}. Max 3 pts/snap: Strike (1) + Laces (1/0.5) + Spiral (1).</p>
+            <div className="max-w-sm mx-auto">
+              <input type="text" value={weather} onChange={(e) => setWeather(e.target.value)} placeholder="Weather conditions (optional)" className="input w-full text-sm py-1.5 text-center" />
+            </div>
             <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(ranked.length, 3)}, minmax(0, 1fr))` }}>
               {ranked.map((r) => (
                 <div key={r.name} className="space-y-3">
@@ -254,6 +268,16 @@ export default function ScoutShortSnapsPage() {
                     <p className="text-3xl font-black text-amber-400">{r.avg.toFixed(2)}</p>
                     <p className="text-xs text-muted">avg / {PTS_PER_SNAP} ({r.total} total)</p>
                   </div>
+                  <button
+                    onClick={() => {
+                      const note = window.prompt(`Notes for ${r.name}:`, athleteNotes[r.name] ?? "");
+                      if (note !== null) setAthleteNotes((prev) => ({ ...prev, [r.name]: note }));
+                    }}
+                    className={clsx("text-[10px] px-1.5 py-0.5 rounded transition-colors mx-auto", athleteNotes[r.name] ? "text-amber-400 bg-amber-500/10 border border-amber-500/30" : "text-muted hover:text-amber-400")}
+                    title={athleteNotes[r.name] || "Add notes"}
+                  >
+                    {athleteNotes[r.name] ? "Notes" : "+Note"}
+                  </button>
                   <div className="card-2 text-left text-xs max-h-[200px] overflow-y-auto">
                     <table className="w-full">
                       <thead><tr>
@@ -284,7 +308,7 @@ export default function ScoutShortSnapsPage() {
             </div>
             <div className="flex gap-3 max-w-sm mx-auto">
               {!saved ? <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to Rankings</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
-              <Link href="/scout/snap" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
+              <Link href="/scout/snap?tab=rankings" className="btn-ghost flex-1 py-3 text-sm text-center">Go to Rankings</Link>
             </div>
           </div>
         </main>

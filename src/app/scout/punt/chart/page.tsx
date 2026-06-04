@@ -40,6 +40,8 @@ function ScoutPuntChartInner() {
   const [puntsPerPlayer, setPuntsPerPlayer] = useState(isManual ? "0" : "5");
   const [dropWorst, setDropWorst] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
+  const [weather, setWeather] = useState("");
 
   const [results, setResults] = useState<PuntResult[]>([]);
   const [activePlayer, setActivePlayer] = useState("");
@@ -135,12 +137,22 @@ function ScoutPuntChartInner() {
     if (!tid || results.length === 0) return;
     const athletes = [...new Set(results.map((r) => r.athlete))];
     const label = `Punt Scout — ${athletes.map((a) => `${a}: ${getPlayerAvg(a).toFixed(2)}`).join(", ")}`;
+    const entriesWithNotes = results.map((r, i) => {
+      const base = { ...r, dropWorst };
+      const note = athleteNotes[r.athlete];
+      if (note) {
+        const isFirstForAthlete = results.findIndex((x) => x.athlete === r.athlete) === i;
+        if (isFirstForAthlete) return { ...base, notes: note };
+      }
+      return base;
+    });
     await insertScoutSession(tid, {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "SCOUT_PUNT",
       label,
       date: new Date().toISOString(),
-      entries: [...results.map((r) => ({ ...r, dropWorst })) ] as unknown as Record<string, unknown>[],
+      weather: weather || undefined,
+      entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
     setSaved(true);
   };
@@ -217,6 +229,9 @@ function ScoutPuntChartInner() {
         <main className="p-4 lg:p-6 max-w-3xl mx-auto space-y-6 text-center">
           <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
           <p className="text-xs text-muted">Score = avg of all punts{dropWorst ? ", worst dropped" : ""}. Punt = Dist + (Hang x 15), bad dir = -10.</p>
+          <div className="max-w-sm mx-auto">
+            <input type="text" value={weather} onChange={(e) => setWeather(e.target.value)} placeholder="Weather conditions (optional)" className="input w-full text-sm py-1.5 text-center" />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -226,6 +241,7 @@ function ScoutPuntChartInner() {
                     <th key={i} className="text-[10px] text-muted text-center py-1 px-2">P{i + 1}</th>
                   ))}
                   <th className="text-[10px] text-muted text-right py-1 px-2">Avg</th>
+                  <th className="text-[10px] text-muted text-center py-1 px-2 w-10"></th>
                 </tr>
               </thead>
               <tbody>
@@ -246,6 +262,18 @@ function ScoutPuntChartInner() {
                       <td key={`e-${j}`} className="text-center py-1 px-2 text-muted">—</td>
                     ))}
                     <td className="text-right py-1 px-2 font-black text-amber-400">{r.avg.toFixed(2)}</td>
+                    <td className="text-center py-1.5 px-1">
+                      <button
+                        onClick={() => {
+                          const note = window.prompt(`Notes for ${r.name}:`, athleteNotes[r.name] ?? "");
+                          if (note !== null) setAthleteNotes((prev) => ({ ...prev, [r.name]: note }));
+                        }}
+                        className={clsx("text-[10px] px-1.5 py-0.5 rounded transition-colors", athleteNotes[r.name] ? "text-amber-400 bg-amber-500/10 border border-amber-500/30" : "text-muted hover:text-amber-400")}
+                        title={athleteNotes[r.name] || "Add notes"}
+                      >
+                        {athleteNotes[r.name] ? "Notes" : "+Note"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -253,7 +281,7 @@ function ScoutPuntChartInner() {
           </div>
           <div className="flex gap-3 max-w-sm mx-auto">
             {!saved ? <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to Rankings</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
-            <Link href="/scout/punt" className="btn-ghost flex-1 py-3 text-sm text-center">Done</Link>
+            <Link href="/scout/punt?tab=rankings" className="btn-ghost flex-1 py-3 text-sm text-center">Go to Rankings</Link>
           </div>
         </main>
       </>

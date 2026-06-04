@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
@@ -29,7 +30,13 @@ const parseHangRaw = (raw: string): number => {
 };
 
 export default function ScoutKOPage() {
-  const [tab, setTab] = useState<"chart" | "rankings">("chart");
+  return <Suspense fallback={<div className="p-8 text-center text-muted">Loading...</div>}><ScoutKOInner /></Suspense>;
+}
+
+function ScoutKOInner() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "rankings" ? "rankings" : "chart";
+  const [tab, setTab] = useState<"chart" | "rankings">(initialTab);
   const [liveMode, setLiveMode] = useState(false);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
@@ -124,7 +131,7 @@ export default function ScoutKOPage() {
   };
 
   // Build per-session-per-athlete rows
-  const ranked: { name: string; sessionId: string; date: string; entries: KOEntry[]; avg: number; worst: number | null }[] = [];
+  const ranked: { name: string; sessionId: string; date: string; entries: KOEntry[]; avg: number; worst: number | null; notes?: string; weather?: string }[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as KOEntry[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
@@ -132,7 +139,9 @@ export default function ScoutKOPage() {
       const ae = entries.filter((e) => e.athlete === name);
       const scores = ae.map((e) => e.score);
       const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
-      ranked.push({ name, sessionId: s.id, date: s.date, entries: ae, avg: calcAvg(scores, dropWorst), worst });
+      const noteEntry = ae.find((e) => (e as { notes?: string }).notes);
+      const notes = noteEntry ? (noteEntry as { notes?: string }).notes : undefined;
+      ranked.push({ name, sessionId: s.id, date: s.date, entries: ae, avg: calcAvg(scores, dropWorst), worst, notes, weather: s.weather });
     }
   }
   ranked.sort((a, b) => b.avg - a.avg);
@@ -312,6 +321,7 @@ export default function ScoutKOPage() {
                         ))}
                         <th className="text-[10px] text-muted text-right py-1 px-2">Avg</th>
                         <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
+                        <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -337,6 +347,9 @@ export default function ScoutKOPage() {
                             <td key={`e-${j}`} className="text-center py-1 px-2 text-muted">—</td>
                           ))}
                           <td className="text-right py-1 px-2 font-black text-amber-400">{r.avg.toFixed(2)}</td>
+                          <td className="text-center py-1 px-1">
+                            {(r.notes || r.weather) && <button onClick={() => window.alert(`${r.weather ? `Weather: ${r.weather}\n\n` : ""}${r.notes ? `Notes for ${r.name}:\n${r.notes}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
+                          </td>
                           <td className="text-center py-1 px-1">
                             <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                           </td>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
@@ -37,10 +38,18 @@ interface RankedRow {
   pct: number;
   entries: SnapEntry[];
   is30Point: boolean;
+  notes?: string;
+  weather?: string;
 }
 
 export default function ScoutSnapPage() {
-  const [tab, setTab] = useState<"chart" | "rankings">("chart");
+  return <Suspense fallback={<div className="p-8 text-center text-muted">Loading...</div>}><ScoutSnapInner /></Suspense>;
+}
+
+function ScoutSnapInner() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "rankings" ? "rankings" : "chart";
+  const [tab, setTab] = useState<"chart" | "rankings">(initialTab);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
@@ -130,7 +139,9 @@ export default function ScoutSnapPage() {
       const total = ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0);
       const maxScore = is30Point ? ae.length * 3 : ae.length;
       const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
-      ranked.push({ name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: ae.length, total, entries: ae, is30Point, maxScore, pct });
+      const noteEntry = ae.find((e) => (e as { notes?: string }).notes);
+      const notes = noteEntry ? (noteEntry as { notes?: string }).notes : undefined;
+      ranked.push({ name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: ae.length, total, entries: ae, is30Point, maxScore, pct, notes, weather: s.weather });
     }
   }
   ranked.sort((a, b) => b.pct - a.pct);
@@ -256,6 +267,7 @@ export default function ScoutSnapPage() {
                         <th className="text-[10px] text-muted text-center py-1 px-2">Score</th>
                         <th className="text-[10px] text-muted text-right py-1 px-2">%</th>
                         <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
+                        <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -271,6 +283,9 @@ export default function ScoutSnapPage() {
                           </td>
                           <td className="text-center py-1 px-2 font-bold text-slate-200">{r.total}/{r.maxScore}</td>
                           <td className="text-right py-1 px-2 font-black text-amber-400">{r.pct}%</td>
+                          <td className="text-center py-1 px-1">
+                            {(r.notes || r.weather) && <button onClick={() => window.alert(`${r.weather ? `Weather: ${r.weather}\n\n` : ""}${r.notes ? `Notes for ${r.name}:\n${r.notes}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
+                          </td>
                           <td className="text-center py-1 px-1">
                             <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                           </td>
