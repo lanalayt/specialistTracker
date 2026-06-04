@@ -338,7 +338,7 @@ function ScoutFGInner() {
                                 <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
                                 <td className="text-center py-1 px-1">
                                   <div className="flex items-center gap-1">
-                                    {r.notes && <button onClick={() => window.alert(`Notes for ${r.name}:\n\n${r.notes}${r.weather ? `\n\nWeather: ${r.weather}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes}>Notes</button>}
+                                    {(r.notes || r.weather) && <button onClick={() => window.alert(`${r.weather ? `Weather: ${r.weather}\n\n` : ""}${r.notes ? `Notes for ${r.name}:\n${r.notes}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
                                     <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                                   </div>
                                 </td>
@@ -390,7 +390,7 @@ function ScoutFGInner() {
                                   <td className="text-right py-1 px-2 font-black text-amber-400">{r.makes}/{r.att} <span className="text-[10px]">({pct}%)</span></td>
                                   <td className="text-center py-1 px-1">
                                     <div className="flex items-center gap-1">
-                                      {r.notes && <button onClick={() => window.alert(`Notes for ${r.name}:\n\n${r.notes}${r.weather ? `\n\nWeather: ${r.weather}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes}>Notes</button>}
+                                      {(r.notes || r.weather) && <button onClick={() => window.alert(`${r.weather ? `Weather: ${r.weather}\n\n` : ""}${r.notes ? `Notes for ${r.name}:\n${r.notes}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
                                       <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
                                     </div>
                                   </td>
