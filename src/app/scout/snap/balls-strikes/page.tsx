@@ -44,7 +44,7 @@ export default function ScoutLongSnapsPage() {
   const [snapsPerPlayer, setSnapsPerPlayer] = useState("10");
   const [maxTime] = useState("");
   const [dropWorst, setDropWorst] = useState(false);
-  const [openSpiralIsBall, setOpenSpiralIsBall] = useState(true);
+  const [openSpiralIsBall, setOpenSpiralIsBall] = useState(false);
   const [saved, setSaved] = useState(false);
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
   const [weather, setWeather] = useState("");
