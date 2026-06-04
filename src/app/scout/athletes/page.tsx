@@ -116,6 +116,26 @@ export default function ScoutAthletesPage() {
     updated[profile.name] = profile;
     setProfiles(updated);
     await saveScoutProfiles(tid, updated);
+
+    // Auto-add to sport lists based on position
+    const positions = (profile.position ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    const positionSportMap: Record<string, string[]> = {
+      Kicker: ["fg", "kickoff"],
+      Punter: ["punt"],
+      Snapper: ["snap"],
+    };
+    for (const pos of positions) {
+      const sports = positionSportMap[pos] ?? [];
+      for (const sport of sports) {
+        const list = sportAthletes[sport] ?? [];
+        if (!list.includes(profile.name)) {
+          const newList = [...list, profile.name];
+          setSportAthletes((prev) => ({ ...prev, [sport]: newList }));
+          await saveScoutAthletes(tid, sport, newList);
+        }
+      }
+    }
+
     setProfileOpen(null);
   };
 
