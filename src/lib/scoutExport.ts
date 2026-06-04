@@ -59,13 +59,14 @@ export function exportFGScoutExcel(sessions: ScoutSession[]) {
 export async function exportFGScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
   const rows = buildFGRows(sessions);
+  let y = 15;
   rows.forEach((r, i) => {
-    if (i > 0) doc.addPage();
+    if (i > 0) y = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
     doc.setFontSize(14);
-    doc.text(r.session, 14, 15);
+    doc.text(r.session, 14, y);
     doc.setFontSize(10);
-    doc.text(r.date, 14, 22);
-    autoTable(doc, { head: [r.head], body: r.body, startY: 26, styles: { fontSize: 9 } });
+    doc.text(r.date, 14, y + 7);
+    autoTable(doc, { head: [r.head], body: r.body, startY: y + 11, styles: { fontSize: 9 } });
   });
   addLogoToPDF(doc as any, true);
   await addAppLogoToPDFFooter(doc as any, true);
@@ -117,13 +118,14 @@ export function exportPuntScoutExcel(sessions: ScoutSession[]) {
 export async function exportPuntScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
   const rows = buildPuntKORows(sessions, "Punt");
+  let y = 15;
   rows.forEach((r, i) => {
-    if (i > 0) doc.addPage();
+    if (i > 0) y = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
     doc.setFontSize(14);
-    doc.text(r.session, 14, 15);
+    doc.text(r.session, 14, y);
     doc.setFontSize(10);
-    doc.text(r.date, 14, 22);
-    autoTable(doc, { head: [r.head], body: r.body, startY: 26, styles: { fontSize: 8 } });
+    doc.text(r.date, 14, y + 7);
+    autoTable(doc, { head: [r.head], body: r.body, startY: y + 11, styles: { fontSize: 8 } });
   });
   addLogoToPDF(doc as any, true);
   await addAppLogoToPDFFooter(doc as any, true);
@@ -143,13 +145,14 @@ export function exportKOScoutExcel(sessions: ScoutSession[]) {
 export async function exportKOScoutPDF(sessions: ScoutSession[]) {
   const doc = new jsPDF({ orientation: "landscape" });
   const rows = buildPuntKORows(sessions, "KO");
+  let y = 15;
   rows.forEach((r, i) => {
-    if (i > 0) doc.addPage();
+    if (i > 0) y = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
     doc.setFontSize(14);
-    doc.text(r.session, 14, 15);
+    doc.text(r.session, 14, y);
     doc.setFontSize(10);
-    doc.text(r.date, 14, 22);
-    autoTable(doc, { head: [r.head], body: r.body, startY: 26, styles: { fontSize: 8 } });
+    doc.text(r.date, 14, y + 7);
+    autoTable(doc, { head: [r.head], body: r.body, startY: y + 11, styles: { fontSize: 8 } });
   });
   addLogoToPDF(doc as any, true);
   await addAppLogoToPDFFooter(doc as any, true);

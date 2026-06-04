@@ -37,6 +37,7 @@ interface RankedRow {
   total: number;
   maxScore: number;
   pct: number;
+  avgTime?: number;
   entries: SnapEntry[];
   is30Point: boolean;
   notes?: string;
@@ -145,7 +146,9 @@ function ScoutSnapInner() {
       const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
       const noteEntry = ae.find((e) => (e as { notes?: string }).notes);
       const notes = noteEntry ? (noteEntry as { notes?: string }).notes : undefined;
-      ranked.push({ name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: ae.length, total, entries: ae, is30Point, maxScore, pct, notes, weather: s.weather });
+      const timedEntries = ae.filter((e) => e.time && parseFloat(e.time) > 0);
+      const avgTime = timedEntries.length > 0 ? timedEntries.reduce((sum, e) => sum + parseFloat(e.time!), 0) / timedEntries.length : undefined;
+      ranked.push({ name, sessionId: s.id, sessionLabel: s.label, date: s.date, count: ae.length, total, entries: ae, is30Point, maxScore, pct, avgTime, notes, weather: s.weather });
     }
   }
   ranked.sort((a, b) => b.pct - a.pct);
@@ -295,6 +298,7 @@ function ScoutSnapInner() {
                         <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
                         <th className="text-[10px] text-muted text-center py-1 px-2">Snaps</th>
                         <th className="text-[10px] text-muted text-center py-1 px-2"></th>
+                        {rankingTab === "long" && <th className="text-[10px] text-muted text-center py-1 px-2">Avg Time</th>}
                         <th className="text-[10px] text-muted text-center py-1 px-2">Score</th>
                         <th className="text-[10px] text-muted text-right py-1 px-2">%</th>
                         <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
@@ -315,6 +319,7 @@ function ScoutSnapInner() {
                           <td className="text-center py-1 px-2">
                             <button onClick={() => setDetailOpen(r)} className="text-[10px] px-2 py-0.5 rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors font-semibold">See Chart</button>
                           </td>
+                          {rankingTab === "long" && <td className="text-center py-1 px-2 font-bold text-slate-300">{r.avgTime ? `${r.avgTime.toFixed(2)}s` : "—"}</td>}
                           <td className="text-center py-1 px-2 font-bold text-slate-200">{r.total}/{r.maxScore}</td>
                           <td className="text-right py-1 px-2 font-black text-amber-400">{r.pct}%</td>
                           <td className="text-center py-1 px-1">
