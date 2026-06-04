@@ -20,26 +20,69 @@ function calcAvg(scores: number[], dropWorst: boolean): number {
 interface FGEntry { athlete: string; kickNum: number; distance: number; hash: string; pointValue: number; result: string; score: number }
 
 function buildFGRows(sessions: ScoutSession[]) {
-  const allRows: { session: string; date: string; head: string[]; body: string[][] }[] = [];
+  const allRows: { session: string; date: string; head: string[]; body: string[][]; isPreset: boolean }[] = [];
   for (const s of sessions) {
-    const entries = s.entries as unknown as FGEntry[];
+    const entries = s.entries as unknown as (FGEntry & { chartMode?: string })[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
-    const kicks = [...new Set(entries.map((e) => e.kickNum))].sort((a, b) => a - b);
-    const kickLabels = kicks.map((k) => {
-      const e = entries.find((en) => en.kickNum === k);
-      return `${e?.distance ?? ""}yd ${e?.hash ?? ""}`;
-    });
-    const head = ["Rank", "Name", ...kickLabels, "Total"];
-    const ranked = athletes
-      .map((name) => ({ name, entries: entries.filter((e) => e.athlete === name), total: entries.filter((e) => e.athlete === name).reduce((s, e) => s + e.score, 0) }))
-      .sort((a, b) => b.total - a.total);
-    const body = ranked.map((r, i) => [
-      String(i + 1), r.name,
-      ...kicks.map((k) => { const e = r.entries.find((en) => en.kickNum === k); return e ? String(e.score) : "—"; }),
-      String(r.total),
-    ]);
-    const cleanLabel = s.label.replace(/ — .*$/, "");
-    allRows.push({ session: cleanLabel, date: new Date(s.date).toLocaleDateString(), head, body });
+    // Determine preset vs manual
+    const mode = entries[0]?.chartMode;
+    let isPreset: boolean;
+    if (mode) {
+      isPreset = mode === "preset";
+    } else {
+      const firstAthlete = athletes[0];
+      const firstKicks = entries.filter((e) => e.athlete === firstAthlete).map((e) => `${e.distance}-${e.hash}`);
+      isPreset = athletes.length >= 2 && athletes.every((a) => {
+        const kicks = entries.filter((e) => e.athlete === a).map((e) => `${e.distance}-${e.hash}`);
+        return kicks.length === firstKicks.length && kicks.every((k, i) => k === firstKicks[i]);
+      });
+    }
+
+    if (isPreset) {
+      const kicks = [...new Set(entries.map((e) => e.kickNum))].sort((a, b) => a - b);
+      const kickLabels = kicks.map((k) => {
+        const e = entries.find((en) => en.kickNum === k);
+        return `${e?.distance ?? ""}yd ${e?.hash ?? ""}`;
+      });
+      const head = ["Rank", "Name", ...kickLabels, "Total"];
+      const ranked = athletes
+        .map((name) => ({ name, entries: entries.filter((e) => e.athlete === name), total: entries.filter((e) => e.athlete === name).reduce((s, e) => s + e.score, 0) }))
+        .sort((a, b) => b.total - a.total);
+      const body = ranked.map((r, i) => [
+        String(i + 1), r.name,
+        ...kicks.map((k) => { const e = r.entries.find((en) => en.kickNum === k); return e ? String(e.score) : "—"; }),
+        String(r.total),
+      ]);
+      const cleanLabel = s.label.replace(/ — .*$/, "");
+      allRows.push({ session: cleanLabel, date: new Date(s.date).toLocaleDateString(), head, body, isPreset: true });
+    } else {
+      // Manual chart: show distance+hash per kick, makes/att (pct%)
+      const maxKicks = Math.max(...athletes.map((n) => entries.filter((e) => e.athlete === n).length));
+      const kickHeaders = Array.from({ length: maxKicks }, (_, i) => `K${i + 1}`);
+      const head = ["Rank", "Name", ...kickHeaders, "Result"];
+      const ranked = athletes
+        .map((name) => {
+          const ae = entries.filter((e) => e.athlete === name);
+          const makes = ae.filter((e) => e.result === "make").length;
+          return { name, entries: ae, makes, att: ae.length };
+        })
+        .sort((a, b) => {
+          const pctA = a.att > 0 ? a.makes / a.att : 0;
+          const pctB = b.att > 0 ? b.makes / b.att : 0;
+          return pctB - pctA;
+        });
+      const body = ranked.map((r, i) => {
+        const pct = r.att > 0 ? Math.round((r.makes / r.att) * 100) : 0;
+        return [
+          String(i + 1), r.name,
+          ...r.entries.map((e) => `${e.distance}${e.hash} ${e.result === "make" ? "GOOD" : "MISS"}`),
+          ...Array.from({ length: maxKicks - r.entries.length }, () => "—"),
+          `${r.makes}/${r.att} (${pct}%)`,
+        ];
+      });
+      const cleanLabel = s.label.replace(/ — .*$/, "");
+      allRows.push({ session: cleanLabel, date: new Date(s.date).toLocaleDateString(), head, body, isPreset: false });
+    }
   }
   return allRows;
 }
@@ -164,7 +207,7 @@ export async function exportKOScoutPDF(sessions: ScoutSession[]) {
 interface SnapEntry { athlete: string; points?: number; score?: number; accuracy?: string; laces?: string; spiral?: string; time?: string; markerX?: number; markerY?: number; markerInZone?: boolean }
 
 function buildSnapRanked(sessions: ScoutSession[]) {
-  const all: { name: string; count: number; total: number; maxScore: number; pct: number; is30Point: boolean }[] = [];
+  const all: { name: string; count: number; total: number; maxScore: number; pct: number; is30Point: boolean; avgTime?: number }[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as SnapEntry[];
     const is30Point = s.label.startsWith("30 Point") || s.label.startsWith("Short Snap");
@@ -174,7 +217,9 @@ function buildSnapRanked(sessions: ScoutSession[]) {
       const total = ae.reduce((sum, e) => sum + (e.points ?? e.score ?? 0), 0);
       const maxScore = is30Point ? ae.length * 3 : ae.length;
       const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
-      all.push({ name, count: ae.length, total, maxScore, pct, is30Point });
+      const timedEntries = ae.filter((e) => e.time && parseFloat(e.time) > 0);
+      const avgTime = timedEntries.length > 0 ? timedEntries.reduce((sum, e) => sum + parseFloat(e.time!), 0) / timedEntries.length : undefined;
+      all.push({ name, count: ae.length, total, maxScore, pct, is30Point, avgTime });
     }
   }
   const short = all.filter((r) => r.is30Point).sort((a, b) => b.pct - a.pct);
@@ -192,9 +237,9 @@ export function exportSnapScoutExcel(sessions: ScoutSession[]) {
     XLSX.utils.book_append_sheet(wb, ws, "Short Snaps");
   }
   if (long.length > 0) {
-    const aoa = [["Rank", "Name", "Snaps", "Score", "%"], ...long.map((r, i) => [String(i + 1), r.name, String(r.count), `${r.total}/${r.maxScore}`, `${r.pct}%`])];
+    const aoa = [["Rank", "Name", "Snaps", "Avg Time", "Score", "%"], ...long.map((r, i) => [String(i + 1), r.name, String(r.count), r.avgTime ? `${r.avgTime.toFixed(2)}s` : "—", `${r.total}/${r.maxScore}`, `${r.pct}%`])];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 6 }, { wch: 18 }, { wch: 8 }, { wch: 12 }, { wch: 8 }];
+    ws["!cols"] = [{ wch: 6 }, { wch: 18 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 8 }];
     XLSX.utils.book_append_sheet(wb, ws, "Long Snaps");
   }
   XLSX.writeFile(wb, "Snap_Scout_Rankings.xlsx");
@@ -373,8 +418,8 @@ export async function exportSnapScoutPDF(sessions: ScoutSession[]) {
     doc.setFontSize(14);
     doc.text("Long Snap Rankings", 14, 15);
     autoTable(doc, {
-      head: [["Rank", "Name", "Snaps", "Score", "%"]],
-      body: long.map((r, i) => [String(i + 1), r.name, String(r.count), `${r.total}/${r.maxScore}`, `${r.pct}%`]),
+      head: [["Rank", "Name", "Snaps", "Avg Time", "Score", "%"]],
+      body: long.map((r, i) => [String(i + 1), r.name, String(r.count), r.avgTime ? `${r.avgTime.toFixed(2)}s` : "—", `${r.total}/${r.maxScore}`, `${r.pct}%`]),
       startY: 22,
       styles: { fontSize: 10 },
     });

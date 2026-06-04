@@ -50,7 +50,7 @@ function ScoutPuntInner() {
   const [editDir, setEditDir] = useState(true);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string } | null>(null);
+  const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string; sessionId?: string } | null>(null);
 
   // Live input state
   const [liveAthletes, setLiveAthletes] = useState<string[]>([]);
@@ -212,6 +212,23 @@ function ScoutPuntInner() {
     }
     setSelectedRows(new Set());
     setSelectMode(false);
+    await loadData();
+  };
+
+  const handleInfoSave = async (weather: string, notes: string) => {
+    if (!infoModal?.sessionId) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const supabase = createClient();
+    const sess = sessions.find((s) => s.id === infoModal.sessionId);
+    if (!sess) return;
+    await supabase.from("sessions").update({ weather: weather || null, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", infoModal.sessionId);
+    const allEntries = [...sess.entries] as Record<string, unknown>[];
+    const athleteFirstIdx = allEntries.findIndex((e) => (e as { athlete?: string }).athlete === infoModal.name);
+    if (athleteFirstIdx >= 0) {
+      allEntries[athleteFirstIdx] = { ...allEntries[athleteFirstIdx], notes: notes || undefined };
+      await supabase.from("sessions").update({ entries: allEntries, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", infoModal.sessionId);
+    }
     await loadData();
   };
 
@@ -390,7 +407,7 @@ function ScoutPuntInner() {
                           ))}
                           <td className="text-right py-1 px-2 font-black text-amber-400">{r.avg.toFixed(2)}</td>
                           <td className="text-center py-1 px-1">
-                            {(r.notes || r.weather) && <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date })} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
+                            <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId })} className={clsx("text-[10px] px-1 py-0.5 rounded transition-colors", r.notes || r.weather ? "text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20" : "text-muted hover:text-amber-400 border border-border")}>Info</button>
                           </td>
                           <td className="text-center py-1 px-1">
                             {!selectMode && <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
@@ -440,7 +457,7 @@ function ScoutPuntInner() {
       )}
 
       {infoModal && (
-        <InfoModal name={infoModal.name} notes={infoModal.notes} weather={infoModal.weather} date={infoModal.date} onClose={() => setInfoModal(null)} />
+        <InfoModal name={infoModal.name} notes={infoModal.notes} weather={infoModal.weather} date={infoModal.date} onSave={handleInfoSave} onClose={() => setInfoModal(null)} />
       )}
     </>
   );

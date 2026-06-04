@@ -33,7 +33,7 @@ function ScoutFGInner() {
   const [liveMode, setLiveMode] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string } | null>(null);
+  const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string; sessionId?: string } | null>(null);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
@@ -198,6 +198,23 @@ function ScoutFGInner() {
     const tid = getTeamId();
     if (!tid) return;
     await deleteAthleteFromSession(tid, sessionId, name);
+    await loadData();
+  };
+
+  const handleInfoSave = async (weather: string, notes: string) => {
+    if (!infoModal?.sessionId) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const supabase = createClient();
+    const sess = sessions.find((s) => s.id === infoModal.sessionId);
+    if (!sess) return;
+    await supabase.from("sessions").update({ weather: weather || null, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", infoModal.sessionId);
+    const allEntries = [...sess.entries] as Record<string, unknown>[];
+    const athleteFirstIdx = allEntries.findIndex((e) => (e as { athlete?: string }).athlete === infoModal.name);
+    if (athleteFirstIdx >= 0) {
+      allEntries[athleteFirstIdx] = { ...allEntries[athleteFirstIdx], notes: notes || undefined };
+      await supabase.from("sessions").update({ entries: allEntries, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", infoModal.sessionId);
+    }
     await loadData();
   };
 
@@ -373,7 +390,7 @@ function ScoutFGInner() {
                                 <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
                                 <td className="text-center py-1 px-1">
                                   <div className="flex items-center gap-1">
-                                    {(r.notes || r.weather) && <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date })} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors">Info</button>}
+                                    <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId })} className={clsx("text-[10px] px-1 py-0.5 rounded transition-colors", r.notes || r.weather ? "text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20" : "text-muted hover:text-amber-400 border border-border")}>Info</button>
                                     {!selectMode && <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
                                   </div>
                                 </td>
@@ -430,7 +447,7 @@ function ScoutFGInner() {
                                   <td className="text-right py-1 px-2 font-black text-amber-400">{r.makes}/{r.att} <span className="text-[10px]">({pct}%)</span></td>
                                   <td className="text-center py-1 px-1">
                                     <div className="flex items-center gap-1">
-                                      {(r.notes || r.weather) && <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date })} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors">Info</button>}
+                                      <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId })} className={clsx("text-[10px] px-1 py-0.5 rounded transition-colors", r.notes || r.weather ? "text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20" : "text-muted hover:text-amber-400 border border-border")}>Info</button>
                                       {!selectMode && <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
                                     </div>
                                   </td>
@@ -462,6 +479,7 @@ function ScoutFGInner() {
           notes={infoModal.notes}
           weather={infoModal.weather}
           date={infoModal.date}
+          onSave={handleInfoSave}
           onClose={() => setInfoModal(null)}
         />
       )}

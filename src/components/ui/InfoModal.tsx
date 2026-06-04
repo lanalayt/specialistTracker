@@ -1,14 +1,20 @@
 "use client";
 
+import { useState } from "react";
+
 interface InfoModalProps {
   name: string;
   weather?: string;
   notes?: string;
   date?: string;
+  onSave?: (weather: string, notes: string) => void;
   onClose: () => void;
 }
 
-export function InfoModal({ name, weather, notes, date, onClose }: InfoModalProps) {
+export function InfoModal({ name, weather, notes, date, onSave, onClose }: InfoModalProps) {
+  const [w, setW] = useState(weather ?? "");
+  const [n, setN] = useState(notes ?? "");
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
@@ -17,25 +23,19 @@ export function InfoModal({ name, weather, notes, date, onClose }: InfoModalProp
           <h3 className="text-sm font-bold text-slate-100">{name}</h3>
           {date && <p className="text-[10px] text-muted mt-0.5">{new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>}
         </div>
-        <div className="px-5 pb-5 space-y-3">
-          {weather && (
-            <div className="flex items-start gap-2">
-              <span className="text-[10px] font-semibold text-muted uppercase tracking-wider shrink-0 pt-0.5 w-16">Weather</span>
-              <p className="text-xs text-slate-300">{weather}</p>
-            </div>
-          )}
-          {notes && (
-            <div className="flex items-start gap-2">
-              <span className="text-[10px] font-semibold text-muted uppercase tracking-wider shrink-0 pt-0.5 w-16">Notes</span>
-              <p className="text-xs text-slate-300 whitespace-pre-wrap">{notes}</p>
-            </div>
-          )}
-          {!weather && !notes && (
-            <p className="text-xs text-muted italic">No additional info</p>
-          )}
+        <div className="px-5 pb-4 space-y-3">
+          <div>
+            <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">Weather</p>
+            <input type="text" value={w} onChange={(e) => setW(e.target.value)} placeholder="Enter weather conditions..." className="input w-full text-xs py-1.5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">Notes</p>
+            <textarea value={n} onChange={(e) => setN(e.target.value)} placeholder="Enter notes..." rows={3} className="input w-full text-xs py-1.5 resize-none" />
+          </div>
         </div>
-        <div className="px-5 pb-4">
-          <button onClick={onClose} className="w-full py-2 text-xs font-semibold text-muted hover:text-white border border-border rounded-input transition-colors">Close</button>
+        <div className="px-5 pb-4 flex gap-2">
+          {onSave && <button onClick={() => { onSave(w, n); onClose(); }} className="btn-primary flex-1 py-2 text-xs font-semibold">Save</button>}
+          <button onClick={onClose} className={`${onSave ? "btn-ghost" : "btn-primary"} flex-1 py-2 text-xs font-semibold`}>Close</button>
         </div>
       </div>
     </div>
