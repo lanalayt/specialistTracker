@@ -15,7 +15,7 @@ import clsx from "clsx";
 function getMissLabel(s: LongSnapEntry, isShort = true): string {
   if (s.markerInZone || s.accuracy === "ON_TARGET") return "";
   if (s.markerX == null || s.markerY == null) return "";
-  const zone = isShort ? { top: 45, bottom: 78, left: 42, right: 76 } : { top: 34, bottom: 68, left: 25, right: 75 };
+  const zone = isShort ? { top: 45, bottom: 78, left: 42, right: 76 } : { top: 34, bottom: 68, left: 30, right: 70 };
   const x = s.markerX; const y = s.markerY;
   const vLabel = y < zone.top ? "HIGH" : y > zone.bottom ? "LOW" : "";
   const hLabel = x < zone.left ? "LEFT" : x > zone.right ? "RIGHT" : "";

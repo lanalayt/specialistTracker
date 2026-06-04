@@ -18,7 +18,7 @@ const MISS_ARROWS: Record<string, string> = { "HIGH LEFT": "↖", "HIGH": "↑",
 function getAccLabel(e: LongSnapEntry, isShort: boolean): string {
   if (e.accuracy === "ON_TARGET") return "Strike";
   if (e.markerX == null || e.markerY == null || e.markerInZone) return "Ball";
-  const zone = isShort ? { top: 45, bottom: 78, left: 42, right: 76 } : { top: 34, bottom: 68, left: 25, right: 75 };
+  const zone = isShort ? { top: 45, bottom: 78, left: 42, right: 76 } : { top: 34, bottom: 68, left: 30, right: 70 };
   const v = e.markerY < zone.top ? "HIGH" : e.markerY > zone.bottom ? "LOW" : "";
   const h = e.markerX < zone.left ? "LEFT" : e.markerX > zone.right ? "RIGHT" : "";
   const dir = v && h ? `${v} ${h}` : v || h;
