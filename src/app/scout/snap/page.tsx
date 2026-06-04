@@ -388,6 +388,7 @@ function ScoutSnapInner() {
             </div>
 
             {/* Snap-by-snap table */}
+            <p className="text-[10px] text-muted text-center">Tap a snap to edit</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -398,13 +399,14 @@ function ScoutSnapInner() {
                     {!detailOpen.is30Point && <th className="text-[10px] text-muted text-center py-1 px-1">Time</th>}
                     <th className="text-[10px] text-muted text-center py-1 px-1">Spiral</th>
                     <th className="text-[10px] text-muted text-right py-1 px-1">Pts</th>
+                    <th className="text-[10px] text-muted text-center py-1 px-1 w-6"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {detailOpen.entries.map((e, i) => {
                     const isEditing = editSnapIdx === i;
                     return (
-                      <tr key={i} className={clsx("border-t border-border/30 cursor-pointer hover:bg-surface-2/50 transition-colors", isEditing && "bg-surface-2/30")} onClick={() => isEditing ? setEditSnapIdx(null) : startSnapEdit(i)}>
+                      <tr key={i} className={clsx("border-t border-border/30", isEditing && "bg-surface-2/30")}>
                         <td className="text-muted py-1 px-1">{i + 1}</td>
                         <td className={clsx("text-center py-1 px-1 font-semibold", e.accuracy === "Strike" ? "text-make" : "text-miss")}>{e.accuracy}</td>
                         {detailOpen.is30Point && (
@@ -419,6 +421,11 @@ function ScoutSnapInner() {
                           {e.spiral === "Good" ? "Tight" : "Open"}
                         </td>
                         <td className="text-right py-1 px-1 font-bold text-amber-400">{e.points ?? e.score ?? 0}</td>
+                        <td className="text-center py-1 px-1">
+                          <button onClick={() => isEditing ? setEditSnapIdx(null) : startSnapEdit(i)} className={clsx("text-[10px] transition-colors", isEditing ? "text-accent font-bold" : "text-muted hover:text-amber-400")}>
+                            {isEditing ? "Close" : "Edit"}
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}

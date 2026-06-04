@@ -335,6 +335,7 @@ function ScoutFGInner() {
                 {presetData.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Preset Chart</p>
+                    <p className="text-[10px] text-muted">Tap a score to toggle make/miss</p>
                     <div className="card space-y-3">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
@@ -390,6 +391,7 @@ function ScoutFGInner() {
                 {liveData.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-sky-400 uppercase tracking-wider">Manual Chart</p>
+                    <p className="text-[10px] text-muted">Tap a kick to toggle make/miss</p>
                     <div className="card space-y-3">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
