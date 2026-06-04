@@ -57,7 +57,10 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
   const parseTimeRaw = (raw: string): number => {
     const digits = raw.replace(/\D/g, "");
     if (!digits) return 0;
-    return parseFloat(`${digits.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${digits.padStart(3, "0").slice(-2)}`);
+    const padded = digits.padStart(3, "0");
+    const whole = padded.slice(0, -2).replace(/^0+/, "") || "0";
+    const frac = padded.slice(-2);
+    return parseFloat(`${whole}.${frac}`);
   };
 
   // Pre-fill inputs when switching to a kick that has previous snap data
@@ -83,11 +86,11 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
         }
       }
     } else {
-      // Clear for empty kick
+      // Clear for empty kick — default spiral to Open (Bad) for long snaps
       setMarker(null);
       setPuntMarker(null);
       setLaces("");
-      setSpiral("");
+      setSpiral(isFG ? "" : "Bad");
     }
   }, [previousSnaps]);
 

@@ -69,8 +69,12 @@ function SnapAthleteChartInner() {
   const totalReps = parseInt(reps) || 0;
 
   const parseTimeRaw = (raw: string): number => {
-    const v = parseFloat(raw);
-    return isNaN(v) ? 0 : v;
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return 0;
+    const padded = digits.padStart(3, "0");
+    const whole = padded.slice(0, -2).replace(/^0+/, "") || "0";
+    const frac = padded.slice(-2);
+    return parseFloat(`${whole}.${frac}`);
   };
 
   useUnsavedWarning(entries.length > 0 && !saved);
@@ -400,7 +404,7 @@ function SnapAthleteChartInner() {
             </div>
             <div>
               <p className="text-[10px] text-muted mb-1">Snap Time <span className="text-muted/50">(optional)</span></p>
-              <input type="text" inputMode="decimal" value={snapTime} onChange={(e) => setSnapTime(e.target.value.replace(/[^\d.]/g, ""))} placeholder="0.75" className="input w-24 text-center text-sm font-bold py-1.5" />
+              <input type="text" inputMode="numeric" value={snapTime ? parseTimeRaw(snapTime).toFixed(2) : ""} onChange={(e) => setSnapTime(e.target.value.replace(/\D/g, ""))} placeholder="0.75" className="input w-24 text-center text-sm font-bold py-1.5" />
             </div>
           </>
         )}
