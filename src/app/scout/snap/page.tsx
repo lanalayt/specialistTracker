@@ -7,6 +7,7 @@ import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveSco
 import { createClient } from "@/lib/supabase";
 import { exportSnapScoutExcel, exportSnapScoutPDF, exportIndividualSnapExcel, exportIndividualSnapPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
+import { InfoModal } from "@/components/ui/InfoModal";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { HolderStrikeZone } from "@/components/ui/HolderStrikeZone";
 import { PunterStrikeZone } from "@/components/ui/PunterStrikeZone";
@@ -60,6 +61,9 @@ function ScoutSnapInner() {
   const [exportRow, setExportRow] = useState<RankedRow | null>(null);
   const [mergePrompt, setMergePrompt] = useState<{ profile: ScoutProfile; originalName: string } | null>(null);
   const diagramRef = useRef<HTMLDivElement>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string } | null>(null);
   const [editAccuracy, setEditAccuracy] = useState<"Strike" | "Ball" | "">("");
   const [editLaces, setEditLaces] = useState("");
   const [editSpiral, setEditSpiral] = useState("");
@@ -157,6 +161,28 @@ function ScoutSnapInner() {
     await loadData();
   };
 
+  const toggleRowSelection = (key: string) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRows.size === 0) return;
+    if (!window.confirm(`Delete ${selectedRows.size} selected chart${selectedRows.size !== 1 ? "s" : ""}?`)) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    for (const key of selectedRows) {
+      const [sessionId, name] = key.split("|||");
+      await deleteAthleteFromSession(tid, sessionId, name);
+    }
+    setSelectedRows(new Set());
+    setSelectMode(false);
+    await loadData();
+  };
+
   const handleSaveProfile = async (profile: ScoutProfile, originalName?: string) => {
     const tid = getTeamId();
     if (!tid) return;
@@ -249,6 +275,10 @@ function ScoutSnapInner() {
             {!loading && activeRanked.length > 0 && (
               <div className="flex gap-2">
                 <ExportButton onExcel={() => exportSnapScoutExcel(sessions)} onPDF={() => exportSnapScoutPDF(sessions)} />
+                <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
+                {selectMode && selectedRows.size > 0 && (
+                  <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>
+                )}
               </div>
             )}
             {loading ? (
@@ -261,6 +291,7 @@ function ScoutSnapInner() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr>
+                        {selectMode && <th className="w-6 py-1 px-1"></th>}
                         <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
                         <th className="text-[10px] text-muted text-center py-1 px-2">Snaps</th>
                         <th className="text-[10px] text-muted text-center py-1 px-2"></th>
@@ -271,8 +302,11 @@ function ScoutSnapInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {activeRanked.map((r, i) => (
-                        <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
+                      {activeRanked.map((r, i) => {
+                        const rowKey = `${r.sessionId}|||${r.name}`;
+                        return (
+                        <tr key={`${r.sessionId}-${r.name}`} className={clsx("border-t border-border/30", selectedRows.has(rowKey) && "bg-accent/10")}>
+                          {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                           <td className="py-1 px-2 font-semibold text-slate-200">
                             <span className="text-muted mr-1">{i + 1}.</span>
                             <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{r.name}</button>
@@ -284,13 +318,14 @@ function ScoutSnapInner() {
                           <td className="text-center py-1 px-2 font-bold text-slate-200">{r.total}/{r.maxScore}</td>
                           <td className="text-right py-1 px-2 font-black text-amber-400">{r.pct}%</td>
                           <td className="text-center py-1 px-1">
-                            {(r.notes || r.weather) && <button onClick={() => window.alert(`${r.weather ? `Weather: ${r.weather}\n\n` : ""}${r.notes ? `Notes for ${r.name}:\n${r.notes}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
+                            {(r.notes || r.weather) && <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date })} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
                           </td>
                           <td className="text-center py-1 px-1">
-                            <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                            {!selectMode && <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -492,6 +527,10 @@ function ScoutSnapInner() {
             <button onClick={() => setMergePrompt(null)} className="w-full text-center text-xs text-muted hover:text-white transition-colors">Cancel</button>
           </div>
         </div>
+      )}
+
+      {infoModal && (
+        <InfoModal name={infoModal.name} notes={infoModal.notes} weather={infoModal.weather} date={infoModal.date} onClose={() => setInfoModal(null)} />
       )}
     </>
   );

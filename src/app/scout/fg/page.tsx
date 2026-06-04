@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
+import { InfoModal } from "@/components/ui/InfoModal";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -30,6 +31,9 @@ function ScoutFGInner() {
   const initialTab = searchParams.get("tab") === "rankings" ? "rankings" : "chart";
   const [tab, setTab] = useState<"chart" | "rankings">(initialTab);
   const [liveMode, setLiveMode] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string } | null>(null);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
@@ -148,6 +152,28 @@ function ScoutFGInner() {
   const liveMaxKicks = liveData.length > 0 ? Math.max(...liveData.map((a) => a.entries.length)) : 0;
   // Get preset kick headers (distance + hash from first athlete's entries)
   const presetKickHeaders: { dist: number; hash: string }[] = presetData.length > 0 ? presetData[0].entries.map((e) => ({ dist: e.distance, hash: e.hash })) : [];
+
+  const toggleRowSelection = (key: string) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRows.size === 0) return;
+    if (!window.confirm(`Delete ${selectedRows.size} selected chart${selectedRows.size !== 1 ? "s" : ""}?`)) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    for (const key of selectedRows) {
+      const [sessionId, name] = key.split("|||");
+      await deleteAthleteFromSession(tid, sessionId, name);
+    }
+    setSelectedRows(new Set());
+    setSelectMode(false);
+    await loadData();
+  };
 
   const handleToggleKick = async (sessionId: string, athleteName: string, kickIdx: number) => {
     const tid = getTeamId();
@@ -291,8 +317,12 @@ function ScoutFGInner() {
         {tab === "rankings" && (
           <div className="space-y-6">
             {!loading && athleteData.length > 0 && (
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <ExportButton onExcel={() => exportFGScoutExcel(sessions)} onPDF={() => exportFGScoutPDF(sessions)} />
+                <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
+                {selectMode && selectedRows.size > 0 && (
+                  <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>
+                )}
               </div>
             )}
             {loading ? (
@@ -310,6 +340,7 @@ function ScoutFGInner() {
                         <table className="w-full text-xs">
                           <thead>
                             <tr>
+                              {selectMode && <th className="w-6 py-1 px-1"></th>}
                               <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
                               {presetKickHeaders.map((k, i) => (
                                 <th key={i} className="text-[10px] text-muted text-center py-1 px-1 whitespace-nowrap">{k.dist}yd<br/><span className="text-[8px]">{k.hash}</span></th>
@@ -319,8 +350,11 @@ function ScoutFGInner() {
                             </tr>
                           </thead>
                           <tbody>
-                            {presetData.map((r, i) => (
-                              <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
+                            {presetData.map((r, i) => {
+                              const rowKey = `${r.sessionId}|||${r.name}`;
+                              return (
+                              <tr key={rowKey} className={clsx("border-t border-border/30", selectedRows.has(rowKey) && "bg-accent/10")}>
+                                {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                                 <td className="py-1 px-2 font-semibold text-slate-200">
                                   <span className="text-muted mr-1">{i + 1}.</span>
                                   <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
@@ -338,12 +372,13 @@ function ScoutFGInner() {
                                 <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
                                 <td className="text-center py-1 px-1">
                                   <div className="flex items-center gap-1">
-                                    {(r.notes || r.weather) && <button onClick={() => window.alert(`${r.weather ? `Weather: ${r.weather}\n\n` : ""}${r.notes ? `Notes for ${r.name}:\n${r.notes}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
-                                    <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                    {(r.notes || r.weather) && <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date })} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors">Info</button>}
+                                    {!selectMode && <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
                                   </div>
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -360,6 +395,7 @@ function ScoutFGInner() {
                         <table className="w-full text-xs">
                           <thead>
                             <tr>
+                              {selectMode && <th className="w-6 py-1 px-1"></th>}
                               <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
                               {Array.from({ length: liveMaxKicks }, (_, i) => (
                                 <th key={i} className="text-[10px] text-muted text-center py-1 px-1">K{i + 1}</th>
@@ -371,8 +407,10 @@ function ScoutFGInner() {
                           <tbody>
                             {liveData.map((r, i) => {
                               const pct = r.att > 0 ? Math.round((r.makes / r.att) * 100) : 0;
+                              const rowKey = `${r.sessionId}|||${r.name}`;
                               return (
-                                <tr key={`${r.sessionId}-${r.name}`} className="border-t border-border/30">
+                                <tr key={rowKey} className={clsx("border-t border-border/30", selectedRows.has(rowKey) && "bg-accent/10")}>
+                                  {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                                   <td className="py-1 px-2 font-semibold text-slate-200">
                                     <span className="text-muted mr-1">{i + 1}.</span>
                                     <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
@@ -390,8 +428,8 @@ function ScoutFGInner() {
                                   <td className="text-right py-1 px-2 font-black text-amber-400">{r.makes}/{r.att} <span className="text-[10px]">({pct}%)</span></td>
                                   <td className="text-center py-1 px-1">
                                     <div className="flex items-center gap-1">
-                                      {(r.notes || r.weather) && <button onClick={() => window.alert(`${r.weather ? `Weather: ${r.weather}\n\n` : ""}${r.notes ? `Notes for ${r.name}:\n${r.notes}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes || r.weather || ""}>Info</button>}
-                                      <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                      {(r.notes || r.weather) && <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date })} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors">Info</button>}
+                                      {!selectMode && <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
                                     </div>
                                   </td>
                                 </tr>
@@ -414,6 +452,15 @@ function ScoutFGInner() {
           profile={profiles[profileOpen] ?? { name: profileOpen }}
           onSave={handleSaveProfile}
           onClose={() => setProfileOpen(null)}
+        />
+      )}
+      {infoModal && (
+        <InfoModal
+          name={infoModal.name}
+          notes={infoModal.notes}
+          weather={infoModal.weather}
+          date={infoModal.date}
+          onClose={() => setInfoModal(null)}
         />
       )}
     </>
