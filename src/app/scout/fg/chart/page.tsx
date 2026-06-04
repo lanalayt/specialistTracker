@@ -217,15 +217,30 @@ function ScoutFGChartInner() {
     const results = buildResults();
     if (!tid || results.length === 0) return;
     const label = `FG Scout — ${selectedPlayers.map((a) => `${a}: ${getPlayerScore(a)}`).join(", ")}`;
+    // Attach notes to each athlete's first entry
+    const entriesWithNotes = results.map((r, i) => {
+      const base = i === 0 ? { ...r, chartMode: chartMode } : { ...r };
+      const note = athleteNotes[r.athlete];
+      if (note) {
+        const isFirstForAthlete = results.findIndex((x) => x.athlete === r.athlete) === i;
+        if (isFirstForAthlete) return { ...base, notes: note };
+      }
+      return base;
+    });
     await insertScoutSession(tid, {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "SCOUT_FG",
       label,
       date: new Date().toISOString(),
-      entries: results.map((r, i) => i === 0 ? { ...r, chartMode: chartMode } : r) as unknown as Record<string, unknown>[],
+      weather: weather || undefined,
+      entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
     setSaved(true);
   };
+
+  // Notes + weather for results
+  const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
+  const [weather, setWeather] = useState("");
 
   const handleNewChart = () => {
     setResultMap({});
@@ -233,6 +248,8 @@ function ScoutFGChartInner() {
     setSelectedPlayers([]);
     setSaved(false);
     setManualKicks([]);
+    setAthleteNotes({});
+    setWeather("");
     setPhase(chartMode === "preset" ? "preset-edit" : "manual-setup");
   };
 
@@ -442,6 +459,18 @@ function ScoutFGChartInner() {
         <Header title="FG Scout Results" />
         <main className="p-4 lg:p-6 max-w-3xl mx-auto space-y-6 text-center">
           <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
+
+          {/* Weather */}
+          <div className="max-w-sm mx-auto">
+            <input
+              type="text"
+              value={weather}
+              onChange={(e) => setWeather(e.target.value)}
+              placeholder="Weather conditions (optional)"
+              className="input w-full text-sm py-1.5 text-center"
+            />
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -454,6 +483,7 @@ function ScoutFGChartInner() {
                     </th>
                   ))}
                   <th className="text-[10px] text-muted text-right py-1 px-2">Total</th>
+                  <th className="text-[10px] text-muted text-center py-1 px-2 w-10"></th>
                 </tr>
               </thead>
               <tbody>
@@ -471,6 +501,18 @@ function ScoutFGChartInner() {
                       );
                     })}
                     <td className="text-right py-1.5 px-2 font-black text-amber-400">{r.total}</td>
+                    <td className="text-center py-1.5 px-1">
+                      <button
+                        onClick={() => {
+                          const note = window.prompt(`Notes for ${r.name}:`, athleteNotes[r.name] ?? "");
+                          if (note !== null) setAthleteNotes((prev) => ({ ...prev, [r.name]: note }));
+                        }}
+                        className={clsx("text-[10px] px-1.5 py-0.5 rounded transition-colors", athleteNotes[r.name] ? "text-amber-400 bg-amber-500/10 border border-amber-500/30" : "text-muted hover:text-amber-400")}
+                        title={athleteNotes[r.name] || "Add notes"}
+                      >
+                        {athleteNotes[r.name] ? "Notes" : "+Note"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -482,7 +524,7 @@ function ScoutFGChartInner() {
             ) : (
               <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>
             )}
-            <button onClick={handleNewChart} className="btn-ghost flex-1 py-3 text-sm">New Chart</button>
+            <Link href="/scout/fg?tab=rankings" className="btn-ghost flex-1 py-3 text-sm text-center">Go to Rankings</Link>
           </div>
         </main>
       </>

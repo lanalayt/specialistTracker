@@ -13,6 +13,7 @@ export interface ScoutSession {
   sport: string; // SCOUT_FG, SCOUT_PUNT, SCOUT_KO, SCOUT_SNAP
   label: string;
   date: string;
+  weather?: string;
   entries: Record<string, unknown>[];
 }
 
@@ -33,6 +34,7 @@ export async function loadScoutSessions(teamId: string, sport: string): Promise<
       sport: row.sport as string,
       label: row.label as string,
       date: row.date as string,
+      weather: (row.weather as string) ?? undefined,
       entries: (row.entries ?? []) as Record<string, unknown>[],
     }));
   } catch (err) {
@@ -52,6 +54,7 @@ export async function insertScoutSession(teamId: string, session: ScoutSession):
         sport: session.sport,
         label: session.label,
         date: session.date,
+        weather: session.weather || null,
         mode: "practice",
         entries: session.entries,
         updated_at: new Date().toISOString(),

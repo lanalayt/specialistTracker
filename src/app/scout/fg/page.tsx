@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
@@ -21,7 +22,13 @@ const RESULT_LABEL: Record<string, string> = { YL: "GOOD", YC: "GOOD", YR: "GOOD
 interface FGEntry { athlete: string; kickNum: number; distance: number; hash: string; pointValue: number; result: "make" | "miss"; score: number }
 
 export default function ScoutFGPage() {
-  const [tab, setTab] = useState<"chart" | "rankings">("chart");
+  return <Suspense fallback={<div className="p-8 text-center text-muted">Loading...</div>}><ScoutFGInner /></Suspense>;
+}
+
+function ScoutFGInner() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "rankings" ? "rankings" : "chart";
+  const [tab, setTab] = useState<"chart" | "rankings">(initialTab);
   const [liveMode, setLiveMode] = useState(false);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
@@ -108,9 +115,9 @@ export default function ScoutFGPage() {
   useEffect(() => { loadData(); }, []);
 
   // Build per-session-per-athlete rows
-  const athleteData: { name: string; sessionId: string; date: string; entries: FGEntry[]; total: number; makes: number; att: number; isPreset: boolean }[] = [];
+  const athleteData: { name: string; sessionId: string; date: string; entries: FGEntry[]; total: number; makes: number; att: number; isPreset: boolean; notes?: string; weather?: string }[] = [];
   for (const s of sessions) {
-    const entries = s.entries as unknown as (FGEntry & { chartMode?: string })[];
+    const entries = s.entries as unknown as (FGEntry & { chartMode?: string; notes?: string })[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     // Use chartMode tag if present, otherwise fallback: preset requires 2+ athletes with identical kick sequences
     const mode = entries[0]?.chartMode;
@@ -129,7 +136,9 @@ export default function ScoutFGPage() {
       const ae = entries.filter((e) => e.athlete === name);
       const total = ae.reduce((sum, e) => sum + e.score, 0);
       const makes = ae.filter((e) => e.result === "make").length;
-      athleteData.push({ name, sessionId: s.id, date: s.date, entries: ae, total, makes, att: ae.length, isPreset });
+      const noteEntry = ae.find((e) => (e as { notes?: string }).notes);
+      const notes = noteEntry ? (noteEntry as { notes?: string }).notes : undefined;
+      athleteData.push({ name, sessionId: s.id, date: s.date, entries: ae, total, makes, att: ae.length, isPreset, notes, weather: s.weather });
     }
   }
   athleteData.sort((a, b) => b.total - a.total);
@@ -328,7 +337,10 @@ export default function ScoutFGPage() {
                                 ))}
                                 <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
                                 <td className="text-center py-1 px-1">
-                                  <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                  <div className="flex items-center gap-1">
+                                    {r.notes && <button onClick={() => window.alert(`Notes for ${r.name}:\n\n${r.notes}${r.weather ? `\n\nWeather: ${r.weather}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes}>Notes</button>}
+                                    <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -377,7 +389,10 @@ export default function ScoutFGPage() {
                                   ))}
                                   <td className="text-right py-1 px-2 font-black text-amber-400">{r.makes}/{r.att} <span className="text-[10px]">({pct}%)</span></td>
                                   <td className="text-center py-1 px-1">
-                                    <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                    <div className="flex items-center gap-1">
+                                      {r.notes && <button onClick={() => window.alert(`Notes for ${r.name}:\n\n${r.notes}${r.weather ? `\n\nWeather: ${r.weather}` : ""}`)} className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1 py-0.5 rounded hover:bg-amber-500/20 transition-colors" title={r.notes}>Notes</button>}
+                                      <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>
+                                    </div>
                                   </td>
                                 </tr>
                               );
