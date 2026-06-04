@@ -18,7 +18,7 @@ const MISS_ARROWS: Record<string, string> = { "HIGH LEFT": "↖", "HIGH": "↑",
 function getAccLabel(e: LongSnapEntry, isShort: boolean): string {
   if (e.accuracy === "ON_TARGET") return "Strike";
   if (e.markerX == null || e.markerY == null || e.markerInZone) return "Ball";
-  const zone = isShort ? { top: 45, bottom: 78, left: 42, right: 76 } : { top: 34, bottom: 68, left: 30, right: 70 };
+  const zone = isShort ? { top: 45, bottom: 78, left: 42, right: 76 } : { top: 34, bottom: 68, left: 33, right: 67 };
   const v = e.markerY < zone.top ? "HIGH" : e.markerY > zone.bottom ? "LOW" : "";
   const h = e.markerX < zone.left ? "LEFT" : e.markerX > zone.right ? "RIGHT" : "";
   const dir = v && h ? `${v} ${h}` : v || h;
@@ -68,13 +68,11 @@ function SnapAthleteChartInner() {
   const getPlayerEntries = (name: string) => entries.filter((e) => e.athlete === name);
   const totalReps = parseInt(reps) || 0;
 
-  const parseTimeRaw = (raw: string): number => {
-    const digits = raw.replace(/\D/g, "");
-    if (!digits) return 0;
+  const formatSnapTime = (digits: string): string => {
+    if (!digits) return "";
     const padded = digits.padStart(3, "0");
     const whole = padded.slice(0, -2).replace(/^0+/, "") || "0";
-    const frac = padded.slice(-2);
-    return parseFloat(`${whole}.${frac}`);
+    return `${whole}.${padded.slice(-2)}`;
   };
 
   useUnsavedWarning(entries.length > 0 && !saved);
@@ -144,7 +142,7 @@ function SnapAthleteChartInner() {
     const entry: LongSnapEntry = {
       athleteId: currentPlayer, athlete: currentPlayer,
       snapType: (isFG ? "FG" : "PUNT") as SnapType,
-      time: snapTime ? parseTimeRaw(snapTime) : 0,
+      time: snapTime ? parseFloat(snapTime) || 0 : 0,
       accuracy: acc, laces: isFG ? laces || undefined : undefined,
       spiral: spiral || undefined, score,
       markerX: isFG ? marker?.x : puntMarker?.x,
@@ -404,7 +402,7 @@ function SnapAthleteChartInner() {
             </div>
             <div>
               <p className="text-[10px] text-muted mb-1">Snap Time <span className="text-muted/50">(optional)</span></p>
-              <input type="text" inputMode="numeric" value={snapTime ? parseTimeRaw(snapTime).toFixed(2) : ""} onChange={(e) => setSnapTime(e.target.value.replace(/\D/g, ""))} placeholder="0.75" className="input w-24 text-center text-sm font-bold py-1.5" />
+              <input type="text" inputMode="numeric" value={snapTime} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); setSnapTime(d ? formatSnapTime(d) : ""); }} placeholder="0.75" className="input w-24 text-center text-sm font-bold py-1.5" />
             </div>
           </>
         )}

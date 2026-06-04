@@ -54,13 +54,11 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
   const [puntMarker, setPuntMarker] = useState<SnapMarker | null>(null);
   const [snapTime, setSnapTime] = useState("");
 
-  const parseTimeRaw = (raw: string): number => {
-    const digits = raw.replace(/\D/g, "");
-    if (!digits) return 0;
+  const formatSnapTime = (digits: string): string => {
+    if (!digits) return "";
     const padded = digits.padStart(3, "0");
     const whole = padded.slice(0, -2).replace(/^0+/, "") || "0";
-    const frac = padded.slice(-2);
-    return parseFloat(`${whole}.${frac}`);
+    return `${whole}.${padded.slice(-2)}`;
   };
 
   // Pre-fill inputs when switching to a kick that has previous snap data
@@ -102,7 +100,7 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
     if (!canSave) return;
 
     const acc = isFG ? (marker?.inZone ? "ON_TARGET" : "HIGH") : (puntMarker?.inZone ? "ON_TARGET" : "HIGH");
-    const snapTimeVal = snapTime ? parseTimeRaw(snapTime) : 0;
+    const snapTimeVal = snapTime ? parseFloat(snapTime) || 0 : 0;
 
     // Score: FG uses 30-point scoring (strike 1 + laces 0/0.5/1 + spiral 0/1 = max 3)
     // Punt uses simple strike/ball (1 or 0)
@@ -253,7 +251,7 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
             {/* Snap Time (optional) */}
             <div>
               <p className="text-[10px] text-muted mb-1">Snap Time <span className="text-muted/50">(optional)</span></p>
-              <input type="text" inputMode="numeric" value={snapTime ? parseTimeRaw(snapTime).toFixed(2) : ""} onChange={(e) => setSnapTime(e.target.value.replace(/\D/g, ""))} placeholder="0.75" className="input w-24 text-center text-sm font-bold py-1.5" />
+              <input type="text" inputMode="numeric" value={snapTime} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); setSnapTime(d ? formatSnapTime(d) : ""); }} placeholder="0.75" className="input w-24 text-center text-sm font-bold py-1.5" />
             </div>
           </>
         )}
