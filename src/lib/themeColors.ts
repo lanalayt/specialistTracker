@@ -54,6 +54,7 @@ export const PRESETS: { name: string; colors: ThemeColors }[] = [
   { name: "Purple & Gold", colors: { primary: "#8b5cf6", secondary: "#0f0a1a", tertiary: "#c4a000" } },
   { name: "Red & White", colors: { primary: "#e21833", secondary: "#0e0808", tertiary: "#ffffff" } },
   { name: "Blue & White", colors: { primary: "#003da5", secondary: "#0a0f1a", tertiary: "#ffffff" } },
+  { name: "Purple, White & Magenta", colors: { primary: "#ffffff", secondary: "#1a0a2e", tertiary: "#d6249f" } },
 ];
 
 function parseHex(hex: string): [number, number, number] {
