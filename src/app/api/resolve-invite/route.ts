@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(req: Request) {
   try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !serviceKey) {
+      console.error("resolve-invite: Supabase env vars are not set");
+      return NextResponse.json({ error: "Server not configured" }, { status: 500 });
+    }
+    const supabase = createClient(url, serviceKey);
+
     const { code } = await req.json();
     if (!code || typeof code !== "string") {
       return NextResponse.json({ error: "Missing code" }, { status: 400 });
