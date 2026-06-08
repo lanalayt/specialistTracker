@@ -314,6 +314,21 @@ export function scoutDisplayName(name: string, numbers?: Record<string, string>)
   return num ? `#${num} ${name}` : name;
 }
 
+/** Today's local date as a YYYY-MM-DD string for <input type="date"> defaults */
+export function todayDateInput(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Convert a YYYY-MM-DD date-input value to an ISO string, keeping the current time of day */
+export function dateInputToISO(dateStr: string): string {
+  if (!dateStr) return new Date().toISOString();
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return new Date().toISOString();
+  const now = new Date();
+  return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+}
+
 // ── Assigned Charts (stored in team_data) ────────────────────────────────────
 
 export interface AssignedChart {

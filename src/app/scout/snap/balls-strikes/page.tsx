@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { getTeamId } from "@/lib/teamData";
-import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName } from "@/lib/scoutStore";
+import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -48,6 +48,7 @@ export default function ScoutLongSnapsPage() {
   const [saved, setSaved] = useState(false);
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
   const [weather, setWeather] = useState("");
+  const [chartDate, setChartDate] = useState(todayDateInput());
 
   const [snaps, setSnaps] = useState<BsSnap[]>([]);
   const [activePlayer, setActivePlayer] = useState("");
@@ -186,7 +187,7 @@ export default function ScoutLongSnapsPage() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "SCOUT_SNAP",
       label,
-      date: new Date().toISOString(),
+      date: dateInputToISO(chartDate),
       weather: weather || undefined,
       entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
@@ -202,6 +203,10 @@ export default function ScoutLongSnapsPage() {
           <Link href="/scout/snap" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
           <h2 className="text-lg font-bold text-slate-100">Long Snap Setup</h2>
           <p className="text-xs text-muted">Select or add snappers, then set number of snaps.</p>
+          <div>
+            <p className="text-xs text-muted mb-1">Date</p>
+            <input type="date" value={chartDate} onChange={(e) => setChartDate(e.target.value)} className="input w-full max-w-[200px] text-sm py-1.5" />
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {athleteNames.map((a) => (
               <div key={a} className="flex items-center gap-0.5">
