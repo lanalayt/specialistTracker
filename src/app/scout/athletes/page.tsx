@@ -73,6 +73,17 @@ export default function ScoutAthletesPage() {
     setNewName("");
   };
 
+  const toggleAthleteSport = async (name: string, sportKey: string) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    const list = sportAthletes[sportKey] ?? [];
+    const updated = list.includes(name)
+      ? list.filter((n) => n !== name)
+      : [...list, name];
+    setSportAthletes((prev) => ({ ...prev, [sportKey]: updated }));
+    await saveScoutAthletes(tid, sportKey, updated);
+  };
+
   const handleDeleteAthlete = async (name: string) => {
     if (!window.confirm(`Are you sure you want to delete ${name}'s profile? This does not remove their ranking data.`)) return;
     const tid = getTeamId();
@@ -146,7 +157,7 @@ export default function ScoutAthletesPage() {
       <main className="p-4 lg:p-6 max-w-2xl space-y-6">
         <div>
           <h1 className="text-xl font-extrabold text-slate-100">Scout Athletes</h1>
-          <p className="text-xs text-muted mt-1">Manage athlete profiles across all scout sports. Click a name to edit their profile.</p>
+          <p className="text-xs text-muted mt-1">Manage athlete profiles across all scout sports. Click a name to edit their profile. Tap a discipline below each athlete to make them selectable in that discipline&apos;s charting.</p>
         </div>
 
         {/* Add athlete */}
@@ -217,7 +228,6 @@ export default function ScoutAthletesPage() {
                   <div className="px-3 py-2 text-[10px] text-muted">{filtered.length} athlete{filtered.length !== 1 ? "s" : ""}</div>
                   {filtered.map((name) => {
                     const profile = profiles[name];
-                    const inSports = SPORTS.filter((s) => (sportAthletes[s.key] ?? []).includes(name)).map((s) => s.label);
                     return (
                       <div key={name} className="flex items-center justify-between py-3 px-3">
                         <div className="min-w-0 flex-1">
@@ -231,6 +241,26 @@ export default function ScoutAthletesPage() {
                             {profile?.position && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border text-muted font-semibold">{profile.position}</span>}
                             {profile?.school && <span className="text-[10px] text-muted">{profile.school}</span>}
                             {profile?.schoolYear && <span className="text-[10px] text-muted">{profile.schoolYear}</span>}
+                          </div>
+                          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                            {SPORTS.map((s) => {
+                              const inSport = (sportAthletes[s.key] ?? []).includes(name);
+                              return (
+                                <button
+                                  key={s.key}
+                                  onClick={() => toggleAthleteSport(name, s.key)}
+                                  className={clsx(
+                                    "px-2 py-0.5 rounded-input text-[10px] font-semibold transition-all border",
+                                    inSport
+                                      ? "bg-amber-500 text-slate-900 border-amber-500"
+                                      : "bg-surface-2 text-muted border-border hover:text-white hover:border-slate-500"
+                                  )}
+                                  title={inSport ? `Remove ${name} from ${s.label} charting` : `Add ${name} to ${s.label} charting`}
+                                >
+                                  {s.label}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
