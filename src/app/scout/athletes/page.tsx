@@ -58,19 +58,12 @@ export default function ScoutAthletesPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  const handleAddAthlete = async () => {
+  const handleAddAthlete = () => {
     const trimmed = newName.trim();
     if (!trimmed || allNames.includes(trimmed)) return;
-    const tid = getTeamId();
-    if (!tid) return;
-
-    // Add to profiles
-    const updatedProfiles = { ...profiles, [trimmed]: { name: trimmed } };
-    setProfiles(updatedProfiles);
-    await saveScoutProfiles(tid, updatedProfiles);
-
-    setAllNames((prev) => [...prev, trimmed].sort((a, b) => a.localeCompare(b)));
+    // Open the profile modal for the new athlete so position + info can be set
     setNewName("");
+    setProfileOpen(trimmed);
   };
 
   const toggleAthleteSport = async (name: string, sportKey: string) => {
@@ -127,6 +120,9 @@ export default function ScoutAthletesPage() {
     updated[profile.name] = profile;
     setProfiles(updated);
     await saveScoutProfiles(tid, updated);
+
+    // Ensure the athlete appears in the list (covers newly added profiles)
+    setAllNames((prev) => prev.includes(profile.name) ? prev : [...prev, profile.name].sort((a, b) => a.localeCompare(b)));
 
     // Auto-add to sport lists based on position
     const positions = (profile.position ?? "").split(",").map((s) => s.trim()).filter(Boolean);

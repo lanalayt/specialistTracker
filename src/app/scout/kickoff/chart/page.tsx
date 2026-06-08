@@ -52,6 +52,11 @@ function ScoutKOChartInner() {
   const [distInput, setDistInput] = useState("");
   const [hangInput, setHangInput] = useState("");
   const [dirGood, setDirGood] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editDist, setEditDist] = useState("");
+  const [editHang, setEditHang] = useState("");
+  const [editDir, setEditDir] = useState(true);
 
   const parseHangRaw = (raw: string): number => {
     const digits = raw.replace(/\D/g, "");
@@ -125,6 +130,24 @@ function ScoutKOChartInner() {
   const handleUndo = () => {
     if (results.length === 0) return;
     setResults((prev) => prev.slice(0, -1));
+  };
+
+  const startEditResult = (idx: number) => {
+    const r = results[idx];
+    if (!r) return;
+    setEditIdx(idx);
+    setEditDist(String(r.distance));
+    setEditHang(String(r.hangTime));
+    setEditDir(r.directionGood);
+  };
+
+  const saveEditResult = () => {
+    if (editIdx === null) return;
+    const dist = parseInt(editDist);
+    const hang = parseFloat(editHang);
+    if (isNaN(dist) || dist <= 0 || isNaN(hang) || hang <= 0) return;
+    setResults((prev) => prev.map((r, i) => i === editIdx ? { ...r, distance: dist, hangTime: hang, directionGood: editDir, score: calcKickScore(dist, hang, editDir) } : r));
+    setEditIdx(null);
   };
 
   const handleFinish = () => {
@@ -363,19 +386,63 @@ function ScoutKOChartInner() {
 
         {/* Full kick log */}
         {results.length > 0 && (
-          <div className="space-y-1 pt-2 border-t border-border overflow-y-auto max-h-[200px]">
-            {[...results].reverse().map((r, i) => (
-              <div key={results.length - 1 - i} className="flex items-center text-xs gap-2">
-                <span className="text-muted w-5">#{results.length - i}</span>
-                <span className="text-slate-400 w-20 truncate">{scoutDisplayName(r.athlete, scoutNumbers)}</span>
-                <span className={clsx(r.directionGood ? "text-make" : "text-miss")}>{r.distance}yd</span>
-                <span className={clsx(r.directionGood ? "text-make" : "text-miss")}>{r.hangTime.toFixed(2)}s</span>
-                <span className="text-amber-400 font-bold ml-auto">{r.score.toFixed(2)}</span>
-              </div>
-            ))}
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-muted uppercase tracking-wider">{editMode ? "Tap a kick to edit" : "Kick Log"}</p>
+              <button onClick={() => { setEditMode(!editMode); setEditIdx(null); }} className={clsx("text-[10px] font-semibold px-2 py-0.5 rounded-input border transition-all", editMode ? "border-amber-500 bg-amber-500/10 text-amber-400" : "border-border text-muted hover:text-white")}>{editMode ? "Done" : "Edit"}</button>
+            </div>
+            <div className="space-y-1 overflow-y-auto max-h-[200px]">
+              {[...results].reverse().map((r, i) => {
+                const idx = results.length - 1 - i;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => { if (editMode) startEditResult(idx); }}
+                    disabled={!editMode}
+                    className={clsx("w-full flex items-center text-xs gap-2 py-1 px-1 rounded transition-colors", editMode ? "hover:bg-surface-2 cursor-pointer ring-1 ring-border" : "cursor-default")}
+                  >
+                    <span className="text-muted w-5">#{idx + 1}</span>
+                    <span className="text-slate-400 w-20 truncate text-left">{scoutDisplayName(r.athlete, scoutNumbers)}</span>
+                    <span className={clsx(r.directionGood ? "text-make" : "text-miss")}>{r.distance}yd</span>
+                    <span className={clsx(r.directionGood ? "text-make" : "text-miss")}>{r.hangTime.toFixed(2)}s</span>
+                    <span className="text-amber-400 font-bold ml-auto">{r.score.toFixed(2)}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </main>
+
+      {editIdx !== null && results[editIdx] && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditIdx(null)} />
+          <div className="relative bg-surface border border-border rounded-xl w-full max-w-xs mx-4 p-5 space-y-3">
+            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Edit Kick #{editIdx + 1} — {scoutDisplayName(results[editIdx].athlete, scoutNumbers)}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+                <input type="text" inputMode="numeric" value={editDist} onChange={(e) => setEditDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+              </div>
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Hang Time</p>
+                <input type="text" inputMode="decimal" value={editHang} onChange={(e) => setEditHang(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5" />
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted text-center mb-1">Direction</p>
+              <div className="flex rounded-input border border-border overflow-hidden">
+                <button onClick={() => setEditDir(true)} className={clsx("flex-1 py-2 text-sm font-semibold transition-colors", editDir ? "bg-make text-slate-900" : "text-muted hover:text-white")}>Good</button>
+                <button onClick={() => setEditDir(false)} className={clsx("flex-1 py-2 text-sm font-semibold transition-colors border-l border-border", !editDir ? "bg-miss text-white" : "text-muted hover:text-white")}>Bad (-10)</button>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setEditIdx(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
+              <button onClick={saveEditResult} className="btn-primary flex-1 py-2 text-xs font-bold">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -336,8 +336,8 @@ export default function ScoutShortSnapsPage() {
               return (
                 <button key={p} onClick={() => setActivePlayer(p)} className={clsx("card-2 px-3 py-2 text-center transition-all min-w-[80px]", p === activePlayer ? "ring-2 ring-amber-500" : "opacity-60 hover:opacity-100")}>
                   <p className="text-xs font-bold text-slate-200">{scoutDisplayName(p, scoutNumbers)}</p>
-                  <p className="text-lg font-black text-amber-400">{count > 0 ? getPlayerAvg(p).toFixed(2) : "—"}</p>
-                  <p className="text-[10px] text-muted">{count}/{spp}</p>
+                  <p className="text-lg font-black text-amber-400">{count > 0 ? `${getPlayerPoints(p)}/${count * PTS_PER_SNAP}` : "—"}</p>
+                  <p className="text-[10px] text-muted">{count}/{spp} snaps</p>
                 </button>
               );
             })}
