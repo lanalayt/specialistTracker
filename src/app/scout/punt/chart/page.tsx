@@ -17,7 +17,15 @@ interface PuntResult {
   opTime: number;
   directionGood: boolean;
   score: number;
+  targetDir?: string; // "L" | "M" | "R" target direction when direction mode is on
 }
+
+const DIR_OPTIONS = [
+  { value: "L", label: "Left" },
+  { value: "M", label: "Middle" },
+  { value: "R", label: "Right" },
+];
+const dirLabel = (d?: string) => DIR_OPTIONS.find((o) => o.value === d)?.label ?? "";
 
 function calcAvg(scores: number[], dropWorst: boolean): number {
   if (scores.length === 0) return 0;
@@ -38,6 +46,9 @@ function ScoutPuntChartInner() {
   const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
   const [newAthleteNum, setNewAthleteNum] = useState("");
   const [puntsPerPlayer, setPuntsPerPlayer] = useState(isManual ? "0" : "5");
+  const [directionMode, setDirectionMode] = useState(false);
+  const [baseDir, setBaseDir] = useState("M");
+  const [puntTypes, setPuntTypes] = useState<{ count: string; dir: string }[]>([]);
   const [dropWorst, setDropWorst] = useState(true);
   const [saved, setSaved] = useState(false);
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
@@ -56,6 +67,8 @@ function ScoutPuntChartInner() {
   const [editHang, setEditHang] = useState("");
   const [editOp, setEditOp] = useState("");
   const [editDir, setEditDir] = useState(true);
+  const [showComplete, setShowComplete] = useState(false);
+  const [completeDismissed, setCompleteDismissed] = useState(false);
 
   const parseHangRaw = (raw: string): number => {
     const digits = raw.replace(/\D/g, "");
@@ -66,6 +79,33 @@ function ScoutPuntChartInner() {
   const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
   const getPlayerScores = (name: string) => getPlayerResults(name).map((r) => r.score);
   const getPlayerAvg = (name: string) => calcAvg(getPlayerScores(name), dropWorst);
+
+  // Flatten the configured punt types into a per-punt target-direction sequence.
+  const dirSequence = (() => {
+    if (!directionMode) return [] as string[];
+    const seq: string[] = [];
+    for (let i = 0; i < (parseInt(puntsPerPlayer) || 0); i++) seq.push(baseDir);
+    for (const t of puntTypes) {
+      const c = parseInt(t.count) || 0;
+      for (let i = 0; i < c; i++) seq.push(t.dir);
+    }
+    return seq;
+  })();
+
+  const addPuntType = () => setPuntTypes((prev) => [...prev, { count: "5", dir: "M" }]);
+  const updatePuntType = (i: number, field: "count" | "dir", value: string) =>
+    setPuntTypes((prev) => prev.map((t, j) => j === i ? { ...t, [field]: value } : t));
+  const removePuntType = (i: number) => setPuntTypes((prev) => prev.filter((_, j) => j !== i));
+
+  // Total punts each player should take (0 = unlimited / manual).
+  const kppTotal = isManual ? 0 : (directionMode ? dirSequence.length : (parseInt(puntsPerPlayer) || 0));
+
+  // Once every selected athlete has reached the target count, prompt to keep going or submit.
+  useEffect(() => {
+    if (phase !== "live" || kppTotal <= 0 || selectedPlayers.length === 0) return;
+    const done = selectedPlayers.every((p) => results.filter((r) => r.athlete === p).length >= kppTotal);
+    if (done && !completeDismissed) setShowComplete(true);
+  }, [results, kppTotal, selectedPlayers, completeDismissed, phase]);
 
   useEffect(() => {
     let active = true;
@@ -115,8 +155,9 @@ function ScoutPuntChartInner() {
     const op = parseHangRaw(opInput);
     if (isNaN(dist) || dist <= 0 || !hang || !activePlayer) return;
     const score = parseFloat((dist + hang * 15 + (dirGood ? 0 : -10)).toFixed(2));
-    const kickNum = getPlayerResults(activePlayer).length + 1;
-    setResults((prev) => [...prev, { athlete: activePlayer, kickNum, distance: dist, hangTime: hang, opTime: op, directionGood: dirGood, score }]);
+    const puntIdx = getPlayerResults(activePlayer).length;
+    const targetDir = directionMode ? dirSequence[puntIdx] : undefined;
+    setResults((prev) => [...prev, { athlete: activePlayer, kickNum: puntIdx + 1, distance: dist, hangTime: hang, opTime: op, directionGood: dirGood, score, targetDir }]);
     setDistInput("");
     setHangInput("");
     setOpInput("");
@@ -213,10 +254,45 @@ function ScoutPuntChartInner() {
           </div>
           {selectedPlayers.length > 0 && <p className="text-xs text-muted">Order: {selectedPlayers.map((p) => scoutDisplayName(p, scoutNumbers)).join(" → ")}</p>}
           {!isManual && (
-            <div>
-              <p className="text-xs text-muted mb-1">Punts per player</p>
-              <input type="text" inputMode="numeric" value={puntsPerPlayer} onChange={(e) => setPuntsPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
-            </div>
+            <>
+              <div className="flex items-center justify-between card-2 px-4 py-3">
+                <div>
+                  <p className="text-xs font-semibold text-slate-200">Direction</p>
+                  <p className="text-[10px] text-muted">Assign a target direction to each punt</p>
+                </div>
+                <button
+                  onClick={() => setDirectionMode(!directionMode)}
+                  className={clsx("w-10 h-5 rounded-full transition-colors relative", directionMode ? "bg-amber-500" : "bg-surface-2 border border-border")}
+                >
+                  <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", directionMode ? "left-5" : "left-0.5")} />
+                </button>
+              </div>
+              <div>
+                <p className="text-xs text-muted mb-1">Punts per player</p>
+                <div className="flex gap-2 items-center">
+                  <input type="text" inputMode="numeric" value={puntsPerPlayer} onChange={(e) => setPuntsPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
+                  {directionMode && (
+                    <select value={baseDir} onChange={(e) => setBaseDir(e.target.value)} className="input text-sm py-1.5">
+                      {DIR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  )}
+                </div>
+              </div>
+              {directionMode && (
+                <div className="space-y-2">
+                  {puntTypes.map((t, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input type="text" inputMode="numeric" value={t.count} onChange={(e) => updatePuntType(i, "count", e.target.value.replace(/\D/g, ""))} placeholder="# punts" className="input w-20 text-center text-sm font-bold py-1.5" />
+                      <select value={t.dir} onChange={(e) => updatePuntType(i, "dir", e.target.value)} className="input text-sm py-1.5">
+                        {DIR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                      <button onClick={() => removePuntType(i)} className="px-2 py-1.5 text-xs text-muted hover:text-miss transition-colors">&times;</button>
+                    </div>
+                  ))}
+                  <button onClick={addPuntType} className="btn-ghost w-full py-2 text-xs font-bold border border-amber-500/40 text-amber-400">+ Add Punt Type</button>
+                </div>
+              )}
+            </>
           )}
           <div className="flex items-center justify-between card-2 px-4 py-3">
             <div>
@@ -235,7 +311,7 @@ function ScoutPuntChartInner() {
             <p>Punt score = Distance + (Hang Time x 15). Bad direction = -10.</p>
             <p>Final = average of all punts{dropWorst ? ", dropping the worst one" : ""}.</p>
           </div>
-          <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || (!isManual && !parseInt(puntsPerPlayer))} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
+          <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || (!isManual && (directionMode ? dirSequence.length === 0 : !parseInt(puntsPerPlayer)))} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
         </main>
       </>
     );
@@ -283,6 +359,7 @@ function ScoutPuntChartInner() {
                       const isDropped = r.worst !== null && e.score === r.worst && j === r.entries.findIndex((x) => x.score === r.worst);
                       return (
                         <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "", e.directionGood ? "text-make" : "text-miss")}>
+                          {e.targetDir && <span className="text-[8px] block text-slate-400 font-semibold">{e.targetDir}</span>}
                           <span className="font-bold">{e.distance}</span>
                           <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
                           <span className="text-[8px] block text-muted">{e.score.toFixed(1)}</span>
@@ -320,8 +397,9 @@ function ScoutPuntChartInner() {
   }
 
   // ── Live ──
-  const kpp = isManual ? 0 : (parseInt(puntsPerPlayer) || 0);
+  const kpp = kppTotal;
   const playerKickCount = getPlayerResults(activePlayer).length;
+  const currentTargetDir = directionMode ? dirSequence[playerKickCount] : undefined;
 
   return (
     <>
@@ -355,6 +433,7 @@ function ScoutPuntChartInner() {
 
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">{scoutDisplayName(activePlayer, scoutNumbers)} — Punt {playerKickCount + 1}{kpp > 0 ? ` of ${kpp}` : ""}</p>
+          {currentTargetDir && <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Aim {dirLabel(currentTargetDir)}</p>}
         </div>
 
         <div className="card space-y-3">
@@ -447,6 +526,30 @@ function ScoutPuntChartInner() {
             <div className="flex gap-2">
               <button onClick={() => setEditIdx(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
               <button onClick={saveEditResult} className="btn-primary flex-1 py-2 text-xs font-bold">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showComplete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative bg-surface border border-border rounded-xl w-full max-w-xs mx-4 p-5 space-y-4">
+            <div className="text-center">
+              <p className="text-sm font-bold text-slate-100">All athletes have punted</p>
+              <p className="text-[10px] text-muted">{kppTotal} punt{kppTotal !== 1 ? "s" : ""} each — average score</p>
+            </div>
+            <div className="space-y-1">
+              {[...selectedPlayers].sort((a, b) => getPlayerAvg(b) - getPlayerAvg(a)).map((p) => (
+                <div key={p} className="flex items-center justify-between text-xs py-1 border-b border-border/30 last:border-0">
+                  <span className="text-slate-200 font-semibold">{scoutDisplayName(p, scoutNumbers)}</span>
+                  <span className="text-amber-400 font-black">{getPlayerAvg(p).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setShowComplete(false); setCompleteDismissed(true); }} className="btn-ghost flex-1 py-2.5 text-xs font-bold border border-border">Keep Punting</button>
+              <button onClick={() => { setShowComplete(false); setPhase("results"); }} className="btn-primary flex-1 py-2.5 text-xs font-bold">Submit to Rankings</button>
             </div>
           </div>
         </div>

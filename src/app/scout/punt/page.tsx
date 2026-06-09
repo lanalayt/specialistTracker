@@ -273,16 +273,11 @@ function ScoutPuntInner() {
         {tab === "chart" && !liveMode && (
           <div className="space-y-4">
             <p className="text-sm text-muted">Start a new punt evaluation.</p>
-            <div className="grid grid-cols-3 gap-3 max-w-lg">
+            <div className="grid grid-cols-2 gap-3 max-w-md">
               <Link href="/scout/punt/chart" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">📋</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Preset Chart</h3>
                 <p className="text-[10px] text-muted mt-1">Set punts per player</p>
-              </Link>
-              <Link href="/scout/punt/chart?mode=manual" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
-                <p className="text-2xl mb-2">✏️</p>
-                <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Manual Chart</h3>
-                <p className="text-[10px] text-muted mt-1">Enter punts on the fly</p>
               </Link>
               <button onClick={() => { setLiveMode(true); setLiveStep("select"); setSelectedLive([]); }} className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">⚡</p>
