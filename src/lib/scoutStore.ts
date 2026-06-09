@@ -334,29 +334,46 @@ export async function removeScoutAthlete(teamId: string, sport: string, name: st
 }
 
 // ── Scout athlete jersey numbers ─────────────────────────────────────────────
+// Jersey numbers are shared across ALL disciplines: a number set in one sport
+// tags the athlete everywhere (one team-wide map), until changed. The `sport`
+// argument is accepted for backwards compatibility but ignored.
 
-export async function loadScoutNumbers(teamId: string, sport: string): Promise<Record<string, string>> {
-  const key = `scout_numbers_${sport}`;
-  if (!teamId || teamId === "local-dev") return cacheGet<Record<string, string>>(teamId, key, {});
-  const res = await cloudGet<Record<string, string>>(teamId, key);
-  if (res.ok) {
-    const nums = res.value && typeof res.value === "object" ? res.value : {};
-    cacheSet(teamId, key, nums);
-    return nums;
+const SCOUT_NUMBERS_KEY = "scout_numbers";
+const LEGACY_NUMBER_SPORTS = ["fg", "kickoff", "punt", "snap"];
+const _numbersMigrated = new Set<string>(); // teams whose legacy per-sport numbers were folded in this session
+
+export async function loadScoutNumbers(teamId: string, _sport: string): Promise<Record<string, string>> {
+  if (!isRealTeam(teamId)) return cacheGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY, {});
+  const res = await cloudGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY);
+  if (!res.ok) return cacheGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY, {});
+  const shared: Record<string, string> = res.value && typeof res.value === "object" ? { ...res.value } : {};
+  // One-time migration: fold any legacy per-sport numbers into the shared map.
+  if (!_numbersMigrated.has(teamId)) {
+    _numbersMigrated.add(teamId);
+    let changed = false;
+    for (const sp of LEGACY_NUMBER_SPORTS) {
+      const legacy = await cloudGet<Record<string, string>>(teamId, `scout_numbers_${sp}`);
+      if (legacy.ok && legacy.value && typeof legacy.value === "object") {
+        for (const [name, num] of Object.entries(legacy.value)) {
+          if (num && !(name in shared)) { shared[name] = num; changed = true; }
+        }
+      }
+    }
+    if (changed) await cloudPut(teamId, SCOUT_NUMBERS_KEY, shared);
   }
-  return cacheGet<Record<string, string>>(teamId, key, {});
+  cacheSet(teamId, SCOUT_NUMBERS_KEY, shared);
+  return shared;
 }
 
 /**
- * Save the full jersey-number map. Callers pass the complete map (loaded
- * cloud-fresh), so this is an authoritative write — allowing a number to be
- * cleared. Reads are cloud-authoritative, so this is safe in normal use.
+ * Save the full (team-wide) jersey-number map. Callers pass the complete map
+ * loaded cloud-fresh, so this is an authoritative write — allowing a number to
+ * be cleared. The number applies across every discipline.
  */
-export async function saveScoutNumbers(teamId: string, sport: string, numbers: Record<string, string>): Promise<void> {
-  const key = `scout_numbers_${sport}`;
-  cacheSet(teamId, key, numbers);
-  if (!teamId || teamId === "local-dev") return;
-  await cloudPut(teamId, key, numbers);
+export async function saveScoutNumbers(teamId: string, _sport: string, numbers: Record<string, string>): Promise<void> {
+  cacheSet(teamId, SCOUT_NUMBERS_KEY, numbers);
+  if (!isRealTeam(teamId)) return;
+  await cloudPut(teamId, SCOUT_NUMBERS_KEY, numbers);
 }
 
 /** Display name with optional jersey number prefix */
