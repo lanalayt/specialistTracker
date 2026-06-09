@@ -4,6 +4,16 @@ import { useState, useEffect } from "react";
 import { SCOUT_DISCIPLINES, type ScoutProfile } from "@/lib/scoutStore";
 import clsx from "clsx";
 
+const US_STATES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
+  "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT",
+  "VA", "WA", "WV", "WI", "WY", "DC",
+];
+
+// Graduation/school years, starting at 2026 and going up.
+const SCHOOL_YEARS = Array.from({ length: 15 }, (_, i) => String(2026 + i));
+
 interface Props {
   profile: ScoutProfile;
   onSave: (profile: ScoutProfile, originalName?: string) => void;
@@ -30,14 +40,15 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
     });
   };
 
-  const fieldsBeforePos: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
+  type Field = { key: keyof ScoutProfile; label: string; placeholder: string; options?: string[] };
+  const fieldsBeforePos: Field[] = [
     { key: "name", label: "Name", placeholder: "Full name" },
   ];
-  const fieldsAfterPos: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
+  const fieldsAfterPos: Field[] = [
     { key: "dob", label: "DOB", placeholder: "MM/DD/YYYY" },
     { key: "school", label: "School", placeholder: "School name" },
-    { key: "schoolState", label: "School State", placeholder: "e.g. CO" },
-    { key: "schoolYear", label: "School Year", placeholder: "e.g. Junior, 2026" },
+    { key: "schoolState", label: "School State", placeholder: "Select state", options: US_STATES },
+    { key: "schoolYear", label: "School Year", placeholder: "Select year", options: SCHOOL_YEARS },
     { key: "height", label: "Height", placeholder: "e.g. 6'2\"" },
     { key: "weight", label: "Weight", placeholder: "e.g. 195 lbs" },
     { key: "majorPreference", label: "Major Preference", placeholder: "e.g. Business" },
@@ -88,13 +99,26 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
           {fieldsAfterPos.map((f) => (
             <div key={f.key}>
               <p className="text-[10px] text-muted uppercase tracking-wider mb-1">{f.label}</p>
-              <input
-                type="text"
-                value={form[f.key] ?? ""}
-                onChange={(e) => update(f.key, e.target.value)}
-                placeholder={f.placeholder}
-                className="input w-full text-sm py-1.5"
-              />
+              {f.options ? (
+                <select
+                  value={(form[f.key] as string) ?? ""}
+                  onChange={(e) => update(f.key, e.target.value)}
+                  className="input w-full text-sm py-1.5"
+                >
+                  <option value="">{f.placeholder}</option>
+                  {f.options.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={(form[f.key] as string) ?? ""}
+                  onChange={(e) => update(f.key, e.target.value)}
+                  placeholder={f.placeholder}
+                  className="input w-full text-sm py-1.5"
+                />
+              )}
             </div>
           ))}
           <div>
