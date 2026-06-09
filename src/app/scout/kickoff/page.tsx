@@ -62,6 +62,9 @@ function ScoutKOInner() {
   const [liveHangInput, setLiveHangInput] = useState("");
   const [liveDirGood, setLiveDirGood] = useState(true);
   const [liveKicks, setLiveKicks] = useState<{ athlete: string; distance: number; hangTime: number; directionGood: boolean; score: number }[]>([]);
+  const [liveStep, setLiveStep] = useState<"select" | "input">("select");
+  const [selectedLive, setSelectedLive] = useState<string[]>([]);
+  const toggleLiveSelect = (name: string) => setSelectedLive((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -94,6 +97,7 @@ function ScoutKOInner() {
     if (!trimmed || liveAthletes.includes(trimmed)) return;
     const updated = [...liveAthletes, trimmed];
     setLiveAthletes(updated);
+    setSelectedLive((prev) => prev.includes(trimmed) ? prev : [...prev, trimmed]);
     setNewLiveAthlete("");
     if (!liveAthlete) setLiveAthlete(trimmed);
     const tid = getTeamId();
@@ -277,7 +281,7 @@ function ScoutKOInner() {
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Manual Chart</h3>
                 <p className="text-[10px] text-muted mt-1">Enter kicks on the fly</p>
               </Link>
-              <button onClick={() => setLiveMode(true)} className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
+              <button onClick={() => { setLiveMode(true); setLiveStep("select"); setSelectedLive([]); }} className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">⚡</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Live Input</h3>
                 <p className="text-[10px] text-muted mt-1">One kick at a time</p>
@@ -286,21 +290,37 @@ function ScoutKOInner() {
           </div>
         )}
 
-        {tab === "chart" && liveMode && (
+        {tab === "chart" && liveMode && liveStep === "select" && (
           <div className="space-y-4">
             <button onClick={() => setLiveMode(false)} className="text-xs text-muted hover:text-white transition-colors">&larr; Back to Chart Options</button>
             <div className="card space-y-3">
-              <p className="text-sm font-bold text-slate-100">Live Input</p>
-              <p className="text-[10px] text-muted">Enter distance, hang time, direction — one kick at a time.</p>
+              <p className="text-sm font-bold text-slate-100">Select Athletes</p>
+              <p className="text-[10px] text-muted">Tap who&apos;s kicking. Add a name with an optional jersey number, then start.</p>
               <div className="flex flex-wrap gap-1.5">
                 {liveAthletes.map((a) => (
-                  <button key={a} onClick={() => setLiveAthlete(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", liveAthlete === a ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{scoutDisplayName(a, scoutNumbers)}</button>
+                  <button key={a} onClick={() => toggleLiveSelect(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", selectedLive.includes(a) ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{scoutDisplayName(a, scoutNumbers)}</button>
                 ))}
               </div>
               <div className="flex gap-2">
                 <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
                 <input type="text" value={newLiveAthlete} onChange={(e) => setNewLiveAthlete(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
                 <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
+              </div>
+              <button onClick={() => { setLiveAthlete(selectedLive.includes(liveAthlete) ? liveAthlete : (selectedLive[0] ?? "")); setLiveStep("input"); }} disabled={selectedLive.length === 0} className="btn-primary w-full py-2.5 text-sm font-bold disabled:opacity-40">Start Live Input</button>
+            </div>
+          </div>
+        )}
+
+        {tab === "chart" && liveMode && liveStep === "input" && (
+          <div className="space-y-4">
+            <button onClick={() => setLiveStep("select")} className="text-xs text-muted hover:text-white transition-colors">&larr; Back to Athletes</button>
+            <div className="card space-y-3">
+              <p className="text-sm font-bold text-slate-100">Live Input</p>
+              <p className="text-[10px] text-muted">Enter distance, hang time, direction — one kick at a time.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedLive.map((a) => (
+                  <button key={a} onClick={() => setLiveAthlete(a)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-medium transition-all", liveAthlete === a ? "bg-amber-500 text-slate-900 font-bold" : "bg-surface-2 text-slate-300 border border-border")}>{scoutDisplayName(a, scoutNumbers)}</button>
+                ))}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
