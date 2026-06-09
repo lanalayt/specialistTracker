@@ -10,6 +10,7 @@ import {
   loadScoutProfiles,
   saveScoutProfiles,
   deleteScoutProfile,
+  applyScoutDisciplines,
   type ScoutProfile,
 } from "@/lib/scoutStore";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
@@ -127,24 +128,20 @@ export default function ScoutAthletesPage() {
     // Ensure the athlete appears in the list (covers newly added profiles)
     setAllNames((prev) => prev.includes(profile.name) ? prev : [...prev, profile.name].sort((a, b) => a.localeCompare(b)));
 
-    // Auto-add to sport lists based on position
-    const positions = (profile.position ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-    const positionSportMap: Record<string, string[]> = {
-      Kicker: ["fg", "kickoff"],
-      Punter: ["punt"],
-      Snapper: ["snap"],
-    };
-    for (const pos of positions) {
-      const sports = positionSportMap[pos] ?? [];
-      for (const sport of sports) {
-        const list = sportAthletes[sport] ?? [];
-        if (!list.includes(profile.name)) {
-          const newList = [...list, profile.name];
-          setSportAthletes((prev) => ({ ...prev, [sport]: newList }));
-          await saveScoutAthletes(tid, sport, newList);
-        }
+    // Sync charting membership to the selected disciplines (full reconcile — the
+    // modal was seeded from current membership, so unselected ones are removed).
+    const disciplines = profile.disciplines ?? [];
+    setSportAthletes((prev) => {
+      const next = { ...prev };
+      for (const sport of SPORTS) {
+        const has = (next[sport.key] ?? []).includes(profile.name);
+        const want = disciplines.includes(sport.key);
+        if (want && !has) next[sport.key] = [...(next[sport.key] ?? []), profile.name];
+        else if (!want && has) next[sport.key] = (next[sport.key] ?? []).filter((n) => n !== profile.name);
       }
-    }
+      return next;
+    });
+    await applyScoutDisciplines(tid, profile.name, disciplines, true);
 
     setProfileOpen(null);
   };
@@ -237,8 +234,7 @@ export default function ScoutAthletesPage() {
                             {name}
                           </button>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            {profile?.position && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-border text-muted font-semibold">{profile.position}</span>}
-                            {profile?.school && <span className="text-[10px] text-muted">{profile.school}</span>}
+                            {profile?.school && <span className="text-[10px] text-muted">{profile.school}{profile?.schoolState ? `, ${profile.schoolState}` : ""}</span>}
                             {profile?.schoolYear && <span className="text-[10px] text-muted">{profile.schoolYear}</span>}
                           </div>
                           <div className="flex items-center gap-1 mt-1.5 flex-wrap">
@@ -286,13 +282,18 @@ export default function ScoutAthletesPage() {
         })()}
       </main>
 
-      {profileOpen && (
-        <ScoutProfileModal
-          profile={profiles[profileOpen] ?? { name: profileOpen }}
-          onSave={handleSaveProfile}
-          onClose={() => setProfileOpen(null)}
-        />
-      )}
+      {profileOpen && (() => {
+        const base = profiles[profileOpen] ?? { name: profileOpen };
+        // Seed disciplines from current charting membership so the modal reflects reality.
+        const disciplines = SPORTS.filter((s) => (sportAthletes[s.key] ?? []).includes(profileOpen)).map((s) => s.key);
+        return (
+          <ScoutProfileModal
+            profile={{ ...base, disciplines }}
+            onSave={handleSaveProfile}
+            onClose={() => setProfileOpen(null)}
+          />
+        );
+      })()}
     </>
   );
 }

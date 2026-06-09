@@ -213,8 +213,11 @@ export interface ScoutProfile {
   name: string;
   dob?: string;
   school?: string;
+  schoolState?: string;
   schoolYear?: string;
   position?: string;
+  /** Disciplines the athlete charts in: "fg" | "kickoff" | "punt" | "snap" */
+  disciplines?: string[];
   height?: string;
   weight?: string;
   majorPreference?: string;
@@ -360,6 +363,32 @@ export async function saveScoutNumbers(teamId: string, sport: string, numbers: R
 export function scoutDisplayName(name: string, numbers?: Record<string, string>): string {
   const num = numbers?.[name];
   return num ? `#${num} ${name}` : name;
+}
+
+/** The scout disciplines an athlete can be charted in. Keys match the per-sport athlete lists. */
+export const SCOUT_DISCIPLINES: { key: string; label: string }[] = [
+  { key: "fg", label: "FG" },
+  { key: "kickoff", label: "Kickoff" },
+  { key: "punt", label: "Punt" },
+  { key: "snap", label: "Snap" },
+];
+
+/**
+ * Sync an athlete's discipline (charting) membership.
+ * - Selected disciplines: the athlete is added to that sport's charting list.
+ * - removeUnselected=true: also removes them from any unselected discipline
+ *   (use only when `disciplines` reflects the athlete's full, current set).
+ */
+export async function applyScoutDisciplines(
+  teamId: string,
+  name: string,
+  disciplines: string[],
+  removeUnselected: boolean
+): Promise<void> {
+  for (const d of SCOUT_DISCIPLINES) {
+    if (disciplines.includes(d.key)) await saveScoutAthletes(teamId, d.key, [name]);
+    else if (removeUnselected) await removeScoutAthlete(teamId, d.key, name);
+  }
 }
 
 /** Today's local date as a YYYY-MM-DD string for <input type="date"> defaults */

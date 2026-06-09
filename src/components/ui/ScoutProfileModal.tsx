@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { ScoutProfile } from "@/lib/scoutStore";
+import { SCOUT_DISCIPLINES, type ScoutProfile } from "@/lib/scoutStore";
 import clsx from "clsx";
-
-const POSITION_OPTIONS = ["Kicker", "Punter", "Snapper"];
 
 interface Props {
   profile: ScoutProfile;
@@ -23,12 +21,13 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const selectedPositions = (form.position ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  const togglePosition = (pos: string) => {
-    const next = selectedPositions.includes(pos)
-      ? selectedPositions.filter((p) => p !== pos)
-      : [...selectedPositions, pos];
-    update("position", next.join(", "));
+  const selectedDisciplines = form.disciplines ?? [];
+  const toggleDiscipline = (key: string) => {
+    setForm((prev) => {
+      const cur = prev.disciplines ?? [];
+      const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+      return { ...prev, disciplines: next };
+    });
   };
 
   const fieldsBeforePos: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
@@ -37,6 +36,7 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
   const fieldsAfterPos: { key: keyof ScoutProfile; label: string; placeholder: string }[] = [
     { key: "dob", label: "DOB", placeholder: "MM/DD/YYYY" },
     { key: "school", label: "School", placeholder: "School name" },
+    { key: "schoolState", label: "School State", placeholder: "e.g. CO" },
     { key: "schoolYear", label: "School Year", placeholder: "e.g. Junior, 2026" },
     { key: "height", label: "Height", placeholder: "e.g. 6'2\"" },
     { key: "weight", label: "Weight", placeholder: "e.g. 195 lbs" },
@@ -66,21 +66,21 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
             </div>
           ))}
           <div>
-            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Position</p>
-            <div className="flex gap-1.5">
-              {POSITION_OPTIONS.map((pos) => (
+            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Discipline</p>
+            <div className="flex flex-wrap gap-1.5">
+              {SCOUT_DISCIPLINES.map((d) => (
                 <button
-                  key={pos}
+                  key={d.key}
                   type="button"
-                  onClick={() => togglePosition(pos)}
+                  onClick={() => toggleDiscipline(d.key)}
                   className={clsx(
                     "px-3 py-1.5 rounded-input text-xs font-semibold transition-all",
-                    selectedPositions.includes(pos)
+                    selectedDisciplines.includes(d.key)
                       ? "bg-amber-500 text-slate-900"
                       : "bg-surface-2 text-muted border border-border hover:text-white"
                   )}
                 >
-                  {pos}
+                  {d.label}
                 </button>
               ))}
             </div>
