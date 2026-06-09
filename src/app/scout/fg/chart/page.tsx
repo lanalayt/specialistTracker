@@ -16,6 +16,8 @@ interface PresetKick {
   distance: number;
   hash: string;
   pointValue: number;
+  /** If set, this (extra) kick only applies to these athletes. Undefined = all athletes. */
+  athletes?: string[];
 }
 
 interface FGResult {
@@ -57,6 +59,8 @@ function ScoutFGChartInner() {
   const [manualDist, setManualDist] = useState("30");
   const [manualHash, setManualHash] = useState("M");
   const [manualPoints, setManualPoints] = useState("1");
+  // Which athlete(s) an extra kick is for: "all" or a specific athlete name.
+  const [extraKickTarget, setExtraKickTarget] = useState("all");
 
   // Grid-based results: resultMap[athlete][kickIdx] = "make" | "miss"
   const [resultMap, setResultMap] = useState<Record<string, Record<number, "make" | "miss">>>({});
@@ -70,6 +74,12 @@ function ScoutFGChartInner() {
     const overrides = athleteKicks[athlete];
     if (overrides && overrides[kickIdx]) return overrides[kickIdx];
     return kicks[kickIdx] ?? { distance: 0, hash: "M", pointValue: 1 };
+  };
+
+  // A kick column applies to an athlete unless it was added for specific athletes only.
+  const kickAppliesTo = (kickIdx: number, athlete: string): boolean => {
+    const scope = kicks[kickIdx]?.athletes;
+    return !scope || scope.includes(athlete);
   };
 
   const getPlayerScore = (name: string) => {
@@ -95,7 +105,7 @@ function ScoutFGChartInner() {
       const map = resultMap[athlete] ?? {};
       for (let i = 0; i < kicks.length; i++) {
         const res = map[i];
-        if (!res) continue;
+        if (!res || !kickAppliesTo(i, athlete)) continue;
         const kick = getKickForAthlete(athlete, i);
         out.push({
           athlete,
@@ -182,7 +192,7 @@ function ScoutFGChartInner() {
   const findNextEmpty = (fromAthlete: string, fromIdx: number): { athlete: string; kickIdx: number } | null => {
     // Try next kick for same athlete
     for (let i = fromIdx + 1; i < kicks.length; i++) {
-      if (!resultMap[fromAthlete]?.[i]) return { athlete: fromAthlete, kickIdx: i };
+      if (kickAppliesTo(i, fromAthlete) && !resultMap[fromAthlete]?.[i]) return { athlete: fromAthlete, kickIdx: i };
     }
     // Try next athletes
     const startPlayerIdx = selectedPlayers.indexOf(fromAthlete);
@@ -190,7 +200,7 @@ function ScoutFGChartInner() {
       const playerIdx = (startPlayerIdx + p) % selectedPlayers.length;
       const player = selectedPlayers[playerIdx];
       for (let i = 0; i < kicks.length; i++) {
-        if (!resultMap[player]?.[i]) return { athlete: player, kickIdx: i };
+        if (kickAppliesTo(i, player) && !resultMap[player]?.[i]) return { athlete: player, kickIdx: i };
       }
     }
     return null;
@@ -293,7 +303,10 @@ function ScoutFGChartInner() {
   const addExtraKick = () => {
     const d = parseInt(manualDist) || 30;
     const p = parseInt(manualPoints) || 1;
-    const newKick: PresetKick = { distance: d, hash: manualHash, pointValue: p };
+    const newKick: PresetKick = {
+      distance: d, hash: manualHash, pointValue: p,
+      ...(extraKickTarget !== "all" ? { athletes: [extraKickTarget] } : {}),
+    };
     if (chartMode === "preset") {
       setPresetKicks((prev) => [...prev, newKick]);
       setAthleteKicks((prev) => {
@@ -309,6 +322,7 @@ function ScoutFGChartInner() {
     setManualDist("30");
     setManualHash("M");
     setManualPoints("1");
+    setExtraKickTarget("all");
   };
 
   // Warn before leaving if there's unsaved data
@@ -563,6 +577,9 @@ function ScoutFGChartInner() {
                 <tr key={athlete} className="border-t border-border/30">
                   <td className="py-2 px-1 font-semibold text-slate-200 text-xs">{scoutDisplayName(athlete, scoutNumbers)}</td>
                   {kicks.map((_, kickIdx) => {
+                    if (!kickAppliesTo(kickIdx, athlete)) {
+                      return <td key={kickIdx} className="text-center py-2 px-1 text-muted text-[10px]">—</td>;
+                    }
                     const res = resultMap[athlete]?.[kickIdx];
                     const isActive = activeCell?.athlete === athlete && activeCell?.kickIdx === kickIdx;
                     return (
@@ -599,6 +616,7 @@ function ScoutFGChartInner() {
               </div>
               <div className="grid grid-cols-5 gap-1.5">
                 {kicks.map((k, kickIdx) => {
+                  if (!kickAppliesTo(kickIdx, athlete)) return null;
                   const res = resultMap[athlete]?.[kickIdx];
                   const isActive = activeCell?.athlete === athlete && activeCell?.kickIdx === kickIdx;
                   return (
@@ -688,6 +706,15 @@ function ScoutFGChartInner() {
         {/* Add extra kick — available in both preset and manual mode */}
         <div className="card space-y-3">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">Add Extra Kick</p>
+          <div>
+            <p className="text-[10px] text-muted mb-1">For</p>
+            <select value={extraKickTarget} onChange={(e) => setExtraKickTarget(e.target.value)} className="input w-full text-sm py-1.5">
+              <option value="all">All athletes</option>
+              {selectedPlayers.map((p) => (
+                <option key={p} value={p}>{scoutDisplayName(p, scoutNumbers)}</option>
+              ))}
+            </select>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
               <p className="text-[10px] text-muted text-center mb-1">Distance</p>
