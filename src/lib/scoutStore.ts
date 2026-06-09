@@ -43,16 +43,48 @@ async function cloudPut(teamId: string, key: string, value: unknown): Promise<vo
   } catch {}
 }
 
-function cacheGet<T>(key: string, fallback: T): T {
+/**
+ * Tenant isolation rule: for a real signed-in team, scout data is CLOUD-ONLY —
+ * we never read or write localStorage. That makes it impossible for two accounts
+ * used on the same browser to share a cache and leak athletes/profiles between
+ * each other, and it means the cloud is always the single source of truth.
+ *
+ * localStorage is used ONLY in local/dev mode (no real team), where it is still
+ * namespaced so it can't bleed into a real team's view.
+ */
+function isRealTeam(teamId: string): boolean {
+  return !!teamId && teamId !== "local-dev";
+}
+
+function nsKey(teamId: string, key: string): string {
+  return `scout::${isRealTeam(teamId) ? teamId : "local"}::${key}`;
+}
+
+function cacheGet<T>(teamId: string, key: string, fallback: T): T {
+  if (isRealTeam(teamId)) return fallback; // real teams never read the device cache
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(nsKey(teamId, key));
     if (raw) return JSON.parse(raw) as T;
   } catch {}
   return fallback;
 }
 
-function cacheSet(key: string, value: unknown): void {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+function cacheSet(teamId: string, key: string, value: unknown): void {
+  if (isRealTeam(teamId)) return; // real teams never write the device cache
+  try { localStorage.setItem(nsKey(teamId, key), JSON.stringify(value)); } catch {}
+}
+
+// One-time purge of legacy, non-team-scoped scout cache keys. These were shared
+// across all accounts on a device and could leak data between teams.
+if (typeof window !== "undefined") {
+  try {
+    const legacy = ["scout_profiles", "scout_archives", "assigned_charts", "scout_fg_preset"];
+    for (const k of Object.keys(localStorage)) {
+      if (legacy.includes(k) || k.startsWith("scout_athletes_") || k.startsWith("scout_numbers_")) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch {}
 }
 
 // ── Scout Sessions ──────────────────────────────────────────────────────────
@@ -192,57 +224,57 @@ export interface ScoutProfile {
 const SCOUT_PROFILES_KEY = "scout_profiles";
 
 export async function loadScoutProfiles(teamId: string): Promise<Record<string, ScoutProfile>> {
-  if (!teamId || teamId === "local-dev") return cacheGet(SCOUT_PROFILES_KEY, {});
+  if (!teamId || teamId === "local-dev") return cacheGet(teamId, SCOUT_PROFILES_KEY, {});
   const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
   if (res.ok) {
     const profiles = res.value && typeof res.value === "object" ? res.value : {};
-    cacheSet(SCOUT_PROFILES_KEY, profiles);
+    cacheSet(teamId, SCOUT_PROFILES_KEY, profiles);
     return profiles;
   }
   // Offline / read failed — fall back to last-known cache.
-  return cacheGet(SCOUT_PROFILES_KEY, {});
+  return cacheGet(teamId, SCOUT_PROFILES_KEY, {});
 }
 
 /** Merge the given profiles into the cloud copy (adds/updates only — never removes keys). */
 export async function saveScoutProfiles(teamId: string, profiles: Record<string, ScoutProfile>): Promise<void> {
-  cacheSet(SCOUT_PROFILES_KEY, profiles);
+  cacheSet(teamId, SCOUT_PROFILES_KEY, profiles);
   if (!teamId || teamId === "local-dev") return;
   const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
   const cloud = res.ok && res.value && typeof res.value === "object" ? res.value : {};
   const merged = { ...cloud, ...profiles };
-  cacheSet(SCOUT_PROFILES_KEY, merged);
+  cacheSet(teamId, SCOUT_PROFILES_KEY, merged);
   await cloudPut(teamId, SCOUT_PROFILES_KEY, merged);
 }
 
 /** Remove a single profile from the cloud copy (safe delete — read/modify/write). */
 export async function deleteScoutProfile(teamId: string, name: string): Promise<void> {
   if (!teamId || teamId === "local-dev") {
-    const map = cacheGet<Record<string, ScoutProfile>>(SCOUT_PROFILES_KEY, {});
+    const map = cacheGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY, {});
     delete map[name];
-    cacheSet(SCOUT_PROFILES_KEY, map);
+    cacheSet(teamId, SCOUT_PROFILES_KEY, map);
     return;
   }
   const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
   const cloud = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
   delete cloud[name];
-  cacheSet(SCOUT_PROFILES_KEY, cloud);
+  cacheSet(teamId, SCOUT_PROFILES_KEY, cloud);
   await cloudPut(teamId, SCOUT_PROFILES_KEY, cloud);
 }
 
 // ── Presets (stored in team_data) ───────────────────────────────────────────
 
 export async function loadScoutPreset<T>(teamId: string, key: string): Promise<T | null> {
-  if (!teamId || teamId === "local-dev") return cacheGet<T | null>(key, null);
+  if (!teamId || teamId === "local-dev") return cacheGet<T | null>(teamId, key, null);
   const res = await cloudGet<T>(teamId, key);
   if (res.ok) {
-    if (res.value != null) cacheSet(key, res.value);
+    if (res.value != null) cacheSet(teamId, key, res.value);
     return res.value;
   }
-  return cacheGet<T | null>(key, null);
+  return cacheGet<T | null>(teamId, key, null);
 }
 
 export async function saveScoutPreset<T>(teamId: string, key: string, value: T): Promise<void> {
-  localStorage.setItem(key, JSON.stringify(value));
+  cacheSet(teamId, key, value);
   if (!teamId || teamId === "local-dev") return;
   try {
     const supabase = createClient();
@@ -262,25 +294,25 @@ export async function saveScoutPreset<T>(teamId: string, key: string, value: T):
 
 export async function loadScoutAthletes(teamId: string, sport: string): Promise<string[]> {
   const key = `scout_athletes_${sport}`;
-  if (!teamId || teamId === "local-dev") return cacheGet<string[]>(key, []);
+  if (!teamId || teamId === "local-dev") return cacheGet<string[]>(teamId, key, []);
   const res = await cloudGet<string[]>(teamId, key);
   if (res.ok) {
     const names = Array.isArray(res.value) ? res.value : [];
-    cacheSet(key, names);
+    cacheSet(teamId, key, names);
     return names;
   }
-  return cacheGet<string[]>(key, []);
+  return cacheGet<string[]>(teamId, key, []);
 }
 
 /** Add athletes to a sport list, merging with the current cloud copy (never drops names). */
 export async function saveScoutAthletes(teamId: string, sport: string, names: string[]): Promise<void> {
   const key = `scout_athletes_${sport}`;
-  cacheSet(key, names);
+  cacheSet(teamId, key, names);
   if (!teamId || teamId === "local-dev") return;
   const res = await cloudGet<string[]>(teamId, key);
   const cloud = res.ok && Array.isArray(res.value) ? res.value : [];
   const merged = Array.from(new Set([...cloud, ...names]));
-  cacheSet(key, merged);
+  cacheSet(teamId, key, merged);
   await cloudPut(teamId, key, merged);
 }
 
@@ -288,13 +320,13 @@ export async function saveScoutAthletes(teamId: string, sport: string, names: st
 export async function removeScoutAthlete(teamId: string, sport: string, name: string): Promise<void> {
   const key = `scout_athletes_${sport}`;
   if (!teamId || teamId === "local-dev") {
-    cacheSet(key, cacheGet<string[]>(key, []).filter((n) => n !== name));
+    cacheSet(teamId, key, cacheGet<string[]>(teamId, key, []).filter((n) => n !== name));
     return;
   }
   const res = await cloudGet<string[]>(teamId, key);
-  const cloud = res.ok && Array.isArray(res.value) ? res.value : cacheGet<string[]>(key, []);
+  const cloud = res.ok && Array.isArray(res.value) ? res.value : cacheGet<string[]>(teamId, key, []);
   const next = cloud.filter((n) => n !== name);
-  cacheSet(key, next);
+  cacheSet(teamId, key, next);
   await cloudPut(teamId, key, next);
 }
 
@@ -302,14 +334,14 @@ export async function removeScoutAthlete(teamId: string, sport: string, name: st
 
 export async function loadScoutNumbers(teamId: string, sport: string): Promise<Record<string, string>> {
   const key = `scout_numbers_${sport}`;
-  if (!teamId || teamId === "local-dev") return cacheGet<Record<string, string>>(key, {});
+  if (!teamId || teamId === "local-dev") return cacheGet<Record<string, string>>(teamId, key, {});
   const res = await cloudGet<Record<string, string>>(teamId, key);
   if (res.ok) {
     const nums = res.value && typeof res.value === "object" ? res.value : {};
-    cacheSet(key, nums);
+    cacheSet(teamId, key, nums);
     return nums;
   }
-  return cacheGet<Record<string, string>>(key, {});
+  return cacheGet<Record<string, string>>(teamId, key, {});
 }
 
 /**
@@ -319,7 +351,7 @@ export async function loadScoutNumbers(teamId: string, sport: string): Promise<R
  */
 export async function saveScoutNumbers(teamId: string, sport: string, numbers: Record<string, string>): Promise<void> {
   const key = `scout_numbers_${sport}`;
-  cacheSet(key, numbers);
+  cacheSet(teamId, key, numbers);
   if (!teamId || teamId === "local-dev") return;
   await cloudPut(teamId, key, numbers);
 }
@@ -364,42 +396,16 @@ export interface AssignedChart {
 const ASSIGNED_CHARTS_KEY = "assigned_charts";
 
 export async function loadAssignedCharts(teamId: string): Promise<AssignedChart[]> {
-  if (!teamId || teamId === "local-dev") {
-    try {
-      const raw = localStorage.getItem(ASSIGNED_CHARTS_KEY);
-      return raw ? JSON.parse(raw) as AssignedChart[] : [];
-    } catch { return []; }
-  }
-  // Always check cloud for assigned charts (they may be assigned from another device)
-  try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("team_data").select("data").eq("team_id", teamId).eq("data_key", ASSIGNED_CHARTS_KEY).single();
-    if (error || !data) {
-      // Fall back to localStorage if cloud fails
-      try { const raw = localStorage.getItem(ASSIGNED_CHARTS_KEY); return raw ? JSON.parse(raw) as AssignedChart[] : []; } catch { return []; }
-    }
-    const charts = data.data as unknown as AssignedChart[];
-    if (Array.isArray(charts)) {
-      localStorage.setItem(ASSIGNED_CHARTS_KEY, JSON.stringify(charts));
-      return charts;
-    }
-    return [];
-  } catch {
-    try { const raw = localStorage.getItem(ASSIGNED_CHARTS_KEY); return raw ? JSON.parse(raw) as AssignedChart[] : []; } catch { return []; }
-  }
+  if (!isRealTeam(teamId)) return cacheGet<AssignedChart[]>(teamId, ASSIGNED_CHARTS_KEY, []);
+  const res = await cloudGet<AssignedChart[]>(teamId, ASSIGNED_CHARTS_KEY);
+  if (res.ok) return Array.isArray(res.value) ? res.value : [];
+  return [];
 }
 
 export async function saveAssignedCharts(teamId: string, charts: AssignedChart[]): Promise<void> {
-  localStorage.setItem(ASSIGNED_CHARTS_KEY, JSON.stringify(charts));
-  if (!teamId || teamId === "local-dev") return;
-  try {
-    const supabase = createClient();
-    await supabase.from("team_data").upsert(
-      { team_id: teamId, data_key: ASSIGNED_CHARTS_KEY, data: charts as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
-      { onConflict: "team_id,data_key" }
-    );
-  } catch {}
+  cacheSet(teamId, ASSIGNED_CHARTS_KEY, charts);
+  if (!isRealTeam(teamId)) return;
+  await cloudPut(teamId, ASSIGNED_CHARTS_KEY, charts);
 }
 
 // ── Scout Archives (stored in team_data) ────────────────────────────────────
@@ -417,42 +423,14 @@ export interface ScoutArchive {
 const SCOUT_ARCHIVES_KEY = "scout_archives";
 
 export async function loadScoutArchives(teamId: string): Promise<ScoutArchive[]> {
-  if (!teamId || teamId === "local-dev") {
-    try {
-      const raw = localStorage.getItem(SCOUT_ARCHIVES_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  }
-  try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("team_data")
-      .select("data")
-      .eq("team_id", teamId)
-      .eq("data_key", SCOUT_ARCHIVES_KEY)
-      .single();
-    if (error || !data) return [];
-    return (data.data as unknown as ScoutArchive[]) ?? [];
-  } catch {
-    return [];
-  }
+  if (!isRealTeam(teamId)) return cacheGet<ScoutArchive[]>(teamId, SCOUT_ARCHIVES_KEY, []);
+  const res = await cloudGet<ScoutArchive[]>(teamId, SCOUT_ARCHIVES_KEY);
+  if (res.ok) return Array.isArray(res.value) ? res.value : [];
+  return [];
 }
 
 export async function saveScoutArchives(teamId: string, archives: ScoutArchive[]): Promise<void> {
-  localStorage.setItem(SCOUT_ARCHIVES_KEY, JSON.stringify(archives));
-  if (!teamId || teamId === "local-dev") return;
-  try {
-    const supabase = createClient();
-    await supabase.from("team_data").upsert(
-      {
-        team_id: teamId,
-        data_key: SCOUT_ARCHIVES_KEY,
-        data: archives as unknown as Record<string, unknown>,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "team_id,data_key" }
-    );
-  } catch {}
+  cacheSet(teamId, SCOUT_ARCHIVES_KEY, archives);
+  if (!isRealTeam(teamId)) return;
+  await cloudPut(teamId, SCOUT_ARCHIVES_KEY, archives);
 }
