@@ -24,6 +24,14 @@ const SPORTS = [
   { key: "snap", label: "Snap" },
 ];
 
+// Discipline filter options (KO is the short label for kickoff).
+const DISCIPLINE_FILTERS = [
+  { key: "fg", label: "FG" },
+  { key: "kickoff", label: "KO" },
+  { key: "punt", label: "Punt" },
+  { key: "snap", label: "Snap" },
+];
+
 export default function ScoutAthletesPage() {
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [allNames, setAllNames] = useState<string[]>([]);
@@ -31,7 +39,7 @@ export default function ScoutAthletesPage() {
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
-  const [filterType, setFilterType] = useState<"all" | "year" | "position">("all");
+  const [filterType, setFilterType] = useState<"all" | "year" | "discipline">("all");
   const [filterValue, setFilterValue] = useState("");
 
   const loadData = async () => {
@@ -178,13 +186,11 @@ export default function ScoutAthletesPage() {
         {/* Filters */}
         {(() => {
           const years = [...new Set(allNames.map((n) => profiles[n]?.schoolYear).filter(Boolean))] as string[];
-          const positions = [...new Set(allNames.map((n) => profiles[n]?.position).filter(Boolean))] as string[];
-
           const filtered = allNames.filter((name) => {
             if (filterType === "all") return true;
             const p = profiles[name];
             if (filterType === "year") return filterValue ? p?.schoolYear === filterValue : true;
-            if (filterType === "position") return filterValue ? p?.position === filterValue : true;
+            if (filterType === "discipline") return filterValue ? (sportAthletes[filterValue] ?? []).includes(name) : true;
             return true;
           });
 
@@ -194,7 +200,7 @@ export default function ScoutAthletesPage() {
                 <div className="flex rounded-input border border-border overflow-hidden w-fit">
                   <button onClick={() => { setFilterType("all"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", filterType === "all" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>All</button>
                   <button onClick={() => { setFilterType("year"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", filterType === "year" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Year</button>
-                  <button onClick={() => { setFilterType("position"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", filterType === "position" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Position</button>
+                  <button onClick={() => { setFilterType("discipline"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", filterType === "discipline" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Discipline</button>
                 </div>
                 {filterType === "year" && years.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -204,11 +210,11 @@ export default function ScoutAthletesPage() {
                     ))}
                   </div>
                 )}
-                {filterType === "position" && positions.length > 0 && (
+                {filterType === "discipline" && (
                   <div className="flex flex-wrap gap-1">
-                    <button onClick={() => setFilterValue("")} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-semibold transition-all", !filterValue ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-surface-2 text-muted border border-border")}>All Positions</button>
-                    {positions.sort().map((p) => (
-                      <button key={p} onClick={() => setFilterValue(p)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-semibold transition-all", filterValue === p ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-surface-2 text-muted border border-border")}>{p}</button>
+                    <button onClick={() => setFilterValue("")} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-semibold transition-all", !filterValue ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-surface-2 text-muted border border-border")}>All</button>
+                    {DISCIPLINE_FILTERS.map((d) => (
+                      <button key={d.key} onClick={() => setFilterValue(d.key)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-semibold transition-all", filterValue === d.key ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-surface-2 text-muted border border-border")}>{d.label}</button>
                     ))}
                   </div>
                 )}
