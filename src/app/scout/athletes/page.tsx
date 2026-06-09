@@ -6,8 +6,10 @@ import { getTeamId } from "@/lib/teamData";
 import {
   loadScoutAthletes,
   saveScoutAthletes,
+  removeScoutAthlete,
   loadScoutProfiles,
   saveScoutProfiles,
+  deleteScoutProfile,
   type ScoutProfile,
 } from "@/lib/scoutStore";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
@@ -70,11 +72,11 @@ export default function ScoutAthletesPage() {
     const tid = getTeamId();
     if (!tid) return;
     const list = sportAthletes[sportKey] ?? [];
-    const updated = list.includes(name)
-      ? list.filter((n) => n !== name)
-      : [...list, name];
+    const isRemoving = list.includes(name);
+    const updated = isRemoving ? list.filter((n) => n !== name) : [...list, name];
     setSportAthletes((prev) => ({ ...prev, [sportKey]: updated }));
-    await saveScoutAthletes(tid, sportKey, updated);
+    if (isRemoving) await removeScoutAthlete(tid, sportKey, name);
+    else await saveScoutAthletes(tid, sportKey, [name]);
   };
 
   const handleDeleteAthlete = async (name: string) => {
@@ -85,15 +87,14 @@ export default function ScoutAthletesPage() {
     const updatedProfiles = { ...profiles };
     delete updatedProfiles[name];
     setProfiles(updatedProfiles);
-    await saveScoutProfiles(tid, updatedProfiles);
+    await deleteScoutProfile(tid, name);
 
-    // Remove from all sport lists
+    // Remove from all sport lists (safe per-list delete)
     for (const sport of SPORTS) {
       const list = sportAthletes[sport.key] ?? [];
       if (list.includes(name)) {
-        const updated = list.filter((n) => n !== name);
-        setSportAthletes((prev) => ({ ...prev, [sport.key]: updated }));
-        await saveScoutAthletes(tid, sport.key, updated);
+        setSportAthletes((prev) => ({ ...prev, [sport.key]: (prev[sport.key] ?? []).filter((n) => n !== name) }));
+        await removeScoutAthlete(tid, sport.key, name);
       }
     }
 
@@ -106,13 +107,14 @@ export default function ScoutAthletesPage() {
     const updated = { ...profiles };
     if (originalName && originalName !== profile.name) {
       delete updated[originalName];
-      // Update name in all sport athlete lists
+      // Rename in all sport athlete lists: drop the old name, add the new (safe per-list ops)
       for (const sport of SPORTS) {
         const list = sportAthletes[sport.key] ?? [];
         if (list.includes(originalName)) {
           const newList = list.map((n) => n === originalName ? profile.name : n);
           setSportAthletes((prev) => ({ ...prev, [sport.key]: newList }));
-          await saveScoutAthletes(tid, sport.key, newList);
+          await removeScoutAthlete(tid, sport.key, originalName);
+          await saveScoutAthletes(tid, sport.key, [profile.name]);
         }
       }
       setAllNames((prev) => prev.map((n) => n === originalName ? profile.name : n).sort((a, b) => a.localeCompare(b)));
@@ -120,6 +122,7 @@ export default function ScoutAthletesPage() {
     updated[profile.name] = profile;
     setProfiles(updated);
     await saveScoutProfiles(tid, updated);
+    if (originalName && originalName !== profile.name) await deleteScoutProfile(tid, originalName);
 
     // Ensure the athlete appears in the list (covers newly added profiles)
     setAllNames((prev) => prev.includes(profile.name) ? prev : [...prev, profile.name].sort((a, b) => a.localeCompare(b)));

@@ -4,7 +4,56 @@ import { createClient } from "@/lib/supabase";
  * Scout Mode data persistence layer.
  * Uses the existing `sessions` table with SCOUT_* sport values
  * to keep scout data completely isolated from coach mode.
+ *
+ * Persistence model (team_data keys):
+ *   - Reads are CLOUD-AUTHORITATIVE: when signed in we always read the live
+ *     cloud copy so changes made by other accounts/devices are visible.
+ *     localStorage is only a same-device cache / offline fallback.
+ *   - Writes MERGE with the current cloud copy (never blind-overwrite a whole
+ *     collection) so two people editing at once don't clobber each other.
+ *   - Removals go through dedicated remove* helpers so a delete on one device
+ *     is not resurrected by another device's stale list.
  */
+
+/** Read a team_data key from the cloud. ok:false means the read failed (offline / error). */
+async function cloudGet<T>(teamId: string, key: string): Promise<{ ok: true; value: T | null } | { ok: false }> {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("team_data")
+      .select("data")
+      .eq("team_id", teamId)
+      .eq("data_key", key)
+      .maybeSingle();
+    if (error) return { ok: false };
+    return { ok: true, value: (data?.data ?? null) as T | null };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Upsert a team_data key in the cloud (best effort). */
+async function cloudPut(teamId: string, key: string, value: unknown): Promise<void> {
+  try {
+    const supabase = createClient();
+    await supabase.from("team_data").upsert(
+      { team_id: teamId, data_key: key, data: value as Record<string, unknown>, updated_at: new Date().toISOString() },
+      { onConflict: "team_id,data_key" }
+    );
+  } catch {}
+}
+
+function cacheGet<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw) as T;
+  } catch {}
+  return fallback;
+}
+
+function cacheSet(key: string, value: unknown): void {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
 
 // ── Scout Sessions ──────────────────────────────────────────────────────────
 
@@ -143,58 +192,53 @@ export interface ScoutProfile {
 const SCOUT_PROFILES_KEY = "scout_profiles";
 
 export async function loadScoutProfiles(teamId: string): Promise<Record<string, ScoutProfile>> {
-  try {
-    const raw = localStorage.getItem(SCOUT_PROFILES_KEY);
-    if (raw) return JSON.parse(raw) as Record<string, ScoutProfile>;
-  } catch {}
-  if (!teamId || teamId === "local-dev") return {};
-  try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("team_data").select("data").eq("team_id", teamId).eq("data_key", SCOUT_PROFILES_KEY).single();
-    if (error || !data) return {};
-    const profiles = data.data as unknown as Record<string, ScoutProfile>;
-    if (profiles && typeof profiles === "object") {
-      localStorage.setItem(SCOUT_PROFILES_KEY, JSON.stringify(profiles));
-      return profiles;
-    }
-    return {};
-  } catch { return {}; }
+  if (!teamId || teamId === "local-dev") return cacheGet(SCOUT_PROFILES_KEY, {});
+  const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
+  if (res.ok) {
+    const profiles = res.value && typeof res.value === "object" ? res.value : {};
+    cacheSet(SCOUT_PROFILES_KEY, profiles);
+    return profiles;
+  }
+  // Offline / read failed — fall back to last-known cache.
+  return cacheGet(SCOUT_PROFILES_KEY, {});
 }
 
+/** Merge the given profiles into the cloud copy (adds/updates only — never removes keys). */
 export async function saveScoutProfiles(teamId: string, profiles: Record<string, ScoutProfile>): Promise<void> {
-  localStorage.setItem(SCOUT_PROFILES_KEY, JSON.stringify(profiles));
+  cacheSet(SCOUT_PROFILES_KEY, profiles);
   if (!teamId || teamId === "local-dev") return;
-  try {
-    const supabase = createClient();
-    await supabase.from("team_data").upsert(
-      { team_id: teamId, data_key: SCOUT_PROFILES_KEY, data: profiles as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
-      { onConflict: "team_id,data_key" }
-    );
-  } catch {}
+  const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
+  const cloud = res.ok && res.value && typeof res.value === "object" ? res.value : {};
+  const merged = { ...cloud, ...profiles };
+  cacheSet(SCOUT_PROFILES_KEY, merged);
+  await cloudPut(teamId, SCOUT_PROFILES_KEY, merged);
+}
+
+/** Remove a single profile from the cloud copy (safe delete — read/modify/write). */
+export async function deleteScoutProfile(teamId: string, name: string): Promise<void> {
+  if (!teamId || teamId === "local-dev") {
+    const map = cacheGet<Record<string, ScoutProfile>>(SCOUT_PROFILES_KEY, {});
+    delete map[name];
+    cacheSet(SCOUT_PROFILES_KEY, map);
+    return;
+  }
+  const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
+  const cloud = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
+  delete cloud[name];
+  cacheSet(SCOUT_PROFILES_KEY, cloud);
+  await cloudPut(teamId, SCOUT_PROFILES_KEY, cloud);
 }
 
 // ── Presets (stored in team_data) ───────────────────────────────────────────
 
 export async function loadScoutPreset<T>(teamId: string, key: string): Promise<T | null> {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as T;
-  } catch {}
-  if (!teamId || teamId === "local-dev") return null;
-  try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("team_data")
-      .select("data")
-      .eq("team_id", teamId)
-      .eq("data_key", key)
-      .single();
-    if (error || !data) return null;
-    return data.data as T;
-  } catch {
-    return null;
+  if (!teamId || teamId === "local-dev") return cacheGet<T | null>(key, null);
+  const res = await cloudGet<T>(teamId, key);
+  if (res.ok) {
+    if (res.value != null) cacheSet(key, res.value);
+    return res.value;
   }
+  return cacheGet<T | null>(key, null);
 }
 
 export async function saveScoutPreset<T>(teamId: string, key: string, value: T): Promise<void> {
@@ -218,94 +262,66 @@ export async function saveScoutPreset<T>(teamId: string, key: string, value: T):
 
 export async function loadScoutAthletes(teamId: string, sport: string): Promise<string[]> {
   const key = `scout_athletes_${sport}`;
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as string[];
-  } catch {}
-  if (!teamId || teamId === "local-dev") return [];
-  try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("team_data")
-      .select("data")
-      .eq("team_id", teamId)
-      .eq("data_key", key)
-      .single();
-    if (error || !data) return [];
-    const names = data.data as unknown as string[];
-    if (Array.isArray(names)) {
-      localStorage.setItem(key, JSON.stringify(names));
-      return names;
-    }
-    return [];
-  } catch {
-    return [];
+  if (!teamId || teamId === "local-dev") return cacheGet<string[]>(key, []);
+  const res = await cloudGet<string[]>(teamId, key);
+  if (res.ok) {
+    const names = Array.isArray(res.value) ? res.value : [];
+    cacheSet(key, names);
+    return names;
   }
+  return cacheGet<string[]>(key, []);
 }
 
+/** Add athletes to a sport list, merging with the current cloud copy (never drops names). */
 export async function saveScoutAthletes(teamId: string, sport: string, names: string[]): Promise<void> {
   const key = `scout_athletes_${sport}`;
-  localStorage.setItem(key, JSON.stringify(names));
+  cacheSet(key, names);
   if (!teamId || teamId === "local-dev") return;
-  try {
-    const supabase = createClient();
-    await supabase.from("team_data").upsert(
-      {
-        team_id: teamId,
-        data_key: key,
-        data: names as unknown as Record<string, unknown>,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "team_id,data_key" }
-    );
-  } catch {}
+  const res = await cloudGet<string[]>(teamId, key);
+  const cloud = res.ok && Array.isArray(res.value) ? res.value : [];
+  const merged = Array.from(new Set([...cloud, ...names]));
+  cacheSet(key, merged);
+  await cloudPut(teamId, key, merged);
+}
+
+/** Remove one athlete from a sport list (safe delete — read/modify/write against the cloud). */
+export async function removeScoutAthlete(teamId: string, sport: string, name: string): Promise<void> {
+  const key = `scout_athletes_${sport}`;
+  if (!teamId || teamId === "local-dev") {
+    cacheSet(key, cacheGet<string[]>(key, []).filter((n) => n !== name));
+    return;
+  }
+  const res = await cloudGet<string[]>(teamId, key);
+  const cloud = res.ok && Array.isArray(res.value) ? res.value : cacheGet<string[]>(key, []);
+  const next = cloud.filter((n) => n !== name);
+  cacheSet(key, next);
+  await cloudPut(teamId, key, next);
 }
 
 // ── Scout athlete jersey numbers ─────────────────────────────────────────────
 
 export async function loadScoutNumbers(teamId: string, sport: string): Promise<Record<string, string>> {
   const key = `scout_numbers_${sport}`;
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as Record<string, string>;
-  } catch {}
-  if (!teamId || teamId === "local-dev") return {};
-  try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("team_data")
-      .select("data")
-      .eq("team_id", teamId)
-      .eq("data_key", key)
-      .single();
-    if (error || !data) return {};
-    const nums = data.data as unknown as Record<string, string>;
-    if (nums && typeof nums === "object") {
-      localStorage.setItem(key, JSON.stringify(nums));
-      return nums;
-    }
-    return {};
-  } catch {
-    return {};
+  if (!teamId || teamId === "local-dev") return cacheGet<Record<string, string>>(key, {});
+  const res = await cloudGet<Record<string, string>>(teamId, key);
+  if (res.ok) {
+    const nums = res.value && typeof res.value === "object" ? res.value : {};
+    cacheSet(key, nums);
+    return nums;
   }
+  return cacheGet<Record<string, string>>(key, {});
 }
 
+/**
+ * Save the full jersey-number map. Callers pass the complete map (loaded
+ * cloud-fresh), so this is an authoritative write — allowing a number to be
+ * cleared. Reads are cloud-authoritative, so this is safe in normal use.
+ */
 export async function saveScoutNumbers(teamId: string, sport: string, numbers: Record<string, string>): Promise<void> {
   const key = `scout_numbers_${sport}`;
-  localStorage.setItem(key, JSON.stringify(numbers));
+  cacheSet(key, numbers);
   if (!teamId || teamId === "local-dev") return;
-  try {
-    const supabase = createClient();
-    await supabase.from("team_data").upsert(
-      {
-        team_id: teamId,
-        data_key: key,
-        data: numbers as unknown as Record<string, unknown>,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "team_id,data_key" }
-    );
-  } catch {}
+  await cloudPut(teamId, key, numbers);
 }
 
 /** Display name with optional jersey number prefix */

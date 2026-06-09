@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
+import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -101,11 +101,10 @@ function ScoutPuntChartInner() {
   };
 
   const removeAthlete = async (name: string) => {
-    const updated = athleteNames.filter((n) => n !== name);
-    setAthleteNames(updated);
+    setAthleteNames((prev) => prev.filter((n) => n !== name));
     setSelectedPlayers((prev) => prev.filter((n) => n !== name));
     const tid = getTeamId();
-    if (tid) await saveScoutAthletes(tid, "punt", updated);
+    if (tid) await removeScoutAthlete(tid, "punt", name);
   };
 
   useUnsavedWarning(results.length > 0 && !saved);

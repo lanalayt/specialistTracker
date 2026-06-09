@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, insertScoutSession, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, insertScoutSession, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
 import { createClient } from "@/lib/supabase";
 import { exportSnapScoutExcel, exportSnapScoutPDF, exportIndividualSnapExcel, exportIndividualSnapPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -254,6 +254,7 @@ function ScoutSnapInner() {
     updated[profile.name] = profile;
     setProfiles(updated);
     await saveScoutProfiles(tid, updated);
+    if (originalName && originalName !== profile.name) await deleteScoutProfile(tid, originalName);
     setProfileOpen(null);
     setMergePrompt(null);
     if (originalName && originalName !== profile.name) await loadData();

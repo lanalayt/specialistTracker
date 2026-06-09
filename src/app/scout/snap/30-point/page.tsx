@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { getTeamId } from "@/lib/teamData";
-import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
+import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -103,11 +103,10 @@ export default function ScoutShortSnapsPage() {
   };
 
   const removeAthlete = async (name: string) => {
-    const updated = athleteNames.filter((n) => n !== name);
-    setAthleteNames(updated);
+    setAthleteNames((prev) => prev.filter((n) => n !== name));
     setSelectedPlayers((prev) => prev.filter((n) => n !== name));
     const tid = getTeamId();
-    if (tid) await saveScoutAthletes(tid, "snap", updated);
+    if (tid) await removeScoutAthlete(tid, "snap", name);
   };
 
   const handleSnapClick = (marker: ShortSnapMarker) => {
