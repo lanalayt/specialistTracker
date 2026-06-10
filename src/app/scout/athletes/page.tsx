@@ -118,12 +118,28 @@ export default function ScoutAthletesPage() {
       loadScoutSessions(tid, "SCOUT_SNAP"),
     ]);
 
-    setProfiles(prof);
     setSportAthletes({ fg, punt, kickoff, snap });
     setChartSessions({ SCOUT_FG: sFg, SCOUT_PUNT: sPunt, SCOUT_KO: sKo, SCOUT_SNAP: sSnap });
 
-    // Merge all unique names
+    // Merge all unique names (profiles + everyone in any charting list)
     const names = new Set([...Object.keys(prof), ...fg, ...punt, ...kickoff, ...snap]);
+
+    // Backfill: anyone added while charting becomes a real profile here, with
+    // their disciplines synced to charting membership (so a name added in FG shows
+    // FG selected, and adding the same name in Kickoff just adds KO — no duplicate).
+    const sportMap: Record<string, string[]> = { fg, punt, kickoff, snap };
+    const profileUpdates: Record<string, ScoutProfile> = {};
+    for (const name of names) {
+      const desired = SPORTS.filter((s) => (sportMap[s.key] ?? []).includes(name)).map((s) => s.key);
+      const existing = prof[name];
+      const cur = existing?.disciplines ?? [];
+      const inSync = !!existing && cur.length === desired.length && desired.every((d) => cur.includes(d));
+      if (!inSync) profileUpdates[name] = { ...(existing ?? {}), name, disciplines: desired };
+    }
+    const mergedProfiles = Object.keys(profileUpdates).length > 0 ? { ...prof, ...profileUpdates } : prof;
+    setProfiles(mergedProfiles);
+    if (Object.keys(profileUpdates).length > 0) await saveScoutProfiles(tid, profileUpdates);
+
     setAllNames([...names].sort((a, b) => a.localeCompare(b)));
     setLoading(false);
   };
