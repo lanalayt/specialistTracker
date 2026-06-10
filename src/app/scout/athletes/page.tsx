@@ -11,11 +11,53 @@ import {
   saveScoutProfiles,
   deleteScoutProfile,
   applyScoutDisciplines,
+  loadScoutSessions,
+  scoutDisplayName,
   type ScoutProfile,
+  type ScoutSession,
 } from "@/lib/scoutStore";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
 import clsx from "clsx";
+
+// Scout disciplines and their session sport keys, for pulling completed charts.
+const CHART_SPORTS = [
+  { sport: "SCOUT_FG", label: "FG" },
+  { sport: "SCOUT_PUNT", label: "Punt" },
+  { sport: "SCOUT_KO", label: "Kickoff" },
+  { sport: "SCOUT_SNAP", label: "Snap" },
+];
+
+interface AthleteChart {
+  label: string;       // discipline
+  date: string;
+  summary: string;     // headline stat
+  reps: string[];      // per-rep detail lines
+}
+
+function buildAthleteChart(sport: string, label: string, session: ScoutSession, name: string): AthleteChart | null {
+  const ae = (session.entries as unknown as Record<string, unknown>[]).filter((e) => (e as { athlete?: string }).athlete === name);
+  if (ae.length === 0) return null;
+  const num = (e: Record<string, unknown>, k: string) => (typeof e[k] === "number" ? (e[k] as number) : 0);
+  if (sport === "SCOUT_FG") {
+    const makes = ae.filter((e) => e.result === "make").length;
+    const pts = ae.reduce((s, e) => s + num(e, "score"), 0);
+    return { label, date: session.date, summary: `${makes}/${ae.length} made · ${pts} pts`,
+      reps: ae.map((e) => `${num(e, "distance")}${(e.hash as string) ?? ""} ${e.result === "make" ? "✓" : "✗"}`) };
+  }
+  if (sport === "SCOUT_KO" || sport === "SCOUT_PUNT") {
+    const scores = ae.map((e) => num(e, "score"));
+    const avg = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0;
+    return { label, date: session.date, summary: `${avg.toFixed(1)} avg score`,
+      reps: ae.map((e) => `${num(e, "distance")}yd · ${num(e, "hangTime").toFixed(2)}s${e.directionGood === false ? " · bad dir" : ""}`) };
+  }
+  // Snap
+  const is30 = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
+  const total = ae.reduce((s, e) => s + (typeof e.points === "number" ? (e.points as number) : num(e, "score")), 0);
+  const max = is30 ? ae.length * 3 : ae.length;
+  return { label: `${label} (${is30 ? "Short" : "Long"})`, date: session.date, summary: `${total}/${max}`,
+    reps: ae.map((e) => `${(e.accuracy as string) ?? ""}${e.spiral ? ` · ${e.spiral === "Good" ? "tight" : "open"}` : ""}`) };
+}
 
 const SPORTS = [
   { key: "fg", label: "FG" },
@@ -41,6 +83,20 @@ export default function ScoutAthletesPage() {
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<"all" | "year" | "discipline">("all");
   const [filterValue, setFilterValue] = useState("");
+  const [chartSessions, setChartSessions] = useState<Record<string, ScoutSession[]>>({});
+  const [chartModal, setChartModal] = useState<string | null>(null);
+
+  // All completed charts for an athlete, across every discipline, newest first.
+  const getAthleteCharts = (name: string): AthleteChart[] => {
+    const out: AthleteChart[] = [];
+    for (const { sport, label } of CHART_SPORTS) {
+      for (const s of chartSessions[sport] ?? []) {
+        const c = buildAthleteChart(sport, label, s, name);
+        if (c) out.push(c);
+      }
+    }
+    return out.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
 
   const loadData = async () => {
     let tid = getTeamId();
@@ -50,16 +106,21 @@ export default function ScoutAthletesPage() {
     }
     if (!tid) return;
 
-    const [prof, fg, punt, kickoff, snap] = await Promise.all([
+    const [prof, fg, punt, kickoff, snap, sFg, sPunt, sKo, sSnap] = await Promise.all([
       loadScoutProfiles(tid),
       loadScoutAthletes(tid, "fg"),
       loadScoutAthletes(tid, "punt"),
       loadScoutAthletes(tid, "kickoff"),
       loadScoutAthletes(tid, "snap"),
+      loadScoutSessions(tid, "SCOUT_FG"),
+      loadScoutSessions(tid, "SCOUT_PUNT"),
+      loadScoutSessions(tid, "SCOUT_KO"),
+      loadScoutSessions(tid, "SCOUT_SNAP"),
     ]);
 
     setProfiles(prof);
     setSportAthletes({ fg, punt, kickoff, snap });
+    setChartSessions({ SCOUT_FG: sFg, SCOUT_PUNT: sPunt, SCOUT_KO: sKo, SCOUT_SNAP: sSnap });
 
     // Merge all unique names
     const names = new Set([...Object.keys(prof), ...fg, ...punt, ...kickoff, ...snap]);
@@ -230,15 +291,26 @@ export default function ScoutAthletesPage() {
                   <div className="px-3 py-2 text-[10px] text-muted">{filtered.length} athlete{filtered.length !== 1 ? "s" : ""}</div>
                   {filtered.map((name) => {
                     const profile = profiles[name];
+                    const chartCount = getAthleteCharts(name).length;
                     return (
                       <div key={name} className="flex items-center justify-between py-3 px-3">
                         <div className="min-w-0 flex-1">
-                          <button
-                            onClick={() => setProfileOpen(name)}
-                            className="text-sm font-semibold text-slate-100 hover:text-amber-400 transition-colors"
-                          >
-                            {name}
-                          </button>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => setProfileOpen(name)}
+                              className="text-sm font-semibold text-slate-100 hover:text-amber-400 transition-colors"
+                            >
+                              {name}
+                            </button>
+                            {chartCount > 0 && (
+                              <button
+                                onClick={() => setChartModal(name)}
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
+                              >
+                                Charts ({chartCount})
+                              </button>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             {profile?.school && <span className="text-[10px] text-muted">{profile.school}{profile?.schoolState ? `, ${profile.schoolState}` : ""}</span>}
                             {profile?.schoolYear && <span className="text-[10px] text-muted">{profile.schoolYear}</span>}
@@ -300,6 +372,36 @@ export default function ScoutAthletesPage() {
           />
         );
       })()}
+
+      {chartModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setChartModal(null)} />
+          <div className="relative bg-surface border border-border rounded-xl w-full max-w-md mx-4 p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-100">{scoutDisplayName(chartModal)} — Completed Charts</h3>
+              <button onClick={() => setChartModal(null)} className="text-muted hover:text-white text-xs transition-colors">Close</button>
+            </div>
+            <div className="space-y-3">
+              {getAthleteCharts(chartModal).map((c, i) => (
+                <div key={i} className="card-2 p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">{c.label}</span>
+                      <span className="text-[10px] text-muted ml-2">{new Date(c.date).toLocaleDateString()}</span>
+                    </div>
+                    <span className="text-xs font-black text-slate-100">{c.summary}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {c.reps.map((r, j) => (
+                      <span key={j} className="text-[10px] text-slate-300 bg-surface border border-border/50 rounded px-1.5 py-0.5">{r}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
