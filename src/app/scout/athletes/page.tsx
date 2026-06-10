@@ -17,6 +17,7 @@ import {
   type ScoutSession,
 } from "@/lib/scoutStore";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
+import { SnapChartDetail, type SnapDetailEntry } from "@/components/ui/SnapChartDetail";
 import { Header } from "@/components/layout/Header";
 import clsx from "clsx";
 
@@ -32,7 +33,10 @@ interface AthleteChart {
   label: string;       // discipline
   date: string;
   summary: string;     // headline stat
-  reps: string[];      // per-rep detail lines
+  reps: string[];      // per-rep detail lines (non-snap)
+  isSnap?: boolean;
+  is30Point?: boolean;
+  snapEntries?: SnapDetailEntry[]; // raw entries for the snap "See Chart" view
 }
 
 function buildAthleteChart(sport: string, label: string, session: ScoutSession, name: string): AthleteChart | null {
@@ -55,8 +59,15 @@ function buildAthleteChart(sport: string, label: string, session: ScoutSession, 
   const is30 = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
   const total = ae.reduce((s, e) => s + (typeof e.points === "number" ? (e.points as number) : num(e, "score")), 0);
   const max = is30 ? ae.length * 3 : ae.length;
-  return { label: `${label} (${is30 ? "Short" : "Long"})`, date: session.date, summary: `${total}/${max}`,
-    reps: ae.map((e) => `${(e.accuracy as string) ?? ""}${e.spiral ? ` · ${e.spiral === "Good" ? "tight" : "open"}` : ""}`) };
+  return {
+    label: `Snap (${is30 ? "Short" : "Long"})`,
+    date: session.date,
+    summary: `${total}/${max}`,
+    reps: [],
+    isSnap: true,
+    is30Point: is30,
+    snapEntries: ae as unknown as SnapDetailEntry[],
+  };
 }
 
 const SPORTS = [
@@ -85,6 +96,7 @@ export default function ScoutAthletesPage() {
   const [filterValue, setFilterValue] = useState("");
   const [chartSessions, setChartSessions] = useState<Record<string, ScoutSession[]>>({});
   const [chartModal, setChartModal] = useState<string | null>(null);
+  const [snapDetail, setSnapDetail] = useState<AthleteChart | null>(null);
 
   // All completed charts for an athlete, across every discipline, newest first.
   const getAthleteCharts = (name: string): AthleteChart[] => {
@@ -400,21 +412,44 @@ export default function ScoutAthletesPage() {
             <div className="space-y-3">
               {getAthleteCharts(chartModal).map((c, i) => (
                 <div key={i} className="card-2 p-3 space-y-1.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <div>
                       <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">{c.label}</span>
                       <span className="text-[10px] text-muted ml-2">{new Date(c.date).toLocaleDateString()}</span>
                     </div>
-                    <span className="text-xs font-black text-slate-100">{c.summary}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-black text-slate-100">{c.summary}</span>
+                      {c.isSnap && (
+                        <button onClick={() => setSnapDetail(c)} className="text-[10px] px-2 py-0.5 rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors font-semibold">See Chart</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {c.reps.map((r, j) => (
-                      <span key={j} className="text-[10px] text-slate-300 bg-surface border border-border/50 rounded px-1.5 py-0.5">{r}</span>
-                    ))}
-                  </div>
+                  {!c.isSnap && c.reps.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {c.reps.map((r, j) => (
+                        <span key={j} className="text-[10px] text-slate-300 bg-surface border border-border/50 rounded px-1.5 py-0.5">{r}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {snapDetail && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSnapDetail(null)} />
+          <div className="relative bg-surface border border-border rounded-xl w-full max-w-md mx-4 p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">{chartModal ? scoutDisplayName(chartModal) : ""}</h3>
+                <p className="text-[10px] text-muted">{snapDetail.label} — {new Date(snapDetail.date).toLocaleDateString()}</p>
+              </div>
+              <button onClick={() => setSnapDetail(null)} className="text-muted hover:text-white text-xs transition-colors">Close</button>
+            </div>
+            <SnapChartDetail entries={snapDetail.snapEntries ?? []} is30Point={!!snapDetail.is30Point} />
           </div>
         </div>
       )}
