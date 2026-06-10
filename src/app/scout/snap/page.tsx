@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, deleteScoutRanking, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
 import { RankingTabs } from "@/components/ui/RankingTabs";
+import { EditChartModal } from "@/components/ui/EditChartModal";
+import { EditChartChooser, type ChooserItem } from "@/components/ui/EditChartChooser";
 import { createClient } from "@/lib/supabase";
 import { exportSnapScoutExcel, exportSnapScoutPDF, exportIndividualSnapExcel, exportIndividualSnapPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -68,6 +70,8 @@ function ScoutSnapInner() {
   const diagramRef = useRef<HTMLDivElement>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [editTarget, setEditTarget] = useState<{ sessionId: string; name: string } | null>(null);
+  const [showEditChooser, setShowEditChooser] = useState(false);
   const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string; sessionId?: string } | null>(null);
   const [editAccuracy, setEditAccuracy] = useState<"Strike" | "Ball" | "">("");
   const [editLaces, setEditLaces] = useState("");
@@ -248,6 +252,21 @@ function ScoutSnapInner() {
     await loadData();
   };
 
+  const handleEditSelected = () => {
+    if (selectedRows.size === 0) return;
+    if (selectedRows.size === 1) {
+      const [sessionId, name] = [...selectedRows][0].split("|||");
+      setEditTarget({ sessionId, name });
+    } else {
+      setShowEditChooser(true);
+    }
+  };
+  const editChooserItems: ChooserItem[] = [...selectedRows].map((k) => {
+    const [sessionId, name] = k.split("|||");
+    return { sessionId, name, date: sessions.find((s) => s.id === sessionId)?.date ?? "" };
+  });
+  const editSession = editTarget ? sessions.find((s) => s.id === editTarget.sessionId) : null;
+
   const handleSaveProfile = async (profile: ScoutProfile, originalName?: string) => {
     const tid = getTeamId();
     if (!tid) return;
@@ -343,6 +362,9 @@ function ScoutSnapInner() {
               <div className="flex gap-2">
                 <ExportButton onExcel={() => exportSnapScoutExcel(rankedSessions)} onPDF={() => exportSnapScoutPDF(rankedSessions)} />
                 <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
+                {selectMode && selectedRows.size > 0 && (
+                  <button onClick={handleEditSelected} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-all">Edit ({selectedRows.size})</button>
+                )}
                 {selectMode && selectedRows.size > 0 && (
                   <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>
                 )}
@@ -608,6 +630,24 @@ function ScoutSnapInner() {
 
       {infoModal && (
         <InfoModal name={infoModal.name} notes={infoModal.notes} weather={infoModal.weather} date={infoModal.date} onSave={handleInfoSave} onClose={() => setInfoModal(null)} />
+      )}
+
+      {showEditChooser && (
+        <EditChartChooser
+          items={editChooserItems}
+          onPick={(it) => { setShowEditChooser(false); setEditTarget({ sessionId: it.sessionId, name: it.name }); }}
+          onClose={() => setShowEditChooser(false)}
+        />
+      )}
+
+      {editTarget && editSession && (
+        <EditChartModal
+          teamId={getTeamId() ?? ""}
+          session={editSession}
+          athlete={editTarget.name}
+          onClose={() => setEditTarget(null)}
+          onSaved={async () => { setEditTarget(null); setSelectMode(false); setSelectedRows(new Set()); await loadData(); }}
+        />
       )}
     </>
   );

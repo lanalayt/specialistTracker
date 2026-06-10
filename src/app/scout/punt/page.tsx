@@ -6,6 +6,8 @@ import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { RankingTabs } from "@/components/ui/RankingTabs";
+import { EditChartModal } from "@/components/ui/EditChartModal";
+import { EditChartChooser, type ChooserItem } from "@/components/ui/EditChartChooser";
 import { createClient } from "@/lib/supabase";
 import { exportPuntScoutExcel, exportPuntScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -50,12 +52,10 @@ function ScoutPuntInner() {
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
   const [dropWorst, setDropWorst] = useState(true);
-  const [editCell, setEditCell] = useState<{ sessionId: string; name: string; kickIdx: number } | null>(null);
-  const [editDist, setEditDist] = useState("");
-  const [editHang, setEditHang] = useState("");
-  const [editDir, setEditDir] = useState(true);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [editTarget, setEditTarget] = useState<{ sessionId: string; name: string } | null>(null);
+  const [showEditChooser, setShowEditChooser] = useState(false);
   const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string; sessionId?: string } | null>(null);
 
   // Live input state
@@ -175,36 +175,20 @@ function ScoutPuntInner() {
   ranked.sort((a, b) => b.avg - a.avg);
   const maxKicks = ranked.length > 0 ? Math.max(...ranked.map((r) => r.entries.length)) : 0;
 
-  const startEditKick = (sessionId: string, name: string, kickIdx: number, entry: PuntEntry) => {
-    setEditCell({ sessionId, name, kickIdx });
-    setEditDist(String(entry.distance));
-    setEditHang(String(entry.hangTime));
-    setEditDir(entry.directionGood);
+  const handleEditSelected = () => {
+    if (selectedRows.size === 0) return;
+    if (selectedRows.size === 1) {
+      const [sessionId, name] = [...selectedRows][0].split("|||");
+      setEditTarget({ sessionId, name });
+    } else {
+      setShowEditChooser(true);
+    }
   };
-
-  const saveEditKick = async () => {
-    if (!editCell) return;
-    const tid = getTeamId();
-    if (!tid) return;
-    const sess = sessions.find((s) => s.id === editCell.sessionId);
-    if (!sess) return;
-    const allEntries = [...sess.entries] as unknown as PuntEntry[];
-    const athleteEntries = allEntries.filter((e) => e.athlete === editCell.name);
-    const entry = athleteEntries[editCell.kickIdx];
-    if (!entry) return;
-    const dist = parseInt(editDist) || entry.distance;
-    const hang = parseFloat(editHang) || entry.hangTime;
-    entry.distance = dist;
-    entry.hangTime = hang;
-    entry.directionGood = editDir;
-    entry.score = parseFloat((dist + hang * 15 + (editDir ? 0 : -10)).toFixed(2));
-    try {
-      const supabase = createClient();
-      await supabase.from("sessions").update({ entries: allEntries, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", editCell.sessionId);
-    } catch {}
-    setEditCell(null);
-    await loadData();
-  };
+  const editChooserItems: ChooserItem[] = [...selectedRows].map((k) => {
+    const [sessionId, name] = k.split("|||");
+    return { sessionId, name, date: sessions.find((s) => s.id === sessionId)?.date ?? "" };
+  });
+  const editSession = editTarget ? sessions.find((s) => s.id === editTarget.sessionId) : null;
 
   const rankingName = (id: string) => rankings.find((r) => r.id === id)?.name ?? "this ranking";
 
@@ -427,6 +411,9 @@ function ScoutPuntInner() {
                 <ExportButton onExcel={() => exportPuntScoutExcel(rankedSessions)} onPDF={() => exportPuntScoutPDF(rankedSessions)} />
                 <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
                 {selectMode && selectedRows.size > 0 && (
+                  <button onClick={handleEditSelected} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-all">Edit ({selectedRows.size})</button>
+                )}
+                {selectMode && selectedRows.size > 0 && (
                   <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>
                 )}
               </div>
@@ -465,13 +452,12 @@ function ScoutPuntInner() {
                           </td>
                           {r.entries.map((e, j) => {
                             const isDropped = r.worst !== null && e.score === r.worst && j === r.entries.findIndex((x) => x.score === r.worst);
-                            const isEditing = editCell?.sessionId === r.sessionId && editCell?.name === r.name && editCell?.kickIdx === j;
                             return (
                               <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "")}>
-                                <button onClick={() => isEditing ? setEditCell(null) : startEditKick(r.sessionId, r.name, j, e)} className={clsx("hover:opacity-70 transition-opacity", e.directionGood ? "text-make" : "text-miss", isEditing && "ring-1 ring-amber-400 rounded px-1")}>
+                                <span className={clsx(e.directionGood ? "text-make" : "text-miss")}>
                                   <span className="font-bold">{e.distance}</span>
                                   <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
-                                </button>
+                                </span>
                               </td>
                             );
                           })}
@@ -491,30 +477,6 @@ function ScoutPuntInner() {
                     </tbody>
                   </table>
                 </div>
-                {editCell && (
-                  <div className="card space-y-2 mt-3">
-                    <p className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">Edit Kick</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <p className="text-[8px] text-muted text-center mb-1">Distance</p>
-                        <input type="text" inputMode="numeric" value={editDist} onChange={(e) => setEditDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-xs font-bold py-1.5" />
-                      </div>
-                      <div>
-                        <p className="text-[8px] text-muted text-center mb-1">Hang Time</p>
-                        <input type="text" inputMode="decimal" value={editHang} onChange={(e) => setEditHang(e.target.value)} className="input w-full text-center text-xs font-bold py-1.5" />
-                      </div>
-                      <div>
-                        <p className="text-[8px] text-muted text-center mb-1">Direction</p>
-                        <button onClick={() => setEditDir(true)} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all", editDir ? "bg-make/20 text-make border-make/50" : "bg-surface-2 text-muted border-border")}>Good</button>
-                        <button onClick={() => setEditDir(false)} className={clsx("w-full py-1.5 rounded-input text-[10px] font-bold border transition-all mt-1", !editDir ? "bg-miss/20 text-miss border-miss/50" : "bg-surface-2 text-muted border-border")}>Bad</button>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditCell(null)} className="btn-ghost flex-1 py-2 text-xs">Cancel</button>
-                      <button onClick={saveEditKick} className="btn-primary flex-1 py-2 text-xs font-bold">Save</button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -531,6 +493,26 @@ function ScoutPuntInner() {
 
       {infoModal && (
         <InfoModal name={infoModal.name} notes={infoModal.notes} weather={infoModal.weather} date={infoModal.date} onSave={handleInfoSave} onClose={() => setInfoModal(null)} />
+      )}
+
+      {showEditChooser && (
+        <EditChartChooser
+          items={editChooserItems}
+          numbers={scoutNumbers}
+          onPick={(it) => { setShowEditChooser(false); setEditTarget({ sessionId: it.sessionId, name: it.name }); }}
+          onClose={() => setShowEditChooser(false)}
+        />
+      )}
+
+      {editTarget && editSession && (
+        <EditChartModal
+          teamId={getTeamId() ?? ""}
+          session={editSession}
+          athlete={editTarget.name}
+          numbers={scoutNumbers}
+          onClose={() => setEditTarget(null)}
+          onSaved={async () => { setEditTarget(null); setSelectMode(false); setSelectedRows(new Set()); await loadData(); }}
+        />
       )}
     </>
   );

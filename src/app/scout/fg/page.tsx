@@ -6,6 +6,8 @@ import { getTeamId } from "@/lib/teamData";
 import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { RankingTabs } from "@/components/ui/RankingTabs";
+import { EditChartModal } from "@/components/ui/EditChartModal";
+import { EditChartChooser, type ChooserItem } from "@/components/ui/EditChartChooser";
 import { createClient } from "@/lib/supabase";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -35,6 +37,8 @@ function ScoutFGInner() {
   const [liveMode, setLiveMode] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [editTarget, setEditTarget] = useState<{ sessionId: string; name: string } | null>(null);
+  const [showEditChooser, setShowEditChooser] = useState(false);
   const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string; sessionId?: string } | null>(null);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [rankings, setRankings] = useState<ScoutRanking[]>([{ id: "overall", name: "Overall" }]);
@@ -223,23 +227,20 @@ function ScoutFGInner() {
     await loadData();
   };
 
-  const handleToggleKick = async (sessionId: string, athleteName: string, kickIdx: number) => {
-    const tid = getTeamId();
-    if (!tid) return;
-    const sess = sessions.find((s) => s.id === sessionId);
-    if (!sess) return;
-    const allEntries = [...sess.entries] as unknown as FGEntry[];
-    const athleteEntries = allEntries.filter((e) => e.athlete === athleteName);
-    const entry = athleteEntries[kickIdx];
-    if (!entry) return;
-    entry.result = entry.result === "make" ? "miss" : "make";
-    entry.score = entry.result === "make" ? entry.pointValue : 0;
-    try {
-      const supabase = createClient();
-      await supabase.from("sessions").update({ entries: allEntries, updated_at: new Date().toISOString() }).eq("team_id", tid).eq("id", sessionId);
-    } catch {}
-    await loadData();
+  const handleEditSelected = () => {
+    if (selectedRows.size === 0) return;
+    if (selectedRows.size === 1) {
+      const [sessionId, name] = [...selectedRows][0].split("|||");
+      setEditTarget({ sessionId, name });
+    } else {
+      setShowEditChooser(true);
+    }
   };
+  const editChooserItems: ChooserItem[] = [...selectedRows].map((k) => {
+    const [sessionId, name] = k.split("|||");
+    return { sessionId, name, date: sessions.find((s) => s.id === sessionId)?.date ?? "" };
+  });
+  const editSession = editTarget ? sessions.find((s) => s.id === editTarget.sessionId) : null;
 
   const handleDeleteRow = async (name: string, sessionId: string) => {
     const tid = getTeamId();
@@ -415,6 +416,9 @@ function ScoutFGInner() {
                 <ExportButton onExcel={() => exportFGScoutExcel(rankedSessions)} onPDF={() => exportFGScoutPDF(rankedSessions)} />
                 <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
                 {selectMode && selectedRows.size > 0 && (
+                  <button onClick={handleEditSelected} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-all">Edit ({selectedRows.size})</button>
+                )}
+                {selectMode && selectedRows.size > 0 && (
                   <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>
                 )}
               </div>
@@ -430,7 +434,7 @@ function ScoutFGInner() {
                 {presetData.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Preset Chart</p>
-                    <p className="text-[10px] text-muted">Tap a score to toggle make/miss</p>
+                    <p className="text-[10px] text-muted">Select a chart, then Edit to change it</p>
                     <div className="card space-y-3">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
@@ -457,9 +461,9 @@ function ScoutFGInner() {
                                 </td>
                                 {r.entries.map((e, j) => (
                                   <td key={j} className="text-center py-1 px-1">
-                                    <button onClick={() => handleToggleKick(r.sessionId, r.name, j)} className={clsx("font-bold hover:opacity-70 transition-opacity", e.result === "make" ? "text-make" : "text-miss")}>
+                                    <span className={clsx("font-bold", e.result === "make" ? "text-make" : "text-miss")}>
                                       {e.score}
-                                    </button>
+                                    </span>
                                   </td>
                                 ))}
                                 {Array.from({ length: presetMaxKicks - r.entries.length }, (_, j) => (
@@ -486,7 +490,7 @@ function ScoutFGInner() {
                 {liveData.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-sky-400 uppercase tracking-wider">Manual Chart</p>
-                    <p className="text-[10px] text-muted">Tap a kick to toggle make/miss</p>
+                    <p className="text-[10px] text-muted">Select a chart, then Edit to change it</p>
                     <div className="card space-y-3">
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
@@ -514,9 +518,9 @@ function ScoutFGInner() {
                                   </td>
                                   {r.entries.map((e, j) => (
                                     <td key={j} className="text-center py-1 px-1">
-                                      <button onClick={() => handleToggleKick(r.sessionId, r.name, j)} className={clsx("font-bold hover:opacity-70 transition-opacity text-[10px] whitespace-nowrap", e.result === "make" ? "text-make" : "text-miss")}>
+                                      <span className={clsx("font-bold text-[10px] whitespace-nowrap", e.result === "make" ? "text-make" : "text-miss")}>
                                         {e.distance}{e.hash}
-                                      </button>
+                                      </span>
                                     </td>
                                   ))}
                                   {Array.from({ length: liveMaxKicks - r.entries.length }, (_, j) => (
@@ -559,6 +563,26 @@ function ScoutFGInner() {
           date={infoModal.date}
           onSave={handleInfoSave}
           onClose={() => setInfoModal(null)}
+        />
+      )}
+
+      {showEditChooser && (
+        <EditChartChooser
+          items={editChooserItems}
+          numbers={scoutNumbers}
+          onPick={(it) => { setShowEditChooser(false); setEditTarget({ sessionId: it.sessionId, name: it.name }); }}
+          onClose={() => setShowEditChooser(false)}
+        />
+      )}
+
+      {editTarget && editSession && (
+        <EditChartModal
+          teamId={getTeamId() ?? ""}
+          session={editSession}
+          athlete={editTarget.name}
+          numbers={scoutNumbers}
+          onClose={() => setEditTarget(null)}
+          onSaved={async () => { setEditTarget(null); setSelectMode(false); setSelectedRows(new Set()); await loadData(); }}
         />
       )}
     </>

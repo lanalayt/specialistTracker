@@ -168,6 +168,27 @@ export async function deleteAllScoutSessions(teamId: string, sport: string): Pro
   }
 }
 
+/** Replace one athlete's entries in a session (for editing a saved chart). */
+export async function updateSessionAthleteEntries(teamId: string, sessionId: string, athleteName: string, athleteEntries: Record<string, unknown>[]): Promise<boolean> {
+  if (!teamId || teamId === "local-dev") return false;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.from("sessions").select("entries").eq("team_id", teamId).eq("id", sessionId).single();
+    if (!data) return false;
+    const others = (data.entries as Record<string, unknown>[]).filter((e) => (e as { athlete?: string }).athlete !== athleteName);
+    const merged = [...others, ...athleteEntries];
+    if (merged.length === 0) {
+      await supabase.from("sessions").delete().eq("team_id", teamId).eq("id", sessionId);
+    } else {
+      await supabase.from("sessions").update({ entries: merged, updated_at: new Date().toISOString() }).eq("team_id", teamId).eq("id", sessionId);
+    }
+    return true;
+  } catch (err) {
+    console.warn("[ScoutStore] updateSessionAthleteEntries failed:", err);
+    return false;
+  }
+}
+
 export async function deleteAthleteFromSession(teamId: string, sessionId: string, athleteName: string): Promise<boolean> {
   if (!teamId || teamId === "local-dev") return false;
   try {
