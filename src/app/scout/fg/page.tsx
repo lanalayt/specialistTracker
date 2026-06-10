@@ -269,12 +269,12 @@ function ScoutFGInner() {
               <Link href="/scout/fg/chart?mode=manual" className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">✏️</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Manual Chart</h3>
-                <p className="text-[10px] text-muted mt-1">Enter kicks on the fly</p>
+                <p className="text-[10px] text-muted mt-1">Separate one time chart</p>
               </Link>
               <button onClick={() => { setLiveMode(true); setLiveStep("select"); setSelectedLive([]); }} className="card hover:bg-surface-2 hover:border-amber-500/30 transition-all group cursor-pointer flex flex-col items-center text-center py-6">
                 <p className="text-2xl mb-2">⚡</p>
                 <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition-colors">Live Input</h3>
-                <p className="text-[10px] text-muted mt-1">One kick at a time</p>
+                <p className="text-[10px] text-muted mt-1">Enter kicks on the fly</p>
               </button>
             </div>
           </div>
