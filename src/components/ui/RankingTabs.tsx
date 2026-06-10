@@ -11,10 +11,12 @@ interface Props {
   onRankingsChange: (r: ScoutRanking[]) => void;
   active: string;
   onActiveChange: (id: string) => void;
+  /** Delete a custom ranking group (parent handles cleanup + reload). */
+  onDeleteRanking?: (id: string) => void;
 }
 
 /** Ranking selector tabs for a discipline's rankings page, with inline rename/delete. */
-export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active, onActiveChange }: Props) {
+export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active, onActiveChange, onDeleteRanking }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
 
@@ -33,7 +35,7 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
   if (editing) {
     return (
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-muted uppercase tracking-wider">Rename Rankings</p>
+        <p className="text-[10px] font-semibold text-muted uppercase tracking-wider">Edit Rankings</p>
         {rankings.map((r) => (
           <div key={r.id} className="flex items-center gap-2">
             <input
@@ -41,6 +43,16 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
               onChange={(e) => setDraft((p) => ({ ...p, [r.id]: e.target.value }))}
               className="input flex-1 text-sm py-1.5"
             />
+            {r.id !== "overall" && onDeleteRanking && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Delete the "${r.name}" ranking? Its charts stay in Overall.`)) onDeleteRanking(r.id);
+                }}
+                className="text-[10px] text-muted hover:text-miss px-1 transition-colors"
+              >
+                Delete
+              </button>
+            )}
           </div>
         ))}
         <div className="flex gap-2 pt-1">
@@ -65,7 +77,7 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
           {r.name}
         </button>
       ))}
-      <button onClick={startEdit} className="px-2 py-1 text-xs text-muted hover:text-amber-400 transition-colors" title="Rename rankings">✎</button>
+      <button onClick={startEdit} className="px-2 py-1 text-xs text-muted hover:text-amber-400 transition-colors" title="Rename or delete rankings">✎</button>
     </div>
   );
 }

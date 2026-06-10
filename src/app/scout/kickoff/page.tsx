@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeSessionFromRanking, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { RankingTabs } from "@/components/ui/RankingTabs";
 import { createClient } from "@/lib/supabase";
@@ -199,12 +199,20 @@ function ScoutKOInner() {
     await loadData();
   };
 
+  const rankingName = (id: string) => rankings.find((r) => r.id === id)?.name ?? "this ranking";
+
   const handleDeleteRow = async (name: string, sessionId: string) => {
-    if (!window.confirm(`Are you sure you want to delete this chart for ${name}? This cannot be undone.`)) return;
     const tid = getTeamId();
     if (!tid) return;
-    await deleteAthleteFromSession(tid, sessionId, name);
-    await loadData();
+    if (activeRanking === "overall") {
+      if (!window.confirm(`Delete this chart for ${name}? This permanently removes it from everywhere.`)) return;
+      await deleteAthleteFromSession(tid, sessionId, name);
+      await loadData();
+    } else {
+      if (!window.confirm(`Remove this chart from "${rankingName(activeRanking)}"? It stays in your other rankings.`)) return;
+      await removeSessionFromRanking(tid, sessionId, activeRanking);
+      setSessionRankingsMap((prev) => ({ ...prev, [sessionId]: (prev[sessionId] ?? ["overall"]).filter((r) => r !== activeRanking) }));
+    }
   };
 
   const toggleRowSelection = (key: string) => {
@@ -217,15 +225,34 @@ function ScoutKOInner() {
 
   const handleBulkDelete = async () => {
     if (selectedRows.size === 0) return;
-    if (!window.confirm(`Delete ${selectedRows.size} selected chart${selectedRows.size !== 1 ? "s" : ""}?`)) return;
     const tid = getTeamId();
     if (!tid) return;
-    for (const key of selectedRows) {
-      const [sessionId, name] = key.split("|||");
-      await deleteAthleteFromSession(tid, sessionId, name);
+    if (activeRanking === "overall") {
+      if (!window.confirm(`Permanently delete ${selectedRows.size} selected chart${selectedRows.size !== 1 ? "s" : ""}?`)) return;
+      for (const key of selectedRows) {
+        const [sessionId, name] = key.split("|||");
+        await deleteAthleteFromSession(tid, sessionId, name);
+      }
+      await loadData();
+    } else {
+      if (!window.confirm(`Remove ${selectedRows.size} chart${selectedRows.size !== 1 ? "s" : ""} from "${rankingName(activeRanking)}"? They stay in your other rankings.`)) return;
+      const sessionIds = [...new Set([...selectedRows].map((k) => k.split("|||")[0]))];
+      for (const sessionId of sessionIds) await removeSessionFromRanking(tid, sessionId, activeRanking);
+      setSessionRankingsMap((prev) => {
+        const next = { ...prev };
+        for (const sessionId of sessionIds) next[sessionId] = (next[sessionId] ?? ["overall"]).filter((r) => r !== activeRanking);
+        return next;
+      });
     }
     setSelectedRows(new Set());
     setSelectMode(false);
+  };
+
+  const handleDeleteRanking = async (id: string) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    await deleteScoutRanking(tid, "kickoff", id);
+    if (activeRanking === id) setActiveRanking("overall");
     await loadData();
   };
 
@@ -368,7 +395,6 @@ function ScoutKOInner() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
-            <RankingTabs teamId={getTeamId() ?? ""} sport="kickoff" rankings={rankings} onRankingsChange={setRankings} active={activeRanking} onActiveChange={setActiveRanking} />
             <div className="flex items-center justify-between card-2 px-4 py-3">
               <div>
                 <p className="text-xs font-semibold text-slate-200">Drop Worst Kick</p>
@@ -387,6 +413,7 @@ function ScoutKOInner() {
                 )}
               </div>
             )}
+            <RankingTabs teamId={getTeamId() ?? ""} sport="kickoff" rankings={rankings} onRankingsChange={setRankings} active={activeRanking} onActiveChange={setActiveRanking} onDeleteRanking={handleDeleteRanking} />
             {loading ? (
               <p className="text-sm text-muted py-8 text-center">Loading...</p>
             ) : ranked.length === 0 ? (

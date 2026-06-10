@@ -470,6 +470,43 @@ export async function setSessionRankings(teamId: string, sessionId: string, rank
   await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
 }
 
+/** Remove a session from one ranking only (un-assign). Other rankings keep it. */
+export async function removeSessionFromRanking(teamId: string, sessionId: string, rankingId: string): Promise<void> {
+  if (!isRealTeam(teamId)) {
+    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
+    m[sessionId] = (m[sessionId] ?? ["overall"]).filter((r) => r !== rankingId);
+    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
+    return;
+  }
+  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
+  const m = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
+  m[sessionId] = (m[sessionId] ?? ["overall"]).filter((r) => r !== rankingId);
+  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
+  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+}
+
+/** Delete a ranking group. Its charts are kept and fall back to Overall. */
+export async function deleteScoutRanking(teamId: string, sport: string, rankingId: string): Promise<void> {
+  if (rankingId === "overall") return;
+  const rankings = await loadScoutRankings(teamId, sport);
+  await saveScoutRankings(teamId, sport, rankings.filter((r) => r.id !== rankingId));
+  const reassign = (m: Record<string, string[]>) => {
+    for (const k of Object.keys(m)) {
+      const next = (m[k] ?? []).filter((r) => r !== rankingId);
+      m[k] = next.length > 0 ? next : ["overall"];
+    }
+    return m;
+  };
+  if (!isRealTeam(teamId)) {
+    cacheSet(teamId, SESSION_RANKINGS_KEY, reassign(cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {})));
+    return;
+  }
+  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
+  const m = reassign(res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {});
+  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
+  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+}
+
 /** Today's local date as a YYYY-MM-DD string for <input type="date"> defaults */
 export function todayDateInput(): string {
   const d = new Date();
