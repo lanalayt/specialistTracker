@@ -30,13 +30,13 @@ interface FGResult {
   score: number;
 }
 
-type Phase = "preset-edit" | "setup" | "manual-setup" | "live" | "results";
+type Phase = "preset-edit" | "manual-edit" | "setup" | "manual-setup" | "live" | "results";
 
 function ScoutFGChartInner() {
   const searchParams = useSearchParams();
   const chartMode = searchParams.get("mode") === "manual" ? "manual" : "preset";
 
-  const [phase, setPhase] = useState<Phase>(chartMode === "preset" ? "preset-edit" : "manual-setup");
+  const [phase, setPhase] = useState<Phase>(chartMode === "preset" ? "preset-edit" : "manual-edit");
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
   const [newAthleteName, setNewAthleteName] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
@@ -262,7 +262,8 @@ function ScoutFGChartInner() {
     setAthleteNotes({});
     setWeather("");
     setChartDate(todayDateInput());
-    setPhase(chartMode === "preset" ? "preset-edit" : "manual-setup");
+    setAthleteKicks({});
+    setPhase(chartMode === "preset" ? "preset-edit" : "manual-edit");
   };
 
   // Edit a kick for a specific athlete
@@ -298,6 +299,13 @@ function ScoutFGChartInner() {
     const d = parseInt(manualDist) || 30;
     const p = parseInt(manualPoints) || 1;
     setManualKicks((prev) => [...prev, { distance: d, hash: manualHash, pointValue: p }]);
+    setManualDist("30");
+    setManualHash("M");
+    setManualPoints("1");
+  };
+
+  const removeManualKick = (idx: number) => {
+    setManualKicks((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const addExtraKick = () => {
@@ -408,13 +416,70 @@ function ScoutFGChartInner() {
     );
   }
 
+  // ── Manual chart builder (one-time, not saved) ──
+  if (phase === "manual-edit") {
+    return (
+      <>
+        <Header title="FG Manual Chart" />
+        <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
+          <Link href="/scout/fg" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+          <h2 className="text-lg font-bold text-slate-100">
+            {manualKicks.length === 0 ? "Build Your FG Chart" : "Edit FG Chart"}
+          </h2>
+          <p className="text-xs text-muted">Define kicks for this one-time chart. It won&apos;t be saved for next time.</p>
+
+          {/* Current kicks */}
+          {manualKicks.length > 0 && (
+            <div className="card-2 space-y-1">
+              {manualKicks.map((k, i) => (
+                <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-border/30 last:border-0">
+                  <span className="text-muted w-6">{i + 1}.</span>
+                  <span className="text-slate-200 font-semibold">{k.distance}yd</span>
+                  <span className="text-slate-300">{k.hash}</span>
+                  <span className="text-amber-400 font-bold">{k.pointValue}pt</span>
+                  <button onClick={() => removeManualKick(i)} className="text-miss text-[10px] hover:underline">Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add kick */}
+          <div className="card space-y-3">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Add Kick</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Distance</p>
+                <input type="text" inputMode="numeric" value={manualDist} onChange={(e) => setManualDist(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+              </div>
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Hash</p>
+                <select value={manualHash} onChange={(e) => setManualHash(e.target.value)} className="input w-full text-center text-sm font-bold py-1.5">
+                  {HASH_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted text-center mb-1">Points</p>
+                <input type="text" inputMode="numeric" value={manualPoints} onChange={(e) => setManualPoints(e.target.value.replace(/\D/g, ""))} className="input w-full text-center text-sm font-bold py-1.5" />
+              </div>
+            </div>
+            <button onClick={addManualKick} disabled={!manualDist} className="btn-primary w-full py-2 text-xs font-bold disabled:opacity-40">Add Kick</button>
+          </div>
+
+          <button onClick={() => setPhase("manual-setup")} disabled={manualKicks.length === 0} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">
+            Select Athletes
+          </button>
+        </main>
+      </>
+    );
+  }
+
   // ── Setup (athlete selection) ──
   if (phase === "setup" || phase === "manual-setup") {
     return (
       <>
         <Header title={chartMode === "preset" ? "FG Preset Chart" : "FG Manual Chart"} />
         <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
-          <Link href="/scout/fg" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
+          <button onClick={() => setPhase(chartMode === "preset" ? "preset-edit" : "manual-edit")} className="text-xs text-muted hover:text-white transition-colors">&larr; Back to Chart</button>
           <h2 className="text-lg font-bold text-slate-100">Select Athletes</h2>
           <p className="text-xs text-muted">Select or add kickers to evaluate.</p>
           <div>
@@ -440,10 +505,10 @@ function ScoutFGChartInner() {
           {selectedPlayers.length > 0 && (
             <p className="text-xs text-muted">Order: {selectedPlayers.map((p) => scoutDisplayName(p, scoutNumbers)).join(" → ")}</p>
           )}
-          {chartMode === "preset" && presetKicks.length > 0 && (
+          {kicks.length > 0 && (
             <div className="card-2 text-xs space-y-1">
               <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">Chart Preview</p>
-              {presetKicks.map((k, i) => (
+              {kicks.map((k, i) => (
                 <div key={i} className="flex items-center gap-3 text-slate-300">
                   <span className="text-muted w-4">{i + 1}.</span>
                   <span>{k.distance}yd</span>
