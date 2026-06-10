@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeSessionFromRanking, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { RankingTabs } from "@/components/ui/RankingTabs";
 import { createClient } from "@/lib/supabase";
@@ -134,8 +134,12 @@ function ScoutFGInner() {
 
   useEffect(() => { loadData(); }, []);
 
-  // Build per-session-per-athlete rows (filtered to the active ranking)
-  const rankedSessions = sessions.filter((s) => (sessionRankings[s.id] ?? ["overall"]).includes(activeRanking));
+  // Per-athlete ranking membership (a per-athlete override beats the session default).
+  const entryRanks = (sessionId: string, name: string) => sessionRankings[`${sessionId}|||${name}`] ?? sessionRankings[sessionId] ?? ["overall"];
+  // Build per-session-per-athlete rows, keeping only the athletes in the active ranking.
+  const rankedSessions = sessions
+    .map((s) => ({ ...s, entries: (s.entries as Record<string, unknown>[]).filter((e) => entryRanks(s.id, (e as { athlete?: string }).athlete ?? "").includes(activeRanking)) }))
+    .filter((s) => s.entries.length > 0);
   const athleteData: { name: string; sessionId: string; date: string; entries: FGEntry[]; total: number; makes: number; att: number; isPreset: boolean; notes?: string; weather?: string }[] = [];
   for (const s of rankedSessions) {
     const entries = s.entries as unknown as (FGEntry & { chartMode?: string; notes?: string })[];
@@ -193,11 +197,17 @@ function ScoutFGInner() {
       await loadData();
     } else {
       if (!window.confirm(`Remove ${selectedRows.size} chart${selectedRows.size !== 1 ? "s" : ""} from "${rankingName(activeRanking)}"? They stay in your other rankings.`)) return;
-      const sessionIds = [...new Set([...selectedRows].map((k) => k.split("|||")[0]))];
-      for (const sessionId of sessionIds) await removeSessionFromRanking(tid, sessionId, activeRanking);
+      for (const key of selectedRows) {
+        const [sessionId, name] = key.split("|||");
+        await removeEntryFromRanking(tid, sessionId, name, activeRanking);
+      }
       setSessionRankingsMap((prev) => {
         const next = { ...prev };
-        for (const sessionId of sessionIds) next[sessionId] = (next[sessionId] ?? ["overall"]).filter((r) => r !== activeRanking);
+        for (const key of selectedRows) {
+          const [sessionId, name] = key.split("|||");
+          const pk = `${sessionId}|||${name}`;
+          next[pk] = (next[pk] ?? next[sessionId] ?? ["overall"]).filter((r) => r !== activeRanking);
+        }
         return next;
       });
     }
@@ -239,9 +249,10 @@ function ScoutFGInner() {
       await deleteAthleteFromSession(tid, sessionId, name);
       await loadData();
     } else {
-      if (!window.confirm(`Remove this chart from "${rankingName(activeRanking)}"? It stays in your other rankings.`)) return;
-      await removeSessionFromRanking(tid, sessionId, activeRanking);
-      setSessionRankingsMap((prev) => ({ ...prev, [sessionId]: (prev[sessionId] ?? ["overall"]).filter((r) => r !== activeRanking) }));
+      if (!window.confirm(`Remove ${name}'s chart from "${rankingName(activeRanking)}"? It stays in your other rankings.`)) return;
+      await removeEntryFromRanking(tid, sessionId, name, activeRanking);
+      const pk = `${sessionId}|||${name}`;
+      setSessionRankingsMap((prev) => ({ ...prev, [pk]: (prev[pk] ?? prev[sessionId] ?? ["overall"]).filter((r) => r !== activeRanking) }));
     }
   };
 

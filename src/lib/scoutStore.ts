@@ -470,6 +470,29 @@ export async function setSessionRankings(teamId: string, sessionId: string, rank
   await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
 }
 
+/**
+ * Remove a single athlete's chart from one ranking (un-assign), without
+ * affecting the other athletes in the same session. Writes a per-athlete
+ * override (key `sessionId|||athlete`) that takes precedence over the
+ * session-level assignment used by everyone else in that session.
+ */
+export async function removeEntryFromRanking(teamId: string, sessionId: string, athlete: string, rankingId: string): Promise<void> {
+  const pairKey = `${sessionId}|||${athlete}`;
+  const apply = (m: Record<string, string[]>) => {
+    const cur = m[pairKey] ?? m[sessionId] ?? ["overall"];
+    m[pairKey] = cur.filter((r) => r !== rankingId);
+    return m;
+  };
+  if (!isRealTeam(teamId)) {
+    cacheSet(teamId, SESSION_RANKINGS_KEY, apply(cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {})));
+    return;
+  }
+  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
+  const m = apply(res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {});
+  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
+  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+}
+
 /** Remove a session from one ranking only (un-assign). Other rankings keep it. */
 export async function removeSessionFromRanking(teamId: string, sessionId: string, rankingId: string): Promise<void> {
   if (!isRealTeam(teamId)) {
