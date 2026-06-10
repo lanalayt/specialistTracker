@@ -25,7 +25,6 @@ const DIR_OPTIONS = [
   { value: "M", label: "Middle" },
   { value: "R", label: "Right" },
 ];
-const dirLabel = (d?: string) => DIR_OPTIONS.find((o) => o.value === d)?.label ?? "";
 
 function calcAvg(scores: number[], dropWorst: boolean): number {
   if (scores.length === 0) return 0;
@@ -69,6 +68,7 @@ function ScoutPuntChartInner() {
   const [editDir, setEditDir] = useState(true);
   const [showComplete, setShowComplete] = useState(false);
   const [completeDismissed, setCompleteDismissed] = useState(false);
+  const [dirOverride, setDirOverride] = useState<string | null>(null); // coach override of the target direction for the current punt
 
   const parseHangRaw = (raw: string): number => {
     const digits = raw.replace(/\D/g, "");
@@ -156,12 +156,13 @@ function ScoutPuntChartInner() {
     if (isNaN(dist) || dist <= 0 || !hang || !activePlayer) return;
     const score = parseFloat((dist + hang * 15 + (dirGood ? 0 : -10)).toFixed(2));
     const puntIdx = getPlayerResults(activePlayer).length;
-    const targetDir = directionMode ? dirSequence[puntIdx] : undefined;
+    const targetDir = directionMode ? (dirOverride ?? dirSequence[puntIdx]) : undefined;
     setResults((prev) => [...prev, { athlete: activePlayer, kickNum: puntIdx + 1, distance: dist, hangTime: hang, opTime: op, directionGood: dirGood, score, targetDir }]);
     setDistInput("");
     setHangInput("");
     setOpInput("");
     setDirGood(true);
+    setDirOverride(null);
     // Auto-rotate to next player
     const idx = selectedPlayers.indexOf(activePlayer);
     const next = selectedPlayers[(idx + 1) % selectedPlayers.length];
@@ -173,6 +174,7 @@ function ScoutPuntChartInner() {
     const last = results[results.length - 1];
     setResults((prev) => prev.slice(0, -1));
     setActivePlayer(last.athlete);
+    setDirOverride(null);
   };
 
   const startEditResult = (idx: number) => {
@@ -400,6 +402,7 @@ function ScoutPuntChartInner() {
   const kpp = kppTotal;
   const playerKickCount = getPlayerResults(activePlayer).length;
   const currentTargetDir = directionMode ? dirSequence[playerKickCount] : undefined;
+  const selectedDir = dirOverride ?? currentTargetDir ?? "M";
 
   return (
     <>
@@ -413,7 +416,7 @@ function ScoutPuntChartInner() {
             return (
               <button
                 key={p}
-                onClick={() => setActivePlayer(p)}
+                onClick={() => { setActivePlayer(p); setDirOverride(null); }}
                 className={clsx(
                   "card-2 px-3 py-2 text-center transition-all min-w-[80px]",
                   p === activePlayer ? "ring-2 ring-amber-500" : "opacity-60 hover:opacity-100"
@@ -433,10 +436,17 @@ function ScoutPuntChartInner() {
 
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">{scoutDisplayName(activePlayer, scoutNumbers)} — Punt {playerKickCount + 1}{kpp > 0 ? ` of ${kpp}` : ""}</p>
-          {currentTargetDir && <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Aim {dirLabel(currentTargetDir)}</p>}
         </div>
 
         <div className="card space-y-3">
+          {directionMode && (
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Direction:</p>
+              <select value={selectedDir} onChange={(e) => setDirOverride(e.target.value)} className="input flex-1 text-sm font-bold py-1.5">
+                {DIR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2">
             <div>
               <p className="text-[10px] text-muted text-center uppercase tracking-wider mb-1">Distance</p>
