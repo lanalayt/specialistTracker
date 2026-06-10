@@ -16,16 +16,20 @@ const SCHOOL_YEARS = Array.from({ length: 15 }, (_, i) => String(2026 + i));
 
 interface Props {
   profile: ScoutProfile;
-  onSave: (profile: ScoutProfile, originalName?: string) => void;
+  onSave: (profile: ScoutProfile, originalName?: string, jerseyNumber?: string) => void;
   onClose: () => void;
+  /** Current jersey number. When provided, a number box appears next to Name. */
+  number?: string;
 }
 
-export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
+export function ScoutProfileModal({ profile, onSave, onClose, number }: Props) {
   const [form, setForm] = useState<ScoutProfile>({ ...profile });
+  const [numberInput, setNumberInput] = useState(number ?? "");
 
   useEffect(() => {
     setForm({ ...profile });
-  }, [profile.name]);
+    setNumberInput(number ?? "");
+  }, [profile.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (key: keyof ScoutProfile, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -41,9 +45,6 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
   };
 
   type Field = { key: keyof ScoutProfile; label: string; placeholder: string; options?: string[] };
-  const fieldsBeforePos: Field[] = [
-    { key: "name", label: "Name", placeholder: "Full name" },
-  ];
   const fieldsAfterPos: Field[] = [
     { key: "dob", label: "DOB", placeholder: "MM/DD/YYYY" },
     { key: "school", label: "School", placeholder: "School name" },
@@ -64,18 +65,28 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
         </div>
 
         <div className="space-y-3">
-          {fieldsBeforePos.map((f) => (
-            <div key={f.key}>
-              <p className="text-[10px] text-muted uppercase tracking-wider mb-1">{f.label}</p>
+          <div>
+            <p className="text-[10px] text-muted uppercase tracking-wider mb-1">{number !== undefined ? "Number / Name" : "Name"}</p>
+            <div className="flex gap-2">
+              {number !== undefined && (
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={numberInput}
+                  onChange={(e) => setNumberInput(e.target.value.replace(/\D/g, ""))}
+                  placeholder="#"
+                  className="input w-16 text-center text-sm font-bold py-1.5"
+                />
+              )}
               <input
                 type="text"
-                value={form[f.key] ?? ""}
-                onChange={(e) => update(f.key, e.target.value)}
-                placeholder={f.placeholder}
-                className="input w-full text-sm py-1.5"
+                value={form.name ?? ""}
+                onChange={(e) => update("name", e.target.value)}
+                placeholder="Full name"
+                className="input flex-1 text-sm py-1.5"
               />
             </div>
-          ))}
+          </div>
           <div>
             <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Discipline</p>
             <div className="flex flex-wrap gap-1.5">
@@ -134,7 +145,7 @@ export function ScoutProfileModal({ profile, onSave, onClose }: Props) {
         </div>
 
         <button
-          onClick={() => onSave(form, profile.name !== form.name ? profile.name : undefined)}
+          onClick={() => onSave(form, profile.name !== form.name ? profile.name : undefined, number !== undefined ? numberInput : undefined)}
           className="btn-primary w-full py-2.5 text-sm font-bold"
         >
           Save Profile

@@ -12,6 +12,8 @@ import {
   deleteScoutProfile,
   applyScoutDisciplines,
   loadScoutSessions,
+  loadScoutNumbers,
+  saveScoutNumbers,
   scoutDisplayName,
   type ScoutProfile,
   type ScoutSession,
@@ -97,6 +99,7 @@ export default function ScoutAthletesPage() {
   const [chartSessions, setChartSessions] = useState<Record<string, ScoutSession[]>>({});
   const [chartModal, setChartModal] = useState<string | null>(null);
   const [snapDetail, setSnapDetail] = useState<AthleteChart | null>(null);
+  const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
 
   // All completed charts for an athlete, across every discipline, newest first.
   const getAthleteCharts = (name: string): AthleteChart[] => {
@@ -118,7 +121,7 @@ export default function ScoutAthletesPage() {
     }
     if (!tid) return;
 
-    const [prof, fg, punt, kickoff, snap, sFg, sPunt, sKo, sSnap] = await Promise.all([
+    const [prof, fg, punt, kickoff, snap, sFg, sPunt, sKo, sSnap, nums] = await Promise.all([
       loadScoutProfiles(tid),
       loadScoutAthletes(tid, "fg"),
       loadScoutAthletes(tid, "punt"),
@@ -128,7 +131,9 @@ export default function ScoutAthletesPage() {
       loadScoutSessions(tid, "SCOUT_PUNT"),
       loadScoutSessions(tid, "SCOUT_KO"),
       loadScoutSessions(tid, "SCOUT_SNAP"),
+      loadScoutNumbers(tid, "fg"),
     ]);
+    setScoutNumbers(nums);
 
     setSportAthletes({ fg, punt, kickoff, snap });
     setChartSessions({ SCOUT_FG: sFg, SCOUT_PUNT: sPunt, SCOUT_KO: sKo, SCOUT_SNAP: sSnap });
@@ -199,7 +204,7 @@ export default function ScoutAthletesPage() {
     setAllNames((prev) => prev.filter((n) => n !== name));
   };
 
-  const handleSaveProfile = async (profile: ScoutProfile, originalName?: string) => {
+  const handleSaveProfile = async (profile: ScoutProfile, originalName?: string, jerseyNumber?: string) => {
     const tid = getTeamId();
     if (!tid) return;
     const updated = { ...profiles };
@@ -239,6 +244,16 @@ export default function ScoutAthletesPage() {
       return next;
     });
     await applyScoutDisciplines(tid, profile.name, disciplines, true);
+
+    // Jersey number — shared across all disciplines, keyed by athlete name.
+    if (jerseyNumber !== undefined) {
+      const nextNums = { ...scoutNumbers };
+      if (originalName && originalName !== profile.name) delete nextNums[originalName];
+      if (jerseyNumber.trim()) nextNums[profile.name] = jerseyNumber.trim();
+      else delete nextNums[profile.name];
+      setScoutNumbers(nextNums);
+      await saveScoutNumbers(tid, "fg", nextNums);
+    }
 
     setProfileOpen(null);
   };
@@ -328,7 +343,7 @@ export default function ScoutAthletesPage() {
                               onClick={() => setProfileOpen(name)}
                               className="text-sm font-semibold text-slate-100 hover:text-amber-400 transition-colors"
                             >
-                              {name}
+                              {scoutDisplayName(name, scoutNumbers)}
                             </button>
                             {chartCount > 0 && (
                               <button
@@ -395,6 +410,7 @@ export default function ScoutAthletesPage() {
         return (
           <ScoutProfileModal
             profile={{ ...base, disciplines }}
+            number={scoutNumbers[profileOpen] ?? ""}
             onSave={handleSaveProfile}
             onClose={() => setProfileOpen(null)}
           />
