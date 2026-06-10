@@ -3,7 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
+import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
+import { RankingTabs } from "@/components/ui/RankingTabs";
 import { createClient } from "@/lib/supabase";
 import { exportKOScoutExcel, exportKOScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -40,6 +42,10 @@ function ScoutKOInner() {
   const [tab, setTab] = useState<"chart" | "rankings">(initialTab);
   const [liveMode, setLiveMode] = useState(false);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
+  const [rankings, setRankings] = useState<ScoutRanking[]>([{ id: "overall", name: "Overall" }]);
+  const [sessionRankings, setSessionRankingsMap] = useState<Record<string, string[]>>({});
+  const [activeRanking, setActiveRanking] = useState("overall");
+  const [showLiveRankings, setShowLiveRankings] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
@@ -70,10 +76,12 @@ function ScoutKOInner() {
     let tid = getTeamId();
     for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
     if (!tid) return;
-    const [sess, prof, nums] = await Promise.all([loadScoutSessions(tid, "SCOUT_KO"), loadScoutProfiles(tid), loadScoutNumbers(tid, "kickoff")]);
+    const [sess, prof, nums, rks, srk] = await Promise.all([loadScoutSessions(tid, "SCOUT_KO"), loadScoutProfiles(tid), loadScoutNumbers(tid, "kickoff"), loadScoutRankings(tid, "kickoff"), loadSessionRankings(tid)]);
     setSessions(sess);
     setProfiles(prof);
     setScoutNumbers(nums);
+    setRankings(rks);
+    setSessionRankingsMap(srk);
     setLoading(false);
   };
 
@@ -121,26 +129,31 @@ function ScoutKOInner() {
     setLiveDirGood(true);
   };
 
-  const handleLiveSave = async () => {
+  const handleLiveSave = async (rankingIds: string[]) => {
     if (liveKicks.length === 0) return;
     const tid = getTeamId();
     if (!tid) return;
     const athletes = [...new Set(liveKicks.map((k) => k.athlete))];
     const label = `KO Scout — ${athletes.map((a) => { const ak = liveKicks.filter((k) => k.athlete === a); return `${a}: ${calcAvg(ak.map((k) => k.score), true).toFixed(2)}`; }).join(", ")}`;
+    const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await insertScoutSession(tid, {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: sessionId,
       sport: "SCOUT_KO",
       label,
       date: new Date().toISOString(),
       entries: liveKicks.map((k, i) => ({ ...k, kickNum: i + 1, dropWorst: true })) as unknown as Record<string, unknown>[],
     });
+    await setSessionRankings(tid, sessionId, rankingIds);
     setLiveKicks([]);
+    setShowLiveRankings(false);
+    setLiveMode(false);
     await loadData();
   };
 
-  // Build per-session-per-athlete rows
+  // Build per-session-per-athlete rows (filtered to the active ranking)
+  const rankedSessions = sessions.filter((s) => (sessionRankings[s.id] ?? ["overall"]).includes(activeRanking));
   const ranked: { name: string; sessionId: string; date: string; entries: KOEntry[]; avg: number; worst: number | null; notes?: string; weather?: string }[] = [];
-  for (const s of sessions) {
+  for (const s of rankedSessions) {
     const entries = s.entries as unknown as KOEntry[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     for (const name of athletes) {
@@ -342,15 +355,20 @@ function ScoutKOInner() {
                       <span className="text-amber-400 font-bold ml-auto">{k.score.toFixed(2)}</span>
                     </div>
                   ))}
-                  <button onClick={handleLiveSave} className="btn-primary w-full py-2 text-xs font-bold mt-2">Save {liveKicks.length} Kick{liveKicks.length !== 1 ? "s" : ""} to Rankings</button>
+                  <button onClick={() => setShowLiveRankings(true)} className="btn-primary w-full py-2 text-xs font-bold mt-2">Save {liveKicks.length} Kick{liveKicks.length !== 1 ? "s" : ""} to Rankings</button>
                 </div>
               )}
             </div>
           </div>
         )}
 
+        {showLiveRankings && (
+          <AssignRankingsModal teamId={getTeamId() ?? ""} sport="kickoff" onConfirm={(ids) => handleLiveSave(ids)} onClose={() => setShowLiveRankings(false)} />
+        )}
+
         {tab === "rankings" && (
           <div className="space-y-4">
+            <RankingTabs teamId={getTeamId() ?? ""} sport="kickoff" rankings={rankings} onRankingsChange={setRankings} active={activeRanking} onActiveChange={setActiveRanking} />
             <div className="flex items-center justify-between card-2 px-4 py-3">
               <div>
                 <p className="text-xs font-semibold text-slate-200">Drop Worst Kick</p>
@@ -362,7 +380,7 @@ function ScoutKOInner() {
             </div>
             {!loading && ranked.length > 0 && (
               <div className="flex gap-2">
-                <ExportButton onExcel={() => exportKOScoutExcel(sessions)} onPDF={() => exportKOScoutPDF(sessions)} />
+                <ExportButton onExcel={() => exportKOScoutExcel(rankedSessions)} onPDF={() => exportKOScoutPDF(rankedSessions)} />
                 <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
                 {selectMode && selectedRows.size > 0 && (
                   <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>

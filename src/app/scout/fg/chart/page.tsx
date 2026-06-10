@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutPreset, saveScoutPreset, insertScoutSession, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
+import { loadScoutPreset, saveScoutPreset, insertScoutSession, setSessionRankings, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
+import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -222,7 +223,7 @@ function ScoutFGChartInner() {
     if (getResultCount() > 0) setPhase("results");
   };
 
-  const handleSave = async () => {
+  const handleSave = async (rankingIds: string[]) => {
     const tid = getTeamId();
     const results = buildResults();
     if (!tid || results.length === 0) return;
@@ -237,16 +238,20 @@ function ScoutFGChartInner() {
       }
       return base;
     });
+    const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await insertScoutSession(tid, {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: sessionId,
       sport: "SCOUT_FG",
       label,
       date: dateInputToISO(chartDate),
       weather: weather || undefined,
       entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
+    await setSessionRankings(tid, sessionId, rankingIds);
     setSaved(true);
+    setShowRankings(false);
   };
+  const [showRankings, setShowRankings] = useState(false);
 
   // Notes + weather for results
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
@@ -604,13 +609,16 @@ function ScoutFGChartInner() {
           </div>
           <div className="flex gap-3 max-w-sm mx-auto">
             {!saved ? (
-              <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to Rankings</button>
+              <button onClick={() => setShowRankings(true)} className="btn-primary flex-1 py-3 text-sm">Save to Rankings</button>
             ) : (
               <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>
             )}
             <Link href="/scout/fg?tab=rankings" className="btn-ghost flex-1 py-3 text-sm text-center">Go to Rankings</Link>
           </div>
         </main>
+        {showRankings && (
+          <AssignRankingsModal teamId={getTeamId() ?? ""} sport="fg" onConfirm={(ids) => handleSave(ids)} onClose={() => setShowRankings(false)} />
+        )}
       </>
     );
   }

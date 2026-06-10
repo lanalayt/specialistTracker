@@ -3,7 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
+import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
+import { RankingTabs } from "@/components/ui/RankingTabs";
 import { createClient } from "@/lib/supabase";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -35,6 +37,10 @@ function ScoutFGInner() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string; sessionId?: string } | null>(null);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
+  const [rankings, setRankings] = useState<ScoutRanking[]>([{ id: "overall", name: "Overall" }]);
+  const [sessionRankings, setSessionRankingsMap] = useState<Record<string, string[]>>({});
+  const [activeRanking, setActiveRanking] = useState("overall");
+  const [showLiveRankings, setShowLiveRankings] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
@@ -92,20 +98,24 @@ function ScoutFGInner() {
     setLiveDist("");
   };
 
-  const handleLiveSave = async () => {
+  const handleLiveSave = async (rankingIds: string[]) => {
     if (liveKicks.length === 0) return;
     const tid = getTeamId();
     if (!tid) return;
     const athletes = [...new Set(liveKicks.map((k) => k.athlete))];
     const label = `FG Scout — ${athletes.map((a) => { const ak = liveKicks.filter((k) => k.athlete === a); return `${a}: ${ak.filter((k) => k.result === "make").length}/${ak.length}`; }).join(", ")}`;
+    const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await insertScoutSession(tid, {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: sessionId,
       sport: "SCOUT_FG",
       label,
       date: new Date().toISOString(),
       entries: liveKicks.map((k, i) => ({ ...k, kickNum: i + 1, ...(i === 0 ? { chartMode: "live" } : {}) })) as unknown as Record<string, unknown>[],
     });
+    await setSessionRankings(tid, sessionId, rankingIds);
     setLiveKicks([]);
+    setShowLiveRankings(false);
+    setLiveMode(false);
     await loadData();
   };
 
@@ -113,8 +123,10 @@ function ScoutFGInner() {
     let tid = getTeamId();
     for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
     if (!tid) return;
-    const [sess, prof, nums] = await Promise.all([loadScoutSessions(tid, "SCOUT_FG"), loadScoutProfiles(tid), loadScoutNumbers(tid, "fg")]);
+    const [sess, prof, nums, rks, srk] = await Promise.all([loadScoutSessions(tid, "SCOUT_FG"), loadScoutProfiles(tid), loadScoutNumbers(tid, "fg"), loadScoutRankings(tid, "fg"), loadSessionRankings(tid)]);
     setSessions(sess);
+    setRankings(rks);
+    setSessionRankingsMap(srk);
     setProfiles(prof);
     setScoutNumbers(nums);
     setLoading(false);
@@ -122,9 +134,10 @@ function ScoutFGInner() {
 
   useEffect(() => { loadData(); }, []);
 
-  // Build per-session-per-athlete rows
+  // Build per-session-per-athlete rows (filtered to the active ranking)
+  const rankedSessions = sessions.filter((s) => (sessionRankings[s.id] ?? ["overall"]).includes(activeRanking));
   const athleteData: { name: string; sessionId: string; date: string; entries: FGEntry[]; total: number; makes: number; att: number; isPreset: boolean; notes?: string; weather?: string }[] = [];
-  for (const s of sessions) {
+  for (const s of rankedSessions) {
     const entries = s.entries as unknown as (FGEntry & { chartMode?: string; notes?: string })[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     // Use chartMode tag if present, otherwise fallback: preset requires 2+ athletes with identical kick sequences
@@ -346,18 +359,23 @@ function ScoutFGInner() {
                       <span className={clsx("font-bold ml-auto", k.result === "make" ? "text-make" : "text-miss")}>{k.result === "make" ? "GOOD" : "MISS"}</span>
                     </div>
                   ))}
-                  <button onClick={handleLiveSave} className="btn-primary w-full py-2 text-xs font-bold mt-2">Save {liveKicks.length} Kick{liveKicks.length !== 1 ? "s" : ""} to Rankings</button>
+                  <button onClick={() => setShowLiveRankings(true)} className="btn-primary w-full py-2 text-xs font-bold mt-2">Save {liveKicks.length} Kick{liveKicks.length !== 1 ? "s" : ""} to Rankings</button>
                 </div>
               )}
             </div>
           </div>
         )}
 
+        {showLiveRankings && (
+          <AssignRankingsModal teamId={getTeamId() ?? ""} sport="fg" onConfirm={(ids) => handleLiveSave(ids)} onClose={() => setShowLiveRankings(false)} />
+        )}
+
         {tab === "rankings" && (
           <div className="space-y-6">
+            <RankingTabs teamId={getTeamId() ?? ""} sport="fg" rankings={rankings} onRankingsChange={setRankings} active={activeRanking} onActiveChange={setActiveRanking} />
             {!loading && athleteData.length > 0 && (
               <div className="flex items-center gap-2">
-                <ExportButton onExcel={() => exportFGScoutExcel(sessions)} onPDF={() => exportFGScoutPDF(sessions)} />
+                <ExportButton onExcel={() => exportFGScoutExcel(rankedSessions)} onPDF={() => exportFGScoutPDF(rankedSessions)} />
                 <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
                 {selectMode && selectedRows.size > 0 && (
                   <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>

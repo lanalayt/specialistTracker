@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { getTeamId } from "@/lib/teamData";
-import { insertScoutSession, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
+import { insertScoutSession, setSessionRankings, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
+import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
@@ -163,7 +164,8 @@ export default function ScoutLongSnapsPage() {
     if (snaps.length > 0) setPhase("results");
   };
 
-  const handleSave = async () => {
+  const [showRankings, setShowRankings] = useState(false);
+  const handleSave = async (rankingIds: string[]) => {
     if (snaps.length === 0) return;
     const tid = getTeamId();
     if (!tid) return;
@@ -182,15 +184,18 @@ export default function ScoutLongSnapsPage() {
     });
     const allAthletes = [...new Set(snaps.map((s) => s.athlete))];
     const label = `Long Snaps — ${allAthletes.map((a) => `${a}: ${getPlayerAvg(a).toFixed(2)} avg`).join(", ")}`;
+    const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await insertScoutSession(tid, {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: sessionId,
       sport: "SCOUT_SNAP",
       label,
       date: dateInputToISO(chartDate),
       weather: weather || undefined,
       entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
+    await setSessionRankings(tid, sessionId, rankingIds);
     setSaved(true);
+    setShowRankings(false);
   };
 
   // ── Setup ──
@@ -323,11 +328,14 @@ export default function ScoutLongSnapsPage() {
               ))}
             </div>
             <div className="flex gap-3 max-w-sm mx-auto">
-              {!saved ? <button onClick={handleSave} className="btn-primary flex-1 py-3 text-sm">Save to Rankings</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
+              {!saved ? <button onClick={() => setShowRankings(true)} className="btn-primary flex-1 py-3 text-sm">Save to Rankings</button> : <span className="flex-1 py-3 text-sm text-make font-bold">Saved!</span>}
               <Link href="/scout/snap?tab=rankings" className="btn-ghost flex-1 py-3 text-sm text-center">Go to Rankings</Link>
             </div>
           </div>
         </main>
+        {showRankings && (
+          <AssignRankingsModal teamId={getTeamId() ?? ""} sport="snap" onConfirm={(ids) => handleSave(ids)} onClose={() => setShowRankings(false)} />
+        )}
       </>
     );
   }

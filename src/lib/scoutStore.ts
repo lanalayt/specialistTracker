@@ -408,6 +408,68 @@ export async function applyScoutDisciplines(
   }
 }
 
+// ── Scout Rankings (named groups, per discipline) ────────────────────────────
+// Each discipline has its own list of rankings. "overall" always exists and is
+// the default. A saved chart (session) is tagged with one or more ranking ids.
+
+export interface ScoutRanking { id: string; name: string; }
+
+const DEFAULT_RANKING: ScoutRanking = { id: "overall", name: "Overall" };
+const SESSION_RANKINGS_KEY = "scout_session_rankings";
+
+export function newRankingId(): string {
+  return `r-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function ensureOverall(list: ScoutRanking[]): ScoutRanking[] {
+  return list.some((r) => r.id === "overall") ? list : [DEFAULT_RANKING, ...list];
+}
+
+export async function loadScoutRankings(teamId: string, sport: string): Promise<ScoutRanking[]> {
+  const key = `scout_rankings_${sport}`;
+  if (!isRealTeam(teamId)) return ensureOverall(cacheGet<ScoutRanking[]>(teamId, key, []));
+  const res = await cloudGet<ScoutRanking[]>(teamId, key);
+  if (res.ok) {
+    const list = ensureOverall(Array.isArray(res.value) ? res.value : []);
+    cacheSet(teamId, key, list);
+    return list;
+  }
+  return ensureOverall(cacheGet<ScoutRanking[]>(teamId, key, []));
+}
+
+export async function saveScoutRankings(teamId: string, sport: string, rankings: ScoutRanking[]): Promise<void> {
+  const key = `scout_rankings_${sport}`;
+  cacheSet(teamId, key, rankings);
+  if (!isRealTeam(teamId)) return;
+  await cloudPut(teamId, key, rankings);
+}
+
+/** Map of sessionId -> ranking ids it belongs to (team-wide). Missing = ["overall"]. */
+export async function loadSessionRankings(teamId: string): Promise<Record<string, string[]>> {
+  if (!isRealTeam(teamId)) return cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
+  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
+  if (res.ok) {
+    const m = res.value && typeof res.value === "object" ? res.value : {};
+    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
+    return m;
+  }
+  return cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
+}
+
+export async function setSessionRankings(teamId: string, sessionId: string, rankingIds: string[]): Promise<void> {
+  if (!isRealTeam(teamId)) {
+    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
+    m[sessionId] = rankingIds;
+    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
+    return;
+  }
+  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
+  const m = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
+  m[sessionId] = rankingIds;
+  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
+  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+}
+
 /** Today's local date as a YYYY-MM-DD string for <input type="date"> defaults */
 export function todayDateInput(): string {
   const d = new Date();

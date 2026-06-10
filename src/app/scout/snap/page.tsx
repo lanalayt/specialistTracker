@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, type ScoutSession, type ScoutProfile } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, loadSessionRankings, loadScoutRankings, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
+import { RankingTabs } from "@/components/ui/RankingTabs";
 import { createClient } from "@/lib/supabase";
 import { exportSnapScoutExcel, exportSnapScoutPDF, exportIndividualSnapExcel, exportIndividualSnapPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -53,6 +54,9 @@ function ScoutSnapInner() {
   const initialTab = searchParams.get("tab") === "rankings" ? "rankings" : "chart";
   const [tab, setTab] = useState<"chart" | "rankings">(initialTab);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
+  const [rankings, setRankings] = useState<ScoutRanking[]>([{ id: "overall", name: "Overall" }]);
+  const [sessionRankings, setSessionRankingsMap] = useState<Record<string, string[]>>({});
+  const [activeRanking, setActiveRanking] = useState("overall");
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
@@ -126,16 +130,19 @@ function ScoutSnapInner() {
     let tid = getTeamId();
     for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
     if (!tid) return;
-    const [sess, prof] = await Promise.all([loadScoutSessions(tid, "SCOUT_SNAP"), loadScoutProfiles(tid)]);
+    const [sess, prof, rks, srk] = await Promise.all([loadScoutSessions(tid, "SCOUT_SNAP"), loadScoutProfiles(tid), loadScoutRankings(tid, "snap"), loadSessionRankings(tid)]);
     setSessions(sess);
     setProfiles(prof);
+    setRankings(rks);
+    setSessionRankingsMap(srk);
     setLoading(false);
   };
 
   useEffect(() => { loadData(); }, []);
 
+  const rankedSessions = sessions.filter((s) => (sessionRankings[s.id] ?? ["overall"]).includes(activeRanking));
   const ranked: RankedRow[] = [];
-  for (const s of sessions) {
+  for (const s of rankedSessions) {
     const entries = s.entries as unknown as SnapEntry[];
     const is30Point = s.label.startsWith("30 Point") || s.label.startsWith("Short Snap");
     const athletes = [...new Set(entries.map((e) => e.athlete))];
@@ -289,6 +296,7 @@ function ScoutSnapInner() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
+            <RankingTabs teamId={getTeamId() ?? ""} sport="snap" rankings={rankings} onRankingsChange={setRankings} active={activeRanking} onActiveChange={setActiveRanking} />
             {/* Short / Long sub-tabs */}
             <div className="flex rounded-input border border-border overflow-hidden w-fit">
               <button onClick={() => setRankingTab("short")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", rankingTab === "short" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Short Snaps</button>
@@ -296,7 +304,7 @@ function ScoutSnapInner() {
             </div>
             {!loading && activeRanked.length > 0 && (
               <div className="flex gap-2">
-                <ExportButton onExcel={() => exportSnapScoutExcel(sessions)} onPDF={() => exportSnapScoutPDF(sessions)} />
+                <ExportButton onExcel={() => exportSnapScoutExcel(rankedSessions)} onPDF={() => exportSnapScoutPDF(rankedSessions)} />
                 <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
                 {selectMode && selectedRows.size > 0 && (
                   <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>
