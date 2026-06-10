@@ -6,6 +6,7 @@ import { getTeamId } from "@/lib/teamData";
 import { insertScoutSession, setSessionRankings, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
+import { chartDraftKey, readChartDraft, clearChartDraft, useChartDraft, isPageReload } from "@/lib/chartDraft";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -17,6 +18,19 @@ interface KOResult {
   hangTime: number;
   directionGood: boolean;
   score: number;
+}
+
+interface KODraft {
+  teamId?: string | null;
+  phase?: "setup" | "live" | "results";
+  selectedPlayers?: string[];
+  kicksPerPlayer?: string;
+  dropWorst?: boolean;
+  chartDate?: string;
+  weather?: string;
+  athleteNotes?: Record<string, string>;
+  results?: KOResult[];
+  activePlayer?: string;
 }
 
 function calcKickScore(dist: number, hang: number, dirGood: boolean): number {
@@ -69,6 +83,8 @@ function ScoutKOChartInner() {
   const getPlayerScores = (name: string) => getPlayerResults(name).map((r) => r.score);
   const getPlayerAvg = (name: string) => calcAvg(getPlayerScores(name), dropWorst);
 
+  const DRAFT_KEY = chartDraftKey("SCOUT_KO", isManual ? "manual" : "preset");
+
   useEffect(() => {
     let active = true;
     async function load() {
@@ -76,11 +92,29 @@ function ScoutKOChartInner() {
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid || !active) return;
       const [names, nums] = await Promise.all([loadScoutAthletes(tid, "kickoff"), loadScoutNumbers(tid, "kickoff")]);
-      if (active) { setAthleteNames(names); setScoutNumbers(nums); }
+      if (!active) return;
+      setAthleteNames(names);
+      setScoutNumbers(nums);
+      // Restore an in-progress chart after an accidental refresh.
+      const d = isPageReload() ? readChartDraft<KODraft>(DRAFT_KEY, tid) : null;
+      if (d && d.phase && d.phase !== "setup" && (d.results?.length ?? 0) > 0) {
+        setSelectedPlayers(d.selectedPlayers ?? []);
+        setKicksPerPlayer(d.kicksPerPlayer ?? "5");
+        setDropWorst(d.dropWorst ?? true);
+        setChartDate(d.chartDate ?? todayDateInput());
+        setWeather(d.weather ?? "");
+        setAthleteNotes(d.athleteNotes ?? {});
+        setResults(d.results ?? []);
+        setActivePlayer(d.activePlayer ?? (d.selectedPlayers?.[0] ?? ""));
+        setPhase(d.phase);
+      }
     }
     load();
     return () => { active = false; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mirror in-progress charting to sessionStorage so a refresh can restore it.
+  useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, kicksPerPlayer, dropWorst, chartDate, weather, athleteNotes, results, activePlayer }, phase !== "setup" && !saved);
 
   const togglePlayer = (name: string) => {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
@@ -179,6 +213,7 @@ function ScoutKOChartInner() {
       entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
     await setSessionRankings(tid, sessionId, rankingIds);
+    clearChartDraft(DRAFT_KEY);
     setSaved(true);
     setShowRankings(false);
   };

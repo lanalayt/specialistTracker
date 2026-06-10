@@ -6,6 +6,7 @@ import { getTeamId } from "@/lib/teamData";
 import { loadScoutPreset, saveScoutPreset, insertScoutSession, setSessionRankings, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
+import { chartDraftKey, readChartDraft, clearChartDraft, useChartDraft, isPageReload } from "@/lib/chartDraft";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -32,6 +33,19 @@ interface FGResult {
 }
 
 type Phase = "preset-edit" | "manual-edit" | "setup" | "manual-setup" | "live" | "results";
+
+interface FGDraft {
+  teamId?: string | null;
+  phase?: Phase;
+  selectedPlayers?: string[];
+  presetKicks?: PresetKick[];
+  manualKicks?: PresetKick[];
+  athleteKicks?: Record<string, PresetKick[]>;
+  resultMap?: Record<string, Record<number, "make" | "miss">>;
+  athleteNotes?: Record<string, string>;
+  weather?: string;
+  chartDate?: string;
+}
 
 function ScoutFGChartInner() {
   const searchParams = useSearchParams();
@@ -123,6 +137,8 @@ function ScoutFGChartInner() {
     return out;
   };
 
+  const DRAFT_KEY = chartDraftKey("SCOUT_FG", chartMode);
+
   useEffect(() => {
     let active = true;
     async function load() {
@@ -139,10 +155,23 @@ function ScoutFGChartInner() {
       const preset = await loadScoutPreset<PresetKick[]>(tid, PRESET_KEY);
       if (preset && active) setPresetKicks(preset);
       setPresetLoaded(true);
+      // Restore an in-progress chart after an accidental refresh.
+      const d = isPageReload() ? readChartDraft<FGDraft>(DRAFT_KEY, tid) : null;
+      if (d && (d.phase === "live" || d.phase === "results") && (d.selectedPlayers?.length ?? 0) > 0) {
+        setSelectedPlayers(d.selectedPlayers ?? []);
+        setPresetKicks(d.presetKicks ?? []);
+        setManualKicks(d.manualKicks ?? []);
+        setAthleteKicks(d.athleteKicks ?? {});
+        setResultMap(d.resultMap ?? {});
+        setAthleteNotes(d.athleteNotes ?? {});
+        setWeather(d.weather ?? "");
+        setChartDate(d.chartDate ?? todayDateInput());
+        setPhase(d.phase);
+      }
     }
     load();
     return () => { active = false; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSavePreset = async () => {
     const tid = getTeamId();
@@ -249,6 +278,7 @@ function ScoutFGChartInner() {
       entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
     await setSessionRankings(tid, sessionId, rankingIds);
+    clearChartDraft(DRAFT_KEY);
     setSaved(true);
     setShowRankings(false);
   };
@@ -258,6 +288,9 @@ function ScoutFGChartInner() {
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
   const [weather, setWeather] = useState("");
   const [chartDate, setChartDate] = useState(todayDateInput());
+
+  // Mirror in-progress charting to sessionStorage so a refresh can restore it.
+  useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, presetKicks, manualKicks, athleteKicks, resultMap, athleteNotes, weather, chartDate }, (phase === "live" || phase === "results") && !saved);
 
   const handleNewChart = () => {
     setResultMap({});

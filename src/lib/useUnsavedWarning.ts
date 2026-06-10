@@ -17,6 +17,7 @@ export function useUnsavedWarning(hasUnsaved: boolean) {
     // Browser close / refresh
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
+      e.returnValue = ""; // required by Chrome/Safari to actually show the dialog
     };
     window.addEventListener("beforeunload", onBeforeUnload);
 

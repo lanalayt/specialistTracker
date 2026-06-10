@@ -6,6 +6,7 @@ import { getTeamId } from "@/lib/teamData";
 import { insertScoutSession, setSessionRankings, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
+import { chartDraftKey, readChartDraft, clearChartDraft, useChartDraft, isPageReload } from "@/lib/chartDraft";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -19,6 +20,23 @@ interface PuntResult {
   directionGood: boolean;
   score: number;
   targetDir?: string; // "L" | "M" | "R" target direction when direction mode is on
+}
+
+interface PuntDraft {
+  teamId?: string | null;
+  phase?: "setup" | "live" | "results";
+  selectedPlayers?: string[];
+  puntsPerPlayer?: string;
+  directionMode?: boolean;
+  baseDir?: string;
+  puntTypes?: { count: string; dir: string }[];
+  dropWorst?: boolean;
+  chartDate?: string;
+  weather?: string;
+  athleteNotes?: Record<string, string>;
+  results?: PuntResult[];
+  activePlayer?: string;
+  completeDismissed?: boolean;
 }
 
 const DIR_OPTIONS = [
@@ -108,6 +126,8 @@ function ScoutPuntChartInner() {
     if (done && !completeDismissed) setShowComplete(true);
   }, [results, kppTotal, selectedPlayers, completeDismissed, phase]);
 
+  const DRAFT_KEY = chartDraftKey("SCOUT_PUNT", isManual ? "manual" : "preset");
+
   useEffect(() => {
     let active = true;
     async function load() {
@@ -115,11 +135,31 @@ function ScoutPuntChartInner() {
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid || !active) return;
       const [names, nums] = await Promise.all([loadScoutAthletes(tid, "punt"), loadScoutNumbers(tid, "punt")]);
-      if (active) { setAthleteNames(names); setScoutNumbers(nums); }
+      if (!active) return;
+      setAthleteNames(names);
+      setScoutNumbers(nums);
+      const d = isPageReload() ? readChartDraft<PuntDraft>(DRAFT_KEY, tid) : null;
+      if (d && d.phase && d.phase !== "setup" && (d.results?.length ?? 0) > 0) {
+        setSelectedPlayers(d.selectedPlayers ?? []);
+        setPuntsPerPlayer(d.puntsPerPlayer ?? "5");
+        setDirectionMode(d.directionMode ?? false);
+        setBaseDir(d.baseDir ?? "M");
+        setPuntTypes(d.puntTypes ?? []);
+        setDropWorst(d.dropWorst ?? true);
+        setChartDate(d.chartDate ?? todayDateInput());
+        setWeather(d.weather ?? "");
+        setAthleteNotes(d.athleteNotes ?? {});
+        setResults(d.results ?? []);
+        setActivePlayer(d.activePlayer ?? (d.selectedPlayers?.[0] ?? ""));
+        setCompleteDismissed(d.completeDismissed ?? false);
+        setPhase(d.phase);
+      }
     }
     load();
     return () => { active = false; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, puntsPerPlayer, directionMode, baseDir, puntTypes, dropWorst, chartDate, weather, athleteNotes, results, activePlayer, completeDismissed }, phase !== "setup" && !saved);
 
   const togglePlayer = (name: string) => {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
@@ -228,6 +268,7 @@ function ScoutPuntChartInner() {
       entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
     await setSessionRankings(tid, sessionId, rankingIds);
+    clearChartDraft(DRAFT_KEY);
     setSaved(true);
     setShowRankings(false);
   };

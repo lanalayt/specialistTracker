@@ -6,6 +6,7 @@ import { getTeamId } from "@/lib/teamData";
 import { insertScoutSession, setSessionRankings, loadScoutAthletes, saveScoutAthletes, removeScoutAthlete, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, todayDateInput, dateInputToISO } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
+import { chartDraftKey, readChartDraft, clearChartDraft, useChartDraft, isPageReload } from "@/lib/chartDraft";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
@@ -19,6 +20,19 @@ interface SnapResult {
   spiral: "Good" | "Bad" | "";
   points: number;
   marker?: ShortSnapMarker;
+}
+
+interface ShortSnapDraft {
+  teamId?: string | null;
+  phase?: "setup" | "live" | "results";
+  selectedPlayers?: string[];
+  snapsPerPlayer?: string;
+  dropWorst?: boolean;
+  chartDate?: string;
+  weather?: string;
+  athleteNotes?: Record<string, string>;
+  results?: SnapResult[];
+  activePlayer?: string;
 }
 
 function calcPoints(acc: string, laces: string, spiral: string): number {
@@ -70,6 +84,9 @@ export default function ScoutShortSnapsPage() {
 
   useUnsavedWarning(results.length > 0 && !saved);
 
+  const DRAFT_KEY = chartDraftKey("SCOUT_SNAP", "short");
+  useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, snapsPerPlayer, dropWorst, chartDate, weather, athleteNotes, results, activePlayer }, phase !== "setup" && !saved);
+
   useEffect(() => {
     let active = true;
     async function load() {
@@ -77,7 +94,21 @@ export default function ScoutShortSnapsPage() {
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid || !active) return;
       const [names, nums] = await Promise.all([loadScoutAthletes(tid, "snap"), loadScoutNumbers(tid, "snap")]);
-      if (active) { setAthleteNames(names); setScoutNumbers(nums); }
+      if (!active) return;
+      setAthleteNames(names);
+      setScoutNumbers(nums);
+      const d = isPageReload() ? readChartDraft<ShortSnapDraft>(DRAFT_KEY, tid) : null;
+      if (d && d.phase && d.phase !== "setup" && (d.results?.length ?? 0) > 0) {
+        setSelectedPlayers(d.selectedPlayers ?? []);
+        setSnapsPerPlayer(d.snapsPerPlayer ?? "10");
+        setDropWorst(d.dropWorst ?? false);
+        setChartDate(d.chartDate ?? todayDateInput());
+        setWeather(d.weather ?? "");
+        setAthleteNotes(d.athleteNotes ?? {});
+        setResults(d.results ?? []);
+        setActivePlayer(d.activePlayer ?? (d.selectedPlayers?.[0] ?? ""));
+        setPhase(d.phase);
+      }
     }
     load();
     return () => { active = false; };
@@ -190,6 +221,7 @@ export default function ScoutShortSnapsPage() {
       entries: entriesWithNotes as unknown as Record<string, unknown>[],
     });
     await setSessionRankings(tid, sessionId, rankingIds);
+    clearChartDraft(DRAFT_KEY);
     setSaved(true);
     setShowRankings(false);
   };
