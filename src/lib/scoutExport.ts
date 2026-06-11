@@ -296,17 +296,24 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
   doc.setFillColor(0, 0, 0);
   doc.roundedRect(x, y, w, h, r, r, "F");
 
-  // Silhouette — holder for short snaps, punter for long, matching the live components
+  // Silhouette — holder for short snaps, punter for long, matching the live components.
+  // Clip to the panel so the (oversized) image can't spill outside the box — this mirrors
+  // the on-screen `overflow: hidden` container.
   const silhouetteSrc = isShort ? "/holder-silhouette.png?v=7" : "/punter-silhouette.png";
   const imgData = await loadImageAsDataUrl(silhouetteSrc);
   if (imgData) {
     try {
+      doc.saveGraphicsState();
+      doc.rect(x, y, w, h);
+      (doc as any).clip();
+      (doc as any).discardPath();
       doc.setGState(new (doc as any).GState({ opacity: 0.75 }));
       if (isShort) {
-        // Holder sits low-left, taller than the box (height 130%, bottom-anchored)
+        // Holder: 130% of box height, left -7%, anchored with bottom 23% below the box
+        // (so the top sits 7% above the box top), matching HolderStrikeZone.
         const imgH = h * 1.3;
         const imgW = imgH * 0.58;
-        doc.addImage(imgData, "PNG", x - imgW * 0.07, y + h - imgH * 0.77, imgW, imgH);
+        doc.addImage(imgData, "PNG", x - w * 0.07, y - h * 0.07, imgW, imgH);
       } else {
         // Punter is centered, ~62% of box width, anchored near the top
         const imgW = w * 0.62;
@@ -314,7 +321,8 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
         doc.addImage(imgData, "PNG", x + (w - imgW) / 2, y + h * 0.06, imgW, imgH);
       }
       doc.setGState(new (doc as any).GState({ opacity: 1 }));
-    } catch {}
+      doc.restoreGraphicsState();
+    } catch { doc.restoreGraphicsState(); }
   }
 
   // Strike zone — defaults mirror DEFAULT_HOLDER_ZONE / DEFAULT_ZONE from the live components
@@ -342,7 +350,8 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
     if (e.markerX == null || e.markerY == null) return;
     const mx = x + (e.markerX / 100) * w;
     const my = y + (e.markerY / 100) * h;
-    const inZone = e.markerInZone ?? false;
+    // Long snaps don't persist markerInZone — fall back to accuracy (Strike = in zone).
+    const inZone = e.markerInZone != null ? e.markerInZone : e.accuracy === "Strike";
     if (inZone) { doc.setFillColor(0, 212, 160); doc.setDrawColor(0, 212, 160); }
     else { doc.setFillColor(239, 68, 68); doc.setDrawColor(239, 68, 68); }
     doc.setLineWidth(0.5);
