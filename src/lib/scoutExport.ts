@@ -428,3 +428,90 @@ export async function exportSnapScoutPDF(sessions: ScoutSession[]) {
   await addAppLogoToPDFFooter(doc as any, false);
   doc.save("Snap_Scout_Rankings.pdf");
 }
+
+// ── Single chart (one athlete) PDF — download or share ───────────────────────
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function singleChartTable(session: ScoutSession, athlete: string): { sub: string; head: string[]; body: string[][]; summary: string } {
+  const sport = session.sport;
+  const entries = (session.entries as any[]).filter((e) => e.athlete === athlete);
+  const date = new Date(session.date).toLocaleDateString();
+  if (sport === "SCOUT_FG") {
+    const makes = entries.filter((e) => e.result === "make").length;
+    const pts = entries.reduce((s, e) => s + (Number(e.score) || 0), 0);
+    return {
+      sub: `FG Chart · ${date}`,
+      head: ["#", "Dist", "Hash", "Pts", "Result"],
+      body: entries.map((e, i) => [String(i + 1), String(e.distance), String(e.hash), String(e.pointValue), e.result === "make" ? "Good" : "Miss"]),
+      summary: `${makes}/${entries.length} made · ${pts} pts`,
+    };
+  }
+  if (sport === "SCOUT_KO" || sport === "SCOUT_PUNT") {
+    const scores = entries.map((e) => Number(e.score) || 0);
+    const avg = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0;
+    const isP = sport === "SCOUT_PUNT";
+    return {
+      sub: `${isP ? "Punt" : "Kickoff"} Chart · ${date}`,
+      head: isP ? ["#", "Dist", "Hang", "Op", "Dir", "Score"] : ["#", "Dist", "Hang", "Dir", "Score"],
+      body: entries.map((e, i) => isP
+        ? [String(i + 1), String(e.distance), Number(e.hangTime).toFixed(2), e.opTime != null ? Number(e.opTime).toFixed(2) : "-", e.directionGood === false ? "Bad" : "Good", Number(e.score).toFixed(2)]
+        : [String(i + 1), String(e.distance), Number(e.hangTime).toFixed(2), e.directionGood === false ? "Bad" : "Good", Number(e.score).toFixed(2)]),
+      summary: `${avg.toFixed(2)} avg score`,
+    };
+  }
+  const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
+  const total = entries.reduce((s, e) => s + (typeof e.points === "number" ? e.points : (Number(e.score) || 0)), 0);
+  const max = isShort ? entries.length * 3 : entries.length;
+  return {
+    sub: `Snap (${isShort ? "Short" : "Long"}) Chart · ${date}`,
+    head: isShort ? ["#", "Loc", "Laces", "Spiral", "Pts"] : ["#", "Call", "Time", "Spiral", "Score"],
+    body: entries.map((e, i) => isShort
+      ? [String(i + 1), e.accuracy ?? "", e.laces === "Good" ? "Perfect" : (e.laces ?? ""), e.spiral === "Good" ? "Tight" : "Open", String(e.points ?? 0)]
+      : [String(i + 1), e.accuracy ?? "", e.time || "-", e.spiral === "Good" ? "Tight" : "Open", String(e.score ?? 0)]),
+    summary: `${total}/${max}`,
+  };
+}
+
+async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPDF> {
+  const doc = new jsPDF();
+  const t = singleChartTable(session, athlete);
+  doc.setFontSize(16);
+  doc.text(athlete, 14, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(120);
+  doc.text(t.sub, 14, 25);
+  doc.setTextColor(0);
+  doc.setFontSize(11);
+  doc.text(t.summary, 14, 33);
+  autoTable(doc, { head: [t.head], body: t.body, startY: 38, styles: { fontSize: 10 } });
+  addLogoToPDF(doc as any);
+  await addAppLogoToPDFFooter(doc as any, false);
+  return doc;
+}
+
+const chartFileName = (session: ScoutSession, athlete: string) =>
+  `${athlete}_${session.sport.replace("SCOUT_", "")}_Chart.pdf`.replace(/\s+/g, "_");
+
+export async function downloadChartPDF(session: ScoutSession, athlete: string): Promise<void> {
+  const doc = await chartPDFDoc(session, athlete);
+  doc.save(chartFileName(session, athlete));
+}
+
+/** Share a single chart PDF via the native share sheet (email/text/etc.); falls back to download. */
+export async function shareChartPDF(session: ScoutSession, athlete: string): Promise<"shared" | "downloaded"> {
+  const doc = await chartPDFDoc(session, athlete);
+  const filename = chartFileName(session, athlete);
+  const blob = doc.output("blob");
+  const file = new File([blob], filename, { type: "application/pdf" });
+  const nav = navigator as any;
+  if (nav.canShare && nav.canShare({ files: [file] })) {
+    try {
+      await nav.share({ files: [file], title: `${athlete} — Scout Chart` });
+      return "shared";
+    } catch {
+      // user cancelled or share failed — fall through to download
+    }
+  }
+  doc.save(filename);
+  return "downloaded";
+}

@@ -8,6 +8,7 @@ import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { RankingTabs } from "@/components/ui/RankingTabs";
 import { EditChartModal } from "@/components/ui/EditChartModal";
 import { EditChartChooser, type ChooserItem } from "@/components/ui/EditChartChooser";
+import { ChartActionModal } from "@/components/ui/ChartActionModal";
 import { createClient } from "@/lib/supabase";
 import { exportFGScoutExcel, exportFGScoutPDF } from "@/lib/scoutExport";
 import { ExportButton } from "@/components/ui/ExportButton";
@@ -39,6 +40,7 @@ function ScoutFGInner() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editTarget, setEditTarget] = useState<{ sessionId: string; name: string } | null>(null);
   const [showEditChooser, setShowEditChooser] = useState(false);
+  const [actionTarget, setActionTarget] = useState<{ sessionId: string; name: string } | null>(null);
   const [infoModal, setInfoModal] = useState<{ name: string; notes?: string; weather?: string; date?: string; sessionId?: string } | null>(null);
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [rankings, setRankings] = useState<ScoutRanking[]>([{ id: "overall", name: "Overall" }]);
@@ -416,9 +418,6 @@ function ScoutFGInner() {
                 <ExportButton onExcel={() => exportFGScoutExcel(rankedSessions)} onPDF={() => exportFGScoutPDF(rankedSessions)} />
                 <button onClick={() => { setSelectMode(!selectMode); setSelectedRows(new Set()); }} className={clsx("px-3 py-1.5 text-xs font-semibold rounded-input border transition-all", selectMode ? "border-accent bg-accent/10 text-accent" : "border-border text-muted hover:text-white hover:border-slate-500")}>{selectMode ? "Cancel" : "Select"}</button>
                 {selectMode && selectedRows.size > 0 && (
-                  <button onClick={handleEditSelected} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-all">Edit ({selectedRows.size})</button>
-                )}
-                {selectMode && selectedRows.size > 0 && (
                   <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-all">Delete ({selectedRows.size})</button>
                 )}
               </div>
@@ -453,11 +452,11 @@ function ScoutFGInner() {
                             {presetData.map((r, i) => {
                               const rowKey = `${r.sessionId}|||${r.name}`;
                               return (
-                              <tr key={rowKey} className={clsx("border-t border-border/30", selectedRows.has(rowKey) && "bg-accent/10")}>
+                              <tr key={rowKey} onClick={() => { if (!selectMode) setActionTarget({ sessionId: r.sessionId, name: r.name }); }} className={clsx("border-t border-border/30", !selectMode && "cursor-pointer hover:bg-surface-2/40", selectedRows.has(rowKey) && "bg-accent/10")}>
                                 {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                                 <td className="py-1 px-2 font-semibold text-slate-200">
                                   <span className="text-muted mr-1">{i + 1}.</span>
-                                  <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); }} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                                 </td>
                                 {r.entries.map((e, j) => (
                                   <td key={j} className="text-center py-1 px-1">
@@ -472,8 +471,8 @@ function ScoutFGInner() {
                                 <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
                                 <td className="text-center py-1 px-1">
                                   <div className="flex items-center gap-1">
-                                    <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId })} className={clsx("text-[10px] px-1 py-0.5 rounded transition-colors", r.notes || r.weather ? "text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20" : "text-muted hover:text-amber-400 border border-border")}>Info</button>
-                                    {!selectMode && <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
+                                    <button onClick={(e) => { e.stopPropagation(); setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId }); }} className={clsx("text-[10px] px-1 py-0.5 rounded transition-colors", r.notes || r.weather ? "text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20" : "text-muted hover:text-amber-400 border border-border")}>Info</button>
+                                    {!selectMode && <button onClick={(e) => { e.stopPropagation(); handleDeleteRow(r.name, r.sessionId); }} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
                                   </div>
                                 </td>
                               </tr>
@@ -510,11 +509,11 @@ function ScoutFGInner() {
                               const pct = r.att > 0 ? Math.round((r.makes / r.att) * 100) : 0;
                               const rowKey = `${r.sessionId}|||${r.name}`;
                               return (
-                                <tr key={rowKey} className={clsx("border-t border-border/30", selectedRows.has(rowKey) && "bg-accent/10")}>
+                                <tr key={rowKey} onClick={() => { if (!selectMode) setActionTarget({ sessionId: r.sessionId, name: r.name }); }} className={clsx("border-t border-border/30", !selectMode && "cursor-pointer hover:bg-surface-2/40", selectedRows.has(rowKey) && "bg-accent/10")}>
                                   {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                                   <td className="py-1 px-2 font-semibold text-slate-200">
                                     <span className="text-muted mr-1">{i + 1}.</span>
-                                    <button onClick={() => setProfileOpen(r.name)} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); }} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                                   </td>
                                   {r.entries.map((e, j) => (
                                     <td key={j} className="text-center py-1 px-1">
@@ -529,8 +528,8 @@ function ScoutFGInner() {
                                   <td className="text-right py-1 px-2 font-black text-amber-400">{r.makes}/{r.att} <span className="text-[10px]">({pct}%)</span></td>
                                   <td className="text-center py-1 px-1">
                                     <div className="flex items-center gap-1">
-                                      <button onClick={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId })} className={clsx("text-[10px] px-1 py-0.5 rounded transition-colors", r.notes || r.weather ? "text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20" : "text-muted hover:text-amber-400 border border-border")}>Info</button>
-                                      {!selectMode && <button onClick={() => handleDeleteRow(r.name, r.sessionId)} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
+                                      <button onClick={(e) => { e.stopPropagation(); setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId }); }} className={clsx("text-[10px] px-1 py-0.5 rounded transition-colors", r.notes || r.weather ? "text-amber-400 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20" : "text-muted hover:text-amber-400 border border-border")}>Info</button>
+                                      {!selectMode && <button onClick={(e) => { e.stopPropagation(); handleDeleteRow(r.name, r.sessionId); }} className="text-[10px] text-muted hover:text-miss transition-colors">&times;</button>}
                                     </div>
                                   </td>
                                 </tr>
@@ -563,6 +562,16 @@ function ScoutFGInner() {
           date={infoModal.date}
           onSave={handleInfoSave}
           onClose={() => setInfoModal(null)}
+        />
+      )}
+
+      {actionTarget && sessions.find((s) => s.id === actionTarget.sessionId) && (
+        <ChartActionModal
+          session={sessions.find((s) => s.id === actionTarget.sessionId)!}
+          athlete={actionTarget.name}
+          numbers={scoutNumbers}
+          onEdit={() => { setEditTarget(actionTarget); setActionTarget(null); }}
+          onClose={() => setActionTarget(null)}
         />
       )}
 
