@@ -311,6 +311,18 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
     shiftX = 0.5 - (zone.left + zone.right) / 2;
     shiftY = 0.5 - (zone.top + zone.bottom) / 2;
     zone = { left: zone.left + shiftX, right: zone.right + shiftX, top: zone.top + shiftY, bottom: zone.bottom + shiftY };
+    // Holder figure (white line-art on black) sized to fit INSIDE the panel so its black
+    // background blends with the panel and never spills outside. Bottom-left anchored.
+    const imgData = await loadImageAsDataUrl("/holder-silhouette.png?v=7");
+    if (imgData) {
+      try {
+        const imgH = h * 0.96;
+        const imgW = imgH * (544 / 720); // preserve the PNG's aspect ratio
+        doc.setGState(new (doc as any).GState({ opacity: 0.9 }));
+        doc.addImage(imgData, "PNG", x + w * 0.01, y + h - imgH, imgW, imgH);
+        doc.setGState(new (doc as any).GState({ opacity: 1 }));
+      } catch {}
+    }
   } else {
     const imgData = await loadImageAsDataUrl("/punter-silhouette.png");
     if (imgData) {
