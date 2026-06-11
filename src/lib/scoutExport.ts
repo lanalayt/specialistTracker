@@ -296,39 +296,39 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
   doc.setFillColor(0, 0, 0);
   doc.roundedRect(x, y, w, h, r, r, "F");
 
-  // Silhouette — holder for short snaps, punter for long, matching the live components.
-  // Clip to the panel so the (oversized) image can't spill outside the box — this mirrors
-  // the on-screen `overflow: hidden` container.
-  const silhouetteSrc = isShort ? "/holder-silhouette.png?v=7" : "/punter-silhouette.png";
-  const imgData = await loadImageAsDataUrl(silhouetteSrc);
-  if (imgData) {
-    try {
-      doc.saveGraphicsState();
-      doc.rect(x, y, w, h);
-      (doc as any).clip();
-      (doc as any).discardPath();
-      doc.setGState(new (doc as any).GState({ opacity: 0.75 }));
-      if (isShort) {
-        // Holder: 130% of box height, left -7%, anchored with bottom 23% below the box
-        // (so the top sits 7% above the box top), matching HolderStrikeZone.
-        const imgH = h * 1.3;
-        const imgW = imgH * 0.58;
-        doc.addImage(imgData, "PNG", x - w * 0.07, y - h * 0.07, imgW, imgH);
-      } else {
-        // Punter is centered, ~62% of box width, anchored near the top
+  // Strike zone defaults (fraction of panel) mirror DEFAULT_HOLDER_ZONE / DEFAULT_ZONE.
+  let zone = isShort
+    ? { top: 0.45, bottom: 0.78, left: 0.42, right: 0.76 }
+    : { top: 0.34, bottom: 0.68, left: 0.33, right: 0.67 };
+
+  // Short snaps: the holder silhouette PNG doesn't render cleanly (baked-in background),
+  // so we omit it and instead CENTER the zone in the panel, translating every marker by
+  // the same offset so in/out-of-zone stays exactly correct. Long snaps keep the punter
+  // silhouette, which is a clean transparent cutout that renders well.
+  let shiftX = 0;
+  let shiftY = 0;
+  if (isShort) {
+    shiftX = 0.5 - (zone.left + zone.right) / 2;
+    shiftY = 0.5 - (zone.top + zone.bottom) / 2;
+    zone = { left: zone.left + shiftX, right: zone.right + shiftX, top: zone.top + shiftY, bottom: zone.bottom + shiftY };
+  } else {
+    const imgData = await loadImageAsDataUrl("/punter-silhouette.png");
+    if (imgData) {
+      try {
+        doc.saveGraphicsState();
+        doc.rect(x, y, w, h);
+        (doc as any).clip();
+        (doc as any).discardPath();
+        doc.setGState(new (doc as any).GState({ opacity: 0.75 }));
         const imgW = w * 0.62;
         const imgH = imgW * 1.9;
         doc.addImage(imgData, "PNG", x + (w - imgW) / 2, y + h * 0.06, imgW, imgH);
-      }
-      doc.setGState(new (doc as any).GState({ opacity: 1 }));
-      doc.restoreGraphicsState();
-    } catch { doc.restoreGraphicsState(); }
+        doc.setGState(new (doc as any).GState({ opacity: 1 }));
+        doc.restoreGraphicsState();
+      } catch { doc.restoreGraphicsState(); }
+    }
   }
 
-  // Strike zone — defaults mirror DEFAULT_HOLDER_ZONE / DEFAULT_ZONE from the live components
-  const zone = isShort
-    ? { top: 0.45, bottom: 0.78, left: 0.42, right: 0.76 }
-    : { top: 0.34, bottom: 0.68, left: 0.33, right: 0.67 };
   const zLeft = x + w * zone.left;
   const zTop = y + h * zone.top;
   const zW = w * (zone.right - zone.left);
@@ -348,8 +348,8 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
   const mr = w * 0.038;
   entries.forEach((e, i) => {
     if (e.markerX == null || e.markerY == null) return;
-    const mx = x + (e.markerX / 100) * w;
-    const my = y + (e.markerY / 100) * h;
+    const mx = x + (e.markerX / 100 + shiftX) * w;
+    const my = y + (e.markerY / 100 + shiftY) * h;
     // Long snaps don't persist markerInZone — fall back to accuracy (Strike = in zone).
     const inZone = e.markerInZone != null ? e.markerInZone : e.accuracy === "Strike";
     if (inZone) { doc.setFillColor(0, 212, 160); doc.setDrawColor(0, 212, 160); }
@@ -493,14 +493,11 @@ function singleChartTable(session: ScoutSession, athlete: string): { sub: string
 /** Does this snap chart have placed markers worth drawing a diagram for? */
 function snapDiagramInfo(session: ScoutSession, athlete: string): { isShort: boolean; boxW: number; boxH: number } | null {
   if (session.sport !== "SCOUT_SNAP") return null;
-  const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
-  // Short-snap (holder) diagram doesn't render cleanly in the data-driven PDF, so we
-  // only include the long-snap (punter) diagram here; short snaps are table-only.
-  if (isShort) return null;
   const entries = (session.entries as any[]).filter((e) => e.athlete === athlete);
   if (!entries.some((e) => e.markerX != null && e.markerY != null)) return null;
+  const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
   const boxW = 90;
-  const boxH = boxW * 1.25;
+  const boxH = isShort ? boxW * 260 / 300 : boxW * 1.25;
   return { isShort, boxW, boxH };
 }
 
