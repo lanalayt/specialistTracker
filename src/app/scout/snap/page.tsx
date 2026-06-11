@@ -474,7 +474,7 @@ function ScoutSnapInner() {
             </div>
 
             {/* Snap-by-snap table */}
-            <p className="text-[10px] text-muted text-center">Tap a snap to edit</p>
+            <p className="text-[10px] text-muted text-center">Click a chart to edit</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>

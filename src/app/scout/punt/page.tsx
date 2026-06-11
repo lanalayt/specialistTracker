@@ -424,7 +424,7 @@ function ScoutPuntInner() {
               <p className="text-sm text-muted py-8 text-center">No scout data yet.</p>
             ) : (
               <div className="card space-y-3">
-                <p className="text-[10px] text-muted text-center">Tap a kick to edit</p>
+                <p className="text-[10px] text-muted text-center">Click a chart to edit</p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
