@@ -472,7 +472,7 @@ function singleChartTable(session: ScoutSession, athlete: string): { sub: string
   };
 }
 
-function drawChart(doc: jsPDF, session: ScoutSession, athlete: string) {
+async function drawChart(doc: jsPDF, session: ScoutSession, athlete: string) {
   const t = singleChartTable(session, athlete);
   doc.setFontSize(16);
   doc.text(athlete, 14, 18);
@@ -482,12 +482,24 @@ function drawChart(doc: jsPDF, session: ScoutSession, athlete: string) {
   doc.setTextColor(0);
   doc.setFontSize(11);
   doc.text(t.summary, 14, 33);
-  autoTable(doc, { head: [t.head], body: t.body, startY: 38, styles: { fontSize: 10 } });
+  let tableY = 38;
+  // Snap charts: draw the strike-zone diagram with markers above the table.
+  if (session.sport === "SCOUT_SNAP") {
+    const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
+    const ae = (session.entries as unknown as SnapEntry[])
+      .filter((e) => e.athlete === athlete)
+      .map((e) => ({ ...e, markerInZone: isShort ? (e.markerInZone ?? false) : e.accuracy === "Strike" }));
+    if (ae.some((e) => e.markerX != null && e.markerY != null)) {
+      await drawSnapDiagram(doc, ae, 14, 38, 70, 84, isShort);
+      tableY = 38 + 84 + 8;
+    }
+  }
+  autoTable(doc, { head: [t.head], body: t.body, startY: tableY, styles: { fontSize: 10 } });
 }
 
 async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPDF> {
   const doc = new jsPDF();
-  drawChart(doc, session, athlete);
+  await drawChart(doc, session, athlete);
   addLogoToPDF(doc as any);
   await addAppLogoToPDFFooter(doc as any, false);
   return doc;
@@ -496,10 +508,10 @@ async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPD
 /** A single PDF combining several charts (one page each). */
 async function chartsPDFDoc(items: { session: ScoutSession; athlete: string }[]): Promise<jsPDF> {
   const doc = new jsPDF();
-  items.forEach((it, idx) => {
+  for (let idx = 0; idx < items.length; idx++) {
     if (idx > 0) doc.addPage();
-    drawChart(doc, it.session, it.athlete);
-  });
+    await drawChart(doc, items[idx].session, items[idx].athlete);
+  }
   addLogoToPDF(doc as any);
   await addAppLogoToPDFFooter(doc as any, false);
   return doc;
