@@ -6,11 +6,15 @@ import clsx from "clsx";
 
 type Rep = Record<string, unknown>;
 
+interface KickSlot { kickNum: number; distance: number; hash: string; pointValue: number }
+
 interface Props {
   teamId: string;
   session: ScoutSession;
   athlete: string;
   numbers?: Record<string, string>;
+  /** FG preset positions (columns) so an added kick fills the right column. */
+  kickSlots?: KickSlot[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -49,7 +53,7 @@ function blankRep(sport: string, athlete: string, label: string): Rep {
   return { ...base, accuracy: "Strike", spiral: "Good", time: "", score: 1 };
 }
 
-export function EditChartModal({ teamId, session, athlete, numbers, onClose, onSaved }: Props) {
+export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, onClose, onSaved }: Props) {
   const sport = session.sport;
   const short = isShortSnap(session.label);
   const [reps, setReps] = useState<Rep[]>(() =>
@@ -61,6 +65,40 @@ export function EditChartModal({ teamId, session, athlete, numbers, onClose, onS
     setReps((prev) => prev.map((r, j) => (j === i ? recompute(sport, session.label, { ...r, [key]: value }) : r)));
   const addRep = () => setReps((prev) => [...prev, blankRep(sport, athlete, session.label)]);
   const removeRep = (i: number) => setReps((prev) => prev.filter((_, j) => j !== i));
+
+  // Only an FG *preset* chart has fixed kick positions (columns).
+  const isPresetChart = (() => {
+    if (sport !== "SCOUT_FG") return false;
+    const mode = (session.entries[0] as { chartMode?: string } | undefined)?.chartMode;
+    if (mode) return mode === "preset";
+    const entries = session.entries as Rep[];
+    const names = [...new Set(entries.map((e) => (e as { athlete?: string }).athlete))];
+    if (names.length < 2) return false;
+    const seq = (a: string) => entries.filter((e) => (e as { athlete?: string }).athlete === a).map((e) => `${e.distance}-${e.hash}`).join(",");
+    const first = seq(names[0]!);
+    return names.every((a) => seq(a!) === first);
+  })();
+
+  // For an FG preset chart, the kick positions (columns) come from the rankings
+  // (kickSlots) or, as a fallback, the distinct kick numbers in this session.
+  // Offer the ones this athlete is missing so an added kick fills the right
+  // column (e.g. 35R) instead of landing in a new one.
+  const presetSlots = !isPresetChart
+    ? []
+    : kickSlots && kickSlots.length > 0
+      ? [...kickSlots].sort((a, b) => a.kickNum - b.kickNum)
+      : (() => {
+          const m = new Map<number, KickSlot>();
+          for (const e of session.entries as Rep[]) {
+            const kn = typeof e.kickNum === "number" ? (e.kickNum as number) : null;
+            if (kn != null && !m.has(kn)) m.set(kn, { kickNum: kn, distance: Number(e.distance) || 0, hash: String(e.hash ?? "M"), pointValue: Number(e.pointValue) || 1 });
+          }
+          return [...m.values()].sort((a, b) => a.kickNum - b.kickNum);
+        })();
+  const usedKickNums = new Set(reps.map((r) => r.kickNum));
+  const missingSlots = presetSlots.filter((s) => !usedKickNums.has(s.kickNum));
+  const addSlot = (s: { kickNum: number; distance: number; hash: string; pointValue: number }) =>
+    setReps((prev) => [...prev, recompute(sport, session.label, { athlete, kickNum: s.kickNum, distance: s.distance, hash: s.hash, pointValue: s.pointValue, result: "make" })]);
 
   const save = async () => {
     setSaving(true);
@@ -146,6 +184,17 @@ export function EditChartModal({ teamId, session, athlete, numbers, onClose, onS
             </div>
           ))}
         </div>
+
+        {missingSlots.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[10px] text-muted">Add a missing kick:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {missingSlots.map((s) => (
+                <button key={s.kickNum} onClick={() => addSlot(s)} className="px-2.5 py-1 rounded-input text-[10px] font-bold bg-surface-2 text-amber-400 border border-amber-500/40 hover:bg-amber-500/10 transition-all">+ {s.distance}{s.hash}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <button onClick={addRep} className="btn-ghost w-full py-2 text-xs font-bold border border-amber-500/40 text-amber-400">+ Add Rep</button>
 

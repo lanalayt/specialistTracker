@@ -178,10 +178,10 @@ function ScoutFGInner() {
   const liveMaxKicks = liveData.length > 0 ? Math.max(...liveData.map((a) => a.entries.length)) : 0;
   // Preset columns keyed by kick number, spanning ALL preset charts. This keeps each
   // kick in its true position — e.g. a chart of kicks 6-10 lands in columns 6-10, not 1-5.
-  const presetColMap = new Map<number, { dist: number; hash: string }>();
+  const presetColMap = new Map<number, { dist: number; hash: string; pointValue: number }>();
   for (const r of presetData) {
     for (const e of r.entries) {
-      if (!presetColMap.has(e.kickNum)) presetColMap.set(e.kickNum, { dist: e.distance, hash: e.hash });
+      if (!presetColMap.has(e.kickNum)) presetColMap.set(e.kickNum, { dist: e.distance, hash: e.hash, pointValue: e.pointValue ?? 1 });
     }
   }
   const presetCols = [...presetColMap.entries()].sort((a, b) => a[0] - b[0]).map(([kickNum, c]) => ({ kickNum, ...c }));
@@ -598,6 +598,7 @@ function ScoutFGInner() {
           session={editSession}
           athlete={editTarget.name}
           numbers={scoutNumbers}
+          kickSlots={presetCols.map((c) => ({ kickNum: c.kickNum, distance: c.dist, hash: c.hash, pointValue: c.pointValue }))}
           onClose={() => setEditTarget(null)}
           onSaved={async () => { setEditTarget(null); setSelectMode(false); setSelectedRows(new Set()); await loadData(); }}
         />
