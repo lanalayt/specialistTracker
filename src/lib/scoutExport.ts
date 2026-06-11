@@ -472,8 +472,7 @@ function singleChartTable(session: ScoutSession, athlete: string): { sub: string
   };
 }
 
-async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPDF> {
-  const doc = new jsPDF();
+function drawChart(doc: jsPDF, session: ScoutSession, athlete: string) {
   const t = singleChartTable(session, athlete);
   doc.setFontSize(16);
   doc.text(athlete, 14, 18);
@@ -484,6 +483,23 @@ async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPD
   doc.setFontSize(11);
   doc.text(t.summary, 14, 33);
   autoTable(doc, { head: [t.head], body: t.body, startY: 38, styles: { fontSize: 10 } });
+}
+
+async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPDF> {
+  const doc = new jsPDF();
+  drawChart(doc, session, athlete);
+  addLogoToPDF(doc as any);
+  await addAppLogoToPDFFooter(doc as any, false);
+  return doc;
+}
+
+/** A single PDF combining several charts (one page each). */
+async function chartsPDFDoc(items: { session: ScoutSession; athlete: string }[]): Promise<jsPDF> {
+  const doc = new jsPDF();
+  items.forEach((it, idx) => {
+    if (idx > 0) doc.addPage();
+    drawChart(doc, it.session, it.athlete);
+  });
   addLogoToPDF(doc as any);
   await addAppLogoToPDFFooter(doc as any, false);
   return doc;
@@ -495,6 +511,33 @@ const chartFileName = (session: ScoutSession, athlete: string) =>
 export async function downloadChartPDF(session: ScoutSession, athlete: string): Promise<void> {
   const doc = await chartPDFDoc(session, athlete);
   doc.save(chartFileName(session, athlete));
+}
+
+/** Download several charts combined into one PDF. */
+export async function downloadChartsPDF(items: { session: ScoutSession; athlete: string }[], athlete: string): Promise<void> {
+  if (items.length === 0) return;
+  const doc = await chartsPDFDoc(items);
+  doc.save(`${athlete}_Charts.pdf`.replace(/\s+/g, "_"));
+}
+
+/** Share several charts as one combined PDF via the native share sheet; falls back to download. */
+export async function shareChartsPDF(items: { session: ScoutSession; athlete: string }[], athlete: string): Promise<"shared" | "downloaded"> {
+  if (items.length === 0) return "downloaded";
+  const doc = await chartsPDFDoc(items);
+  const filename = `${athlete}_Charts.pdf`.replace(/\s+/g, "_");
+  const blob = doc.output("blob");
+  const file = new File([blob], filename, { type: "application/pdf" });
+  const nav = navigator as any;
+  if (nav.canShare && nav.canShare({ files: [file] })) {
+    try {
+      await nav.share({ files: [file], title: `${athlete} — Scout Charts` });
+      return "shared";
+    } catch {
+      // fall through
+    }
+  }
+  doc.save(filename);
+  return "downloaded";
 }
 
 /** Share a single chart PDF via the native share sheet (email/text/etc.); falls back to download. */

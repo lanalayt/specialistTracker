@@ -20,6 +20,7 @@ import {
 } from "@/lib/scoutStore";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { SnapChartDetail, type SnapDetailEntry } from "@/components/ui/SnapChartDetail";
+import { downloadChartsPDF, shareChartsPDF } from "@/lib/scoutExport";
 import { Header } from "@/components/layout/Header";
 import clsx from "clsx";
 
@@ -39,6 +40,7 @@ interface AthleteChart {
   isSnap?: boolean;
   is30Point?: boolean;
   snapEntries?: SnapDetailEntry[]; // raw entries for the snap "See Chart" view
+  session: ScoutSession; // source session (for PDF export)
 }
 
 function buildAthleteChart(sport: string, label: string, session: ScoutSession, name: string): AthleteChart | null {
@@ -49,13 +51,13 @@ function buildAthleteChart(sport: string, label: string, session: ScoutSession, 
     const makes = ae.filter((e) => e.result === "make").length;
     const pts = ae.reduce((s, e) => s + num(e, "score"), 0);
     return { label, date: session.date, summary: `${makes}/${ae.length} made · ${pts} pts`,
-      reps: ae.map((e) => `${num(e, "distance")}${(e.hash as string) ?? ""} ${e.result === "make" ? "✓" : "✗"}`) };
+      reps: ae.map((e) => `${num(e, "distance")}${(e.hash as string) ?? ""} ${e.result === "make" ? "✓" : "✗"}`), session };
   }
   if (sport === "SCOUT_KO" || sport === "SCOUT_PUNT") {
     const scores = ae.map((e) => num(e, "score"));
     const avg = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0;
     return { label, date: session.date, summary: `${avg.toFixed(1)} avg score`,
-      reps: ae.map((e) => `${num(e, "distance")}yd · ${num(e, "hangTime").toFixed(2)}s${e.directionGood === false ? " · bad dir" : ""}`) };
+      reps: ae.map((e) => `${num(e, "distance")}yd · ${num(e, "hangTime").toFixed(2)}s${e.directionGood === false ? " · bad dir" : ""}`), session };
   }
   // Snap
   const is30 = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
@@ -69,6 +71,7 @@ function buildAthleteChart(sport: string, label: string, session: ScoutSession, 
     isSnap: true,
     is30Point: is30,
     snapEntries: ae as unknown as SnapDetailEntry[],
+    session,
   };
 }
 
@@ -99,6 +102,34 @@ export default function ScoutAthletesPage() {
   const [chartSessions, setChartSessions] = useState<Record<string, ScoutSession[]>>({});
   const [chartModal, setChartModal] = useState<string | null>(null);
   const [snapDetail, setSnapDetail] = useState<AthleteChart | null>(null);
+  const [chartShareStep, setChartShareStep] = useState<null | "select" | "options">(null);
+  const [selectedShareIdx, setSelectedShareIdx] = useState<Set<number>>(new Set());
+  const [shareBusy, setShareBusy] = useState(false);
+
+  const closeChartModal = () => { setChartModal(null); setChartShareStep(null); setSelectedShareIdx(new Set()); };
+  const toggleShareSel = (i: number) => setSelectedShareIdx((prev) => {
+    const n = new Set(prev);
+    if (n.has(i)) n.delete(i); else n.add(i);
+    return n;
+  });
+  const shareItems = (name: string) => {
+    const charts = getAthleteCharts(name);
+    return [...selectedShareIdx].map((i) => ({ session: charts[i].session, athlete: name }));
+  };
+  const doDownloadCharts = async () => {
+    if (!chartModal) return;
+    setShareBusy(true);
+    await downloadChartsPDF(shareItems(chartModal), chartModal);
+    setShareBusy(false);
+    closeChartModal();
+  };
+  const doSendCharts = async () => {
+    if (!chartModal) return;
+    setShareBusy(true);
+    await shareChartsPDF(shareItems(chartModal), chartModal);
+    setShareBusy(false);
+    closeChartModal();
+  };
   const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
 
   // All completed charts for an athlete, across every discipline, newest first.
@@ -417,42 +448,78 @@ export default function ScoutAthletesPage() {
         );
       })()}
 
-      {chartModal && (
+      {chartModal && (() => {
+        const charts = getAthleteCharts(chartModal);
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setChartModal(null)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeChartModal} />
           <div className="relative bg-surface border border-border rounded-xl w-full max-w-md mx-4 p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-100">{scoutDisplayName(chartModal)} — Completed Charts</h3>
-              <button onClick={() => setChartModal(null)} className="text-muted hover:text-white text-xs transition-colors">Close</button>
+              <h3 className="text-sm font-bold text-slate-100">{scoutDisplayName(chartModal)} — {chartShareStep ? "Share Charts" : "Completed Charts"}</h3>
+              <div className="flex items-center gap-3">
+                {chartShareStep === null && charts.length > 0 && (
+                  <button onClick={() => { setChartShareStep("select"); setSelectedShareIdx(new Set()); }} className="text-[11px] font-semibold text-amber-400 hover:underline">Share</button>
+                )}
+                <button onClick={closeChartModal} className="text-muted hover:text-white text-xs transition-colors">Close</button>
+              </div>
             </div>
-            <div className="space-y-3">
-              {getAthleteCharts(chartModal).map((c, i) => (
-                <div key={i} className="card-2 p-3 space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">{c.label}</span>
-                      <span className="text-[10px] text-muted ml-2">{new Date(c.date).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-black text-slate-100">{c.summary}</span>
-                      {c.isSnap && (
-                        <button onClick={() => setSnapDetail(c)} className="text-[10px] px-2 py-0.5 rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors font-semibold">See Chart</button>
+
+            {chartShareStep === "options" ? (
+              <div className="space-y-2">
+                <p className="text-[10px] text-muted">{selectedShareIdx.size} chart{selectedShareIdx.size !== 1 ? "s" : ""} combined into one PDF.</p>
+                <button onClick={doDownloadCharts} disabled={shareBusy} className="btn-primary w-full py-2.5 text-sm font-bold disabled:opacity-40">Download PDF</button>
+                <button onClick={doSendCharts} disabled={shareBusy} className="btn-ghost w-full py-2.5 text-sm font-bold border border-border disabled:opacity-40">Send via Email / Text</button>
+                <button onClick={() => setChartShareStep("select")} className="w-full text-center text-xs text-muted hover:text-white transition-colors">&larr; Back</button>
+              </div>
+            ) : (
+              <>
+                {chartShareStep === "select" && <p className="text-[10px] text-muted">Select the charts to share.</p>}
+                <div className="space-y-3">
+                  {charts.map((c, i) => (
+                    <div
+                      key={i}
+                      onClick={() => { if (chartShareStep === "select") toggleShareSel(i); }}
+                      className={clsx("card-2 p-3 space-y-1.5", chartShareStep === "select" && "cursor-pointer", chartShareStep === "select" && selectedShareIdx.has(i) && "ring-1 ring-amber-500")}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {chartShareStep === "select" && (
+                            <span className={clsx("w-4 h-4 rounded border flex items-center justify-center text-[10px] shrink-0", selectedShareIdx.has(i) ? "bg-amber-500 border-amber-500 text-slate-900" : "border-border")}>{selectedShareIdx.has(i) ? "✓" : ""}</span>
+                          )}
+                          <div>
+                            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">{c.label}</span>
+                            <span className="text-[10px] text-muted ml-2">{new Date(c.date).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs font-black text-slate-100">{c.summary}</span>
+                          {c.isSnap && chartShareStep === null && (
+                            <button onClick={(e) => { e.stopPropagation(); setSnapDetail(c); }} className="text-[10px] px-2 py-0.5 rounded-input border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors font-semibold">See Chart</button>
+                          )}
+                        </div>
+                      </div>
+                      {!c.isSnap && c.reps.length > 0 && chartShareStep === null && (
+                        <div className="flex flex-wrap gap-1">
+                          {c.reps.map((r, j) => (
+                            <span key={j} className="text-[10px] text-slate-300 bg-surface border border-border/50 rounded px-1.5 py-0.5">{r}</span>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  </div>
-                  {!c.isSnap && c.reps.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {c.reps.map((r, j) => (
-                        <span key={j} className="text-[10px] text-slate-300 bg-surface border border-border/50 rounded px-1.5 py-0.5">{r}</span>
-                      ))}
-                    </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
+                {chartShareStep === "select" && (
+                  <div className="flex gap-2">
+                    <button onClick={() => { setChartShareStep(null); setSelectedShareIdx(new Set()); }} className="btn-ghost flex-1 py-2.5 text-xs">Cancel</button>
+                    <button onClick={() => setChartShareStep("options")} disabled={selectedShareIdx.size === 0} className="btn-primary flex-1 py-2.5 text-xs font-bold disabled:opacity-40">Share{selectedShareIdx.size > 0 ? ` (${selectedShareIdx.size})` : ""}</button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {snapDetail && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
