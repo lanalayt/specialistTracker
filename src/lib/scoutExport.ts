@@ -493,11 +493,14 @@ function singleChartTable(session: ScoutSession, athlete: string): { sub: string
 /** Does this snap chart have placed markers worth drawing a diagram for? */
 function snapDiagramInfo(session: ScoutSession, athlete: string): { isShort: boolean; boxW: number; boxH: number } | null {
   if (session.sport !== "SCOUT_SNAP") return null;
+  const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
+  // Short-snap (holder) diagram doesn't render cleanly in the data-driven PDF, so we
+  // only include the long-snap (punter) diagram here; short snaps are table-only.
+  if (isShort) return null;
   const entries = (session.entries as any[]).filter((e) => e.athlete === athlete);
   if (!entries.some((e) => e.markerX != null && e.markerY != null)) return null;
-  const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
   const boxW = 90;
-  const boxH = isShort ? boxW * 260 / 300 : boxW * 1.25;
+  const boxH = boxW * 1.25;
   return { isShort, boxW, boxH };
 }
 
