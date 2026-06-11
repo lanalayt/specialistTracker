@@ -150,18 +150,18 @@ function ScoutFGInner() {
   for (const s of rankedSessions) {
     const entries = s.entries as unknown as (FGEntry & { chartMode?: string; notes?: string })[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
-    // Use chartMode tag if present, otherwise fallback: preset requires 2+ athletes with identical kick sequences
-    const mode = entries[0]?.chartMode;
+    // Use chartMode tag if present (check every entry — editing an athlete can shift
+    // the tagged entry off index 0). Otherwise fall back: preset requires 2+ athletes
+    // with the same set of kicks (order-independent, so a missing-then-added kick still
+    // counts as preset).
+    const mode = entries.find((e) => e.chartMode)?.chartMode;
     let isPreset: boolean;
     if (mode) {
       isPreset = mode === "preset";
     } else {
-      const firstAthlete = athletes[0];
-      const firstKicks = entries.filter((e) => e.athlete === firstAthlete).map((e) => `${e.distance}-${e.hash}`);
-      isPreset = athletes.length >= 2 && athletes.every((a) => {
-        const kicks = entries.filter((e) => e.athlete === a).map((e) => `${e.distance}-${e.hash}`);
-        return kicks.length === firstKicks.length && kicks.every((k, i) => k === firstKicks[i]);
-      });
+      const sig = (a: string) => entries.filter((e) => e.athlete === a).map((e) => `${e.distance}-${e.hash}`).sort().join(",");
+      const firstSig = sig(athletes[0]);
+      isPreset = athletes.length >= 2 && athletes.every((a) => sig(a) === firstSig);
     }
     for (const name of athletes) {
       const ae = entries.filter((e) => e.athlete === name);

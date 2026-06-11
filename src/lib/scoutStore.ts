@@ -175,8 +175,15 @@ export async function updateSessionAthleteEntries(teamId: string, sessionId: str
     const supabase = createClient();
     const { data } = await supabase.from("sessions").select("entries").eq("team_id", teamId).eq("id", sessionId).single();
     if (!data) return false;
-    const others = (data.entries as Record<string, unknown>[]).filter((e) => (e as { athlete?: string }).athlete !== athleteName);
-    const merged = [...others, ...athleteEntries];
+    const all = data.entries as Record<string, unknown>[];
+    // The session-level chart mode (e.g. "preset"/"live") is tagged on the original
+    // first entry. Capture it so editing/reordering an athlete doesn't drop the tag
+    // and silently turn a preset chart into a manual one.
+    const sessionMode = (all.find((e) => (e as { chartMode?: string }).chartMode) as { chartMode?: string } | undefined)?.chartMode;
+    const others = all.filter((e) => (e as { athlete?: string }).athlete !== athleteName);
+    const strip = (e: Record<string, unknown>) => { const { chartMode: _cm, ...rest } = e as { chartMode?: unknown }; return rest as Record<string, unknown>; };
+    const merged = [...others, ...athleteEntries].map(strip);
+    if (sessionMode != null && merged.length > 0) merged[0] = { ...merged[0], chartMode: sessionMode };
     if (merged.length === 0) {
       await supabase.from("sessions").delete().eq("team_id", teamId).eq("id", sessionId);
     } else {

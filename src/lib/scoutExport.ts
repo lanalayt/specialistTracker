@@ -24,18 +24,16 @@ function buildFGRows(sessions: ScoutSession[]) {
   for (const s of sessions) {
     const entries = s.entries as unknown as (FGEntry & { chartMode?: string })[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
-    // Determine preset vs manual
-    const mode = entries[0]?.chartMode;
+    // Determine preset vs manual (tag may have shifted off index 0 after an edit;
+    // fall back to an order-independent kick-set comparison).
+    const mode = entries.find((e) => e.chartMode)?.chartMode;
     let isPreset: boolean;
     if (mode) {
       isPreset = mode === "preset";
     } else {
-      const firstAthlete = athletes[0];
-      const firstKicks = entries.filter((e) => e.athlete === firstAthlete).map((e) => `${e.distance}-${e.hash}`);
-      isPreset = athletes.length >= 2 && athletes.every((a) => {
-        const kicks = entries.filter((e) => e.athlete === a).map((e) => `${e.distance}-${e.hash}`);
-        return kicks.length === firstKicks.length && kicks.every((k, i) => k === firstKicks[i]);
-      });
+      const sig = (a: string) => entries.filter((e) => e.athlete === a).map((e) => `${e.distance}-${e.hash}`).sort().join(",");
+      const firstSig = sig(athletes[0]);
+      isPreset = athletes.length >= 2 && athletes.every((a) => sig(a) === firstSig);
     }
 
     if (isPreset) {

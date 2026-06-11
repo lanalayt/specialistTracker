@@ -69,12 +69,12 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
   // Only an FG *preset* chart has fixed kick positions (columns).
   const isPresetChart = (() => {
     if (sport !== "SCOUT_FG") return false;
-    const mode = (session.entries[0] as { chartMode?: string } | undefined)?.chartMode;
-    if (mode) return mode === "preset";
     const entries = session.entries as Rep[];
+    const mode = (entries.find((e) => (e as { chartMode?: string }).chartMode) as { chartMode?: string } | undefined)?.chartMode;
+    if (mode) return mode === "preset";
     const names = [...new Set(entries.map((e) => (e as { athlete?: string }).athlete))];
     if (names.length < 2) return false;
-    const seq = (a: string) => entries.filter((e) => (e as { athlete?: string }).athlete === a).map((e) => `${e.distance}-${e.hash}`).join(",");
+    const seq = (a: string) => entries.filter((e) => (e as { athlete?: string }).athlete === a).map((e) => `${e.distance}-${e.hash}`).sort().join(",");
     const first = seq(names[0]!);
     return names.every((a) => seq(a!) === first);
   })();
@@ -108,12 +108,14 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
     const note = (session.entries as Rep[]).find((e) => (e as { athlete?: string }).athlete === athlete && (e as { notes?: string }).notes);
     const used = reps.map((r) => (typeof r.kickNum === "number" ? (r.kickNum as number) : 0));
     let nextKick = (used.length ? Math.max(...used) : 0) + 1;
-    const finalReps = reps.map((r, i) => {
+    let finalReps = reps.map((r) => {
       const kickNum = typeof r.kickNum === "number" ? r.kickNum : nextKick++;
-      const rr = recompute(sport, session.label, { ...r, athlete, kickNum });
-      if (i === 0 && note) (rr as { notes?: unknown }).notes = (note as { notes?: unknown }).notes;
-      return rr;
+      return recompute(sport, session.label, { ...r, athlete, kickNum });
     });
+    // Preset charts: keep kicks in column (kickNum) order so an added kick slots into
+    // its correct spot instead of landing at the end.
+    if (isPresetChart) finalReps = [...finalReps].sort((a, b) => (a.kickNum as number) - (b.kickNum as number));
+    if (note && finalReps.length > 0) (finalReps[0] as { notes?: unknown }).notes = (note as { notes?: unknown }).notes;
     const ok = await updateSessionAthleteEntries(teamId, session.id, athlete, finalReps);
     setSaving(false);
     if (ok) onSaved();
