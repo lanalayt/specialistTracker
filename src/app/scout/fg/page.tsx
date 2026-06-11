@@ -175,10 +175,16 @@ function ScoutFGInner() {
   athleteData.sort((a, b) => b.total - a.total);
   const presetData = athleteData.filter((a) => a.isPreset);
   const liveData = athleteData.filter((a) => !a.isPreset);
-  const presetMaxKicks = presetData.length > 0 ? Math.max(...presetData.map((a) => a.entries.length)) : 0;
   const liveMaxKicks = liveData.length > 0 ? Math.max(...liveData.map((a) => a.entries.length)) : 0;
-  // Get preset kick headers (distance + hash from first athlete's entries)
-  const presetKickHeaders: { dist: number; hash: string }[] = presetData.length > 0 ? presetData[0].entries.map((e) => ({ dist: e.distance, hash: e.hash })) : [];
+  // Preset columns keyed by kick number, spanning ALL preset charts. This keeps each
+  // kick in its true position — e.g. a chart of kicks 6-10 lands in columns 6-10, not 1-5.
+  const presetColMap = new Map<number, { dist: number; hash: string }>();
+  for (const r of presetData) {
+    for (const e of r.entries) {
+      if (!presetColMap.has(e.kickNum)) presetColMap.set(e.kickNum, { dist: e.distance, hash: e.hash });
+    }
+  }
+  const presetCols = [...presetColMap.entries()].sort((a, b) => a[0] - b[0]).map(([kickNum, c]) => ({ kickNum, ...c }));
 
   const toggleRowSelection = (key: string) => {
     setSelectedRows((prev) => {
@@ -441,8 +447,8 @@ function ScoutFGInner() {
                             <tr>
                               {selectMode && <th className="w-6 py-1 px-1"></th>}
                               <th className="text-[10px] text-muted text-left py-1 px-2">Name</th>
-                              {presetKickHeaders.map((k, i) => (
-                                <th key={i} className="text-[10px] text-muted text-center py-1 px-1 whitespace-nowrap">{k.dist}yd<br/><span className="text-[8px]">{k.hash}</span></th>
+                              {presetCols.map((k) => (
+                                <th key={k.kickNum} className="text-[10px] text-muted text-center py-1 px-1 whitespace-nowrap">{k.dist}yd<br/><span className="text-[8px]">{k.hash}</span></th>
                               ))}
                               <th className="text-[10px] text-muted text-right py-1 px-2">Total</th>
                               <th className="text-[10px] text-muted text-center py-1 px-1 w-8"></th>
@@ -458,16 +464,18 @@ function ScoutFGInner() {
                                   <span className="text-muted mr-1">{i + 1}.</span>
                                   <button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); }} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                                 </td>
-                                {r.entries.map((e, j) => (
-                                  <td key={j} className="text-center py-1 px-1">
-                                    <span className={clsx("font-bold", e.result === "make" ? "text-make" : "text-miss")}>
-                                      {e.score}
-                                    </span>
-                                  </td>
-                                ))}
-                                {Array.from({ length: presetMaxKicks - r.entries.length }, (_, j) => (
-                                  <td key={`e-${j}`} className="text-center py-1 px-1 text-muted">—</td>
-                                ))}
+                                {presetCols.map((c) => {
+                                  const e = r.entries.find((en) => en.kickNum === c.kickNum);
+                                  return (
+                                    <td key={c.kickNum} className="text-center py-1 px-1">
+                                      {e ? (
+                                        <span className={clsx("font-bold", e.result === "make" ? "text-make" : "text-miss")}>{e.score}</span>
+                                      ) : (
+                                        <span className="text-muted">—</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
                                 <td className="text-right py-1 px-2 font-black text-amber-400">{r.total}</td>
                                 <td className="text-center py-1 px-1">
                                   <div className="flex items-center gap-1">

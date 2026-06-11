@@ -64,10 +64,15 @@ export function EditChartModal({ teamId, session, athlete, numbers, onClose, onS
 
   const save = async () => {
     setSaving(true);
-    // Preserve the athlete's note (if any) on the first rep, renumber, recompute.
+    // Preserve the athlete's note (if any) on the first rep, recompute scores.
+    // Keep each rep's existing kick number (so a chart of e.g. kicks 6-10 stays
+    // aligned to those columns); only assign new numbers to added reps.
     const note = (session.entries as Rep[]).find((e) => (e as { athlete?: string }).athlete === athlete && (e as { notes?: string }).notes);
+    const used = reps.map((r) => (typeof r.kickNum === "number" ? (r.kickNum as number) : 0));
+    let nextKick = (used.length ? Math.max(...used) : 0) + 1;
     const finalReps = reps.map((r, i) => {
-      const rr = recompute(sport, session.label, { ...r, athlete, kickNum: i + 1 });
+      const kickNum = typeof r.kickNum === "number" ? r.kickNum : nextKick++;
+      const rr = recompute(sport, session.label, { ...r, athlete, kickNum });
       if (i === 0 && note) (rr as { notes?: unknown }).notes = (note as { notes?: unknown }).notes;
       return rr;
     });
