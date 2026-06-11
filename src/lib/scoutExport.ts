@@ -292,55 +292,66 @@ async function loadImageAsDataUrl(src: string): Promise<string | null> {
 }
 
 async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: number, w: number, h: number, isShort: boolean) {
-  // Background
-  doc.setFillColor(20, 20, 20);
-  doc.rect(x, y, w, h, "F");
-  // Border
-  doc.setDrawColor(140, 140, 140);
-  doc.setLineWidth(0.5);
-  doc.rect(x, y, w, h);
+  const r = Math.min(w, h) * 0.03; // rounded-corner radius
 
-  // Holder silhouette for short snaps
-  if (isShort) {
-    const imgData = await loadImageAsDataUrl("/holder-silhouette.png?v=7");
-    if (imgData) {
-      try {
+  // Black panel background (matches on-screen strike-zone)
+  doc.setFillColor(0, 0, 0);
+  doc.roundedRect(x, y, w, h, r, r, "F");
+
+  // Silhouette — holder for short snaps, punter for long, matching the live components
+  const silhouetteSrc = isShort ? "/holder-silhouette.png?v=7" : "/punter-silhouette.png";
+  const imgData = await loadImageAsDataUrl(silhouetteSrc);
+  if (imgData) {
+    try {
+      doc.setGState(new (doc as any).GState({ opacity: 0.75 }));
+      if (isShort) {
+        // Holder sits low-left, taller than the box (height 130%, bottom-anchored)
         const imgH = h * 1.3;
         const imgW = imgH * 0.58;
-        doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
         doc.addImage(imgData, "PNG", x - imgW * 0.07, y + h - imgH * 0.77, imgW, imgH);
-        doc.setGState(new (doc as any).GState({ opacity: 1 }));
-      } catch {}
-    }
+      } else {
+        // Punter is centered, ~62% of box width, anchored near the top
+        const imgW = w * 0.62;
+        const imgH = imgW * 1.9;
+        doc.addImage(imgData, "PNG", x + (w - imgW) / 2, y + h * 0.06, imgW, imgH);
+      }
+      doc.setGState(new (doc as any).GState({ opacity: 1 }));
+    } catch {}
   }
 
-  // Strike zone — use holder zone for short, punter zone for long
+  // Strike zone — defaults mirror DEFAULT_HOLDER_ZONE / DEFAULT_ZONE from the live components
   const zone = isShort
     ? { top: 0.45, bottom: 0.78, left: 0.42, right: 0.76 }
-    : { top: 0.34, bottom: 0.68, left: 0.25, right: 0.75 };
+    : { top: 0.34, bottom: 0.68, left: 0.33, right: 0.67 };
   const zLeft = x + w * zone.left;
   const zTop = y + h * zone.top;
   const zW = w * (zone.right - zone.left);
   const zH = h * (zone.bottom - zone.top);
-  doc.setDrawColor(220, 60, 60);
-  doc.setLineWidth(0.4);
-  doc.rect(zLeft, zTop, zW, zH);
+  const zr = Math.min(zW, zH) * 0.06;
   // Light fill inside zone
-  doc.setFillColor(220, 60, 60);
-  doc.setGState(new (doc as any).GState({ opacity: 0.06 }));
-  doc.rect(zLeft, zTop, zW, zH, "F");
+  doc.setFillColor(239, 68, 68);
+  doc.setGState(new (doc as any).GState({ opacity: 0.1 }));
+  doc.roundedRect(zLeft, zTop, zW, zH, zr, zr, "F");
   doc.setGState(new (doc as any).GState({ opacity: 1 }));
-  // Draw markers
+  // Zone outline (red-500)
+  doc.setDrawColor(239, 68, 68);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(zLeft, zTop, zW, zH, zr, zr);
+
+  // Markers — green if in zone, red if miss (matches on-screen colors)
+  const mr = w * 0.038;
   entries.forEach((e, i) => {
     if (e.markerX == null || e.markerY == null) return;
     const mx = x + (e.markerX / 100) * w;
     const my = y + (e.markerY / 100) * h;
     const inZone = e.markerInZone ?? false;
-    doc.setFillColor(inZone ? 0 : 220, inZone ? 200 : 60, inZone ? 160 : 60);
-    doc.circle(mx, my, 3.5, "F");
-    doc.setFontSize(7);
+    if (inZone) { doc.setFillColor(0, 212, 160); doc.setDrawColor(0, 212, 160); }
+    else { doc.setFillColor(239, 68, 68); doc.setDrawColor(239, 68, 68); }
+    doc.setLineWidth(0.5);
+    doc.circle(mx, my, mr, "FD");
+    doc.setFontSize(Math.max(6, mr * 2));
     doc.setTextColor(255, 255, 255);
-    doc.text(String(i + 1), mx, my + 1.8, { align: "center" });
+    doc.text(String(i + 1), mx, my + mr * 0.55, { align: "center" });
     doc.setTextColor(0, 0, 0);
   });
 }
@@ -482,19 +493,23 @@ async function drawChart(doc: jsPDF, session: ScoutSession, athlete: string) {
   doc.setTextColor(0);
   doc.setFontSize(11);
   doc.text(t.summary, 14, 33);
-  let tableY = 38;
-  // Snap charts: draw the strike-zone diagram with markers above the table.
+  let startY = 38;
+
+  // Snap charts: render the strike-zone diagram above the table when markers exist
   if (session.sport === "SCOUT_SNAP") {
-    const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
-    const ae = (session.entries as unknown as SnapEntry[])
-      .filter((e) => e.athlete === athlete)
-      .map((e) => ({ ...e, markerInZone: isShort ? (e.markerInZone ?? false) : e.accuracy === "Strike" }));
-    if (ae.some((e) => e.markerX != null && e.markerY != null)) {
-      await drawSnapDiagram(doc, ae, 14, 38, 70, 84, isShort);
-      tableY = 38 + 84 + 8;
+    const entries = (session.entries as any[]).filter((e) => e.athlete === athlete);
+    const hasMarkers = entries.some((e) => e.markerX != null && e.markerY != null);
+    if (hasMarkers) {
+      const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
+      const boxW = 90;
+      const boxH = isShort ? boxW * 260 / 300 : boxW * 1.25;
+      const boxX = (210 - boxW) / 2;
+      await drawSnapDiagram(doc, entries, boxX, startY, boxW, boxH, isShort);
+      startY = startY + boxH + 6;
     }
   }
-  autoTable(doc, { head: [t.head], body: t.body, startY: tableY, styles: { fontSize: 10 } });
+
+  autoTable(doc, { head: [t.head], body: t.body, startY, styles: { fontSize: 10 } });
 }
 
 async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPDF> {
