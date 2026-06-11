@@ -460,7 +460,7 @@ function singleChartTable(session: ScoutSession, athlete: string): { sub: string
     return {
       sub: `FG Chart · ${date}`,
       head: ["#", "Dist", "Hash", "Pts", "Result"],
-      body: entries.map((e, i) => [String(i + 1), String(e.distance), String(e.hash), String(e.pointValue), e.result === "make" ? "Good" : "Miss"]),
+      body: entries.map((e, i) => [String(i + 1), String(e.distance), String(e.hash), String(e.result === "make" ? (Number(e.pointValue) || 0) : 0), e.result === "make" ? "Good" : "Miss"]),
       summary: `${makes}/${entries.length} made · ${pts} pts`,
     };
   }
@@ -490,33 +490,52 @@ function singleChartTable(session: ScoutSession, athlete: string): { sub: string
   };
 }
 
-async function drawChart(doc: jsPDF, session: ScoutSession, athlete: string) {
+/** Does this snap chart have placed markers worth drawing a diagram for? */
+function snapDiagramInfo(session: ScoutSession, athlete: string): { isShort: boolean; boxW: number; boxH: number } | null {
+  if (session.sport !== "SCOUT_SNAP") return null;
+  const entries = (session.entries as any[]).filter((e) => e.athlete === athlete);
+  if (!entries.some((e) => e.markerX != null && e.markerY != null)) return null;
+  const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
+  const boxW = 90;
+  const boxH = isShort ? boxW * 260 / 300 : boxW * 1.25;
+  return { isShort, boxW, boxH };
+}
+
+/** Estimate the vertical space a chart block needs, so several can be packed per page. */
+function chartBlockHeight(session: ScoutSession, athlete: string): number {
+  const t = singleChartTable(session, athlete);
+  let h = 24; // title + sub + summary header block
+  const diag = snapDiagramInfo(session, athlete);
+  if (diag) h += diag.boxH + 6;
+  h += (t.body.length + 1) * 9 + 6; // body rows + head row, conservative row height
+  return h;
+}
+
+/** Draw one chart block with its top edge at `top`; returns the Y where it ends. */
+async function drawChart(doc: jsPDF, session: ScoutSession, athlete: string, top = 14): Promise<number> {
   const t = singleChartTable(session, athlete);
   doc.setFontSize(16);
-  doc.text(athlete, 14, 18);
+  doc.setTextColor(0);
+  doc.text(athlete, 14, top + 4);
   doc.setFontSize(10);
   doc.setTextColor(120);
-  doc.text(t.sub, 14, 25);
+  doc.text(t.sub, 14, top + 11);
   doc.setTextColor(0);
   doc.setFontSize(11);
-  doc.text(t.summary, 14, 33);
-  let startY = 38;
+  doc.text(t.summary, 14, top + 19);
+  let startY = top + 24;
 
   // Snap charts: render the strike-zone diagram above the table when markers exist
-  if (session.sport === "SCOUT_SNAP") {
+  const diag = snapDiagramInfo(session, athlete);
+  if (diag) {
     const entries = (session.entries as any[]).filter((e) => e.athlete === athlete);
-    const hasMarkers = entries.some((e) => e.markerX != null && e.markerY != null);
-    if (hasMarkers) {
-      const isShort = session.label.startsWith("Short Snaps") || session.label.startsWith("30 Point");
-      const boxW = 90;
-      const boxH = isShort ? boxW * 260 / 300 : boxW * 1.25;
-      const boxX = (210 - boxW) / 2;
-      await drawSnapDiagram(doc, entries, boxX, startY, boxW, boxH, isShort);
-      startY = startY + boxH + 6;
-    }
+    const boxX = (210 - diag.boxW) / 2;
+    await drawSnapDiagram(doc, entries, boxX, startY, diag.boxW, diag.boxH, diag.isShort);
+    startY = startY + diag.boxH + 6;
   }
 
-  autoTable(doc, { head: [t.head], body: t.body, startY, styles: { fontSize: 10 } });
+  autoTable(doc, { head: [t.head], body: t.body, startY, styles: { fontSize: 10 }, margin: { left: 14, right: 14 } });
+  return (doc as any).lastAutoTable?.finalY ?? startY;
 }
 
 async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPDF> {
@@ -527,12 +546,29 @@ async function chartPDFDoc(session: ScoutSession, athlete: string): Promise<jsPD
   return doc;
 }
 
-/** A single PDF combining several charts (one page each). */
+/**
+ * A single PDF combining several charts. Charts flow down the page and pack as many
+ * as fully fit; a chart only moves to a new page when it won't fit in the space left.
+ */
 async function chartsPDFDoc(items: { session: ScoutSession; athlete: string }[]): Promise<jsPDF> {
   const doc = new jsPDF();
-  for (let idx = 0; idx < items.length; idx++) {
-    if (idx > 0) doc.addPage();
-    await drawChart(doc, items[idx].session, items[idx].athlete);
+  const TOP = 14;
+  const BOTTOM_LIMIT = 270; // leave room for the footer logo
+  let cursor = TOP;
+  for (const { session, athlete } of items) {
+    const onFreshPage = cursor <= TOP + 0.01;
+    if (!onFreshPage && cursor + chartBlockHeight(session, athlete) > BOTTOM_LIMIT) {
+      doc.addPage();
+      cursor = TOP;
+    }
+    // Thin divider between stacked charts on the same page
+    if (cursor > TOP + 0.01) {
+      doc.setDrawColor(210);
+      doc.setLineWidth(0.2);
+      doc.line(14, cursor - 4, 196, cursor - 4);
+    }
+    const finalY = await drawChart(doc, session, athlete, cursor);
+    cursor = finalY + 12;
   }
   addLogoToPDF(doc as any);
   await addAppLogoToPDFFooter(doc as any, false);
