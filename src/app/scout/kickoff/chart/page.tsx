@@ -56,7 +56,7 @@ function ScoutKOChartInner() {
   const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
   const [newAthleteNum, setNewAthleteNum] = useState("");
   const [kicksPerPlayer, setKicksPerPlayer] = useState(isManual ? "0" : "5");
-  const [dropWorst, setDropWorst] = useState(true);
+  const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
   const [weather, setWeather] = useState("");

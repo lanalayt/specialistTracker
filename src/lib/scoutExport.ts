@@ -119,7 +119,7 @@ export async function exportFGScoutPDF(sessions: ScoutSession[]) {
 interface PuntKOEntry { athlete: string; kickNum: number; distance: number; hangTime: number; opTime?: number; directionGood: boolean; score: number; dropWorst?: boolean }
 
 function buildPuntKORows(sessions: ScoutSession[], sport: "Punt" | "KO") {
-  const allRows: { session: string; date: string; head: string[]; body: string[][] }[] = [];
+  const allRows: { session: string; date: string; head: string[]; body: string[][]; dropWorst: boolean }[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as PuntKOEntry[];
     const dw = entries[0]?.dropWorst ?? false;
@@ -141,7 +141,7 @@ function buildPuntKORows(sessions: ScoutSession[], sport: "Punt" | "KO") {
       r.avg.toFixed(2),
     ]);
     const cleanLabel = s.label.replace(/ — .*$/, "");
-    allRows.push({ session: cleanLabel, date: new Date(s.date).toLocaleDateString(), head, body });
+    allRows.push({ session: cleanLabel, date: new Date(s.date).toLocaleDateString(), head, body, dropWorst: dw });
   }
   return allRows;
 }
@@ -164,8 +164,8 @@ export async function exportPuntScoutPDF(sessions: ScoutSession[]) {
     if (i > 0) y = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
     doc.setFontSize(14);
     doc.text(r.session, 14, y);
-    doc.setFontSize(10);
-    doc.text(r.date, 14, y + 7);
+    doc.setFontSize(9);
+    doc.text(`${r.date}  |  Drop Worst: ${r.dropWorst ? "ON" : "OFF"}`, 14, y + 7);
     autoTable(doc, { head: [r.head], body: r.body, startY: y + 11, styles: { fontSize: 8 } });
   });
   addLogoToPDF(doc as any, true);
@@ -191,8 +191,8 @@ export async function exportKOScoutPDF(sessions: ScoutSession[]) {
     if (i > 0) y = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
     doc.setFontSize(14);
     doc.text(r.session, 14, y);
-    doc.setFontSize(10);
-    doc.text(r.date, 14, y + 7);
+    doc.setFontSize(9);
+    doc.text(`${r.date}  |  Drop Worst: ${r.dropWorst ? "ON" : "OFF"}`, 14, y + 7);
     autoTable(doc, { head: [r.head], body: r.body, startY: y + 11, styles: { fontSize: 8 } });
   });
   addLogoToPDF(doc as any, true);

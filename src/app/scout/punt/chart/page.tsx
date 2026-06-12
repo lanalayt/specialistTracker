@@ -67,7 +67,7 @@ function ScoutPuntChartInner() {
   const [directionMode, setDirectionMode] = useState(false);
   const [baseDir, setBaseDir] = useState("M");
   const [puntTypes, setPuntTypes] = useState<{ count: string; dir: string }[]>([]);
-  const [dropWorst, setDropWorst] = useState(true);
+  const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
   const [weather, setWeather] = useState("");

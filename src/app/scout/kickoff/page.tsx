@@ -52,7 +52,7 @@ function ScoutKOInner() {
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
-  const [dropWorst, setDropWorst] = useState(true);
+  const [dropWorst, setDropWorst] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editTarget, setEditTarget] = useState<{ sessionId: string; name: string } | null>(null);
