@@ -164,8 +164,8 @@ export async function exportPuntScoutPDF(sessions: ScoutSession[]) {
     if (i > 0) y = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
     doc.setFontSize(14);
     doc.text(r.session, 14, y);
-    doc.setFontSize(9);
-    doc.text(`${r.date}  |  Drop Worst: ${r.dropWorst ? "ON" : "OFF"}`, 14, y + 7);
+    doc.setFontSize(10);
+    doc.text(r.date, 14, y + 7);
     autoTable(doc, { head: [r.head], body: r.body, startY: y + 11, styles: { fontSize: 8 } });
   });
   addLogoToPDF(doc as any, true);
@@ -191,8 +191,8 @@ export async function exportKOScoutPDF(sessions: ScoutSession[]) {
     if (i > 0) y = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
     doc.setFontSize(14);
     doc.text(r.session, 14, y);
-    doc.setFontSize(9);
-    doc.text(`${r.date}  |  Drop Worst: ${r.dropWorst ? "ON" : "OFF"}`, 14, y + 7);
+    doc.setFontSize(10);
+    doc.text(r.date, 14, y + 7);
     autoTable(doc, { head: [r.head], body: r.body, startY: y + 11, styles: { fontSize: 8 } });
   });
   addLogoToPDF(doc as any, true);
