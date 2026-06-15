@@ -116,41 +116,63 @@ export async function exportFGScoutPDF(sessions: ScoutSession[]) {
 
 // ── Punt / KO Export ────────────────────────────────────────────────────────
 
-interface PuntKOEntry { athlete: string; kickNum: number; distance: number; hangTime: number; opTime?: number; directionGood: boolean; score: number; dropWorst?: boolean }
+interface PuntKOEntry { athlete: string; kickNum: number; distance: number; hangTime: number; opTime?: number; directionGood: boolean; score: number; dropWorst?: boolean; targetDir?: string }
+
+function puntAvgs(ae: PuntKOEntry[]) {
+  const distE = ae.filter((e) => e.distance > 0);
+  const hangE = ae.filter((e) => e.hangTime > 0);
+  const opE = ae.filter((e) => (e.opTime ?? 0) > 0);
+  return {
+    avgDist: distE.length > 0 ? (distE.reduce((s, e) => s + e.distance, 0) / distE.length).toFixed(1) : "—",
+    avgHang: hangE.length > 0 ? (hangE.reduce((s, e) => s + e.hangTime, 0) / hangE.length).toFixed(2) : "—",
+    avgOp: opE.length > 0 ? (opE.reduce((s, e) => s + (e.opTime ?? 0), 0) / opE.length).toFixed(2) : "—",
+  };
+}
 
 function buildPuntKORows(sessions: ScoutSession[], sport: "Punt" | "KO") {
   const allRows: { session: string; date: string; head: string[]; body: string[][]; dropWorst: boolean }[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as PuntKOEntry[];
     const dw = entries[0]?.dropWorst ?? false;
+    const hasDir = sport === "Punt" && entries.some((e) => !!e.targetDir);
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     const maxKicks = Math.max(...athletes.map((n) => entries.filter((e) => e.athlete === n).length));
     const kickHeaders = Array.from({ length: maxKicks }, (_, i) => `${sport === "Punt" ? "P" : "K"}${i + 1}`);
-    const extraCols = sport === "Punt" ? ["Avg Dist", "Avg Hang", "Avg OT", "Avg Score"] : ["Avg"];
+    const dirLabels = hasDir ? ["L", "M", "R"] : [];
+    const extraCols = sport === "Punt"
+      ? ["Avg Dist", "Avg Hang", "Avg OT", ...dirLabels.flatMap((d) => [`${d} Dist`, `${d} Hang`, `${d} OT`]), "Avg Score"]
+      : ["Avg"];
     const head = ["Rank", "Name", ...kickHeaders, ...extraCols];
     const ranked = athletes
       .map((name) => {
         const ae = entries.filter((e) => e.athlete === name);
         const scores = ae.map((e) => e.score);
-        const distE = ae.filter((e) => e.distance > 0);
-        const hangE = ae.filter((e) => e.hangTime > 0);
-        const opE = ae.filter((e) => (e.opTime ?? 0) > 0);
-        return {
-          name, entries: ae, avg: calcAvg(scores, dw),
-          avgDist: distE.length > 0 ? (distE.reduce((s, e) => s + e.distance, 0) / distE.length).toFixed(1) : "—",
-          avgHang: hangE.length > 0 ? (hangE.reduce((s, e) => s + e.hangTime, 0) / hangE.length).toFixed(2) : "—",
-          avgOp: opE.length > 0 ? (opE.reduce((s, e) => s + (e.opTime ?? 0), 0) / opE.length).toFixed(2) : "—",
-        };
+        const overall = puntAvgs(ae);
+        const byDir: Record<string, { avgDist: string; avgHang: string; avgOp: string }> = {};
+        if (hasDir) {
+          for (const d of dirLabels) {
+            byDir[d] = puntAvgs(ae.filter((e) => e.targetDir === d));
+          }
+        }
+        return { name, entries: ae, avg: calcAvg(scores, dw), ...overall, byDir };
       })
       .sort((a, b) => b.avg - a.avg);
     const body = ranked.map((r, i) => {
       const row = [
         String(i + 1), r.name,
-        ...r.entries.map((e) => `${e.distance}yd / ${e.hangTime.toFixed(2)}s${e.directionGood ? "" : " (bad)"}`),
+        ...r.entries.map((e) => `${e.distance}yd / ${e.hangTime.toFixed(2)}s${e.directionGood ? "" : " (bad)"}${e.targetDir ? ` [${e.targetDir}]` : ""}`),
         ...Array.from({ length: maxKicks - r.entries.length }, () => "—"),
       ];
-      if (sport === "Punt") row.push(r.avgDist, r.avgHang, r.avgOp, r.avg.toFixed(2));
-      else row.push(r.avg.toFixed(2));
+      if (sport === "Punt") {
+        row.push(r.avgDist, r.avgHang, r.avgOp);
+        for (const d of dirLabels) {
+          const ds = r.byDir[d];
+          row.push(ds?.avgDist ?? "—", ds?.avgHang ?? "—", ds?.avgOp ?? "—");
+        }
+        row.push(r.avg.toFixed(2));
+      } else {
+        row.push(r.avg.toFixed(2));
+      }
       return row;
     });
     const cleanLabel = s.label.replace(/ — .*$/, "");
