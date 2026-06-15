@@ -126,20 +126,33 @@ function buildPuntKORows(sessions: ScoutSession[], sport: "Punt" | "KO") {
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     const maxKicks = Math.max(...athletes.map((n) => entries.filter((e) => e.athlete === n).length));
     const kickHeaders = Array.from({ length: maxKicks }, (_, i) => `${sport === "Punt" ? "P" : "K"}${i + 1}`);
-    const head = ["Rank", "Name", ...kickHeaders, "Avg"];
+    const extraCols = sport === "Punt" ? ["Avg Dist", "Avg Hang", "Avg OT", "Avg Score"] : ["Avg"];
+    const head = ["Rank", "Name", ...kickHeaders, ...extraCols];
     const ranked = athletes
       .map((name) => {
         const ae = entries.filter((e) => e.athlete === name);
         const scores = ae.map((e) => e.score);
-        return { name, entries: ae, avg: calcAvg(scores, dw) };
+        const distE = ae.filter((e) => e.distance > 0);
+        const hangE = ae.filter((e) => e.hangTime > 0);
+        const opE = ae.filter((e) => (e.opTime ?? 0) > 0);
+        return {
+          name, entries: ae, avg: calcAvg(scores, dw),
+          avgDist: distE.length > 0 ? (distE.reduce((s, e) => s + e.distance, 0) / distE.length).toFixed(1) : "—",
+          avgHang: hangE.length > 0 ? (hangE.reduce((s, e) => s + e.hangTime, 0) / hangE.length).toFixed(2) : "—",
+          avgOp: opE.length > 0 ? (opE.reduce((s, e) => s + (e.opTime ?? 0), 0) / opE.length).toFixed(2) : "—",
+        };
       })
       .sort((a, b) => b.avg - a.avg);
-    const body = ranked.map((r, i) => [
-      String(i + 1), r.name,
-      ...r.entries.map((e) => `${e.distance}yd / ${e.hangTime.toFixed(2)}s${e.directionGood ? "" : " (bad)"}`),
-      ...Array.from({ length: maxKicks - r.entries.length }, () => "—"),
-      r.avg.toFixed(2),
-    ]);
+    const body = ranked.map((r, i) => {
+      const row = [
+        String(i + 1), r.name,
+        ...r.entries.map((e) => `${e.distance}yd / ${e.hangTime.toFixed(2)}s${e.directionGood ? "" : " (bad)"}`),
+        ...Array.from({ length: maxKicks - r.entries.length }, () => "—"),
+      ];
+      if (sport === "Punt") row.push(r.avgDist, r.avgHang, r.avgOp, r.avg.toFixed(2));
+      else row.push(r.avg.toFixed(2));
+      return row;
+    });
     const cleanLabel = s.label.replace(/ — .*$/, "");
     allRows.push({ session: cleanLabel, date: new Date(s.date).toLocaleDateString(), head, body, dropWorst: dw });
   }
