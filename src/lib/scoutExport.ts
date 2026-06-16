@@ -334,7 +334,7 @@ async function drawSnapDiagram(doc: jsPDF, entries: SnapEntry[], x: number, y: n
   // Strike zone defaults (fraction of panel) mirror DEFAULT_HOLDER_ZONE / DEFAULT_ZONE.
   let zone = isShort
     ? { top: 0.45, bottom: 0.78, left: 0.42, right: 0.76 }
-    : { top: 0.34, bottom: 0.68, left: 0.33, right: 0.67 };
+    : { top: 0.34, bottom: 0.68, left: 0.36, right: 0.64 };
 
   // Short snaps: the holder silhouette PNG doesn't render cleanly (baked-in background),
   // so we omit it and instead CENTER the zone in the panel, translating every marker by
