@@ -15,8 +15,11 @@ import {
   loadScoutNumbers,
   saveScoutNumbers,
   scoutDisplayName,
+  loadScoutRankings,
+  loadSessionRankings,
   type ScoutProfile,
   type ScoutSession,
+  type ScoutRanking,
 } from "@/lib/scoutStore";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { SnapChartDetail, type SnapDetailEntry } from "@/components/ui/SnapChartDetail";
@@ -97,8 +100,10 @@ export default function ScoutAthletesPage() {
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
-  const [filterType, setFilterType] = useState<"all" | "year" | "discipline">("all");
+  const [filterType, setFilterType] = useState<"all" | "year" | "discipline" | "ranking">("all");
   const [filterValue, setFilterValue] = useState("");
+  const [rankings, setRankings] = useState<ScoutRanking[]>([]);
+  const [sessionRankings, setSessionRankingsMap] = useState<Record<string, string[]>>({});
   const [chartSessions, setChartSessions] = useState<Record<string, ScoutSession[]>>({});
   const [chartModal, setChartModal] = useState<string | null>(null);
   const [snapDetail, setSnapDetail] = useState<AthleteChart | null>(null);
@@ -152,7 +157,7 @@ export default function ScoutAthletesPage() {
     }
     if (!tid) return;
 
-    const [prof, fg, punt, kickoff, snap, sFg, sPunt, sKo, sSnap, nums] = await Promise.all([
+    const [prof, fg, punt, kickoff, snap, sFg, sPunt, sKo, sSnap, nums, rks, srk] = await Promise.all([
       loadScoutProfiles(tid),
       loadScoutAthletes(tid, "fg"),
       loadScoutAthletes(tid, "punt"),
@@ -163,8 +168,12 @@ export default function ScoutAthletesPage() {
       loadScoutSessions(tid, "SCOUT_KO"),
       loadScoutSessions(tid, "SCOUT_SNAP"),
       loadScoutNumbers(tid, "fg"),
+      loadScoutRankings(tid),
+      loadSessionRankings(tid),
     ]);
     setScoutNumbers(nums);
+    setRankings(rks);
+    setSessionRankingsMap(srk);
 
     setSportAthletes({ fg, punt, kickoff, snap });
     setChartSessions({ SCOUT_FG: sFg, SCOUT_PUNT: sPunt, SCOUT_KO: sKo, SCOUT_SNAP: sSnap });
@@ -321,11 +330,28 @@ export default function ScoutAthletesPage() {
         {/* Filters */}
         {(() => {
           const years = [...new Set(allNames.map((n) => profiles[n]?.schoolYear).filter(Boolean))] as string[];
+          // Build a set of athlete names that appear in the selected ranking
+          const athletesInRanking = (rankingId: string): Set<string> => {
+            const names = new Set<string>();
+            const allSessions = [...(chartSessions.SCOUT_FG ?? []), ...(chartSessions.SCOUT_PUNT ?? []), ...(chartSessions.SCOUT_KO ?? []), ...(chartSessions.SCOUT_SNAP ?? [])];
+            for (const s of allSessions) {
+              for (const e of s.entries) {
+                const athlete = (e as { athlete?: string }).athlete;
+                if (!athlete) continue;
+                const pk = `${s.id}|||${athlete}`;
+                const rids = sessionRankings[pk] ?? sessionRankings[s.id] ?? ["overall"];
+                if (rids.includes(rankingId)) names.add(athlete);
+              }
+            }
+            return names;
+          };
+
           const filtered = allNames.filter((name) => {
             if (filterType === "all") return true;
             const p = profiles[name];
             if (filterType === "year") return filterValue ? p?.schoolYear === filterValue : true;
             if (filterType === "discipline") return filterValue ? (sportAthletes[filterValue] ?? []).includes(name) : true;
+            if (filterType === "ranking") return filterValue ? athletesInRanking(filterValue).has(name) : true;
             return true;
           });
 
@@ -336,6 +362,9 @@ export default function ScoutAthletesPage() {
                   <button onClick={() => { setFilterType("all"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors", filterType === "all" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>All</button>
                   <button onClick={() => { setFilterType("year"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", filterType === "year" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Year</button>
                   <button onClick={() => { setFilterType("discipline"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", filterType === "discipline" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Discipline</button>
+                  {rankings.filter((r) => r.id !== "overall").length > 0 && (
+                    <button onClick={() => { setFilterType("ranking"); setFilterValue(""); }} className={clsx("px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border", filterType === "ranking" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white")}>Group</button>
+                  )}
                 </div>
                 {filterType === "year" && years.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -350,6 +379,14 @@ export default function ScoutAthletesPage() {
                     <button onClick={() => setFilterValue("")} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-semibold transition-all", !filterValue ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-surface-2 text-muted border border-border")}>All</button>
                     {DISCIPLINE_FILTERS.map((d) => (
                       <button key={d.key} onClick={() => setFilterValue(d.key)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-semibold transition-all", filterValue === d.key ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-surface-2 text-muted border border-border")}>{d.label}</button>
+                    ))}
+                  </div>
+                )}
+                {filterType === "ranking" && (
+                  <div className="flex flex-wrap gap-1">
+                    <button onClick={() => setFilterValue("")} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-semibold transition-all", !filterValue ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-surface-2 text-muted border border-border")}>All Groups</button>
+                    {rankings.filter((r) => r.id !== "overall").map((r) => (
+                      <button key={r.id} onClick={() => setFilterValue(r.id)} className={clsx("px-2.5 py-1 rounded-input text-[10px] font-semibold transition-all", filterValue === r.id ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-surface-2 text-muted border border-border")}>{r.name}</button>
                     ))}
                   </div>
                 )}

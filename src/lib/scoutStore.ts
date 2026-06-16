@@ -453,23 +453,41 @@ function ensureOverall(list: ScoutRanking[]): ScoutRanking[] {
   return list.some((r) => r.id === "overall") ? list : [DEFAULT_RANKING, ...list];
 }
 
-export async function loadScoutRankings(teamId: string, sport: string): Promise<ScoutRanking[]> {
-  const key = `scout_rankings_${sport}`;
-  if (!isRealTeam(teamId)) return ensureOverall(cacheGet<ScoutRanking[]>(teamId, key, []));
-  const res = await cloudGet<ScoutRanking[]>(teamId, key);
-  if (res.ok) {
-    const list = ensureOverall(Array.isArray(res.value) ? res.value : []);
-    cacheSet(teamId, key, list);
-    return list;
+const SHARED_RANKINGS_KEY = "scout_rankings_shared";
+const _rankingsMigrated = new Set<string>();
+
+export async function loadScoutRankings(teamId: string, _sport?: string): Promise<ScoutRanking[]> {
+  if (!isRealTeam(teamId)) return ensureOverall(cacheGet<ScoutRanking[]>(teamId, SHARED_RANKINGS_KEY, []));
+  const res = await cloudGet<ScoutRanking[]>(teamId, SHARED_RANKINGS_KEY);
+  const shared: ScoutRanking[] = res.ok && Array.isArray(res.value) ? [...res.value] : [];
+  // One-time migration: fold any legacy per-sport rankings into the shared list.
+  if (!_rankingsMigrated.has(teamId)) {
+    _rankingsMigrated.add(teamId);
+    let changed = false;
+    const existingIds = new Set(shared.map((r) => r.id));
+    for (const sp of ["fg", "kickoff", "punt", "snap"]) {
+      const legacy = await cloudGet<ScoutRanking[]>(teamId, `scout_rankings_${sp}`);
+      if (legacy.ok && Array.isArray(legacy.value)) {
+        for (const r of legacy.value) {
+          if (r.id !== "overall" && !existingIds.has(r.id)) {
+            shared.push(r);
+            existingIds.add(r.id);
+            changed = true;
+          }
+        }
+      }
+    }
+    if (changed) await cloudPut(teamId, SHARED_RANKINGS_KEY, shared);
   }
-  return ensureOverall(cacheGet<ScoutRanking[]>(teamId, key, []));
+  const list = ensureOverall(shared);
+  cacheSet(teamId, SHARED_RANKINGS_KEY, list);
+  return list;
 }
 
-export async function saveScoutRankings(teamId: string, sport: string, rankings: ScoutRanking[]): Promise<void> {
-  const key = `scout_rankings_${sport}`;
-  cacheSet(teamId, key, rankings);
+export async function saveScoutRankings(teamId: string, _sport: string, rankings: ScoutRanking[]): Promise<void> {
+  cacheSet(teamId, SHARED_RANKINGS_KEY, rankings);
   if (!isRealTeam(teamId)) return;
-  await cloudPut(teamId, key, rankings);
+  await cloudPut(teamId, SHARED_RANKINGS_KEY, rankings);
 }
 
 /** Map of sessionId -> ranking ids it belongs to (team-wide). Missing = ["overall"]. */
