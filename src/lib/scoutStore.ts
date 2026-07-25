@@ -375,16 +375,20 @@ export async function loadScoutNumbers(teamId: string, _sport: string): Promise<
   const res = await cloudGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY);
   if (!res.ok) return cacheGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY, {});
   const shared: Record<string, string> = res.value && typeof res.value === "object" ? { ...res.value } : {};
-  // One-time migration: fold any legacy per-sport numbers into the shared map.
+  // One-time migration: fold any legacy per-sport numbers into the shared map,
+  // then CLEAR each legacy key so a later-cleared number can't be re-imported
+  // from its stale legacy copy on the next page load.
   if (!_numbersMigrated.has(teamId)) {
     _numbersMigrated.add(teamId);
     let changed = false;
     for (const sp of LEGACY_NUMBER_SPORTS) {
-      const legacy = await cloudGet<Record<string, string>>(teamId, `scout_numbers_${sp}`);
-      if (legacy.ok && legacy.value && typeof legacy.value === "object") {
+      const key = `scout_numbers_${sp}`;
+      const legacy = await cloudGet<Record<string, string>>(teamId, key);
+      if (legacy.ok && legacy.value && typeof legacy.value === "object" && Object.keys(legacy.value).length > 0) {
         for (const [name, num] of Object.entries(legacy.value)) {
           if (num && !(name in shared)) { shared[name] = num; changed = true; }
         }
+        await cloudPut(teamId, key, {});
       }
     }
     if (changed) await cloudPut(teamId, SCOUT_NUMBERS_KEY, shared);
@@ -469,14 +473,18 @@ export async function loadScoutRankings(teamId: string, _sport?: string): Promis
   if (!isRealTeam(teamId)) return ensureOverall(cacheGet<ScoutRanking[]>(teamId, SHARED_RANKINGS_KEY, []));
   const res = await cloudGet<ScoutRanking[]>(teamId, SHARED_RANKINGS_KEY);
   const shared: ScoutRanking[] = res.ok && Array.isArray(res.value) ? [...res.value] : [];
-  // One-time migration: fold any legacy per-sport rankings into the shared list.
+  // One-time migration: fold any legacy per-sport rankings into the shared list,
+  // then CLEAR each legacy key. Without clearing, a group deleted from the shared
+  // list would be re-imported from its still-present legacy copy on the next page
+  // load — i.e. deleting a group then refreshing would bring it back.
   if (!_rankingsMigrated.has(teamId)) {
     _rankingsMigrated.add(teamId);
     let changed = false;
     const existingIds = new Set(shared.map((r) => r.id));
     for (const sp of ["fg", "kickoff", "punt", "snap"]) {
-      const legacy = await cloudGet<ScoutRanking[]>(teamId, `scout_rankings_${sp}`);
-      if (legacy.ok && Array.isArray(legacy.value)) {
+      const key = `scout_rankings_${sp}`;
+      const legacy = await cloudGet<ScoutRanking[]>(teamId, key);
+      if (legacy.ok && Array.isArray(legacy.value) && legacy.value.length > 0) {
         for (const r of legacy.value) {
           if (r.id !== "overall" && !existingIds.has(r.id)) {
             shared.push(r);
@@ -484,6 +492,9 @@ export async function loadScoutRankings(teamId: string, _sport?: string): Promis
             changed = true;
           }
         }
+        // Legacy copy is now fully folded into `shared`; clear it so it can't
+        // resurrect a later-deleted group.
+        await cloudPut(teamId, key, []);
       }
     }
     if (changed) await cloudPut(teamId, SHARED_RANKINGS_KEY, shared);
