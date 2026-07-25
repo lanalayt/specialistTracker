@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, setEntryRankings, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { RankingTabs } from "@/components/ui/RankingTabs";
 import { EditChartModal } from "@/components/ui/EditChartModal";
@@ -50,6 +50,7 @@ function ScoutFGInner() {
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
+  const [profileSession, setProfileSession] = useState<string | null>(null);
 
   // Live input state
   const [liveAthletes, setLiveAthletes] = useState<string[]>([]);
@@ -462,7 +463,7 @@ function ScoutFGInner() {
                                 {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                                 <td className="py-1 px-2 font-semibold text-slate-200">
                                   <span className="text-muted mr-1">{i + 1}.</span>
-                                  <button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); }} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); setProfileSession(r.sessionId); }} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                                 </td>
                                 {presetCols.map((c) => {
                                   const e = r.entries.find((en) => en.kickNum === c.kickNum);
@@ -521,7 +522,7 @@ function ScoutFGInner() {
                                   {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                                   <td className="py-1 px-2 font-semibold text-slate-200">
                                     <span className="text-muted mr-1">{i + 1}.</span>
-                                    <button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); }} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); setProfileSession(r.sessionId); }} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                                   </td>
                                   {r.entries.map((e, j) => (
                                     <td key={j} className="text-center py-1 px-1">
@@ -559,7 +560,17 @@ function ScoutFGInner() {
         <ScoutProfileModal
           profile={profiles[profileOpen] ?? { name: profileOpen }}
           onSave={handleSaveProfile}
-          onClose={() => setProfileOpen(null)}
+          onClose={() => { setProfileOpen(null); setProfileSession(null); }}
+          ranking={profileSession ? {
+            rankings,
+            currentIds: entryRanks(profileSession, profileOpen),
+            onChange: async (ids) => {
+              const tid = getTeamId();
+              if (!tid || !profileSession) return;
+              await setEntryRankings(tid, profileSession, profileOpen, ids);
+              setSessionRankingsMap((prev) => ({ ...prev, [`${profileSession}|||${profileOpen}`]: ids }));
+            },
+          } : undefined}
         />
       )}
       {infoModal && (

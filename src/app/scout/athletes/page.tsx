@@ -100,6 +100,7 @@ export default function ScoutAthletesPage() {
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
+  const [profileIsNew, setProfileIsNew] = useState(false);
   const [filterType, setFilterType] = useState<"all" | "year" | "discipline" | "ranking">("all");
   const [filterValue, setFilterValue] = useState("");
   const [rankings, setRankings] = useState<ScoutRanking[]>([]);
@@ -208,6 +209,7 @@ export default function ScoutAthletesPage() {
     if (!trimmed || allNames.includes(trimmed)) return;
     // Open the profile modal for the new athlete so position + info can be set
     setNewName("");
+    setProfileIsNew(true);
     setProfileOpen(trimmed);
   };
 
@@ -408,7 +410,7 @@ export default function ScoutAthletesPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <button
-                              onClick={() => setProfileOpen(name)}
+                              onClick={() => { setProfileIsNew(false); setProfileOpen(name); }}
                               className="text-sm font-semibold text-slate-100 hover:text-amber-400 transition-colors"
                             >
                               {scoutDisplayName(name, scoutNumbers)}
@@ -449,7 +451,7 @@ export default function ScoutAthletesPage() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <button
-                            onClick={() => setProfileOpen(name)}
+                            onClick={() => { setProfileIsNew(true); setProfileOpen(name); }}
                             className="text-[10px] text-muted hover:text-amber-400 transition-colors px-2 py-1"
                           >
                             Edit
@@ -479,6 +481,7 @@ export default function ScoutAthletesPage() {
           <ScoutProfileModal
             profile={{ ...base, disciplines }}
             number={scoutNumbers[profileOpen] ?? ""}
+            startInEdit={profileIsNew}
             onSave={handleSaveProfile}
             onClose={() => setProfileOpen(null)}
           />
