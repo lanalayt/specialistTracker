@@ -11,6 +11,7 @@ import clsx from "clsx";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
+import { LongSnapCommitModal } from "@/components/ui/LongSnapCommitModal";
 
 const DRAFT_SUFFIX = "fg";
 const INIT_ROWS = 12;
@@ -46,7 +47,7 @@ export default function LongSnapFGSessionPage() {
 
   const [rows, setRows] = useState<LogRow[]>(Array.from({ length: INIT_ROWS }, emptyRow));
   const [weather, setWeather] = useState("");
-  const [weatherLocked, setWeatherLocked] = useState(false);
+  const [showCommit, setShowCommit] = useState(false);
   const [committed, setCommitted] = useState(false);
   const [snapMarkers, setSnapMarkers] = useState<ShortSnapMarker[]>([]);
 
@@ -151,6 +152,7 @@ export default function LongSnapFGSessionPage() {
     });
 
     commitPractice(snaps, undefined, weather);
+    setShowCommit(false);
     setCommitted(true);
     try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers, committed: true })); } catch {}
   };
@@ -166,24 +168,6 @@ export default function LongSnapFGSessionPage() {
   return (
     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
       <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
-        {/* Weather */}
-        <div className="px-4 py-2 border-b border-border shrink-0">
-          {weatherLocked || viewOnly ? (
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <p className="text-[10px] text-muted">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
-                {weather && <p className="text-xs text-slate-300">{weather}</p>}
-              </div>
-              {!viewOnly && <button onClick={() => setWeatherLocked(false)} className="text-muted hover:text-white transition-colors p-1" title="Edit weather"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" /></svg></button>}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
-              <input type="text" value={weather} onChange={(e) => setWeather(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setWeatherLocked(true); } }} placeholder="e.g. 72F, Sunny" className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted" autoFocus={weather === ""} />
-            </div>
-          )}
-        </div>
-
         {/* Header */}
         <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0">
           <h2 className="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-2">
@@ -318,7 +302,7 @@ export default function LongSnapFGSessionPage() {
               )}
               {!viewOnly && (
                 <button
-                  onClick={handleCommit}
+                  onClick={() => setShowCommit(true)}
                   disabled={filledRows.length === 0}
                   className="btn-primary text-xs py-2 px-5"
                 >
@@ -346,6 +330,17 @@ export default function LongSnapFGSessionPage() {
           </button>
         )}
       </div>
+
+      {showCommit && (
+        <LongSnapCommitModal
+          count={filledRows.length}
+          label={new Date().toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" })}
+          weather={weather}
+          onWeatherChange={setWeather}
+          onConfirm={handleCommit}
+          onCancel={() => setShowCommit(false)}
+        />
+      )}
     </main>
   );
 }

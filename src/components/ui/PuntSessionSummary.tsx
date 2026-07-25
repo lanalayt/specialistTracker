@@ -8,6 +8,8 @@ interface PuntSessionSummaryProps {
   label: string;
   onConfirm: () => void;
   onCancel: () => void;
+  weather?: string;
+  onWeatherChange?: (value: string) => void;
 }
 
 export function PuntSessionSummary({
@@ -15,6 +17,8 @@ export function PuntSessionSummary({
   label,
   onConfirm,
   onCancel,
+  weather,
+  onWeatherChange,
 }: PuntSessionSummaryProps) {
   // Only count punts with actual yardage for distance averages
   const ydsEntries = punts.filter((p) => p.yards > 0);
@@ -50,6 +54,18 @@ export function PuntSessionSummary({
         </div>
 
         <div className="p-5 space-y-4">
+          {onWeatherChange && (
+            <div>
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider">Weather</label>
+              <input
+                type="text"
+                value={weather ?? ""}
+                onChange={(e) => onWeatherChange(e.target.value)}
+                placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+                className="mt-1 w-full bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+              />
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-3">
             <div className="card-2 text-center">
               <p className="text-2xl font-extrabold text-accent">{punts.length}</p>

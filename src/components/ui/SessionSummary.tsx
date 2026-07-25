@@ -12,6 +12,8 @@ interface SessionSummaryProps {
   onCancel: () => void;
   snapCount?: number;
   snapEntries?: LongSnapEntry[];
+  weather?: string;
+  onWeatherChange?: (value: string) => void;
 }
 
 export function SessionSummary({
@@ -21,6 +23,8 @@ export function SessionSummary({
   onCancel,
   snapCount = 0,
   snapEntries,
+  weather,
+  onWeatherChange,
 }: SessionSummaryProps) {
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
   const misses = kicks.length - makes;
@@ -48,6 +52,18 @@ export function SessionSummary({
 
         {/* Body */}
         <div className="p-5 space-y-4">
+          {onWeatherChange && (
+            <div>
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider">Weather</label>
+              <input
+                type="text"
+                value={weather ?? ""}
+                onChange={(e) => onWeatherChange(e.target.value)}
+                placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+                className="mt-1 w-full bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+              />
+            </div>
+          )}
           {/* Overview */}
           <div className="grid grid-cols-3 gap-3">
             <div className="card-2 text-center">

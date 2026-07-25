@@ -18,6 +18,8 @@ interface KickoffSessionSummaryProps {
   onCancel: () => void;
   sessionMode?: "practice" | "game";
   typeConfigs?: KOTypeConfig[];
+  weather?: string;
+  onWeatherChange?: (value: string) => void;
 }
 
 function getMetric(type: string, typeConfigs?: KOTypeConfig[]): string {
@@ -31,6 +33,8 @@ export function KickoffSessionSummary({
   onCancel,
   sessionMode = "practice",
   typeConfigs,
+  weather,
+  onWeatherChange,
 }: KickoffSessionSummaryProps) {
   // In practice mode, only show deep kickoffs in the recap
   const recapKicks = sessionMode === "practice" && typeConfigs
@@ -85,6 +89,18 @@ export function KickoffSessionSummary({
         </div>
 
         <div className="p-5 space-y-4">
+          {onWeatherChange && (
+            <div>
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider">Weather</label>
+              <input
+                type="text"
+                value={weather ?? ""}
+                onChange={(e) => onWeatherChange(e.target.value)}
+                placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
+                className="mt-1 w-full bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-sm focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
+              />
+            </div>
+          )}
           {sessionMode === "practice" && nonDeepCount > 0 && (
             <p className="text-[10px] text-muted">
               Showing deep kickoffs only. {nonDeepCount} other kickoff{nonDeepCount !== 1 ? "s" : ""} (sky, squib, onside) will still be saved.

@@ -278,7 +278,6 @@ export default function KickingSessionPage() {
   const scoreEnabled = isAthleteMode ? false : (scoreMode === "on" || (scoreMode === "practice" && sessionMode !== "game"));
   const [scoreOptions, setScoreOptions] = useState<string[]>(() => loadScoreOptions());
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
-  const [weatherLocked, setWeatherLocked] = useState(false);
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [snapKickIdx, setSnapKickIdx] = useState(0);
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>(() => {
@@ -1609,6 +1608,8 @@ export default function KickingSessionPage() {
             })}
             onConfirm={handleConfirmCommit}
             onCancel={() => setPendingKicks(null)}
+            weather={weather}
+            onWeatherChange={setWeather}
             snapCount={allSnapEntries.length}
             snapEntries={allSnapEntries.length > 0 ? allSnapEntries : undefined}
           />
@@ -1756,42 +1757,6 @@ export default function KickingSessionPage() {
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
         {/* Left: Practice Log Table */}
         <div className="lg:w-[60%] flex flex-col border-b lg:border-b-0 lg:border-r border-border min-h-0">
-          {/* Weather input / display */}
-          <div className="px-4 py-2 border-b border-border shrink-0">
-            {weatherLocked || viewOnly ? (
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <p className="text-[10px] text-muted">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
-                  {weather && <p className="text-xs text-slate-300">{weather}</p>}
-                  {!weather && viewOnly && <p className="text-xs text-muted italic">No weather set</p>}
-                </div>
-                {!viewOnly && (
-                  <button
-                    onClick={() => setWeatherLocked(false)}
-                    className="text-muted hover:text-white transition-colors p-1"
-                    title="Edit weather"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                      <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-muted uppercase tracking-wider whitespace-nowrap">Weather</label>
-                <input
-                  type="text"
-                  value={weather}
-                  onChange={(e) => setWeather(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setWeatherLocked(true); } }}
-                  placeholder="e.g. 72°F, Sunny, Wind 10mph SW"
-                  className="flex-1 bg-surface-2 border border-border text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-accent/60 transition-all placeholder:text-muted"
-                  autoFocus={weather === ""}
-                />
-              </div>
-            )}
-          </div>
           {/* Practice / Game mode toggle + Live / Manual toggle */}
           {!viewOnly && !isContinuing && (
             <div className={clsx(
@@ -2387,6 +2352,8 @@ export default function KickingSessionPage() {
           })}
           onConfirm={handleConfirmCommit}
           onCancel={() => setPendingKicks(null)}
+          weather={weather}
+          onWeatherChange={setWeather}
           snapCount={allSnapEntries.length}
           snapEntries={allSnapEntries.length > 0 ? allSnapEntries : undefined}
         />
