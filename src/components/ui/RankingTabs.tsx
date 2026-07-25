@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { saveScoutRankings, ALL_RANKING, ALL_RANKING_ID, type ScoutRanking } from "@/lib/scoutStore";
+import { saveScoutRankings, newRankingId, ALL_RANKING, ALL_RANKING_ID, type ScoutRanking } from "@/lib/scoutStore";
 import clsx from "clsx";
 
 interface Props {
@@ -19,6 +19,8 @@ interface Props {
 export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active, onActiveChange, onDeleteRanking }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
 
   // Real, stored groups (everything except the virtual all-charts group).
   const editable = rankings.filter((r) => r.id !== ALL_RANKING_ID);
@@ -30,7 +32,15 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
 
   const startEdit = () => {
     setDraft(Object.fromEntries(shown.map((r) => [r.id, r.name])));
+    setAdding(false);
+    setNewName("");
     setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setAdding(false);
+    setNewName("");
   };
 
   const commit = async () => {
@@ -41,14 +51,24 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
     await saveScoutRankings(teamId, sport, updated);
   };
 
+  const addGroup = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    const ranking = { id: newRankingId(), name };
+    const updated = [...editable, ranking];
+    onRankingsChange(updated);
+    setDraft((p) => ({ ...p, [ranking.id]: name }));
+    setNewName("");
+    setAdding(false);
+    await saveScoutRankings(teamId, sport, updated);
+  };
+
   if (editing) {
     return (
       <div className="space-y-1.5">
         <p className="text-[10px] font-semibold text-muted uppercase tracking-wider">Edit Rankings</p>
         <p className="text-[10px] text-muted">&quot;Overall&quot; is fixed and always shows every chart.</p>
-        {shown.length === 0 ? (
-          <p className="text-[10px] text-muted italic">No custom groups yet. Save a chart to a new group to create one.</p>
-        ) : shown.map((r) => (
+        {shown.map((r) => (
           <div key={r.id} className="flex items-center gap-2">
             <input
               value={draft[r.id] ?? ""}
@@ -67,8 +87,26 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
             )}
           </div>
         ))}
+        {shown.length === 0 && !adding && (
+          <p className="text-[10px] text-muted italic">No custom groups yet.</p>
+        )}
+        {adding ? (
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addGroup(); }}
+              placeholder="New group name..."
+              className="input flex-1 text-sm py-1.5"
+            />
+            <button onClick={addGroup} disabled={!newName.trim()} className="btn-primary px-3 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)} className="text-xs text-amber-400 hover:underline font-semibold">+ Add group</button>
+        )}
         <div className="flex gap-2 pt-1">
-          <button onClick={() => setEditing(false)} className="btn-ghost flex-1 py-1.5 text-xs">Cancel</button>
+          <button onClick={cancelEdit} className="btn-ghost flex-1 py-1.5 text-xs">Cancel</button>
           <button onClick={commit} className="btn-primary flex-1 py-1.5 text-xs font-bold">Save</button>
         </div>
       </div>
