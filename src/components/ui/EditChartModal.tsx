@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { updateSessionAthleteEntries, migrateEntryRanking, loadScoutAthletes, scoutDisplayName, type ScoutSession } from "@/lib/scoutStore";
+import { updateSessionAthleteEntries, reassignAthleteToOwnSession, loadScoutAthletes, scoutDisplayName, type ScoutSession } from "@/lib/scoutStore";
 import clsx from "clsx";
 
 // Short discipline key for each session sport, used to load that discipline's
@@ -139,11 +139,14 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
     // its correct spot instead of landing at the end.
     if (isPresetChart) finalReps = [...finalReps].sort((a, b) => (a.kickNum as number) - (b.kickNum as number));
     if (note && finalReps.length > 0) (finalReps[0] as { notes?: unknown }).notes = (note as { notes?: unknown }).notes;
-    // Swap the chart's entries onto the new name (filters out the old name's reps).
-    const ok = await updateSessionAthleteEntries(teamId, session.id, athlete, finalReps);
-    if (ok && renamed) {
-      // Carry the chart's ranking group over to the athlete it moved to.
-      await migrateEntryRanking(teamId, session.id, athlete, newName);
+    let ok: boolean;
+    if (renamed) {
+      // Moving to a different athlete: make it that athlete's OWN separate chart
+      // (a new session) so it never merges into a chart they already have.
+      ok = (await reassignAthleteToOwnSession(teamId, session.id, athlete, newName, finalReps)) !== null;
+    } else {
+      // Same athlete — just replace this chart's reps in place.
+      ok = await updateSessionAthleteEntries(teamId, session.id, athlete, finalReps);
     }
     setSaving(false);
     if (ok) onSaved();

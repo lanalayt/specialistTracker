@@ -196,6 +196,74 @@ export async function updateSessionAthleteEntries(teamId: string, sessionId: str
   }
 }
 
+/**
+ * Reassign one athlete's chart to a DIFFERENT athlete as its own separate chart.
+ * The reps are removed from the source session and placed in a brand-new session
+ * owned by the new athlete, so they never merge into a chart the new athlete
+ * already has in the source session. The source chart's sport, label, date,
+ * weather, chart-mode tag, and ranking group all carry over.
+ * Returns the new session id, or null on failure.
+ */
+export async function reassignAthleteToOwnSession(
+  teamId: string,
+  sessionId: string,
+  oldAthlete: string,
+  newAthlete: string,
+  newReps: Record<string, unknown>[]
+): Promise<string | null> {
+  if (!teamId || teamId === "local-dev") return null;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.from("sessions").select("*").eq("team_id", teamId).eq("id", sessionId).single();
+    if (!data) return null;
+    const all = (data.entries ?? []) as Record<string, unknown>[];
+    const sessionMode = (all.find((e) => (e as { chartMode?: string }).chartMode) as { chartMode?: string } | undefined)?.chartMode;
+    const strip = (e: Record<string, unknown>) => { const { chartMode: _cm, ...rest } = e as { chartMode?: unknown }; return rest as Record<string, unknown>; };
+
+    // 1) Remove the old athlete's reps from the source session (delete it if now empty).
+    const remaining = all.filter((e) => (e as { athlete?: string }).athlete !== oldAthlete).map(strip);
+    if (sessionMode != null && remaining.length > 0) remaining[0] = { ...remaining[0], chartMode: sessionMode };
+    if (remaining.length === 0) {
+      await supabase.from("sessions").delete().eq("team_id", teamId).eq("id", sessionId);
+    } else {
+      await supabase.from("sessions").update({ entries: remaining, updated_at: new Date().toISOString() }).eq("team_id", teamId).eq("id", sessionId);
+    }
+
+    // 2) Create a new session holding just the moved reps, under the new athlete.
+    const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const moved = newReps.map(strip);
+    if (sessionMode != null && moved.length > 0) moved[0] = { ...moved[0], chartMode: sessionMode };
+    await supabase.from("sessions").upsert(
+      {
+        id: newId,
+        team_id: teamId,
+        sport: data.sport,
+        label: data.label,
+        date: data.date,
+        weather: (data.weather as string) ?? null,
+        mode: (data.mode as string) ?? "practice",
+        entries: moved,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "team_id,id", ignoreDuplicates: true }
+    );
+
+    // 3) Give the new chart the same ranking group(s) the old chart had.
+    const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
+    const m = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
+    const pairKey = `${sessionId}|||${oldAthlete}`;
+    m[newId] = m[pairKey] ?? m[sessionId] ?? ["overall"];
+    delete m[pairKey];
+    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
+    await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+
+    return newId;
+  } catch (err) {
+    console.warn("[ScoutStore] reassignAthleteToOwnSession failed:", err);
+    return null;
+  }
+}
+
 export async function deleteAthleteFromSession(teamId: string, sessionId: string, athleteName: string): Promise<boolean> {
   if (!teamId || teamId === "local-dev") return false;
   try {
