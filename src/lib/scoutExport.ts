@@ -133,7 +133,9 @@ function buildPuntKORows(sessions: ScoutSession[], sport: "Punt" | "KO") {
   const allRows: { session: string; date: string; head: string[]; body: string[][]; dropWorst: boolean }[] = [];
   for (const s of sessions) {
     const entries = s.entries as unknown as PuntKOEntry[];
-    const dw = entries[0]?.dropWorst ?? false;
+    // Drop-worst has been removed — always use the plain average, even for
+    // older sessions that still carry a dropWorst flag.
+    const dw = false;
     const hasDir = sport === "Punt" && entries.some((e) => !!e.targetDir);
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     const maxKicks = Math.max(...athletes.map((n) => entries.filter((e) => e.athlete === n).length));

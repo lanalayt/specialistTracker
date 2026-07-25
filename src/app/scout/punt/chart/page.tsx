@@ -30,7 +30,6 @@ interface PuntDraft {
   directionMode?: boolean;
   baseDir?: string;
   puntTypes?: { count: string; dir: string }[];
-  dropWorst?: boolean;
   chartDate?: string;
   weather?: string;
   athleteNotes?: Record<string, string>;
@@ -45,13 +44,9 @@ const DIR_OPTIONS = [
   { value: "R", label: "Right" },
 ];
 
-function calcAvg(scores: number[], dropWorst: boolean): number {
+function calcAvg(scores: number[]): number {
   if (scores.length === 0) return 0;
-  if (scores.length === 1) return scores[0];
-  if (!dropWorst) return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
-  const sorted = [...scores].sort((a, b) => a - b);
-  const best = sorted.slice(1);
-  return parseFloat((best.reduce((s, v) => s + v, 0) / best.length).toFixed(2));
+  return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
 }
 
 function ScoutPuntChartInner() {
@@ -67,7 +62,6 @@ function ScoutPuntChartInner() {
   const [directionMode, setDirectionMode] = useState(false);
   const [baseDir, setBaseDir] = useState("M");
   const [puntTypes, setPuntTypes] = useState<{ count: string; dir: string }[]>([]);
-  const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
   const [weather, setWeather] = useState("");
@@ -97,7 +91,7 @@ function ScoutPuntChartInner() {
 
   const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
   const getPlayerScores = (name: string) => getPlayerResults(name).map((r) => r.score);
-  const getPlayerAvg = (name: string) => calcAvg(getPlayerScores(name), dropWorst);
+  const getPlayerAvg = (name: string) => calcAvg(getPlayerScores(name));
 
   // Flatten the configured punt types into a per-punt target-direction sequence.
   const dirSequence = (() => {
@@ -145,7 +139,6 @@ function ScoutPuntChartInner() {
         setDirectionMode(d.directionMode ?? false);
         setBaseDir(d.baseDir ?? "M");
         setPuntTypes(d.puntTypes ?? []);
-        setDropWorst(d.dropWorst ?? true);
         setChartDate(d.chartDate ?? todayDateInput());
         setWeather(d.weather ?? "");
         setAthleteNotes(d.athleteNotes ?? {});
@@ -159,7 +152,7 @@ function ScoutPuntChartInner() {
     return () => { active = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, puntsPerPlayer, directionMode, baseDir, puntTypes, dropWorst, chartDate, weather, athleteNotes, results, activePlayer, completeDismissed }, phase !== "setup" && !saved);
+  useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, puntsPerPlayer, directionMode, baseDir, puntTypes, chartDate, weather, athleteNotes, results, activePlayer, completeDismissed }, phase !== "setup" && !saved);
 
   const togglePlayer = (name: string) => {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
@@ -250,7 +243,7 @@ function ScoutPuntChartInner() {
     const athletes = [...new Set(results.map((r) => r.athlete))];
     const label = `Punt Scout — ${athletes.map((a) => `${a}: ${getPlayerAvg(a).toFixed(2)}`).join(", ")}`;
     const entriesWithNotes = results.map((r, i) => {
-      const base = { ...r, dropWorst };
+      const base = { ...r };
       const note = athleteNotes[r.athlete];
       if (note) {
         const isFirstForAthlete = results.findIndex((x) => x.athlete === r.athlete) === i;
@@ -342,22 +335,10 @@ function ScoutPuntChartInner() {
               )}
             </>
           )}
-          <div className="flex items-center justify-between card-2 px-4 py-3">
-            <div>
-              <p className="text-xs font-semibold text-slate-200">Drop Worst Kick</p>
-              <p className="text-[10px] text-muted">Exclude lowest score from average</p>
-            </div>
-            <button
-              onClick={() => setDropWorst(!dropWorst)}
-              className={clsx("w-10 h-5 rounded-full transition-colors relative", dropWorst ? "bg-amber-500" : "bg-surface-2 border border-border")}
-            >
-              <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", dropWorst ? "left-5" : "left-0.5")} />
-            </button>
-          </div>
           <div className="card-2 p-3 text-xs text-muted space-y-1">
             <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Scoring</p>
             <p>Punt score = Distance + (Hang Time x 15). Bad direction = -10.</p>
-            <p>Final = average of all punts{dropWorst ? ", dropping the worst one" : ""}.</p>
+            <p>Final = average of all punts.</p>
           </div>
           <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || (!isManual && (directionMode ? dirSequence.length === 0 : !parseInt(puntsPerPlayer)))} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
         </main>
@@ -372,9 +353,7 @@ function ScoutPuntChartInner() {
     const ranked = allAthletes
       .map((name) => {
         const entries = getPlayerResults(name);
-        const scores = entries.map((e) => e.score);
-        const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
-        return { name, entries, avg: getPlayerAvg(name), worst };
+        return { name, entries, avg: getPlayerAvg(name) };
       })
       .sort((a, b) => b.avg - a.avg);
 
@@ -383,7 +362,7 @@ function ScoutPuntChartInner() {
         <Header title="Punt Scout Results" />
         <main className="p-4 lg:p-6 max-w-3xl mx-auto space-y-6 text-center">
           <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
-          <p className="text-xs text-muted">Score = avg of all punts{dropWorst ? ", worst dropped" : ""}. Punt = Dist + (Hang x 15), bad dir = -10.</p>
+          <p className="text-xs text-muted">Score = avg of all punts. Punt = Dist + (Hang x 15), bad dir = -10.</p>
           <div className="max-w-sm mx-auto">
             <input type="text" value={weather} onChange={(e) => setWeather(e.target.value)} placeholder="Weather conditions (optional)" className="input w-full text-sm py-1.5 text-center" />
           </div>
@@ -404,9 +383,8 @@ function ScoutPuntChartInner() {
                   <tr key={r.name} className="border-t border-border/30">
                     <td className="py-1 px-2 font-semibold text-slate-200 text-left"><span className="text-muted mr-1">{i + 1}.</span>{scoutDisplayName(r.name, scoutNumbers)}</td>
                     {r.entries.map((e, j) => {
-                      const isDropped = r.worst !== null && e.score === r.worst && j === r.entries.findIndex((x) => x.score === r.worst);
                       return (
-                        <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "", e.directionGood ? "text-make" : "text-miss")}>
+                        <td key={j} className={clsx("text-center py-1 px-2", e.directionGood ? "text-make" : "text-miss")}>
                           {e.targetDir && <span className="text-[8px] block text-slate-400 font-semibold">{e.targetDir}</span>}
                           <span className="font-bold">{e.distance}</span>
                           <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
@@ -480,7 +458,7 @@ function ScoutPuntChartInner() {
         </div>
 
         <p className="text-[10px] text-muted text-center">
-          Punt score = Dist + (Hang x 15), bad dir = -10. Final = avg{dropWorst ? ", drop worst" : ""}.
+          Punt score = Dist + (Hang x 15), bad dir = -10. Final = avg.
         </p>
 
         <div className="flex items-center justify-between">

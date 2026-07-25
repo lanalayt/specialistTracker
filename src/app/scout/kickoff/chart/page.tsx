@@ -25,7 +25,6 @@ interface KODraft {
   phase?: "setup" | "live" | "results";
   selectedPlayers?: string[];
   kicksPerPlayer?: string;
-  dropWorst?: boolean;
   chartDate?: string;
   weather?: string;
   athleteNotes?: Record<string, string>;
@@ -37,13 +36,9 @@ function calcKickScore(dist: number, hang: number, dirGood: boolean): number {
   return parseFloat((dist + hang * 10 + (dirGood ? 0 : -10)).toFixed(2));
 }
 
-function calcAvg(scores: number[], dropWorst: boolean): number {
+function calcAvg(scores: number[]): number {
   if (scores.length === 0) return 0;
-  if (scores.length === 1) return scores[0];
-  if (!dropWorst) return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
-  const sorted = [...scores].sort((a, b) => a - b);
-  const best = sorted.slice(1);
-  return parseFloat((best.reduce((s, v) => s + v, 0) / best.length).toFixed(2));
+  return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
 }
 
 function ScoutKOChartInner() {
@@ -56,7 +51,6 @@ function ScoutKOChartInner() {
   const [scoutNumbers, setScoutNumbers] = useState<Record<string, string>>({});
   const [newAthleteNum, setNewAthleteNum] = useState("");
   const [kicksPerPlayer, setKicksPerPlayer] = useState(isManual ? "0" : "5");
-  const [dropWorst, setDropWorst] = useState(false);
   const [saved, setSaved] = useState(false);
   const [athleteNotes, setAthleteNotes] = useState<Record<string, string>>({});
   const [weather, setWeather] = useState("");
@@ -81,7 +75,7 @@ function ScoutKOChartInner() {
 
   const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
   const getPlayerScores = (name: string) => getPlayerResults(name).map((r) => r.score);
-  const getPlayerAvg = (name: string) => calcAvg(getPlayerScores(name), dropWorst);
+  const getPlayerAvg = (name: string) => calcAvg(getPlayerScores(name));
 
   const DRAFT_KEY = chartDraftKey("SCOUT_KO", isManual ? "manual" : "preset");
 
@@ -100,7 +94,6 @@ function ScoutKOChartInner() {
       if (d && d.phase && d.phase !== "setup" && (d.results?.length ?? 0) > 0) {
         setSelectedPlayers(d.selectedPlayers ?? []);
         setKicksPerPlayer(d.kicksPerPlayer ?? "5");
-        setDropWorst(d.dropWorst ?? true);
         setChartDate(d.chartDate ?? todayDateInput());
         setWeather(d.weather ?? "");
         setAthleteNotes(d.athleteNotes ?? {});
@@ -114,7 +107,7 @@ function ScoutKOChartInner() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mirror in-progress charting to sessionStorage so a refresh can restore it.
-  useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, kicksPerPlayer, dropWorst, chartDate, weather, athleteNotes, results, activePlayer }, phase !== "setup" && !saved);
+  useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, kicksPerPlayer, chartDate, weather, athleteNotes, results, activePlayer }, phase !== "setup" && !saved);
 
   const togglePlayer = (name: string) => {
     setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
@@ -195,7 +188,7 @@ function ScoutKOChartInner() {
     const allAthletes = [...new Set(results.map((r) => r.athlete))];
     const label = `KO Scout — ${allAthletes.map((a) => `${a}: ${getPlayerAvg(a).toFixed(2)}`).join(", ")}`;
     const entriesWithNotes = results.map((r, i) => {
-      const base = { ...r, dropWorst };
+      const base = { ...r };
       const note = athleteNotes[r.athlete];
       if (note) {
         const isFirstForAthlete = results.findIndex((x) => x.athlete === r.athlete) === i;
@@ -252,22 +245,10 @@ function ScoutKOChartInner() {
               <input type="text" inputMode="numeric" value={kicksPerPlayer} onChange={(e) => setKicksPerPlayer(e.target.value.replace(/\D/g, ""))} className="input w-20 text-center text-sm font-bold py-1.5" />
             </div>
           )}
-          <div className="flex items-center justify-between card-2 px-4 py-3">
-            <div>
-              <p className="text-xs font-semibold text-slate-200">Drop Worst Kick</p>
-              <p className="text-[10px] text-muted">Exclude lowest score from average</p>
-            </div>
-            <button
-              onClick={() => setDropWorst(!dropWorst)}
-              className={clsx("w-10 h-5 rounded-full transition-colors relative", dropWorst ? "bg-amber-500" : "bg-surface-2 border border-border")}
-            >
-              <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", dropWorst ? "left-5" : "left-0.5")} />
-            </button>
-          </div>
           <div className="card-2 p-3 text-xs text-muted space-y-1">
             <p className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">Scoring</p>
             <p>Kick score = Distance + (Hang Time x 10). Bad direction = -10.</p>
-            <p>Final = average of all kicks{dropWorst ? ", dropping the worst one" : ""}.</p>
+            <p>Final = average of all kicks.</p>
           </div>
           <button onClick={() => { setPhase("live"); setActivePlayer(selectedPlayers[0] ?? ""); }} disabled={selectedPlayers.length === 0 || (!isManual && !parseInt(kicksPerPlayer))} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">Start</button>
         </main>
@@ -282,9 +263,7 @@ function ScoutKOChartInner() {
     const ranked = allAthletes
       .map((name) => {
         const entries = getPlayerResults(name);
-        const scores = entries.map((e) => e.score);
-        const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
-        return { name, entries, avg: getPlayerAvg(name), worst };
+        return { name, entries, avg: getPlayerAvg(name) };
       })
       .sort((a, b) => b.avg - a.avg);
 
@@ -293,7 +272,7 @@ function ScoutKOChartInner() {
         <Header title="KO Scout Results" />
         <main className="p-4 lg:p-6 max-w-3xl mx-auto space-y-6 text-center">
           <h2 className="text-2xl font-extrabold text-slate-100">Results</h2>
-          <p className="text-xs text-muted">Score = avg of all kicks{dropWorst ? ", worst dropped" : ""}. Kick = Dist + (Hang x 10), bad dir = -10.</p>
+          <p className="text-xs text-muted">Score = avg of all kicks. Kick = Dist + (Hang x 10), bad dir = -10.</p>
           <div className="max-w-sm mx-auto">
             <input type="text" value={weather} onChange={(e) => setWeather(e.target.value)} placeholder="Weather conditions (optional)" className="input w-full text-sm py-1.5 text-center" />
           </div>
@@ -314,10 +293,8 @@ function ScoutKOChartInner() {
                   <tr key={r.name} className="border-t border-border/30">
                     <td className="py-1 px-2 font-semibold text-slate-200 text-left"><span className="text-muted mr-1">{i + 1}.</span>{scoutDisplayName(r.name, scoutNumbers)}</td>
                     {r.entries.map((e, j) => {
-                      const isWorst = r.worst !== null && e.score === r.worst && r.entries.filter((x) => x.score === r.worst).length > 0;
-                      const isDropped = isWorst && j === r.entries.findIndex((x) => x.score === r.worst);
                       return (
-                        <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "", e.directionGood ? "text-make" : "text-miss")}>
+                        <td key={j} className={clsx("text-center py-1 px-2", e.directionGood ? "text-make" : "text-miss")}>
                           <span className="font-bold">{e.distance}</span>
                           <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
                           <span className="text-[8px] block text-muted">{e.score.toFixed(1)}</span>
@@ -388,7 +365,7 @@ function ScoutKOChartInner() {
         </div>
 
         <p className="text-[10px] text-muted text-center">
-          Kick score = Dist + (Hang x 10), bad dir = -10. Final = avg{dropWorst ? ", drop worst" : ""}.
+          Kick score = Dist + (Hang x 10), bad dir = -10. Final = avg.
         </p>
 
         {/* Active player header */}

@@ -18,15 +18,11 @@ import { Header } from "@/components/layout/Header";
 import Link from "next/link";
 import clsx from "clsx";
 
-interface PuntEntry { athlete: string; kickNum: number; distance: number; hangTime: number; opTime: number; directionGood: boolean; score: number; dropWorst?: boolean }
+interface PuntEntry { athlete: string; kickNum: number; distance: number; hangTime: number; opTime: number; directionGood: boolean; score: number }
 
-function calcAvg(scores: number[], dropWorst: boolean): number {
+function calcAvg(scores: number[]): number {
   if (scores.length === 0) return 0;
-  if (scores.length === 1) return scores[0];
-  if (!dropWorst) return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
-  const sorted = [...scores].sort((a, b) => a - b);
-  const best = sorted.slice(1);
-  return parseFloat((best.reduce((s, v) => s + v, 0) / best.length).toFixed(2));
+  return parseFloat((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2));
 }
 
 const parseHangRaw = (raw: string): number => {
@@ -53,7 +49,6 @@ function ScoutPuntInner() {
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState<string | null>(null);
   const [profileSession, setProfileSession] = useState<string | null>(null);
-  const [dropWorst, setDropWorst] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editTarget, setEditTarget] = useState<{ sessionId: string; name: string } | null>(null);
@@ -140,14 +135,14 @@ function ScoutPuntInner() {
     const tid = getTeamId();
     if (!tid) return;
     const athletes = [...new Set(livePunts.map((p) => p.athlete))];
-    const label = `Punt Scout — ${athletes.map((a) => { const ap = livePunts.filter((p) => p.athlete === a); return `${a}: ${calcAvg(ap.map((p) => p.score), true).toFixed(2)}`; }).join(", ")}`;
+    const label = `Punt Scout — ${athletes.map((a) => { const ap = livePunts.filter((p) => p.athlete === a); return `${a}: ${calcAvg(ap.map((p) => p.score)).toFixed(2)}`; }).join(", ")}`;
     const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await insertScoutSession(tid, {
       id: sessionId,
       sport: "SCOUT_PUNT",
       label,
       date: new Date().toISOString(),
-      entries: livePunts.map((p, i) => ({ ...p, kickNum: i + 1, dropWorst: true })) as unknown as Record<string, unknown>[],
+      entries: livePunts.map((p, i) => ({ ...p, kickNum: i + 1 })) as unknown as Record<string, unknown>[],
     });
     await setSessionRankings(tid, sessionId, rankingIds);
     setLivePunts([]);
@@ -162,17 +157,16 @@ function ScoutPuntInner() {
   const rankedSessions = sessions
     .map((s) => ({ ...s, entries: (s.entries as Record<string, unknown>[]).filter((e) => activeRanking === ALL_RANKING_ID || entryRanks(s.id, (e as { athlete?: string }).athlete ?? "").includes(activeRanking)) }))
     .filter((s) => s.entries.length > 0);
-  const ranked: { name: string; sessionId: string; date: string; entries: PuntEntry[]; avg: number; worst: number | null; notes?: string; weather?: string }[] = [];
+  const ranked: { name: string; sessionId: string; date: string; entries: PuntEntry[]; avg: number; notes?: string; weather?: string }[] = [];
   for (const s of rankedSessions) {
     const entries = s.entries as unknown as PuntEntry[];
     const athletes = [...new Set(entries.map((e) => e.athlete))];
     for (const name of athletes) {
       const ae = entries.filter((e) => e.athlete === name);
       const scores = ae.map((e) => e.score);
-      const worst = dropWorst && scores.length > 1 ? Math.min(...scores) : null;
       const noteEntry = ae.find((e) => (e as { notes?: string }).notes);
       const notes = noteEntry ? (noteEntry as { notes?: string }).notes : undefined;
-      ranked.push({ name, sessionId: s.id, date: s.date, entries: ae, avg: calcAvg(scores, dropWorst), worst, notes, weather: s.weather });
+      ranked.push({ name, sessionId: s.id, date: s.date, entries: ae, avg: calcAvg(scores), notes, weather: s.weather });
     }
   }
   ranked.sort((a, b) => b.avg - a.avg);
@@ -400,15 +394,6 @@ function ScoutPuntInner() {
 
         {tab === "rankings" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between card-2 px-4 py-3">
-              <div>
-                <p className="text-xs font-semibold text-slate-200">Drop Worst Punt</p>
-                <p className="text-[10px] text-muted">Exclude lowest score from average</p>
-              </div>
-              <button onClick={() => setDropWorst(!dropWorst)} className={clsx("w-10 h-5 rounded-full transition-colors relative", dropWorst ? "bg-amber-500" : "bg-surface-2 border border-border")}>
-                <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", dropWorst ? "left-5" : "left-0.5")} />
-              </button>
-            </div>
             {!loading && ranked.length > 0 && (
               <div className="flex gap-2">
                 <ExportButton onExcel={() => exportPuntScoutExcel(rankedSessions)} onPDF={() => exportPuntScoutPDF(rankedSessions)} />
@@ -450,17 +435,14 @@ function ScoutPuntInner() {
                             <span className="text-muted mr-1">{i + 1}.</span>
                             <button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); setProfileSession(r.sessionId); }} className="hover:text-amber-400 transition-colors underline decoration-dotted">{scoutDisplayName(r.name, scoutNumbers)}</button>
                           </td>
-                          {r.entries.map((e, j) => {
-                            const isDropped = r.worst !== null && e.score === r.worst && j === r.entries.findIndex((x) => x.score === r.worst);
-                            return (
-                              <td key={j} className={clsx("text-center py-1 px-2", isDropped ? "opacity-40 line-through" : "")}>
-                                <span className={clsx(e.directionGood ? "text-make" : "text-miss")}>
-                                  <span className="font-bold">{e.distance}</span>
-                                  <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
-                                </span>
-                              </td>
-                            );
-                          })}
+                          {r.entries.map((e, j) => (
+                            <td key={j} className="text-center py-1 px-2">
+                              <span className={clsx(e.directionGood ? "text-make" : "text-miss")}>
+                                <span className="font-bold">{e.distance}</span>
+                                <span className="text-[9px] block">{e.hangTime.toFixed(2)}s</span>
+                              </span>
+                            </td>
+                          ))}
                           {Array.from({ length: maxKicks - r.entries.length }, (_, j) => (
                             <td key={`e-${j}`} className="text-center py-1 px-2 text-muted">—</td>
                           ))}
