@@ -2384,11 +2384,16 @@ export default function KickingSessionPage() {
             previousSnaps={snapLogsMap[String(snapKickIdx)]}
             onClose={() => setShowSnapOverlay(false)}
             onSaved={(entry) => {
-              setSnapLogsMap((prev) => ({ ...prev, [String(snapKickIdx)]: [...(prev[String(snapKickIdx)] ?? []), entry] }));
-              // Auto-advance to next unlogged kick
-              const currentFilledIdx = filledRows.findIndex(({ i }) => i === snapKickIdx);
-              const nextUnlogged = filledRows.slice(currentFilledIdx + 1).find(({ i }) => !(snapLogsMap[String(i)]?.length) && i !== snapKickIdx);
-              if (nextUnlogged) setSnapKickIdx(nextUnlogged.i);
+              const key = String(snapKickIdx);
+              const wasLogged = (snapLogsMap[key]?.length ?? 0) > 0;
+              // One snap per kick: replace rather than append (also covers editing).
+              setSnapLogsMap((prev) => ({ ...prev, [key]: [entry] }));
+              // Only auto-advance when adding a NEW snap; when editing, stay put.
+              if (!wasLogged) {
+                const currentFilledIdx = filledRows.findIndex(({ i }) => i === snapKickIdx);
+                const nextUnlogged = filledRows.slice(currentFilledIdx + 1).find(({ i }) => !(snapLogsMap[String(i)]?.length) && i !== snapKickIdx);
+                if (nextUnlogged) setSnapKickIdx(nextUnlogged.i);
+              }
             }}
             kickList={filledRows.map(({ r, i }, fi) => ({
               idx: i,
