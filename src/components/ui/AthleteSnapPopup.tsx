@@ -96,8 +96,12 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
     ? !!marker && !!laces && !!spiral && !!snapper
     : !!puntMarker && !!spiral && !!snapper;
 
+  // Team mode (kickList present): one snap per kick — once this kick has a snap,
+  // block logging another for it.
+  const alreadyLogged = !!kickList && kickList.length > 0 && (previousSnaps?.length ?? 0) > 0;
+
   const handleSave = () => {
-    if (!canSave) return;
+    if (!canSave || alreadyLogged) return;
 
     const acc = isFG ? (marker?.inZone ? "ON_TARGET" : "HIGH") : (puntMarker?.inZone ? "ON_TARGET" : "HIGH");
     const snapTimeVal = snapTime ? parseFloat(snapTime) || 0 : 0;
@@ -256,8 +260,8 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
           </>
         )}
 
-        <button onClick={handleSave} disabled={!canSave} className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-40">
-          Log Snap
+        <button onClick={handleSave} disabled={!canSave || alreadyLogged} className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-40">
+          {alreadyLogged ? "Snap Logged ✓" : "Log Snap"}
         </button>
 
         {/* Kick list (team mode) */}

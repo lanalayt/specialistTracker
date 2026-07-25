@@ -1458,7 +1458,8 @@ export default function KickingSessionPage() {
                             setSnapKickIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
                             setShowSnapOverlay(true);
                           }}
-                          className="px-3 py-2 rounded-input border border-accent/50 text-accent hover:bg-accent/10 text-xs font-semibold transition-all"
+                          disabled={filledRows.length === 0}
+                          className="px-3 py-2 rounded-input border border-accent/50 text-accent hover:bg-accent/10 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           Log Snap
                         </button>
@@ -1834,7 +1835,8 @@ export default function KickingSessionPage() {
                     setSnapKickIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
                     setShowSnapOverlay(true);
                   }}
-                  className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                  disabled={filledRows.length === 0}
+                  className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Log Snap
                 </button>
