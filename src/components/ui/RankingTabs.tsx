@@ -64,20 +64,22 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
   }
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {rankings.map((r) => (
-        <button
-          key={r.id}
-          onClick={() => onActiveChange(r.id)}
-          className={clsx(
-            "px-3 py-1 rounded-input text-xs font-semibold transition-all border",
-            active === r.id ? "bg-amber-500 text-slate-900 border-amber-500" : "bg-surface-2 text-muted border-border hover:text-white hover:border-slate-500"
-          )}
-        >
-          {r.name}
-        </button>
-      ))}
-      <button onClick={startEdit} className="px-2 py-1 text-xs text-muted hover:text-amber-400 transition-colors" title="Rename or delete rankings">✎</button>
+    <div className="flex items-center gap-2">
+      <div>
+        <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Ranking Group</p>
+        <div className="flex items-center gap-2">
+          <select
+            value={active}
+            onChange={(e) => onActiveChange(e.target.value)}
+            className="input w-auto min-w-[10rem] text-sm font-semibold py-1.5 pr-8"
+          >
+            {rankings.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+          <button onClick={startEdit} className="px-2 py-1 text-xs text-muted hover:text-amber-400 transition-colors" title="Rename or delete rankings">✎</button>
+        </div>
+      </div>
     </div>
   );
 }
