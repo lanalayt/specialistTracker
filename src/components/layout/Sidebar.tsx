@@ -8,13 +8,13 @@ import { useTeamLogo } from "@/lib/useTeamLogo";
 import { getTeamId } from "@/lib/teamData";
 import { getTeamSettings } from "@/lib/teamSettingsStore";
 import { useTutorial } from "@/components/ui/Tutorial";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import { KickerIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import { InvitePopup } from "@/components/ui/InvitePopup";
 import clsx from "clsx";
 
 const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode; disabled?: boolean; tutorialId?: string }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "⚡" },
-  { href: "/kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={20} />, tutorialId: "nav-kicking" },
+  { href: "/kicking", label: "FG Kicking", iconEl: <KickerIcon size={20} />, tutorialId: "nav-kicking" },
   { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} />, tutorialId: "nav-punting" },
   { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} />, tutorialId: "nav-kickoff" },
   { href: "/longsnap", label: "Snapping", icon: "📏" },
@@ -31,7 +31,7 @@ const COACH_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.
 
 const ATHLETE_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/athlete", label: "Athlete Home", icon: "⚡" },
-  { href: "/athlete/kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/athlete/kicking", label: "FG Kicking", iconEl: <KickerIcon size={20} /> },
   { href: "/athlete/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/athlete/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/athlete/longsnap", label: "Snapping", icon: "📏" },
@@ -41,7 +41,7 @@ const ATHLETE_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: 
 
 const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/scout", label: "Scout Home", icon: "⚡" },
-  { href: "/scout/fg", label: "FG Scouting", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/scout/fg", label: "FG Scouting", iconEl: <KickerIcon size={20} /> },
   { href: "/scout/punt", label: "Punt Scouting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/scout/kickoff", label: "KO Scouting", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/scout/snap", label: "Snap Scouting", icon: "📏" },

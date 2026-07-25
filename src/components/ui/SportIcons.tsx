@@ -25,6 +25,13 @@ export function GoalpostIcon({ className, size = 24 }: IconProps) {
   );
 }
 
+/** Kicker follow-through — matches the FG module tile art (theme-neutral PNG) */
+export function KickerIcon({ className, size = 24 }: IconProps) {
+  return (
+    <img src="/kicker-fg.png" alt="" style={{ height: size, width: "auto", objectFit: "contain" }} className={className} />
+  );
+}
+
 /** Football with arc motion line — represents a punt in flight */
 export function PuntFootIcon({ className, size = 24 }: IconProps) {
   return (

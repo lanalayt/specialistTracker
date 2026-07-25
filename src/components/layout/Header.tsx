@@ -7,13 +7,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTeamLogo } from "@/lib/useTeamLogo";
 import { useTutorial } from "@/components/ui/Tutorial";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import { KickerIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import { InvitePopup } from "@/components/ui/InvitePopup";
 import clsx from "clsx";
 
 const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode; disabled?: boolean }[] = [
   { href: "/dashboard", label: "Dashboard", icon: "⚡" },
-  { href: "/kicking", label: "Kicking", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/kicking", label: "Kicking", iconEl: <KickerIcon size={20} /> },
   { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/longsnap", label: "Snapping", icon: "📏" },
@@ -33,7 +33,7 @@ const ALWAYS_ITEMS: { href: string; label: string; icon?: string; iconEl?: React
 
 const ATHLETE_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/athlete", label: "Athlete Home", icon: "⚡" },
-  { href: "/athlete/kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/athlete/kicking", label: "FG Kicking", iconEl: <KickerIcon size={20} /> },
   { href: "/athlete/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/athlete/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/athlete/longsnap", label: "Snapping", icon: "📏" },
@@ -43,7 +43,7 @@ const ATHLETE_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: 
 
 const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
   { href: "/scout", label: "Scout Home", icon: "⚡" },
-  { href: "/scout/fg", label: "FG Scouting", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/scout/fg", label: "FG Scouting", iconEl: <KickerIcon size={20} /> },
   { href: "/scout/punt", label: "Punt Scouting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/scout/kickoff", label: "KO Scouting", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/scout/snap", label: "Snap Scouting", icon: "📏" },
@@ -355,7 +355,7 @@ export function Header({ title: _title }: { title?: string }) {
 
 const SCOUT_MOBILE_NAV = [
   { href: "/scout", label: "Home", icon: "⚡" },
-  { href: "/scout/fg", label: "FG", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/scout/fg", label: "FG", iconEl: <KickerIcon size={20} /> },
   { href: "/scout/punt", label: "Punt", iconEl: <PuntFootIcon size={20} /> },
   { href: "/scout/kickoff", label: "KO", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/scout/snap", label: "Snap", icon: "📏" },
@@ -364,7 +364,7 @@ const SCOUT_MOBILE_NAV = [
 
 const ATHLETE_MOBILE_NAV = [
   { href: "/athlete", label: "Home", icon: "⚡" },
-  { href: "/athlete/kicking", label: "FG", iconEl: <GoalpostIcon size={20} /> },
+  { href: "/athlete/kicking", label: "FG", iconEl: <KickerIcon size={20} /> },
   { href: "/athlete/punting", label: "Punt", iconEl: <PuntFootIcon size={20} /> },
   { href: "/athlete/kickoff", label: "KO", iconEl: <KickoffTeeIcon size={20} /> },
   { href: "/athlete/longsnap", label: "Snap", icon: "📏" },
