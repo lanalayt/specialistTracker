@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { saveScoutRankings, type ScoutRanking } from "@/lib/scoutStore";
+import { saveScoutRankings, ALL_RANKING, ALL_RANKING_ID, type ScoutRanking } from "@/lib/scoutStore";
 import clsx from "clsx";
 
 interface Props {
@@ -15,18 +15,27 @@ interface Props {
   onDeleteRanking?: (id: string) => void;
 }
 
-/** Ranking selector tabs for a discipline's rankings page, with inline rename/delete. */
+/** Ranking selector dropdown for a discipline's rankings page, with inline rename/delete. */
 export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active, onActiveChange, onDeleteRanking }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
 
+  // Real, stored groups (everything except the virtual all-charts group).
+  const editable = rankings.filter((r) => r.id !== ALL_RANKING_ID);
+  // Shown, editable groups: hide the untouched default "overall" since the locked
+  // "Overall" now covers all charts (a renamed old-overall still shows).
+  const shown = editable.filter((r) => !(r.id === "overall" && r.name === "Overall"));
+  // Dropdown order: locked "Overall" (all charts) first, then the stored groups.
+  const displayList = [ALL_RANKING, ...shown];
+
   const startEdit = () => {
-    setDraft(Object.fromEntries(rankings.map((r) => [r.id, r.name])));
+    setDraft(Object.fromEntries(shown.map((r) => [r.id, r.name])));
     setEditing(true);
   };
 
   const commit = async () => {
-    const updated = rankings.map((r) => ({ ...r, name: (draft[r.id] ?? r.name).trim() || r.name }));
+    // Map over all stored groups so a hidden default "overall" isn't dropped.
+    const updated = editable.map((r) => ({ ...r, name: (draft[r.id] ?? r.name).trim() || r.name }));
     onRankingsChange(updated);
     setEditing(false);
     await saveScoutRankings(teamId, sport, updated);
@@ -36,7 +45,10 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
     return (
       <div className="space-y-1.5">
         <p className="text-[10px] font-semibold text-muted uppercase tracking-wider">Edit Rankings</p>
-        {rankings.map((r) => (
+        <p className="text-[10px] text-muted">&quot;Overall&quot; is fixed and always shows every chart.</p>
+        {shown.length === 0 ? (
+          <p className="text-[10px] text-muted italic">No custom groups yet. Save a chart to a new group to create one.</p>
+        ) : shown.map((r) => (
           <div key={r.id} className="flex items-center gap-2">
             <input
               value={draft[r.id] ?? ""}
@@ -73,7 +85,7 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
             onChange={(e) => onActiveChange(e.target.value)}
             className="input w-auto min-w-[10rem] text-sm font-semibold py-1.5 pr-8"
           >
-            {rankings.map((r) => (
+            {displayList.map((r) => (
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>

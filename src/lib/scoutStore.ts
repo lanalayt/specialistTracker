@@ -443,6 +443,15 @@ export async function applyScoutDisciplines(
 export interface ScoutRanking { id: string; name: string; }
 
 const DEFAULT_RANKING: ScoutRanking = { id: "overall", name: "Overall" };
+
+/**
+ * Virtual "all charts" ranking. Always shown first, can't be renamed or
+ * deleted, and displays every chart in the discipline regardless of group
+ * assignment. It is never persisted — injected for display only — so a team
+ * that renamed the old "overall" group keeps that custom name.
+ */
+export const ALL_RANKING_ID = "__all__";
+export const ALL_RANKING: ScoutRanking = { id: ALL_RANKING_ID, name: "Overall" };
 const SESSION_RANKINGS_KEY = "scout_session_rankings";
 
 export function newRankingId(): string {

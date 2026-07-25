@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, setEntryRankings, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, setEntryRankings, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, ALL_RANKING_ID, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { RankingTabs } from "@/components/ui/RankingTabs";
 import { EditChartModal } from "@/components/ui/EditChartModal";
@@ -47,7 +47,7 @@ function ScoutKOInner() {
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [rankings, setRankings] = useState<ScoutRanking[]>([{ id: "overall", name: "Overall" }]);
   const [sessionRankings, setSessionRankingsMap] = useState<Record<string, string[]>>({});
-  const [activeRanking, setActiveRanking] = useState("overall");
+  const [activeRanking, setActiveRanking] = useState(ALL_RANKING_ID);
   const [showLiveRankings, setShowLiveRankings] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
@@ -157,7 +157,7 @@ function ScoutKOInner() {
   const entryRanks = (sessionId: string, name: string) => sessionRankings[`${sessionId}|||${name}`] ?? sessionRankings[sessionId] ?? ["overall"];
   // Build per-session-per-athlete rows, keeping only the athletes in the active ranking.
   const rankedSessions = sessions
-    .map((s) => ({ ...s, entries: (s.entries as Record<string, unknown>[]).filter((e) => entryRanks(s.id, (e as { athlete?: string }).athlete ?? "").includes(activeRanking)) }))
+    .map((s) => ({ ...s, entries: (s.entries as Record<string, unknown>[]).filter((e) => activeRanking === ALL_RANKING_ID || entryRanks(s.id, (e as { athlete?: string }).athlete ?? "").includes(activeRanking)) }))
     .filter((s) => s.entries.length > 0);
   const ranked: { name: string; sessionId: string; date: string; entries: KOEntry[]; avg: number; worst: number | null; notes?: string; weather?: string }[] = [];
   for (const s of rankedSessions) {
@@ -180,7 +180,7 @@ function ScoutKOInner() {
   const handleDeleteRow = async (name: string, sessionId: string) => {
     const tid = getTeamId();
     if (!tid) return;
-    if (activeRanking === "overall") {
+    if (activeRanking === ALL_RANKING_ID) {
       if (!window.confirm(`Delete this chart for ${name}? This permanently removes it from everywhere.`)) return;
       await deleteAthleteFromSession(tid, sessionId, name);
       await loadData();
@@ -204,7 +204,7 @@ function ScoutKOInner() {
     if (selectedRows.size === 0) return;
     const tid = getTeamId();
     if (!tid) return;
-    if (activeRanking === "overall") {
+    if (activeRanking === ALL_RANKING_ID) {
       if (!window.confirm(`Permanently delete ${selectedRows.size} selected chart${selectedRows.size !== 1 ? "s" : ""}?`)) return;
       for (const key of selectedRows) {
         const [sessionId, name] = key.split("|||");
@@ -235,7 +235,7 @@ function ScoutKOInner() {
     const tid = getTeamId();
     if (!tid) return;
     await deleteScoutRanking(tid, "kickoff", id);
-    if (activeRanking === id) setActiveRanking("overall");
+    if (activeRanking === id) setActiveRanking(ALL_RANKING_ID);
     await loadData();
   };
 
