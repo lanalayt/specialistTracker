@@ -157,9 +157,7 @@ export default function ScoutLongSnapsPage() {
 
     setSnaps((prev) => [...prev, { athlete: activePlayer, time: promptTime || "", accuracy, spiral: promptSpiral, marker: pendingMarker }]);
     setPendingMarker(null); setPromptTime(""); setPromptSpiral("");
-    // Auto-rotate
-    const idx = selectedPlayers.indexOf(activePlayer);
-    setActivePlayer(selectedPlayers[(idx + 1) % selectedPlayers.length]);
+    // Stay on the current athlete — the user picks the next one manually.
     if (snaps.length + 1 >= totalSnaps) setPhase("results");
   };
 

@@ -221,18 +221,10 @@ function ScoutFGChartInner() {
   };
 
   const findNextEmpty = (fromAthlete: string, fromIdx: number): { athlete: string; kickIdx: number } | null => {
-    // Try next kick for same athlete
+    // Advance only within the SAME athlete's remaining kicks. When they're done,
+    // return null so the chart waits for the user to pick the next athlete.
     for (let i = fromIdx + 1; i < kicks.length; i++) {
       if (kickAppliesTo(i, fromAthlete) && !resultMap[fromAthlete]?.[i]) return { athlete: fromAthlete, kickIdx: i };
-    }
-    // Try next athletes
-    const startPlayerIdx = selectedPlayers.indexOf(fromAthlete);
-    for (let p = 1; p <= selectedPlayers.length; p++) {
-      const playerIdx = (startPlayerIdx + p) % selectedPlayers.length;
-      const player = selectedPlayers[playerIdx];
-      for (let i = 0; i < kicks.length; i++) {
-        if (kickAppliesTo(i, player) && !resultMap[player]?.[i]) return { athlete: player, kickIdx: i };
-      }
     }
     return null;
   };

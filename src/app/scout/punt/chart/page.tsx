@@ -197,10 +197,7 @@ function ScoutPuntChartInner() {
     setOpInput("");
     setDirGood(true);
     setDirOverride(null);
-    // Auto-rotate to next player
-    const idx = selectedPlayers.indexOf(activePlayer);
-    const next = selectedPlayers[(idx + 1) % selectedPlayers.length];
-    setActivePlayer(next);
+    // Stay on the current athlete — the user picks the next one manually.
   };
 
   const handleUndo = () => {

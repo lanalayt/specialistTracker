@@ -152,9 +152,7 @@ export default function ScoutShortSnapsPage() {
     const points = calcPoints(accuracy, laces, spiral);
     setResults((prev) => [...prev, { athlete: activePlayer, accuracy, laces, spiral, points, marker: pendingMarker }]);
     setAccuracy(""); setLaces(""); setSpiral(""); setPendingMarker(null);
-    // Auto-rotate
-    const idx = selectedPlayers.indexOf(activePlayer);
-    setActivePlayer(selectedPlayers[(idx + 1) % selectedPlayers.length]);
+    // Stay on the current athlete — the user picks the next one manually.
     if (results.length + 1 >= totalSnaps) setPhase("results");
   };
 
