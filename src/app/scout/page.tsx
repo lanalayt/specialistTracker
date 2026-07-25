@@ -1,12 +1,12 @@
 "use client";
 
 import { Header } from "@/components/layout/Header";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import { PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import Link from "next/link";
 import React from "react";
 
 const SCOUT_SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string }[] = [
-  { href: "/scout/fg", iconEl: <GoalpostIcon size={36} />, label: "FG Kicking" },
+  { href: "/scout/fg", iconEl: <img src="/kicker-fg.png" alt="" className="h-11 w-auto" />, label: "FG Kicking" },
   { href: "/scout/punt", iconEl: <PuntFootIcon size={36} />, label: "Punting" },
   { href: "/scout/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
   { href: "/scout/snap", icon: "📏", label: "Snapping" },
