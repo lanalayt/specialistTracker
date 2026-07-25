@@ -51,7 +51,10 @@ const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: Re
   { href: "/scout/archives", label: "Scout Archives", icon: "🗄" },
 ];
 
-export function Header({ title }: { title?: string }) {
+export function Header({ title: _title }: { title?: string }) {
+  // `title` is accepted for call-site compatibility but no longer rendered —
+  // the app-mode selector now occupies the top bar instead of a page title.
+  void _title;
   const pathname = usePathname();
   const router = useRouter();
   const { user, isCoach, signOut } = useAuth();
@@ -104,7 +107,7 @@ export function Header({ title }: { title?: string }) {
     <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur border-b border-border">
       <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 h-14">
         {/* Logo (mobile) */}
-        <div className="flex items-center gap-2 lg:hidden min-w-0 flex-1">
+        <div className="flex items-center lg:hidden flex-shrink-0">
           <input
             ref={fileRef}
             type="file"
@@ -130,15 +133,40 @@ export function Header({ title }: { title?: string }) {
               <img src="/logo-mark.svg" alt="Specialist Tracker" className="w-full h-full" />
             )}
           </button>
-          <span className="text-xs sm:text-lg font-extrabold text-slate-100 leading-tight truncate">
-            {title ?? "Specialist Tracker"}
-          </span>
         </div>
 
-        {/* Page title (desktop) */}
-        <span className="hidden lg:block text-lg font-extrabold text-slate-100">
-          {title}
-        </span>
+        {/* App mode selector — always visible, in place of the page title */}
+        <div className="flex rounded-full border border-border overflow-hidden w-fit flex-shrink-0">
+          <button
+            onClick={() => handleModeChange("team")}
+            className={clsx(
+              "px-3 py-1 text-[10px] font-semibold transition-colors",
+              appMode === "team" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+            )}
+          >
+            Team
+          </button>
+          {isCoach && (
+            <button
+              onClick={() => handleModeChange("scout")}
+              className={clsx(
+                "px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+                appMode === "scout" ? "bg-amber-500 text-slate-900" : "text-muted hover:text-white"
+              )}
+            >
+              Scout
+            </button>
+          )}
+          <button
+            onClick={() => handleModeChange("athlete")}
+            className={clsx(
+              "px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border",
+              appMode === "athlete" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white"
+            )}
+          >
+            Athlete
+          </button>
+        </div>
 
         <div className="flex-1" />
 
@@ -173,46 +201,6 @@ export function Header({ title }: { title?: string }) {
       </div>
 
     </header>
-    {/* Mode toggle row — below the border */}
-    <div className="sticky top-14 z-20 bg-surface/80 backdrop-blur px-3 sm:px-4 py-3">
-      <div className="flex rounded-full border border-border overflow-hidden w-fit">
-        <button
-          onClick={() => handleModeChange("team")}
-          className={clsx(
-            "px-3 py-1 text-[10px] font-semibold transition-colors",
-            appMode === "team"
-              ? "bg-accent text-slate-900"
-              : "text-muted hover:text-white"
-          )}
-        >
-          Team
-        </button>
-        {isCoach && (
-          <button
-            onClick={() => handleModeChange("scout")}
-            className={clsx(
-              "px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border",
-              appMode === "scout"
-                ? "bg-amber-500 text-slate-900"
-                : "text-muted hover:text-white"
-            )}
-          >
-            Scout
-          </button>
-        )}
-        <button
-          onClick={() => handleModeChange("athlete")}
-          className={clsx(
-            "px-3 py-1 text-[10px] font-semibold transition-colors border-l border-border",
-            appMode === "athlete"
-              ? "bg-sky-500 text-slate-900"
-              : "text-muted hover:text-white"
-          )}
-        >
-          Athlete
-        </button>
-      </div>
-    </div>
     {/* Mobile drawer — portaled to body so backdrop-blur on header doesn't break fixed positioning */}
     {menuOpen && typeof document !== "undefined" && createPortal(
         <div className="lg:hidden fixed inset-0 z-50">
