@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { updateSessionAthleteEntries, migrateEntryRanking, saveScoutAthletes, scoutDisplayName, type ScoutSession } from "@/lib/scoutStore";
+import { useState, useEffect } from "react";
+import { updateSessionAthleteEntries, migrateEntryRanking, loadScoutAthletes, scoutDisplayName, type ScoutSession } from "@/lib/scoutStore";
 import clsx from "clsx";
+
+// Short discipline key for each session sport, used to load that discipline's
+// selected athletes for the reassignment dropdown.
+const SPORT_KEY: Record<string, string> = { SCOUT_FG: "fg", SCOUT_PUNT: "punt", SCOUT_KO: "kickoff", SCOUT_SNAP: "snap" };
 
 type Rep = Record<string, unknown>;
 
@@ -59,12 +63,23 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
   const [reps, setReps] = useState<Rep[]>(() =>
     (session.entries as Rep[]).filter((e) => (e as { athlete?: string }).athlete === athlete).map((e) => ({ ...e }))
   );
-  const [nameInput, setNameInput] = useState(athlete);
+  const [selectedName, setSelectedName] = useState(athlete);
+  const [athleteOptions, setAthleteOptions] = useState<string[]>([athlete]);
   const [saving, setSaving] = useState(false);
 
-  // Short discipline key for this session's sport, used to add a renamed athlete
-  // to the discipline so the chart's new owner becomes a real athlete.
-  const SPORT_KEY: Record<string, string> = { SCOUT_FG: "fg", SCOUT_PUNT: "punt", SCOUT_KO: "kickoff", SCOUT_SNAP: "snap" };
+  // Load the athletes selected in this discipline as the reassignment options.
+  // The current athlete is always included so it shows as the default even if
+  // they aren't currently toggled into this discipline.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const key = SPORT_KEY[sport];
+      if (!key) return;
+      const names = await loadScoutAthletes(teamId, key);
+      if (active) setAthleteOptions(Array.from(new Set([athlete, ...names])).sort((a, b) => a.localeCompare(b)));
+    })();
+    return () => { active = false; };
+  }, [teamId, sport, athlete]);
 
   const setField = (i: number, key: string, value: unknown) =>
     setReps((prev) => prev.map((r, j) => (j === i ? recompute(sport, session.label, { ...r, [key]: value }) : r)));
@@ -107,8 +122,8 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
 
   const save = async () => {
     setSaving(true);
-    // If the name was changed, the whole chart moves to that athlete.
-    const newName = nameInput.trim() || athlete;
+    // If a different athlete was picked, the whole chart moves to them.
+    const newName = selectedName || athlete;
     const renamed = newName !== athlete;
     // Preserve the athlete's note (if any) on the first rep, recompute scores.
     // Keep each rep's existing kick number (so a chart of e.g. kicks 6-10 stays
@@ -127,11 +142,8 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
     // Swap the chart's entries onto the new name (filters out the old name's reps).
     const ok = await updateSessionAthleteEntries(teamId, session.id, athlete, finalReps);
     if (ok && renamed) {
-      // Carry the chart's ranking group over, and make sure the new name is a real
-      // athlete in this discipline so the chart shows under them everywhere.
+      // Carry the chart's ranking group over to the athlete it moved to.
       await migrateEntryRanking(teamId, session.id, athlete, newName);
-      const key = SPORT_KEY[sport];
-      if (key) await saveScoutAthletes(teamId, key, [newName]);
     }
     setSaving(false);
     if (ok) onSaved();
@@ -155,17 +167,20 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
         <p className="text-[10px] text-muted">{new Date(session.date).toLocaleDateString()} · {reps.length} rep{reps.length !== 1 ? "s" : ""}</p>
 
         <div>
-          <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Athlete Name</p>
-          <input
-            type="text"
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            placeholder="Athlete name"
+          <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Athlete</p>
+          <select
+            value={selectedName}
+            onChange={(e) => setSelectedName(e.target.value)}
             className="input w-full text-sm py-1.5"
-          />
-          {nameInput.trim() && nameInput.trim() !== athlete && (
-            <p className="text-[10px] text-amber-400 mt-1">This chart will move to {nameInput.trim()}.</p>
+          >
+            {athleteOptions.map((n) => (
+              <option key={n} value={n}>{scoutDisplayName(n, numbers)}</option>
+            ))}
+          </select>
+          {selectedName !== athlete && (
+            <p className="text-[10px] text-amber-400 mt-1">This chart will move to {scoutDisplayName(selectedName, numbers)}.</p>
           )}
+          <p className="text-[10px] text-muted mt-1">To rename or add an athlete, use the Athletes page.</p>
         </div>
 
         <div className="space-y-2">
