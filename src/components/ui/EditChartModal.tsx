@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateSessionAthleteEntries, scoutDisplayName, type ScoutSession } from "@/lib/scoutStore";
+import { updateSessionAthleteEntries, migrateEntryRanking, saveScoutAthletes, scoutDisplayName, type ScoutSession } from "@/lib/scoutStore";
 import clsx from "clsx";
 
 type Rep = Record<string, unknown>;
@@ -59,7 +59,12 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
   const [reps, setReps] = useState<Rep[]>(() =>
     (session.entries as Rep[]).filter((e) => (e as { athlete?: string }).athlete === athlete).map((e) => ({ ...e }))
   );
+  const [nameInput, setNameInput] = useState(athlete);
   const [saving, setSaving] = useState(false);
+
+  // Short discipline key for this session's sport, used to add a renamed athlete
+  // to the discipline so the chart's new owner becomes a real athlete.
+  const SPORT_KEY: Record<string, string> = { SCOUT_FG: "fg", SCOUT_PUNT: "punt", SCOUT_KO: "kickoff", SCOUT_SNAP: "snap" };
 
   const setField = (i: number, key: string, value: unknown) =>
     setReps((prev) => prev.map((r, j) => (j === i ? recompute(sport, session.label, { ...r, [key]: value }) : r)));
@@ -102,6 +107,9 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
 
   const save = async () => {
     setSaving(true);
+    // If the name was changed, the whole chart moves to that athlete.
+    const newName = nameInput.trim() || athlete;
+    const renamed = newName !== athlete;
     // Preserve the athlete's note (if any) on the first rep, recompute scores.
     // Keep each rep's existing kick number (so a chart of e.g. kicks 6-10 stays
     // aligned to those columns); only assign new numbers to added reps.
@@ -110,13 +118,21 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
     let nextKick = (used.length ? Math.max(...used) : 0) + 1;
     let finalReps = reps.map((r) => {
       const kickNum = typeof r.kickNum === "number" ? r.kickNum : nextKick++;
-      return recompute(sport, session.label, { ...r, athlete, kickNum });
+      return recompute(sport, session.label, { ...r, athlete: newName, kickNum });
     });
     // Preset charts: keep kicks in column (kickNum) order so an added kick slots into
     // its correct spot instead of landing at the end.
     if (isPresetChart) finalReps = [...finalReps].sort((a, b) => (a.kickNum as number) - (b.kickNum as number));
     if (note && finalReps.length > 0) (finalReps[0] as { notes?: unknown }).notes = (note as { notes?: unknown }).notes;
+    // Swap the chart's entries onto the new name (filters out the old name's reps).
     const ok = await updateSessionAthleteEntries(teamId, session.id, athlete, finalReps);
+    if (ok && renamed) {
+      // Carry the chart's ranking group over, and make sure the new name is a real
+      // athlete in this discipline so the chart shows under them everywhere.
+      await migrateEntryRanking(teamId, session.id, athlete, newName);
+      const key = SPORT_KEY[sport];
+      if (key) await saveScoutAthletes(teamId, key, [newName]);
+    }
     setSaving(false);
     if (ok) onSaved();
   };
@@ -137,6 +153,20 @@ export function EditChartModal({ teamId, session, athlete, numbers, kickSlots, o
           <button onClick={onClose} className="text-muted hover:text-white text-xs transition-colors">Close</button>
         </div>
         <p className="text-[10px] text-muted">{new Date(session.date).toLocaleDateString()} · {reps.length} rep{reps.length !== 1 ? "s" : ""}</p>
+
+        <div>
+          <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Athlete Name</p>
+          <input
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            placeholder="Athlete name"
+            className="input w-full text-sm py-1.5"
+          />
+          {nameInput.trim() && nameInput.trim() !== athlete && (
+            <p className="text-[10px] text-amber-400 mt-1">This chart will move to {nameInput.trim()}.</p>
+          )}
+        </div>
 
         <div className="space-y-2">
           {reps.map((r, i) => (

@@ -459,7 +459,7 @@ function ScoutFGInner() {
                             {presetData.map((r, i) => {
                               const rowKey = `${r.sessionId}|||${r.name}`;
                               return (
-                              <tr key={rowKey} onClick={() => { if (!selectMode) setActionTarget({ sessionId: r.sessionId, name: r.name }); }} className={clsx("border-t border-border/30", !selectMode && "cursor-pointer hover:bg-surface-2/40", selectedRows.has(rowKey) && "bg-accent/10")}>
+                              <tr key={rowKey} onClick={() => { if (!selectMode) setActionTarget({ sessionId: r.sessionId, name: r.name }); }} className={clsx("border-t border-border/30", !selectMode && "cursor-pointer hover:bg-amber-500/10 transition-colors", selectedRows.has(rowKey) && "bg-accent/10")}>
                                 {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                                 <td className="py-1 px-2 font-semibold text-slate-200">
                                   <span className="text-muted mr-1">{i + 1}.</span>
@@ -518,7 +518,7 @@ function ScoutFGInner() {
                               const pct = r.att > 0 ? Math.round((r.makes / r.att) * 100) : 0;
                               const rowKey = `${r.sessionId}|||${r.name}`;
                               return (
-                                <tr key={rowKey} onClick={() => { if (!selectMode) setActionTarget({ sessionId: r.sessionId, name: r.name }); }} className={clsx("border-t border-border/30", !selectMode && "cursor-pointer hover:bg-surface-2/40", selectedRows.has(rowKey) && "bg-accent/10")}>
+                                <tr key={rowKey} onClick={() => { if (!selectMode) setActionTarget({ sessionId: r.sessionId, name: r.name }); }} className={clsx("border-t border-border/30", !selectMode && "cursor-pointer hover:bg-amber-500/10 transition-colors", selectedRows.has(rowKey) && "bg-accent/10")}>
                                   {selectMode && <td className="py-1 px-1"><input type="checkbox" checked={selectedRows.has(rowKey)} onChange={() => toggleRowSelection(rowKey)} className="accent-accent" /></td>}
                                   <td className="py-1 px-2 font-semibold text-slate-200">
                                     <span className="text-muted mr-1">{i + 1}.</span>
