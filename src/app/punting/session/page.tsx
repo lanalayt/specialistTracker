@@ -7,8 +7,10 @@ import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
 import { PuntSessionSummary } from "@/components/ui/PuntSessionSummary";
 import { PuntFieldStrip } from "@/components/ui/PuntFieldStrip";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
-import type { PuntEntry, PuntType, PuntHash, PuntLandingZone } from "@/types";
+import type { PuntEntry, PuntType, PuntHash, PuntLandingZone, LongSnapEntry } from "@/types";
 import { PUNT_HASHES } from "@/types";
+import { insertSession as insertSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
+import { genId as genSnapId, getSnapBenchmark } from "@/lib/stats";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
@@ -1018,9 +1020,54 @@ export default function PuntingSessionPage() {
     setPendingPunts(sessionPunts);
   };
 
-  const handleConfirmCommit = () => {
+  // Convert snaps entered on this page (SnapOverlay) into long-snap history entries.
+  const harvestPuntSnaps = (): LongSnapEntry[] => {
+    try {
+      const raw = localStorage.getItem("snapOverlay_PUNT");
+      if (!raw) return [];
+      const snapRows = JSON.parse(raw) as { snapper: string; time: string; accuracy: string; laces: string; spiral: string }[];
+      const markersRaw = localStorage.getItem("snapOverlay_PUNT_markers");
+      const markers: { x: number; y: number; num: number; inZone: boolean }[] = markersRaw ? JSON.parse(markersRaw) : [];
+      return snapRows
+        .map((r, i) => ({ r, marker: markers.find((m) => m.num === i + 1) }))
+        .filter(({ r }) => r.snapper && (r.time || r.accuracy))
+        .map(({ r, marker }) => {
+          const time = parseFloat(r.time) || 0;
+          const accuracy = (r.accuracy === "Strike" || r.accuracy.startsWith("✓")) ? "ON_TARGET"
+            : (r.accuracy === "Ball" || r.accuracy.startsWith("✗")) ? "HIGH"
+            : marker ? (marker.inZone ? "ON_TARGET" : "HIGH") : "ON_TARGET";
+          return {
+            athleteId: r.snapper, athlete: r.snapper,
+            snapType: "PUNT", time,
+            accuracy, score: 0,
+            benchmark: getSnapBenchmark("PUNT", time),
+            spiral: r.spiral || undefined,
+            markerX: marker?.x, markerY: marker?.y, markerInZone: marker?.inZone,
+          } as LongSnapEntry;
+        });
+    } catch { return []; }
+  };
+
+  const handleConfirmCommit = async () => {
     if (!pendingPunts) return;
     commitPractice(pendingPunts, undefined, weather, sessionMode ?? undefined, opponent, gameTime);
+    // Auto-save any snaps entered on this page straight to snap history/stats.
+    const snapEntries = harvestPuntSnaps();
+    if (snapEntries.length > 0) {
+      const tid = getTeamId();
+      if (tid) {
+        const snapperNames = [...new Set(snapEntries.map((e) => e.athlete))].join(", ");
+        stampSnapWrite(tid);
+        const snapSession = {
+          id: genSnapId(), teamId: tid, sport: "LONGSNAP",
+          label: `Long Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
+          date: new Date().toISOString(), mode: "practice" as const,
+          entries: snapEntries,
+        };
+        await insertSnapSession(tid, snapSession as never);
+      }
+      clearSnapOverlayData("PUNT");
+    }
     setCommittedPunts(pendingPunts);
     setPendingPunts(null);
     setCommitted(true);
@@ -2687,7 +2734,6 @@ export default function PuntingSessionPage() {
           snapType="PUNT"
           entryCount={filledCount}
           onClose={() => setShowSnapOverlay(false)}
-          gameMode={sessionMode === "game"}
         />
       )}
     </>

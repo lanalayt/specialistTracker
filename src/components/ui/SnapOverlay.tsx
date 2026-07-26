@@ -17,7 +17,6 @@ interface SnapOverlayProps {
   entryCount: number; // how many punts/kicks in the log
   onClose: () => void;
   kickInfos?: KickInfo[]; // FG only — distance + position per kick
-  gameMode?: boolean; // when true, saves to game-specific draft keys
 }
 
 interface SnapRow {
@@ -51,7 +50,7 @@ function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simp
   return { chartMode: "simple", missMode: "simple" };
 }
 
-export function SnapOverlay({ snapType, entryCount, onClose, kickInfos, gameMode }: SnapOverlayProps) {
+export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOverlayProps) {
   // Load snapping athletes from localStorage (same source as longSnapContext)
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
 
@@ -90,7 +89,6 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos, gameMode
   });
 
   const [athlete, setAthlete] = useState<string>("");
-  const [committed, setCommitted] = useState(false);
 
   // Load snapping athletes
   useEffect(() => {
@@ -180,37 +178,6 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos, gameMode
   };
 
   const filledRows = rows.filter((r) => r.snapper || r.time || r.accuracy || r.laces || r.spiral);
-
-  const handleSaveToDraft = () => {
-    const allFilled = rows.map((r, i) => ({ ...r, idx: i })).filter((r) => r.snapper || r.time || r.accuracy || r.laces || r.spiral);
-    if (allFilled.length === 0) return;
-
-    const draftSuffix = snapType === "PUNT" ? "punt" : "fg";
-    const modePrefix = gameMode ? "longsnap_game_draft" : "longsnap_manual_draft";
-    const tid = getTeamId();
-    const draftKey = tid ? `${modePrefix}_${draftSuffix}_${tid}` : `${modePrefix}_${draftSuffix}`;
-
-    // Build all filled rows (overwrite draft entirely)
-    const draftRows = allFilled.map((r) => ({
-      athlete: r.snapper || athlete || "Unknown",
-      time: r.time,
-      accuracy: r.accuracy,
-      critical: false,
-      ...(snapType === "FG" ? { snapType: "FG", laces: r.laces, spiral: r.spiral, dist: kickInfos?.[r.idx]?.dist || "", pos: kickInfos?.[r.idx]?.pos || "" } : {}),
-    }));
-
-    // Pad with empty rows to INIT_ROWS
-    const INIT = 12;
-    const emptySnapRow = snapType === "FG"
-      ? { athlete: "", accuracy: "", laces: "", spiral: "", dist: "", pos: "", critical: false, snapType: "FG" }
-      : { athlete: "", time: "", accuracy: "", critical: false };
-    while (draftRows.length < INIT) draftRows.push({ ...emptySnapRow } as typeof draftRows[0]);
-
-    try { localStorage.setItem(draftKey, JSON.stringify({ rows: draftRows, weather: "", snapMarkers })); } catch {}
-
-    setCommitted(true);
-    setTimeout(() => setCommitted(false), 2000);
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4">
@@ -343,26 +310,23 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos, gameMode
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted flex-1">{filledRows.length} of {entryCount} snaps</span>
-              {filledRows.length > 0 && (
-                <button
-                  onClick={() => {
-                    setRows((prev) => prev.map(() => ({ snapper: "", time: "", accuracy: "", laces: "", spiral: "" })));
-                    setSnapMarkers([]);
-                  }}
-                  className="text-xs py-1.5 px-3 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 transition-all"
-                >
-                  Clear All
-                </button>
-              )}
-              <button
-                onClick={handleSaveToDraft}
-                disabled={filledRows.length === 0}
-                className={clsx("btn-primary text-xs py-1.5 px-4", committed && "bg-make/90")}
-              >
-                {committed ? "✓ Saved!" : "Save to Snapping Log"}
-              </button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted flex-1">{filledRows.length} of {entryCount} snaps</span>
+                {filledRows.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setRows((prev) => prev.map(() => ({ snapper: "", time: "", accuracy: "", laces: "", spiral: "" })));
+                      setSnapMarkers([]);
+                    }}
+                    className="text-xs py-1.5 px-3 rounded-input border border-miss/30 text-miss/70 hover:text-miss hover:border-miss/50 transition-all"
+                  >
+                    Clear All
+                  </button>
+                )}
+                <button onClick={onClose} className="btn-primary text-xs py-1.5 px-4">Done</button>
+              </div>
+              <p className="text-[10px] text-muted">These snaps save to snap history automatically when you commit the session.</p>
             </div>
           </div>
 
