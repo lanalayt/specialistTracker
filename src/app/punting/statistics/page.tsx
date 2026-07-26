@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
-import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import { processPunt, emptyPuntStats } from "@/lib/stats";
 import { PUNT_HASHES } from "@/types";
 import type { PuntHash, PuntStatBucket, PuntAthleteStats, PuntEntry } from "@/types";
@@ -490,6 +489,46 @@ function PuntStatsView({
     return all;
   }, [history, puntFilter]);
 
+  // Stat highlights derived from all game punts
+  const gameHighlights = useMemo(() => {
+    const n = gamePunts.length;
+    if (n === 0) return null;
+    let grossTotal = 0;
+    let returnTotal = 0;
+    let hangTotal = 0;
+    let hangCount = 0;
+    let touchbacks = 0;
+    let inside20 = 0;
+    let inside10 = 0;
+    gamePunts.forEach((p) => {
+      grossTotal += p.yards ?? 0;
+      returnTotal += p.returnYards ?? 0;
+      if (p.hangTime && p.hangTime > 0) {
+        hangTotal += p.hangTime;
+        hangCount += 1;
+      }
+      const yl = p.landingYL ?? 0;
+      const isTouchback = p.touchback || yl >= 100;
+      if (isTouchback) {
+        touchbacks += 1;
+      } else {
+        if (yl >= 80 && yl < 100) inside20 += 1;
+        if (yl >= 90 && yl < 100) inside10 += 1;
+      }
+    });
+    // NCAA net punt average: (gross − return yards − 20 per touchback) / punts
+    const net = (grossTotal - returnTotal - 20 * touchbacks) / n;
+    return {
+      total: n,
+      avgDistance: (grossTotal / n).toFixed(1),
+      netAverage: net.toFixed(1),
+      avgHang: hangCount > 0 ? (hangTotal / hangCount).toFixed(2) : "—",
+      inside20,
+      inside10,
+      touchbacks,
+    };
+  }, [gamePunts]);
+
   // Group allTypeIds by category
   const typesByCategory = useMemo(() => {
     const result: Record<string, string[]> = {};
@@ -517,11 +556,26 @@ function PuntStatsView({
 
   return (
     <div className="space-y-4">
-      {/* Game chart — shows all punts with LOS + landing YL */}
-      {gamePunts.length > 0 && (
+      {/* Stat highlights — key game punting numbers */}
+      {gameHighlights && (
         <section className="card-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Game Chart — All Punts</p>
-          <PuntFieldView punts={gamePunts} />
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Stat Highlights</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Total Punts", value: gameHighlights.total },
+              { label: "Avg Distance", value: gameHighlights.avgDistance },
+              { label: "Net Average", value: gameHighlights.netAverage },
+              { label: "Avg Hang Time", value: gameHighlights.avgHang },
+              { label: "Inside the 20", value: gameHighlights.inside20 },
+              { label: "Inside the 10", value: gameHighlights.inside10 },
+              { label: "Touchbacks", value: gameHighlights.touchbacks },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-input border border-border bg-surface-2 px-3 py-2.5 text-center">
+                <p className="text-xl font-extrabold text-slate-100">{stat.value}</p>
+                <p className="text-[11px] text-muted mt-0.5">{stat.label}</p>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

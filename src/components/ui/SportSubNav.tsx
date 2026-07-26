@@ -5,7 +5,14 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import clsx from "clsx";
 
-const TABS = [
+interface SubNavTab {
+  label: string;
+  slug: string;
+  coachOnly: boolean;
+  disabled?: boolean;
+}
+
+const TABS: SubNavTab[] = [
   { label: "Session", slug: "session", coachOnly: false },
   { label: "Statistics", slug: "statistics", coachOnly: false },
   { label: "History", slug: "history", coachOnly: false },
@@ -14,8 +21,8 @@ const TABS = [
 
 interface SportSubNavProps {
   basePath: string;
-  extraTabs?: { label: string; slug: string }[];
-  tabs?: { label: string; slug: string; coachOnly: boolean }[];
+  extraTabs?: { label: string; slug: string; disabled?: boolean }[];
+  tabs?: { label: string; slug: string; coachOnly: boolean; disabled?: boolean }[];
 }
 
 export function SportSubNav({ basePath, extraTabs, tabs }: SportSubNavProps) {
@@ -36,6 +43,21 @@ export function SportSubNav({ basePath, extraTabs, tabs }: SportSubNavProps) {
           &larr;
         </Link>
         {visibleTabs.map((tab) => {
+          if (tab.disabled) {
+            return (
+              <span
+                key={tab.slug}
+                title="Coming soon"
+                aria-disabled="true"
+                className="px-5 py-3 text-sm font-medium whitespace-nowrap border-b-2 -mb-px text-muted/50 border-transparent cursor-not-allowed flex items-center gap-1.5"
+              >
+                {tab.label}
+                <span className="text-[10px] font-semibold uppercase tracking-wide bg-surface-2 text-muted rounded px-1.5 py-0.5">
+                  Soon
+                </span>
+              </span>
+            );
+          }
           const href = `${basePath}/${tab.slug}`;
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (

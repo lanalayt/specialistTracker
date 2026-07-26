@@ -14,7 +14,7 @@ export default function AthleteKickoffLayout({ children }: { children: React.Rea
       {!isHub && (
         <SportSubNav
           basePath="/athlete/kickoff"
-          extraTabs={[{ label: "Athletes", slug: "athletes" }, { label: "KO Settings", slug: "settings" }]}
+          extraTabs={[{ label: "Charting Games", slug: "charting", disabled: true }, { label: "Athletes", slug: "athletes" }, { label: "KO Settings", slug: "settings" }]}
         />
       )}
       {children}

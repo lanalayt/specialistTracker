@@ -16,7 +16,7 @@ export default function KickoffLayout({ children }: { children: React.ReactNode 
         <Sidebar />
         <div className="lg:pl-56 flex-1 flex flex-col min-h-screen pb-20 lg:pb-0 min-w-0">
           <Header title="Kickoff" />
-          {!isHub && <SportSubNav basePath="/kickoff" extraTabs={[{ label: "KO Settings", slug: "settings" }]} />}
+          {!isHub && <SportSubNav basePath="/kickoff" extraTabs={[{ label: "Charting Games", slug: "charting", disabled: true }, { label: "KO Settings", slug: "settings" }]} />}
           <AthleteViewOnly>{children}</AthleteViewOnly>
         </div>
         <MobileNav />
