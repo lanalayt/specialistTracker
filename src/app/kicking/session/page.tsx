@@ -520,6 +520,14 @@ export default function KickingSessionPage() {
     .filter(({ r }) => r.athlete || r.dist || r.pos || r.result || r.score);
   const filledCount = filledRows.length;
 
+  // Kicks available for snap logging. In a live/committed session the kicks live
+  // in sessionKicks; in manual entry they're the filled table rows. The `idx` is
+  // the snapLogsMap key for that kick.
+  const snapKicks: { idx: number; athlete: string; dist: string; pos: string }[] =
+    sessionKicks.length > 0
+      ? sessionKicks.map((k, i) => ({ idx: i, athlete: k.athlete, dist: String(k.dist ?? ""), pos: String(k.pos ?? "") }))
+      : filledRows.map(({ r, i }) => ({ idx: i, athlete: r.athlete, dist: r.dist, pos: r.pos }));
+
   // ── Determine which filled rows are locked (have logged results) ──
   const isContinuing = sessionKicks.length > 0 && !sessionActive;
   // Map: filledRowIndex → true if that row's kick has been logged
@@ -1454,11 +1462,11 @@ export default function KickingSessionPage() {
                         <p className="label text-slate-100">&nbsp;</p>
                         <button
                           onClick={() => {
-                            const firstUnlogged = filledRows.findIndex(({ i }) => !snapLogsMap[String(i)]?.length);
-                            setSnapKickIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
+                            const firstUnlogged = snapKicks.findIndex((k) => !snapLogsMap[String(k.idx)]?.length);
+                            setSnapKickIdx(firstUnlogged >= 0 ? snapKicks[firstUnlogged].idx : (snapKicks[0]?.idx ?? 0));
                             setShowSnapOverlay(true);
                           }}
-                          disabled={filledRows.length === 0}
+                          disabled={snapKicks.length === 0}
                           className="px-3 py-2 rounded-input border border-accent/50 text-accent hover:bg-accent/10 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           Log Snap
@@ -1831,11 +1839,11 @@ export default function KickingSessionPage() {
                 <button
                   onClick={() => {
                     // Start at first filled row without a snap logged
-                    const firstUnlogged = filledRows.findIndex(({ i }) => !snapLogsMap[String(i)]?.length);
-                    setSnapKickIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
+                    const firstUnlogged = snapKicks.findIndex((k) => !snapLogsMap[String(k.idx)]?.length);
+                    setSnapKickIdx(firstUnlogged >= 0 ? snapKicks[firstUnlogged].idx : (snapKicks[0]?.idx ?? 0));
                     setShowSnapOverlay(true);
                   }}
-                  disabled={filledRows.length === 0}
+                  disabled={snapKicks.length === 0}
                   className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Log Snap
@@ -2362,7 +2370,7 @@ export default function KickingSessionPage() {
       )}
 
       {showSnapOverlay && (() => {
-        const snapKickRow = rows[snapKickIdx];
+        const snapKickRow = snapKicks.find((k) => k.idx === snapKickIdx);
         return (
           <AthleteSnapPopup
             snapType="FG"
@@ -2390,19 +2398,19 @@ export default function KickingSessionPage() {
               setSnapLogsMap((prev) => ({ ...prev, [key]: [entry] }));
               // Only auto-advance when adding a NEW snap; when editing, stay put.
               if (!wasLogged) {
-                const currentFilledIdx = filledRows.findIndex(({ i }) => i === snapKickIdx);
-                const nextUnlogged = filledRows.slice(currentFilledIdx + 1).find(({ i }) => !(snapLogsMap[String(i)]?.length) && i !== snapKickIdx);
-                if (nextUnlogged) setSnapKickIdx(nextUnlogged.i);
+                const currentIdx = snapKicks.findIndex((k) => k.idx === snapKickIdx);
+                const nextUnlogged = snapKicks.slice(currentIdx + 1).find((k) => !(snapLogsMap[String(k.idx)]?.length) && k.idx !== snapKickIdx);
+                if (nextUnlogged) setSnapKickIdx(nextUnlogged.idx);
               }
             }}
-            kickList={filledRows.map(({ r, i }, fi) => ({
-              idx: i,
+            kickList={snapKicks.map((k, fi) => ({
+              idx: k.idx,
               kickNum: fi + 1,
-              athlete: r.athlete || "?",
-              dist: r.dist || "?",
-              pos: r.pos || "?",
-              hasSnap: (snapLogsMap[String(i)]?.length ?? 0) > 0,
-              isActive: snapKickIdx === i,
+              athlete: k.athlete || "?",
+              dist: k.dist || "?",
+              pos: k.pos || "?",
+              hasSnap: (snapLogsMap[String(k.idx)]?.length ?? 0) > 0,
+              isActive: snapKickIdx === k.idx,
             }))}
             onKickSelect={(idx) => setSnapKickIdx(idx)}
           />
