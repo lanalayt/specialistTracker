@@ -523,7 +523,7 @@ export default function PuntingSessionPage() {
     // Load new mode's draft
     const nd = loadDraftForMode(newMode);
     setRows(nd?.rows ?? Array.from({ length: INIT_ROWS }, emptyRow));
-    setManualEntry(nd?.manualEntry ?? (newMode === "game"));
+    setManualEntry(nd?.manualEntry ?? true);
     setSessionActive(nd?.sessionActive ?? false);
     setPlannedPunts(nd?.plannedPunts ?? []);
     setPlannedRowIndices(nd?.plannedRowIndices ?? []);
