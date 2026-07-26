@@ -523,7 +523,7 @@ export default function KickingSessionPage() {
   // Kicks available for snap logging. In a live/committed session the kicks live
   // in sessionKicks; in manual entry they're the filled table rows. The `idx` is
   // the snapLogsMap key for that kick.
-  const snapKicks: { idx: number; athlete: string; dist: string; pos: string }[] =
+  const baseSnapKicks: { idx: number; athlete: string; dist: string; pos: string }[] =
     sessionKicks.length > 0
       ? sessionKicks.map((k, i) => ({ idx: i, athlete: k.athlete, dist: String(k.dist ?? ""), pos: String(k.pos ?? "") }))
       : filledRows.map(({ r, i }) => ({ idx: i, athlete: r.athlete, dist: r.dist, pos: r.pos }));
@@ -774,6 +774,20 @@ export default function KickingSessionPage() {
   const isEditing = editingKickIdx !== null;
   const showEntryCard = (!allKicksLogged || isEditing) && plannedKicks[currentKickIdx];
   const currentPlan = plannedKicks[currentKickIdx];
+
+  // In a live session, expose the current (not-yet-logged) kick for snap logging
+  // so a snap can be entered as you go. Its snapLogsMap key is the array index it
+  // will occupy in sessionKicks once LOG KICK is pressed (the append position).
+  const liveCurrentSnapKick =
+    !manualEntry && !isEditing && !allKicksLogged && currentPlan
+      ? {
+          idx: sessionKicks.length,
+          athlete: currentPlan.athlete,
+          dist: currentPlan.isPAT ? "" : String(currentPlan.dist ?? ""),
+          pos: currentPlan.pos,
+        }
+      : null;
+  const snapKicks = liveCurrentSnapKick ? [...baseSnapKicks, liveCurrentSnapKick] : baseSnapKicks;
 
   const updateCurrentPlan = (field: "athlete" | "dist" | "pos" | "isPAT", value: string | number | boolean) => {
     setPlannedKicks((prev) => {
@@ -1462,11 +1476,12 @@ export default function KickingSessionPage() {
                         <p className="label text-slate-100">&nbsp;</p>
                         <button
                           onClick={() => {
-                            const firstUnlogged = snapKicks.findIndex((k) => !snapLogsMap[String(k.idx)]?.length);
-                            setSnapKickIdx(firstUnlogged >= 0 ? snapKicks[firstUnlogged].idx : (snapKicks[0]?.idx ?? 0));
+                            // Log the snap for the kick currently on screen: the one
+                            // being edited, or the append slot for the new kick.
+                            const targetIdx = isEditing && editingKickIdx !== null ? editingKickIdx : sessionKicks.length;
+                            setSnapKickIdx(targetIdx);
                             setShowSnapOverlay(true);
                           }}
-                          disabled={snapKicks.length === 0}
                           className="px-3 py-2 rounded-input border border-accent/50 text-accent hover:bg-accent/10 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           Log Snap
