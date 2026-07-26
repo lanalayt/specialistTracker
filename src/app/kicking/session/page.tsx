@@ -794,21 +794,24 @@ export default function KickingSessionPage() {
   const showEntryCard = (!allKicksLogged || isEditing) && plannedKicks[currentKickIdx];
   const currentPlan = plannedKicks[currentKickIdx];
 
-  // In a live session, describe the current (not-yet-logged) kick so its snap can
-  // be entered before LOG KICK. Its snapLogsMap key is the array index it WILL
-  // occupy once logged (the append position). It is intentionally NOT added to the
-  // kick list — that list shows only real, already-logged kicks so the snap count
-  // always matches the kick count (no phantom/duplicate entry).
-  const liveCurrentSnapKick =
-    !manualEntry && !isEditing && !allKicksLogged && currentPlan
-      ? {
-          idx: sessionKicks.length,
-          athlete: currentPlan.athlete,
-          dist: currentPlan.isPAT ? "" : String(currentPlan.dist ?? ""),
-          pos: currentPlan.pos,
-        }
+  // Snap kick list. In a live session with a plan, always show ALL planned kicks
+  // (not just the ones logged so far) so a snap can be logged for each as you go.
+  // Each kick keeps a stable snapLogsMap key: its sessionKicks array index once
+  // logged, otherwise the plan position (which equals that array index when kicks
+  // are logged in order). Manual entry falls back to the filled-row list.
+  const liveSnapKicks =
+    !manualEntry && plannedKicks.length > 0
+      ? plannedKicks.map((pk, planIdx) => {
+          const arrIdx = getLoggedKickArrayIdx(planIdx);
+          return {
+            idx: arrIdx >= 0 ? arrIdx : planIdx,
+            athlete: pk.athlete,
+            dist: pk.isPAT ? "" : String(pk.dist ?? ""),
+            pos: String(pk.pos ?? ""),
+          };
+        })
       : null;
-  const snapKicks = baseSnapKicks;
+  const snapKicks = liveSnapKicks ?? baseSnapKicks;
 
   const updateCurrentPlan = (field: "athlete" | "dist" | "pos" | "isPAT", value: string | number | boolean) => {
     setPlannedKicks((prev) => {
@@ -996,8 +999,7 @@ export default function KickingSessionPage() {
 
   // Snap popup — defined once and rendered in BOTH the live (sessionActive)
   // and the manual/committed return branches so "Log Snap" works everywhere.
-  const snapKickRow = snapKicks.find((k) => k.idx === snapKickIdx)
-    ?? (liveCurrentSnapKick && liveCurrentSnapKick.idx === snapKickIdx ? liveCurrentSnapKick : undefined);
+  const snapKickRow = snapKicks.find((k) => k.idx === snapKickIdx);
   const snapOverlay = showSnapOverlay ? (
     <AthleteSnapPopup
       snapType="FG"
@@ -1557,9 +1559,13 @@ export default function KickingSessionPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            // Log the snap for the kick currently on screen: the one
-                            // being edited, or the append slot for the new kick.
-                            const targetIdx = isEditing && editingKickIdx !== null ? editingKickIdx : sessionKicks.length;
+                            // Log the snap for the kick currently on screen — use its
+                            // stable key: the sessionKicks index if already logged,
+                            // otherwise the plan position (its append slot in order).
+                            const loggedArrIdx = getLoggedKickArrayIdx(currentKickIdx);
+                            const targetIdx = isEditing && editingKickIdx !== null
+                              ? editingKickIdx
+                              : (loggedArrIdx >= 0 ? loggedArrIdx : currentKickIdx);
                             setSnapKickIdx(targetIdx);
                             setShowSnapOverlay(true);
                           }}
