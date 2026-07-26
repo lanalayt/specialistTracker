@@ -902,7 +902,10 @@ export default function PuntingSessionPage() {
     let poochYLVal: number | undefined = undefined;
     if (isPooch && sessionMode !== "game") {
       poochYLVal = poochYL !== "" ? parseInt(poochYL) || 0 : undefined;
-      ydsVal = 0; // pooch punts do not contribute to distance averages
+      ydsVal = 0; // pooch punts do not contribute to distance averages (practice)
+    } else if (isPooch && sessionMode === "game" && landingYLVal != null) {
+      // Game pooch: keep gross yards AND record the opponent landing yard line for Avg YL.
+      poochYLVal = Math.max(0, 100 - landingYLVal);
     }
     // Auto-detect touchback: landing at opponent's end zone (field pos >= 100)
     const isTouchback = landingYLVal != null && landingYLVal >= 100;
