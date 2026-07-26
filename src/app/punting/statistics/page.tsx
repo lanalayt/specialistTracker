@@ -500,6 +500,7 @@ function PuntStatsView({
     let touchbacks = 0;
     let inside20 = 0;
     let inside10 = 0;
+    let fairCatches = 0;
     gamePunts.forEach((p) => {
       grossTotal += p.yards ?? 0;
       returnTotal += p.returnYards ?? 0;
@@ -507,6 +508,7 @@ function PuntStatsView({
         hangTotal += p.hangTime;
         hangCount += 1;
       }
+      if (p.fairCatch) fairCatches += 1;
       const yl = p.landingYL ?? 0;
       const isTouchback = p.touchback || yl >= 100;
       if (isTouchback) {
@@ -526,6 +528,7 @@ function PuntStatsView({
       inside20,
       inside10,
       touchbacks,
+      fairCatches,
     };
   }, [gamePunts]);
 
@@ -569,6 +572,7 @@ function PuntStatsView({
               { label: "Inside the 20", value: gameHighlights.inside20 },
               { label: "Inside the 10", value: gameHighlights.inside10 },
               { label: "Touchbacks", value: gameHighlights.touchbacks },
+              { label: "Fair Catches", value: gameHighlights.fairCatches },
             ].map((stat) => (
               <div key={stat.label} className="rounded-input border border-border bg-surface-2 px-3 py-2.5 text-center">
                 <p className="text-xl font-extrabold text-slate-100">{stat.value}</p>
