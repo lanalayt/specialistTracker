@@ -2033,7 +2033,8 @@ export default function PuntingSessionPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowSnapOverlay(true)}
-                  className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                  disabled={filledCount === 0}
+                  className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Log Snap
                 </button>

@@ -154,6 +154,9 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos, gameMode
 
   const handleSnapClick = (marker: SnapMarker) => {
     const rowIdx = marker.num - 1;
+    // One snap per entry, and no snap without an entry: ignore clicks that don't
+    // map to an existing punt/kick row (e.g. all rows already have a snap, or none exist).
+    if (rowIdx < 0 || rowIdx >= entryCount) return;
     if (rowIdx < rows.length) {
       let acc: string;
       if (marker.inZone) {

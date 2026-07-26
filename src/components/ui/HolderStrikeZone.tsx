@@ -74,11 +74,13 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
     onSnap({ x: xPct, y: yPct, num: nextNum, inZone: inZone2 });
   };
 
-  const handleEdgeDrag = useCallback((e: MouseEvent) => {
+  const handleEdgeDrag = useCallback((e: MouseEvent | TouchEvent) => {
     if (!dragEdge || !containerRef.current) return;
+    const pt = "touches" in e ? e.touches[0] : e;
+    if (!pt) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const yPct = Math.max(5, Math.min(95, ((e.clientY - rect.top) / rect.height) * 100));
-    const xPct = Math.max(5, Math.min(95, ((e.clientX - rect.left) / rect.width) * 100));
+    const yPct = Math.max(5, Math.min(95, ((pt.clientY - rect.top) / rect.height) * 100));
+    const xPct = Math.max(5, Math.min(95, ((pt.clientX - rect.left) / rect.width) * 100));
     setZone((prev: typeof DEFAULT_HOLDER_ZONE) => {
       if (dragEdge === "top") return { ...prev, top: Math.min(yPct, prev.bottom - 10) };
       if (dragEdge === "bottom") return { ...prev, bottom: Math.max(yPct, prev.top + 10) };
@@ -90,11 +92,18 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
 
   useEffect(() => {
     if (!dragEdge) return;
-    const handleMove = (e: MouseEvent) => handleEdgeDrag(e);
+    const handleMove = (e: MouseEvent | TouchEvent) => { if ("touches" in e) e.preventDefault(); handleEdgeDrag(e); };
     const handleUp = () => setDragEdge(null);
     window.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleUp);
-    return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleUp);
+    };
   }, [dragEdge, handleEdgeDrag]);
 
   return (
@@ -172,10 +181,10 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
         {/* Drag handles when editing */}
         {isEditing && (
           <>
-            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.left}%`, width: `${displayZone.right - displayZone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("top"); }} />
-            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.bottom}%`, left: `${displayZone.left}%`, width: `${displayZone.right - displayZone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("bottom"); }} />
-            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.left}%`, width: 6, height: `${displayZone.bottom - displayZone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("left"); }} />
-            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.right}%`, width: 6, height: `${displayZone.bottom - displayZone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("right"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.left}%`, width: `${displayZone.right - displayZone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("top"); }} onTouchStart={(e) => { e.stopPropagation(); setDragEdge("top"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.bottom}%`, left: `${displayZone.left}%`, width: `${displayZone.right - displayZone.left}%`, height: 6, transform: "translateY(-50%)", cursor: "ns-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("bottom"); }} onTouchStart={(e) => { e.stopPropagation(); setDragEdge("bottom"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.left}%`, width: 6, height: `${displayZone.bottom - displayZone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("left"); }} onTouchStart={(e) => { e.stopPropagation(); setDragEdge("left"); }} />
+            <div className="absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20" style={{ top: `${displayZone.top}%`, left: `${displayZone.right}%`, width: 6, height: `${displayZone.bottom - displayZone.top}%`, transform: "translateX(-50%)", cursor: "ew-resize" }} onMouseDown={(e) => { e.stopPropagation(); setDragEdge("right"); }} onTouchStart={(e) => { e.stopPropagation(); setDragEdge("right"); }} />
           </>
         )}
       </div>
