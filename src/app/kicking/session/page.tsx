@@ -985,6 +985,54 @@ export default function KickingSessionPage() {
     setClearUndoData(null);
   };
 
+  // Snap popup — defined once and rendered in BOTH the live (sessionActive)
+  // and the manual/committed return branches so "Log Snap" works everywhere.
+  const snapKickRow = snapKicks.find((k) => k.idx === snapKickIdx);
+  const snapOverlay = showSnapOverlay ? (
+    <AthleteSnapPopup
+      snapType="FG"
+      athletes={snapAthletes}
+      holders={holderAthletes}
+      holderEnabled={holderEnabled}
+      onHolderToggle={(on) => {
+        setHolderEnabled(on);
+        try {
+          const raw = localStorage.getItem("fgSettings");
+          const settings = raw ? JSON.parse(raw) : {};
+          settings.holderEnabled = on;
+          localStorage.setItem("fgSettings", JSON.stringify(settings));
+        } catch {}
+      }}
+      kickerName={snapKickRow?.athlete || undefined}
+      kickDistance={snapKickRow?.dist ? parseInt(snapKickRow.dist) : undefined}
+      kickHash={snapKickRow?.pos || undefined}
+      previousSnaps={snapLogsMap[String(snapKickIdx)]}
+      onClose={() => setShowSnapOverlay(false)}
+      onSaved={(entry) => {
+        const key = String(snapKickIdx);
+        const wasLogged = (snapLogsMap[key]?.length ?? 0) > 0;
+        // One snap per kick: replace rather than append (also covers editing).
+        setSnapLogsMap((prev) => ({ ...prev, [key]: [entry] }));
+        // Only auto-advance when adding a NEW snap; when editing, stay put.
+        if (!wasLogged) {
+          const currentIdx = snapKicks.findIndex((k) => k.idx === snapKickIdx);
+          const nextUnlogged = snapKicks.slice(currentIdx + 1).find((k) => !(snapLogsMap[String(k.idx)]?.length) && k.idx !== snapKickIdx);
+          if (nextUnlogged) setSnapKickIdx(nextUnlogged.idx);
+        }
+      }}
+      kickList={snapKicks.map((k, fi) => ({
+        idx: k.idx,
+        kickNum: fi + 1,
+        athlete: k.athlete || "?",
+        dist: k.dist || "?",
+        pos: k.pos || "?",
+        hasSnap: (snapLogsMap[String(k.idx)]?.length ?? 0) > 0,
+        isActive: snapKickIdx === k.idx,
+      }))}
+      onKickSelect={(idx) => setSnapKickIdx(idx)}
+    />
+  ) : null;
+
   // ════════════════════════════════════════════════════════════
   //  MODE CHOOSER — shown when no active draft
   // ════════════════════════════════════════════════════════════
@@ -1657,6 +1705,7 @@ export default function KickingSessionPage() {
             snapEntries={allSnapEntries.length > 0 ? allSnapEntries : undefined}
           />
         )}
+        {snapOverlay}
       </>
     );
   }
@@ -2403,53 +2452,7 @@ export default function KickingSessionPage() {
         />
       )}
 
-      {showSnapOverlay && (() => {
-        const snapKickRow = snapKicks.find((k) => k.idx === snapKickIdx);
-        return (
-          <AthleteSnapPopup
-            snapType="FG"
-            athletes={snapAthletes}
-            holders={holderAthletes}
-            holderEnabled={holderEnabled}
-            onHolderToggle={(on) => {
-              setHolderEnabled(on);
-              try {
-                const raw = localStorage.getItem("fgSettings");
-                const settings = raw ? JSON.parse(raw) : {};
-                settings.holderEnabled = on;
-                localStorage.setItem("fgSettings", JSON.stringify(settings));
-              } catch {}
-            }}
-            kickerName={snapKickRow?.athlete || undefined}
-            kickDistance={snapKickRow?.dist ? parseInt(snapKickRow.dist) : undefined}
-            kickHash={snapKickRow?.pos || undefined}
-            previousSnaps={snapLogsMap[String(snapKickIdx)]}
-            onClose={() => setShowSnapOverlay(false)}
-            onSaved={(entry) => {
-              const key = String(snapKickIdx);
-              const wasLogged = (snapLogsMap[key]?.length ?? 0) > 0;
-              // One snap per kick: replace rather than append (also covers editing).
-              setSnapLogsMap((prev) => ({ ...prev, [key]: [entry] }));
-              // Only auto-advance when adding a NEW snap; when editing, stay put.
-              if (!wasLogged) {
-                const currentIdx = snapKicks.findIndex((k) => k.idx === snapKickIdx);
-                const nextUnlogged = snapKicks.slice(currentIdx + 1).find((k) => !(snapLogsMap[String(k.idx)]?.length) && k.idx !== snapKickIdx);
-                if (nextUnlogged) setSnapKickIdx(nextUnlogged.idx);
-              }
-            }}
-            kickList={snapKicks.map((k, fi) => ({
-              idx: k.idx,
-              kickNum: fi + 1,
-              athlete: k.athlete || "?",
-              dist: k.dist || "?",
-              pos: k.pos || "?",
-              hasSnap: (snapLogsMap[String(k.idx)]?.length ?? 0) > 0,
-              isActive: snapKickIdx === k.idx,
-            }))}
-            onKickSelect={(idx) => setSnapKickIdx(idx)}
-          />
-        );
-      })()}
+      {snapOverlay}
     </>
   );
 }
