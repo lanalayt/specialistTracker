@@ -9,7 +9,17 @@ const BASE_CARDS = [
   { icon: "📁", label: "History", desc: "Browse past sessions", slug: "history" },
 ];
 
-export function SportHub({ basePath, sportName, hasCharting = false }: { basePath: string; sportName: string; hasCharting?: boolean }) {
+export function SportHub({
+  basePath,
+  sportName,
+  hasCharting = false,
+  chartingComingSoon = false,
+}: {
+  basePath: string;
+  sportName: string;
+  hasCharting?: boolean;
+  chartingComingSoon?: boolean;
+}) {
   const { isAthlete } = useAuth();
 
   const athleteCard = { icon: "👤", label: "Athletes", desc: "Manage athlete roster", slug: "athletes" };
@@ -42,6 +52,20 @@ export function SportHub({ basePath, sportName, hasCharting = false }: { basePat
             <p className="text-xs text-muted mt-1">{card.desc}</p>
           </Link>
         ))}
+        {chartingComingSoon && (
+          <div
+            aria-disabled="true"
+            title="Coming soon"
+            className="card relative opacity-60 cursor-not-allowed flex flex-col items-center text-center py-8"
+          >
+            <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-wide bg-surface-2 text-muted rounded px-1.5 py-0.5">
+              Soon
+            </span>
+            <span className="text-4xl mb-3">🎯</span>
+            <h3 className="text-sm font-bold text-slate-100">Charting Games</h3>
+            <p className="text-xs text-muted mt-1">Coming soon</p>
+          </div>
+        )}
       </div>
     </main>
   );
