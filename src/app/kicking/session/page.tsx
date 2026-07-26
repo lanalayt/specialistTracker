@@ -1450,8 +1450,8 @@ export default function KickingSessionPage() {
                       </div>
                     </div>
 
-                    {/* Score + Op Time + Log Snap */}
-                    {(scoreEnabled || opTimeEnabled) && (
+                    {/* Score + Op Time + Log Snap — the row always renders so the
+                        Log Snap button is available even with Score/OT disabled. */}
                     <div className="flex gap-2 items-end">
                       {scoreEnabled && (
                       <div className="min-w-0">
@@ -1494,6 +1494,7 @@ export default function KickingSessionPage() {
                       <div className="shrink-0 ml-auto">
                         <p className="label text-slate-100">&nbsp;</p>
                         <button
+                          type="button"
                           onClick={() => {
                             // Log the snap for the kick currently on screen: the one
                             // being edited, or the append slot for the new kick.
@@ -1501,13 +1502,12 @@ export default function KickingSessionPage() {
                             setSnapKickIdx(targetIdx);
                             setShowSnapOverlay(true);
                           }}
-                          className="px-3 py-2 rounded-input border border-accent/50 text-accent hover:bg-accent/10 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="px-3 py-2 rounded-input bg-accent/15 border border-accent text-accent hover:bg-accent/25 active:scale-95 text-xs font-bold transition-all"
                         >
-                          Log Snap
+                          + Log Snap
                         </button>
                       </div>
                     </div>
-                    )}
 
                     {/* Star + Log button + Remove */}
                     <div className="flex gap-2">
