@@ -101,6 +101,25 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
   localStorage.setItem(draftKey(mode), JSON.stringify(draft));
 }
 
+// Remembers the practice Live/Manual choice independent of session data, so it
+// survives leaving and returning even when no reps were entered.
+const ENTRY_MODE_PREF_KEY = "ko_practice_entry_mode"; // "live" | "manual"
+function loadPracticeEntryPref(): boolean {
+  // Returns the default manualEntry value (true = manual entry).
+  if (typeof window === "undefined") return true;
+  try {
+    return localStorage.getItem(ENTRY_MODE_PREF_KEY) !== "live";
+  } catch {
+    return true;
+  }
+}
+function savePracticeEntryPref(manual: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ENTRY_MODE_PREF_KEY, manual ? "manual" : "live");
+  } catch {}
+}
+
 interface KOTypeConfig {
   id: string;
   label: string;
@@ -293,7 +312,7 @@ export default function KickoffSessionPage() {
     const saved = initialMode ? loadDraftForMode(initialMode) : null;
     return saved ?? {
       rows: Array.from({ length: INIT_ROWS }, emptyRow),
-      manualEntry: true,
+      manualEntry: loadPracticeEntryPref(),
       sessionActive: false,
       plannedKicks: [],
       plannedRowIndices: [],
@@ -413,7 +432,7 @@ export default function KickoffSessionPage() {
     // Load new mode's draft
     const nd = loadDraftForMode(newMode);
     setRows(nd?.rows ?? Array.from({ length: INIT_ROWS }, emptyRow));
-    setManualEntry(nd?.manualEntry ?? (newMode === "game"));
+    setManualEntry(nd?.manualEntry ?? (newMode === "game" ? true : loadPracticeEntryPref()));
     setSessionActive(nd?.sessionActive ?? false);
     setPlannedKicks(nd?.plannedKicks ?? []);
     setPlannedRowIndices(nd?.plannedRowIndices ?? []);
@@ -1534,7 +1553,7 @@ export default function KickoffSessionPage() {
                 <div className="flex-1" />
                 <div className="flex rounded-input border border-border overflow-hidden">
                   <button
-                    onClick={() => { if (sessionMode !== "game") setManualEntry(false); }}
+                    onClick={() => { if (sessionMode !== "game") { setManualEntry(false); savePracticeEntryPref(false); } }}
                     className={clsx(
                       "px-3 py-1.5 text-xs font-semibold transition-colors",
                       !manualEntry ? "bg-accent text-slate-900" : "text-muted hover:text-white",
@@ -1544,7 +1563,7 @@ export default function KickoffSessionPage() {
                     Live Mode
                   </button>
                   <button
-                    onClick={() => setManualEntry(true)}
+                    onClick={() => { setManualEntry(true); if (sessionMode !== "game") savePracticeEntryPref(true); }}
                     className={clsx(
                       "px-3 py-1.5 text-xs font-semibold transition-colors border-l border-border",
                       manualEntry ? "bg-accent text-slate-900" : "text-muted hover:text-white"
