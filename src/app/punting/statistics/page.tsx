@@ -83,6 +83,13 @@ function avgYds(b: PuntStatBucket): string {
   return (b.totalYards / count).toFixed(1);
 }
 
+// Pooch only: average landing yard line (game stats).
+function avgYL(b: PuntStatBucket): string {
+  const count = b.poochYardLineAtt ?? 0;
+  if (count === 0) return "—";
+  return ((b.poochYardLineTotal ?? 0) / count).toFixed(1);
+}
+
 function avgHT(b: PuntStatBucket): string {
   const count = b.hangAtt ?? b.att;
   if (count === 0) return "—";
@@ -152,7 +159,8 @@ function PuntStatTable({
         <tr>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
-          <th className={clsx("text-[10px] font-semibold uppercase tracking-wider text-right py-1.5 px-1.5", isYL ? "text-accent" : "text-muted")}>{isYL ? "YL" : "Dist"}</th>
+          <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Dist</th>
+          {isYL && <th className="text-[10px] font-semibold text-accent uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>}
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
@@ -169,7 +177,8 @@ function PuntStatTable({
             <tr key={a.id} className="hover:bg-surface/30 transition-colors">
               <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{b.att || "—"}</td>
-              <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", isYL ? "text-accent font-semibold" : "text-slate-200")}>{avgYds(b)}</td>
+              <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgYds(b)}</td>
+              {isYL && <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{avgYL(b)}</td>}
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgHT(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgOT(b)}</td>
               <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{avgDA(b)}</td>

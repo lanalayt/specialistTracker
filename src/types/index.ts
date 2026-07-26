@@ -123,6 +123,9 @@ export interface PuntStatBucket {
   totalDirectionalAccuracy: number;
   daAtt?: number;
   criticalDirections: number;
+  // Pooch only: landing yard-line average (game stats).
+  poochYardLineTotal?: number;
+  poochYardLineAtt?: number;
 }
 
 export interface PuntAthleteStats {

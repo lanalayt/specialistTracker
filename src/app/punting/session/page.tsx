@@ -785,6 +785,8 @@ export default function PuntingSessionPage() {
       returnYards: isTouchback ? 0 : (r.fairCatch ? 0 : retVal),
       fairCatch: r.fairCatch || undefined,
       touchback: isTouchback || undefined,
+      // Pooch punts (game): record the opponent yard line the ball landed on for Avg YL.
+      poochLandingYardLine: isYardLineType(r.type, puntTypes) ? Math.max(0, 100 - landingYLVal) : undefined,
     };
     setSessionPunts((prev) => {
       // Replace if already saved for this kickNum, else append

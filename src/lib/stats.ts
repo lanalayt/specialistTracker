@@ -210,8 +210,11 @@ export function processPunt(
   const isYardLine = typeConfig ? typeConfig.metric === "yardline"
     : (typeof type === "string" && type.toUpperCase().includes("POOCH"));
   const htEnabled = typeConfig ? typeConfig.hangTime : true;
-  // Determine which metrics have data (0 = not entered for numeric fields)
-  const hasYards = yards > 0 && !isYardLine;
+  // Determine which metrics have data (0 = not entered for numeric fields).
+  // Pooch punts contribute their distance to the yard average only when they
+  // actually carry one (game stats compute gross yards from LOS→landing;
+  // practice pooch punts are yard-line-only and store yards = 0).
+  const hasYards = yards > 0;
   const hasHang = hangTime > 0 && htEnabled;
   const hasOT = opTime > 0;
   const daRaw = punt.directionalAccuracy;
@@ -283,6 +286,8 @@ export function processPunt(
     totalDirectionalAccuracy: (b?.totalDirectionalAccuracy || 0) + (hasDA ? directionalAccuracy : 0),
     daAtt: (b?.daAtt || 0) + (hasDA ? 1 : 0),
     criticalDirections: (b?.criticalDirections || 0) + isCritical,
+    poochYardLineTotal: (b?.poochYardLineTotal || 0) + (hasPoochYL ? poochLandingYardLine! : 0),
+    poochYardLineAtt: (b?.poochYardLineAtt || 0) + (hasPoochYL ? 1 : 0),
   });
 
   // Only update byType/byHash if those fields were provided
