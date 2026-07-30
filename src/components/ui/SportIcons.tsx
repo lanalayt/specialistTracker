@@ -32,26 +32,10 @@ export function KickerIcon({ className, size = 24 }: IconProps) {
   );
 }
 
-/** Football with arc motion line — represents a punt in flight */
+/** Punter follow-through — matches the punt module tile art (theme-neutral PNG) */
 export function PuntFootIcon({ className, size = 24 }: IconProps) {
   return (
-    <svg viewBox="0 0 32 32" width={size} height={size} className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Motion arc — shows the ball was kicked upward */}
-      <path d="M6 24 Q10 6 22 10" stroke="#64748b" strokeWidth="1.5" strokeDasharray="2 2" strokeLinecap="round" fill="none" />
-      {/* Football — tilted, in flight */}
-      <g transform="translate(20, 8) rotate(30)">
-        <ellipse cx="0" cy="0" rx="7" ry="4" fill="#7c3a1a" />
-        <ellipse cx="0" cy="0" rx="7" ry="4" fill="none" stroke="#5c2a0e" strokeWidth="0.8" />
-        {/* Seam */}
-        <line x1="-4" y1="0" x2="4" y2="0" stroke="white" strokeWidth="1" strokeLinecap="round" />
-        {/* Laces */}
-        <line x1="-2" y1="-1.5" x2="-2" y2="1.5" stroke="white" strokeWidth="0.8" strokeLinecap="round" />
-        <line x1="0" y1="-1.8" x2="0" y2="1.8" stroke="white" strokeWidth="0.8" strokeLinecap="round" />
-        <line x1="2" y1="-1.5" x2="2" y2="1.5" stroke="white" strokeWidth="0.8" strokeLinecap="round" />
-      </g>
-      {/* Kick origin marker */}
-      <circle cx="6" cy="24" r="1.5" fill="#94a3b8" />
-    </svg>
+    <img src="/punter.png" alt="" style={{ height: size, width: "auto", objectFit: "contain" }} className={className} />
   );
 }
 
