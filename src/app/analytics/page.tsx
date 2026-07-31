@@ -11,7 +11,7 @@ import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
 import type { FGKick, PuntEntry } from "@/types";
 import { DIST_RANGES } from "@/types";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 import React from "react";
 
@@ -21,7 +21,7 @@ const TABS: { id: Tab; label: string; icon?: string; iconEl?: React.ReactNode }[
   { id: "kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={18} /> },
   { id: "punting", label: "Punting", iconEl: <PuntFootIcon size={18} /> },
   { id: "kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={18} /> },
-  { id: "longsnap", label: "Long Snap", icon: "📏" },
+  { id: "longsnap", label: "Long Snap", iconEl: <SnapperIcon size={18} /> },
 ];
 
 function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: string; modeFilter: "all" | "practice" | "game" }) {

@@ -39,6 +39,13 @@ export function PuntFootIcon({ className, size = 24 }: IconProps) {
   );
 }
 
+/** Long snapper reaching for the ball — matches the snap module tile art (theme-neutral PNG) */
+export function SnapperIcon({ className, size = 24 }: IconProps) {
+  return (
+    <img src="/snapper.png" alt="" style={{ height: size, width: "auto", objectFit: "contain" }} className={className} />
+  );
+}
+
 /** Football standing upright on a tee */
 export function KickoffTeeIcon({ className, size = 24 }: IconProps) {
   return (
@@ -68,6 +75,7 @@ export function SportIcon({ sport, size = 24, className }: { sport: string; size
     case "KICKING": return <GoalpostIcon size={size} className={className} />;
     case "PUNTING": return <PuntFootIcon size={size} className={className} />;
     case "KICKOFF": return <KickoffTeeIcon size={size} className={className} />;
-    default: return <span className={className} style={{ fontSize: size }}>{sport === "LONGSNAP" ? "📏" : "📋"}</span>;
+    case "LONGSNAP": return <SnapperIcon size={size} className={className} />;
+    default: return <span className={className} style={{ fontSize: size }}>📋</span>;
   }
 }

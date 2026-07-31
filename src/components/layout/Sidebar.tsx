@@ -8,7 +8,7 @@ import { useTeamLogo } from "@/lib/useTeamLogo";
 import { getTeamId } from "@/lib/teamData";
 import { getTeamSettings } from "@/lib/teamSettingsStore";
 import { useTutorial } from "@/components/ui/Tutorial";
-import { KickerIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import { InvitePopup } from "@/components/ui/InvitePopup";
 import clsx from "clsx";
 
@@ -17,7 +17,7 @@ const NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: React.Re
   { href: "/kicking", label: "FG Kicking", iconEl: <KickerIcon size={20} />, tutorialId: "nav-kicking" },
   { href: "/punting", label: "Punting", iconEl: <PuntFootIcon size={20} />, tutorialId: "nav-punting" },
   { href: "/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} />, tutorialId: "nav-kickoff" },
-  { href: "/longsnap", label: "Snapping", icon: "📏" },
+  { href: "/longsnap", label: "Snapping", iconEl: <SnapperIcon size={20} /> },
   { href: "/analytics", label: "Analytics", icon: "📊", tutorialId: "nav-analytics" },
   { href: "/archives", label: "Archived Stats", icon: "🗄" },
 ];
@@ -34,7 +34,7 @@ const ATHLETE_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: 
   { href: "/athlete/kicking", label: "FG Kicking", iconEl: <KickerIcon size={20} /> },
   { href: "/athlete/punting", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/athlete/kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
-  { href: "/athlete/longsnap", label: "Snapping", icon: "📏" },
+  { href: "/athlete/longsnap", label: "Snapping", iconEl: <SnapperIcon size={20} /> },
   { href: "/athlete/athletes", label: "Athletes", icon: "👥" },
   { href: "/athlete/archives", label: "Archives", icon: "🗄" },
 ];
@@ -44,7 +44,7 @@ const SCOUT_NAV_ITEMS: { href: string; label: string; icon?: string; iconEl?: Re
   { href: "/scout/fg", label: "FG Scouting", iconEl: <KickerIcon size={20} /> },
   { href: "/scout/punt", label: "Punt Scouting", iconEl: <PuntFootIcon size={20} /> },
   { href: "/scout/kickoff", label: "KO Scouting", iconEl: <KickoffTeeIcon size={20} /> },
-  { href: "/scout/snap", label: "Snap Scouting", icon: "📏" },
+  { href: "/scout/snap", label: "Snap Scouting", iconEl: <SnapperIcon size={20} /> },
   { href: "/scout/athletes", label: "Athlete Profiles", icon: "👥" },
   { href: "/scout/archives", label: "Scout Archives", icon: "🗄" },
 ];

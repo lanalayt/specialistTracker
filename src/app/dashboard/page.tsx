@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { StatCard } from "@/components/ui/StatCard";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
@@ -17,7 +17,7 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
   { href: "/kicking", iconEl: <img src="/kicker-fg.png" alt="" className="h-11 w-auto" />, label: "FG Kicking" },
   { href: "/punting", iconEl: <PuntFootIcon size={44} />, label: "Punting" },
   { href: "/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
-  { href: "/longsnap", icon: "📏", label: "Snapping" },
+  { href: "/longsnap", iconEl: <SnapperIcon size={44} />, label: "Snapping" },
 ];
 
 function SeasonHighlights() {
@@ -85,7 +85,7 @@ const SPORT_LABELS: Record<string, { label: string; iconEl: React.ReactNode; bas
   KICKING: { label: "FG", iconEl: <GoalpostIcon size={20} />, basePath: "/kicking/history" },
   PUNTING: { label: "Punt", iconEl: <PuntFootIcon size={20} />, basePath: "/punting/history" },
   KICKOFF: { label: "KO", iconEl: <KickoffTeeIcon size={20} />, basePath: "/kickoff/history" },
-  LONGSNAP: { label: "Snap", iconEl: <span className="text-lg leading-none">📏</span>, basePath: "/longsnap/history" },
+  LONGSNAP: { label: "Snap", iconEl: <SnapperIcon size={20} />, basePath: "/longsnap/history" },
 };
 
 function DashboardContent() {
