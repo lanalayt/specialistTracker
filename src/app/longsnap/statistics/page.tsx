@@ -37,15 +37,20 @@ export default function LongSnapStatisticsPage() {
     return dateFilter.filterByDate(history as { date?: string; entries?: LongSnapEntry[] }[]);
   }, [history, dateFilter.mode, dateFilter.range]) as ({ entries?: LongSnapEntry[]; label?: string } & Record<string, unknown>)[];
 
-  // Practice-only history (exclude charting)
-  const practiceHistory = useMemo(() => {
-    return filteredHistory.filter((s) => !s.label?.startsWith("30 Point Game") && !s.label?.startsWith("Balls & Strikes"));
-  }, [filteredHistory]);
+  const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
+
+  // History for the selected mode (exclude charting sessions)
+  const modeHistory = useMemo(() => {
+    return filteredHistory.filter((s) =>
+      !s.label?.startsWith("30 Point Game") &&
+      !s.label?.startsWith("Balls & Strikes") &&
+      (gameMode === "game" ? s.mode === "game" : s.mode !== "game")
+    );
+  }, [filteredHistory, gameMode]);
 
   const displayStats = useMemo(() => {
-    // Always compute from practice-only sessions
-    return computeFilteredSnapStats(athletes, practiceHistory);
-  }, [practiceHistory, athletes]);
+    return computeFilteredSnapStats(athletes, modeHistory);
+  }, [modeHistory, athletes]);
 
   const [snapTab, setSnapTab] = useState<"long" | "short">("long");
 
@@ -71,7 +76,7 @@ export default function LongSnapStatisticsPage() {
   // Compute per-athlete laces stats from practice history
   const lacesStats = useMemo(() => {
     const result: Record<string, { total: number; att: number }> = {};
-    practiceHistory.forEach((session) => {
+    modeHistory.forEach((session) => {
       const snaps = (session.entries ?? []) as LongSnapEntry[];
       snaps.forEach((s) => {
         if (s.snapType !== "FG" && s.snapType !== "PAT") return;
@@ -83,7 +88,7 @@ export default function LongSnapStatisticsPage() {
       });
     });
     return result;
-  }, [practiceHistory]);
+  }, [modeHistory]);
 
   const totalLaces = Object.values(lacesStats).reduce((acc, v) => ({ total: acc.total + v.total, att: acc.att + v.att }), { total: 0, att: 0 });
 
@@ -91,7 +96,7 @@ export default function LongSnapStatisticsPage() {
   const scoreStats = useMemo(() => {
     const result: Record<string, { totalScore: number; att: number }> = {};
     let allScore = 0, allAtt = 0;
-    practiceHistory.forEach((session) => {
+    modeHistory.forEach((session) => {
       const snaps = (session.entries ?? []) as LongSnapEntry[];
       snaps.forEach((s) => {
         if (s.snapType !== "FG" && s.snapType !== "PAT") return;
@@ -103,7 +108,7 @@ export default function LongSnapStatisticsPage() {
       });
     });
     return { byAthlete: result, totalScore: allScore, totalAtt: allAtt };
-  }, [practiceHistory]);
+  }, [modeHistory]);
 
   // Short snap (FG + PAT) totals
   const shortTotals = athletes.reduce(
@@ -132,6 +137,32 @@ export default function LongSnapStatisticsPage() {
           onPDF={() => exportLongSnapStatsPDF(athletes.map((a) => a.name), history as { date?: string; entries?: LongSnapEntry[] }[])}
         />
       </div>
+
+      {/* Practice / Game mode toggle */}
+      <div className="flex rounded-input border border-border overflow-hidden w-fit">
+        <button
+          onClick={() => setGameMode("practice")}
+          className={clsx(
+            "px-4 py-1.5 text-xs font-semibold transition-colors",
+            gameMode === "practice" ? "bg-accent text-slate-900" : "text-muted hover:text-white"
+          )}
+        >
+          Practice Stats
+        </button>
+        <button
+          onClick={() => setGameMode("game")}
+          className={clsx(
+            "px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border",
+            gameMode === "game" ? "bg-red-500 text-white" : "text-red-400/60 hover:text-red-400"
+          )}
+        >
+          GAME Stats
+        </button>
+      </div>
+
+      {modeHistory.length === 0 && (
+        <p className="text-sm text-muted">No {gameMode} snap sessions yet.</p>
+      )}
 
       {/* Long / Short toggle */}
       <div className="flex rounded-input border border-border overflow-hidden w-fit">

@@ -914,7 +914,9 @@ export default function KickingSessionPage() {
         const snapSession = {
           id: genSnapId(), teamId: tid, sport: "LONGSNAP",
           label: `Short Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
-          date: new Date().toISOString(), mode: "practice" as const,
+          date: new Date().toISOString(),
+          // Tag snaps from a game session as game so they land in game stats.
+          mode: sessionMode === "game" ? "game" : "practice",
           entries: allSnapEntries,
         };
         stampSnapWrite(tid);
