@@ -12,7 +12,7 @@ import React from "react";
 const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string }[] = [
   { href: "/athlete/kicking", iconEl: <img src="/kicker-fg.png" alt="" className="h-11 w-auto" />, label: "FG Kicking" },
   { href: "/athlete/punting", iconEl: <PuntFootIcon size={44} />, label: "Punting" },
-  { href: "/athlete/kickoff", iconEl: <KickoffTeeIcon size={36} />, label: "Kickoff" },
+  { href: "/athlete/kickoff", iconEl: <KickoffTeeIcon size={44} />, label: "Kickoff" },
   { href: "/athlete/longsnap", icon: "🏈", label: "Snapping" },
 ];
 

@@ -46,26 +46,10 @@ export function SnapperIcon({ className, size = 24 }: IconProps) {
   );
 }
 
-/** Football standing upright on a tee */
+/** Kickoff kicker striking a teed ball — matches the kickoff module tile art (theme-neutral PNG) */
 export function KickoffTeeIcon({ className, size = 24 }: IconProps) {
   return (
-    <svg viewBox="0 0 32 32" width={size} height={size} className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Tee — rubber tee shape */}
-      <path d="M11 24 L14 20 L18 20 L21 24 Z" fill="#f97316" stroke="#ea580c" strokeWidth="1" strokeLinejoin="round" />
-      {/* Ground line */}
-      <line x1="8" y1="24" x2="24" y2="24" stroke="#64748b" strokeWidth="1" strokeLinecap="round" />
-      {/* Football — upright on tee */}
-      <g transform="translate(16, 12)">
-        <ellipse cx="0" cy="0" rx="4" ry="7.5" fill="#7c3a1a" />
-        <ellipse cx="0" cy="0" rx="4" ry="7.5" fill="none" stroke="#5c2a0e" strokeWidth="0.8" />
-        {/* Seam */}
-        <line x1="0" y1="-4" x2="0" y2="4" stroke="white" strokeWidth="1" strokeLinecap="round" />
-        {/* Laces */}
-        <line x1="-1.5" y1="-2" x2="1.5" y2="-2" stroke="white" strokeWidth="0.8" strokeLinecap="round" />
-        <line x1="-1.8" y1="0" x2="1.8" y2="0" stroke="white" strokeWidth="0.8" strokeLinecap="round" />
-        <line x1="-1.5" y1="2" x2="1.5" y2="2" stroke="white" strokeWidth="0.8" strokeLinecap="round" />
-      </g>
-    </svg>
+    <img src="/kickoff-kicker.png" alt="" style={{ height: size, width: "auto", objectFit: "contain" }} className={className} />
   );
 }
 
