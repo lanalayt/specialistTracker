@@ -1554,7 +1554,7 @@ export default function KickingSessionPage() {
                       </div>
                       )}
                       {opTimeEnabled && (
-                      <div className="w-14 shrink-0">
+                      <div className="w-14 shrink-0 ml-auto">
                         <p className="label text-slate-100">OT</p>
                         <input
                           type="text"
