@@ -14,6 +14,7 @@ interface SessionSummaryProps {
   snapEntries?: LongSnapEntry[];
   weather?: string;
   onWeatherChange?: (value: string) => void;
+  onLogSnap?: () => void;
 }
 
 export function SessionSummary({
@@ -25,6 +26,7 @@ export function SessionSummary({
   snapEntries,
   weather,
   onWeatherChange,
+  onLogSnap,
 }: SessionSummaryProps) {
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
   const misses = kicks.length - makes;
@@ -134,6 +136,15 @@ export function SessionSummary({
               <span className="text-xs text-sky-400 font-semibold">{snapCount} snap{snapCount !== 1 ? "s" : ""} logged</span>
               <span className="text-[10px] text-muted">— will be saved to snap history</span>
             </div>
+          )}
+
+          {onLogSnap && (
+            <button
+              onClick={onLogSnap}
+              className="w-full py-2.5 rounded-input bg-accent/15 border border-accent text-accent hover:bg-accent/25 active:scale-[0.99] text-sm font-bold transition-all"
+            >
+              + Log Snaps
+            </button>
           )}
 
           <p className="text-xs text-muted">

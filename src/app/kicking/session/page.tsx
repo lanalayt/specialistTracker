@@ -1734,6 +1734,11 @@ export default function KickingSessionPage() {
             onWeatherChange={setWeather}
             snapCount={allSnapEntries.length}
             snapEntries={allSnapEntries.length > 0 ? allSnapEntries : undefined}
+            onLogSnap={() => {
+              const firstUnlogged = snapKicks.findIndex((k) => !snapLogsMap[String(k.idx)]?.length);
+              setSnapKickIdx(firstUnlogged >= 0 ? snapKicks[firstUnlogged].idx : (snapKicks[0]?.idx ?? 0));
+              setShowSnapOverlay(true);
+            }}
           />
         )}
         {snapOverlay}
@@ -2480,6 +2485,11 @@ export default function KickingSessionPage() {
           onWeatherChange={setWeather}
           snapCount={allSnapEntries.length}
           snapEntries={allSnapEntries.length > 0 ? allSnapEntries : undefined}
+          onLogSnap={() => {
+            const firstUnlogged = snapKicks.findIndex((k) => !snapLogsMap[String(k.idx)]?.length);
+            setSnapKickIdx(firstUnlogged >= 0 ? snapKicks[firstUnlogged].idx : (snapKicks[0]?.idx ?? 0));
+            setShowSnapOverlay(true);
+          }}
         />
       )}
 
