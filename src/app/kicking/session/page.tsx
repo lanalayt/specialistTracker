@@ -1519,7 +1519,7 @@ export default function KickingSessionPage() {
                       {scoreEnabled && (
                       <div className="min-w-0">
                         <p className="label text-slate-100">Score</p>
-                        <div className="flex gap-1.5 flex-wrap">
+                        <div className="flex gap-1 flex-wrap">
                           {scoreOptions.map((opt) => {
                             const n = parseInt(opt);
                             const value = isNaN(n) ? 0 : n;
@@ -1528,7 +1528,7 @@ export default function KickingSessionPage() {
                               key={opt}
                               onClick={() => setScore(value)}
                               className={clsx(
-                                "min-w-[2.25rem] h-9 px-2 rounded-full text-sm font-bold transition-all",
+                                "min-w-[2rem] h-9 px-1.5 rounded-full text-sm font-bold transition-all",
                                 score === value
                                   ? "bg-accent text-slate-900"
                                   : "bg-surface-2 text-muted border border-border hover:border-accent/50"
@@ -1542,7 +1542,7 @@ export default function KickingSessionPage() {
                       </div>
                       )}
                       {opTimeEnabled && (
-                      <div className="w-16 shrink-0">
+                      <div className="w-14 shrink-0">
                         <p className="label text-slate-100">OT</p>
                         <input
                           type="text"
@@ -1569,9 +1569,9 @@ export default function KickingSessionPage() {
                             setSnapKickIdx(targetIdx);
                             setShowSnapOverlay(true);
                           }}
-                          className="px-3 py-2 rounded-input bg-accent/15 border border-accent text-accent hover:bg-accent/25 active:scale-95 text-xs font-bold transition-all"
+                          className="px-2.5 py-2 rounded-input bg-accent/15 border border-accent text-accent hover:bg-accent/25 active:scale-95 text-xs font-bold transition-all whitespace-nowrap"
                         >
-                          + Log Snap
+                          Log Snap
                         </button>
                       </div>
                     </div>
