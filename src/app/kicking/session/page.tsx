@@ -1388,6 +1388,16 @@ export default function KickingSessionPage() {
                           </div>
                         </>
                       )}
+                      {currentPlan.isPAT && (
+                        <div className="shrink-0">
+                          <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider mb-1 block">
+                            Kick
+                          </p>
+                          <div className="min-w-[5rem] px-3 text-center text-lg font-extrabold tracking-wide text-amber-400 bg-amber-500/15 border border-amber-500/40 rounded-input py-1.5 flex items-center justify-center">
+                            PAT
+                          </div>
+                        </div>
+                      )}
                       <div className="flex-1">
                         <p className="label text-slate-100">Position</p>
                         <div className="flex gap-1.5">
