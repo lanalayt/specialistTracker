@@ -11,14 +11,14 @@ import { LongSnapProvider } from "@/lib/longSnapContext";
 import { makePct } from "@/lib/stats";
 import type { FGKick, PuntEntry } from "@/types";
 import { DIST_RANGES } from "@/types";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
+import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import clsx from "clsx";
 import React from "react";
 
 type Tab = "kicking" | "punting" | "kickoff" | "longsnap";
 
 const TABS: { id: Tab; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
-  { id: "kicking", label: "FG Kicking", iconEl: <GoalpostIcon size={18} /> },
+  { id: "kicking", label: "FG Kicking", iconEl: <KickerIcon size={18} /> },
   { id: "punting", label: "Punting", iconEl: <PuntFootIcon size={18} /> },
   { id: "kickoff", label: "Kickoff", iconEl: <KickoffTeeIcon size={18} /> },
   { id: "longsnap", label: "Long Snap", iconEl: <SnapperIcon size={18} /> },

@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ensureTeamExists } from "@/lib/teamSettingsStore";
 import { createClient } from "@/lib/supabase";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
+import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import React from "react";
 
 const SPORT_OPTIONS: { id: string; label: string; icon?: string; iconEl?: React.ReactNode; desc: string }[] = [
-  { id: "KICKING", label: "FG Kicking", iconEl: <GoalpostIcon size={28} />, desc: "Field goals & PATs" },
+  { id: "KICKING", label: "FG Kicking", iconEl: <KickerIcon size={28} />, desc: "Field goals & PATs" },
   { id: "PUNTING", label: "Punting", iconEl: <PuntFootIcon size={28} />, desc: "Punts with hang time & direction" },
   { id: "KICKOFF", label: "Kickoff", iconEl: <KickoffTeeIcon size={28} />, desc: "Touchback rate & landing zones" },
   { id: "LONGSNAP", label: "Long Snapping", iconEl: <SnapperIcon size={28} />, desc: "Snap time & accuracy" },

@@ -5,12 +5,12 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { loadDeletedSessions, restoreSession, hardDeleteSession, hardDeleteExpired } from "@/lib/sessionStore";
 import { getTeamId } from "@/lib/teamData";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import { KickerIcon, PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
 import type { Session } from "@/types";
 import React from "react";
 
 const SPORT_INFO: Record<string, { label: string; iconEl: React.ReactNode }> = {
-  KICKING: { label: "FG", iconEl: <GoalpostIcon size={16} /> },
+  KICKING: { label: "FG", iconEl: <KickerIcon size={16} /> },
   PUNTING: { label: "Punt", iconEl: <PuntFootIcon size={16} /> },
   KICKOFF: { label: "KO", iconEl: <KickoffTeeIcon size={16} /> },
 };

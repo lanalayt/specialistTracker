@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { StatCard } from "@/components/ui/StatCard";
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
+import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
@@ -82,7 +82,7 @@ function SeasonHighlights() {
 }
 
 const SPORT_LABELS: Record<string, { label: string; iconEl: React.ReactNode; basePath: string }> = {
-  KICKING: { label: "FG", iconEl: <GoalpostIcon size={20} />, basePath: "/kicking/history" },
+  KICKING: { label: "FG", iconEl: <KickerIcon size={20} />, basePath: "/kicking/history" },
   PUNTING: { label: "Punt", iconEl: <PuntFootIcon size={20} />, basePath: "/punting/history" },
   KICKOFF: { label: "KO", iconEl: <KickoffTeeIcon size={20} />, basePath: "/kickoff/history" },
   LONGSNAP: { label: "Snap", iconEl: <SnapperIcon size={20} />, basePath: "/longsnap/history" },

@@ -56,7 +56,7 @@ export function KickoffTeeIcon({ className, size = 24 }: IconProps) {
 /** Map sport key to icon component */
 export function SportIcon({ sport, size = 24, className }: { sport: string; size?: number; className?: string }) {
   switch (sport) {
-    case "KICKING": return <GoalpostIcon size={size} className={className} />;
+    case "KICKING": return <KickerIcon size={size} className={className} />;
     case "PUNTING": return <PuntFootIcon size={size} className={className} />;
     case "KICKOFF": return <KickoffTeeIcon size={size} className={className} />;
     case "LONGSNAP": return <SnapperIcon size={size} className={className} />;

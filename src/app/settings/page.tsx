@@ -15,11 +15,11 @@ import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, loadCustomThemes,
 import { useTeamLogo } from "@/lib/useTeamLogo";
 import clsx from "clsx";
 
-import { GoalpostIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
+import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import React from "react";
 
 const SPORT_OPTIONS: { id: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
-  { id: "KICKING", label: "FG Kicking", iconEl: <GoalpostIcon size={20} /> },
+  { id: "KICKING", label: "FG Kicking", iconEl: <KickerIcon size={20} /> },
   { id: "PUNTING", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
   { id: "KICKOFF", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
   { id: "LONGSNAP", label: "Long Snapping", iconEl: <SnapperIcon size={20} /> },
