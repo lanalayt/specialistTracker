@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SnapperIcon } from "@/components/ui/SportIcons";
 
 export default function SnapSessionChooser() {
   return (
@@ -16,7 +17,7 @@ export default function SnapSessionChooser() {
             href="/athlete/longsnap/session-short"
             className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
           >
-            <div className="text-4xl mb-3">🏈</div>
+            <div className="mb-3"><SnapperIcon size={44} /></div>
             <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Short Snap</h3>
             <p className="text-xs text-muted mt-1">FG & PAT snaps</p>
           </Link>
@@ -25,7 +26,7 @@ export default function SnapSessionChooser() {
             href="/athlete/longsnap/session-long"
             className="card hover:bg-surface-2 hover:border-accent/30 transition-all group cursor-pointer flex flex-col items-center text-center py-8 px-4"
           >
-            <div className="text-4xl mb-3">🏈</div>
+            <div className="mb-3"><SnapperIcon size={44} /></div>
             <h3 className="text-lg font-bold text-slate-100 group-hover:text-accent transition-colors">Long Snap</h3>
             <p className="text-xs text-muted mt-1">Punt snaps</p>
           </Link>

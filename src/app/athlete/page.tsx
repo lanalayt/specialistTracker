@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
-import { PuntFootIcon, KickoffTeeIcon } from "@/components/ui/SportIcons";
+import { PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import { useAuth } from "@/lib/auth";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
@@ -13,7 +13,7 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
   { href: "/athlete/kicking", iconEl: <img src="/kicker-fg.png" alt="" className="h-11 w-auto" />, label: "FG Kicking" },
   { href: "/athlete/punting", iconEl: <PuntFootIcon size={44} />, label: "Punting" },
   { href: "/athlete/kickoff", iconEl: <KickoffTeeIcon size={44} />, label: "Kickoff" },
-  { href: "/athlete/longsnap", icon: "🏈", label: "Snapping" },
+  { href: "/athlete/longsnap", iconEl: <SnapperIcon size={44} />, label: "Snapping" },
 ];
 
 export default function AthleteDashboardPage() {
