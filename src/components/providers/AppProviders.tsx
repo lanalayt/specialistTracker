@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase";
 import { setTeamId, getTeamId } from "@/lib/teamData";
 import { loadAndApplyTheme, applyTheme } from "@/lib/themeColors";
 import { ensureTeamExists, useTeamSettingsSync, type TeamSettings } from "@/lib/teamSettingsStore";
+import { preloadSettings, subscribeSettingsRealtime } from "@/lib/settingsSync";
 import { TutorialProvider } from "@/components/ui/Tutorial";
 import { upsertMember, loadMembers, useMemberSync } from "@/lib/memberStore";
 import { hardDeleteExpired } from "@/lib/sessionStore";
@@ -31,6 +32,14 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   // Apply saved theme colors — re-run whenever user (and thus teamId) resolves
   useEffect(() => {
     loadAndApplyTheme();
+  }, [user?.id]);
+
+  // Warm the settings store from the DB + live-sync it across devices
+  useEffect(() => {
+    if (!user || user.id === "local-dev") return;
+    preloadSettings();
+    const unsub = subscribeSettingsRealtime(user.id);
+    return () => unsub();
   }, [user?.id]);
 
   // Clean up expired deleted sessions periodically
