@@ -9,6 +9,7 @@ import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportKickoffStats, exportKickoffStatsPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
+import { getCachedSettings } from "@/lib/settingsSync";
 
 const LEGACY_TYPE_LABELS: Record<string, string> = {
   REG: "Regular",
@@ -73,17 +74,15 @@ function loadKoSettings(): { types: KOTypeConfig[]; categories: KOCategory[]; di
     dirMode: "numeric" as DirectionMode,
     directions: [{ id: "1", label: "1.0" }, { id: "0.5", label: "0.5" }, { id: "0", label: "0" }, { id: "-1", label: "OB" }],
   };
-  if (typeof window === "undefined") return defaults;
   try {
-    const raw = localStorage.getItem("kickoffSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const rawTypes = parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES;
+    const parsed = getCachedSettings<{ kickoffTypes?: Record<string, unknown>[]; kickoffCategories?: KOCategory[]; directionMode?: string; directionMetrics?: { id: string; label: string; score?: number }[] }>("kickoffSettings");
+    if (parsed) {
+      const rawTypes = (parsed.kickoffTypes?.length ?? 0) > 0 ? parsed.kickoffTypes! : DEFAULT_KO_TYPES;
       return {
         types: (rawTypes as Record<string, unknown>[]).map(migrateType),
-        categories: parsed.kickoffCategories?.length > 0 ? parsed.kickoffCategories : DEFAULT_CATEGORIES,
+        categories: (parsed.kickoffCategories?.length ?? 0) > 0 ? parsed.kickoffCategories! : DEFAULT_CATEGORIES,
         dirMode: parsed.directionMode === "field" ? "field" : "numeric",
-        directions: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : defaults.directions,
+        directions: (parsed.directionMetrics?.length ?? 0) > 0 ? parsed.directionMetrics! : defaults.directions,
       };
     }
   } catch {}

@@ -24,9 +24,25 @@ const DEFAULTS: Omit<TeamSettings, "id"> = {
   enabledSports: ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP"],
 };
 
-/** Map DB snake_case row to camelCase TeamSettings */
+// ─── In-memory cache ─────────────────────────────────────────────────────────
+// The `teams` table is the single source of truth; this cache lets non-React
+// code (e.g. exportStats) and synchronous initial renders read the last-known
+// settings without hitting the DB or localStorage. Populated by every load.
+let _cache: TeamSettings | null = null;
+
+/** Synchronous read of the last-loaded team settings (null until first load). */
+export function getCachedTeamSettings(): TeamSettings | null {
+  return _cache;
+}
+
+/** Synchronous read of the last-loaded team logo (null until loaded / unset). */
+export function getCachedTeamLogo(): string | null {
+  return _cache?.logo ?? null;
+}
+
+/** Map DB snake_case row to camelCase TeamSettings (and refresh the cache) */
 function rowToSettings(row: Record<string, unknown>): TeamSettings {
-  return {
+  const settings: TeamSettings = {
     id: row.id as string,
     name: row.name as string,
     school: row.school as string,
@@ -37,6 +53,8 @@ function rowToSettings(row: Record<string, unknown>): TeamSettings {
     logo: (row.logo as string) ?? null,
     enabledSports: (row.enabled_sports as string[]) ?? DEFAULTS.enabledSports,
   };
+  _cache = settings;
+  return settings;
 }
 
 /** Map camelCase partial to DB snake_case columns */
@@ -107,6 +125,7 @@ export async function updateTeamSettings(
     cols.updated_at = new Date().toISOString();
     const { error } = await supabase.from("teams").update(cols).eq("id", teamId);
     if (error) throw error;
+    if (_cache && _cache.id === teamId) _cache = { ..._cache, ...partial };
     return true;
   } catch (err) {
     console.warn("[TeamSettings] update failed:", err);

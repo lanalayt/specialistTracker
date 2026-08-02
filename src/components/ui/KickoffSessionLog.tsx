@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useSettings } from "@/lib/settingsSync";
 import type { KickoffEntry, KickoffType } from "@/types";
 
 const LEGACY_TYPE_LABELS: Record<string, string> = {
@@ -10,19 +11,12 @@ const LEGACY_TYPE_LABELS: Record<string, string> = {
   FREE: "Free",
 };
 
-function loadKoTypeLabels(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem("kickoffSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.kickoffTypes && parsed.kickoffTypes.length > 0) {
-        const map: Record<string, string> = {};
-        parsed.kickoffTypes.forEach((t: { id: string; label: string }) => { map[t.id] = t.label; });
-        return map;
-      }
-    }
-  } catch {}
-  return {};
+function koTypeLabels(parsed: { kickoffTypes?: { id: string; label: string }[] } | null): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (parsed?.kickoffTypes && parsed.kickoffTypes.length > 0) {
+    parsed.kickoffTypes.forEach((t) => { map[t.id] = t.label; });
+  }
+  return map;
 }
 
 const DIR_LABELS: Record<string, string> = {
@@ -46,11 +40,8 @@ interface KickoffSessionLogProps {
 }
 
 export function KickoffSessionLog({ kicks, onDelete }: KickoffSessionLogProps) {
-  const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    setTypeLabels(loadKoTypeLabels());
-  }, []);
+  const koSettings = useSettings<{ kickoffTypes?: { id: string; label: string }[] }>("kickoffSettings");
+  const typeLabels = koTypeLabels(koSettings);
 
   if (kicks.length === 0) {
     return (

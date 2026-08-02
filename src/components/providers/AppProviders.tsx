@@ -63,7 +63,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       if (settings) {
         const colors = { primary: settings.colorPrimary, secondary: settings.colorSecondary, tertiary: settings.colorTertiary };
         applyTheme(colors);
-        try { localStorage.setItem("st_theme", JSON.stringify(colors)); } catch {}
       }
     });
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -78,7 +77,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         if (settings) {
           const colors = { primary: settings.colorPrimary, secondary: settings.colorSecondary, tertiary: settings.colorTertiary };
           applyTheme(colors);
-          try { localStorage.setItem("st_theme", JSON.stringify(colors)); } catch {}
         }
       });
     });
@@ -89,7 +87,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     (settings: TeamSettings) => {
       const colors = { primary: settings.colorPrimary, secondary: settings.colorSecondary, tertiary: settings.colorTertiary };
       applyTheme(colors);
-      try { localStorage.setItem("st_theme", JSON.stringify(colors)); } catch {}
     },
     !!user && user.id !== "local-dev"
   );
@@ -194,8 +191,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     // Reset theme to default
-    try { localStorage.removeItem("st_theme"); } catch {}
-    try { localStorage.removeItem("team_logo"); } catch {}
     applyTheme({ primary: "#00d4a0", secondary: "#0a0f14", tertiary: "#1f2f42" });
     window.location.href = "/login";
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

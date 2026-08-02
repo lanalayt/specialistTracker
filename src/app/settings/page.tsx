@@ -10,7 +10,7 @@ import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { createArchive } from "@/lib/archiveManager";
 import { getTeamId } from "@/lib/teamData";
-import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
+import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite, getCachedTeamSettings } from "@/lib/teamSettingsStore";
 import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, loadCustomThemes, saveCustomThemes, loadCustomThemesFromCloud, type ThemeColors, type SavedTheme } from "@/lib/themeColors";
 import { useTeamLogo } from "@/lib/useTeamLogo";
 import clsx from "clsx";
@@ -116,16 +116,13 @@ function SettingsContent() {
 
 
   useEffect(() => {
-    // Load from localStorage first (instant)
-    try {
-      const raw = localStorage.getItem("st_team_v1");
-      if (raw) {
-        const t = JSON.parse(raw);
-        if (t.name) setTeamName(t.name);
-        if (t.school) setSchool(t.school);
-        if (t.config?.enabledSports) setEnabledSports(t.config.enabledSports);
-      }
-    } catch {}
+    // Apply the last-known settings instantly from the in-memory cache
+    const cached = getCachedTeamSettings();
+    if (cached) {
+      setTeamName(cached.name);
+      setSchool(cached.school);
+      setEnabledSports(cached.enabledSports);
+    }
 
     // Then load from teams table (source of truth)
     (async () => {
@@ -140,15 +137,6 @@ function SettingsContent() {
         setTeamName(settings.name);
         setSchool(settings.school);
         setEnabledSports(settings.enabledSports);
-        // Update localStorage cache
-        try {
-          localStorage.setItem("st_team_v1", JSON.stringify({
-            name: settings.name,
-            school: settings.school,
-            config: { enabledSports: settings.enabledSports },
-            dashTitle: settings.dashTitle,
-          }));
-        } catch {}
       }
     })();
   }, []);
@@ -159,17 +147,8 @@ function SettingsContent() {
     );
 
   const handleSave = () => {
-    // Preserve existing fields (like dashTitle) when saving to localStorage cache
-    let existing: Record<string, unknown> = {};
-    try { const raw = localStorage.getItem("st_team_v1"); if (raw) existing = JSON.parse(raw); } catch {}
-    const team = {
-      ...existing,
-      name: teamName,
-      school,
-      config: { enabledSports },
-    };
-    localStorage.setItem("st_team_v1", JSON.stringify(team));
-    // Save to teams table
+    // Save to teams table (source of truth). Only these columns change; other
+    // fields like dashTitle are left intact server-side.
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       stampTeamSettingsWrite();

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { getCurrentTheme } from "@/lib/themeColors";
 import type { FGKick, FGPosition } from "@/types";
 
 interface Props {
@@ -101,7 +102,7 @@ export function FGFieldView({ kicks, currentKick }: Props) {
   const [ezColor, setEzColor] = useState("#991b1b");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   useEffect(() => {
-    try { const r = localStorage.getItem("st_theme"); if (r) { const t = JSON.parse(r); if (t.primary) setEzColor(t.primary); } } catch {}
+    const t = getCurrentTheme(); if (t.primary) setEzColor(t.primary);
   }, []);
   const handleKickTap = useCallback((idx: number) => {
     setSelectedIdx((prev) => (prev === idx ? null : idx));

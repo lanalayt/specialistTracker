@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import Link from "next/link";
 import type { LongSnapEntry, SnapAccuracy, SnapType } from "@/types";
 import clsx from "clsx";
@@ -27,10 +28,14 @@ export default function BallsStrikesPage() {
   const athleteNames = athletes.map((a) => a.name);
 
   const [mode, setMode] = useState<"single" | "multi" | null>(null);
-  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => {
-    try { const raw = localStorage.getItem("snapSettings"); if (raw) { const p = JSON.parse(raw); return p.missMode === "detailed" ? "detailed" : "simple"; } } catch {}
-    return "simple";
-  });
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() =>
+    getCachedSettings<{ missMode?: string }>("snapSettings")?.missMode === "detailed" ? "detailed" : "simple"
+  );
+  useEffect(() => {
+    loadSettingsFromCloud<{ missMode?: string }>("snapSettings").then((cloud) => {
+      if (cloud) setMissMode(cloud.missMode === "detailed" ? "detailed" : "simple");
+    });
+  }, []);
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [maxTime, setMaxTime] = useState("0.75");
   const [started, setStarted] = useState(false);

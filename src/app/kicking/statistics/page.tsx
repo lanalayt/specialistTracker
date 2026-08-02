@@ -10,7 +10,7 @@ import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportFGStats, exportFGStatsPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
-import { loadSettingsFromCloud } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 
 const POS_LABELS: Record<FGPosition, string> = {
   LH: "Left Hash",
@@ -335,14 +335,9 @@ export default function KickingStatisticsPage() {
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
   const dateFilter = useDateRangeFilter();
 
-  const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() => {
-    if (typeof window === "undefined") return "detailed";
-    try {
-      const raw = localStorage.getItem("fgSettings");
-      if (raw) return JSON.parse(raw).makeMode === "simple" ? "simple" : "detailed";
-    } catch {}
-    return "detailed";
-  });
+  const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() =>
+    getCachedSettings<{ makeMode?: string }>("fgSettings")?.makeMode === "simple" ? "simple" : "detailed"
+  );
 
   useEffect(() => {
     loadSettingsFromCloud<{ makeMode?: string }>("fgSettings").then((cloud) => {

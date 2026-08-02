@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useSettings } from "@/lib/settingsSync";
 import type { PuntEntry } from "@/types";
 
 const DEFAULT_PUNT_TYPES = [
@@ -13,15 +14,8 @@ const DEFAULT_PUNT_TYPES = [
   { id: "RUGBY", label: "Rugby" },
 ];
 
-function loadPuntTypes(): { id: string; label: string }[] {
-  if (typeof window === "undefined") return DEFAULT_PUNT_TYPES;
-  try {
-    const raw = localStorage.getItem("puntSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.puntTypes && parsed.puntTypes.length > 0) return parsed.puntTypes;
-    }
-  } catch {}
+function resolvePuntTypes(parsed: { puntTypes?: { id: string; label: string }[] } | null): { id: string; label: string }[] {
+  if (parsed?.puntTypes && parsed.puntTypes.length > 0) return parsed.puntTypes;
   return DEFAULT_PUNT_TYPES;
 }
 
@@ -31,14 +25,9 @@ interface PuntSessionLogProps {
 }
 
 export function PuntSessionLog({ punts, onDelete }: PuntSessionLogProps) {
-  const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const types = loadPuntTypes();
-    const map: Record<string, string> = {};
-    types.forEach((t) => { map[t.id] = t.label; });
-    setTypeLabels(map);
-  }, []);
+  const puntSettings = useSettings<{ puntTypes?: { id: string; label: string }[] }>("puntSettings");
+  const typeLabels: Record<string, string> = {};
+  resolvePuntTypes(puntSettings).forEach((t) => { typeLabels[t.id] = t.label; });
 
   if (punts.length === 0) {
     return (

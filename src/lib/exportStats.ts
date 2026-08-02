@@ -14,6 +14,8 @@ import type {
   LongSnapStatBucket,
 } from "@/types";
 import { POSITIONS, DIST_RANGES, PUNT_HASHES, SNAP_TYPES } from "@/types";
+import { getCachedSettings } from "@/lib/settingsSync";
+import { getCachedTeamLogo } from "@/lib/teamSettingsStore";
 import {
   processKick,
   emptyAthleteStats,
@@ -29,7 +31,7 @@ import {
 // ─── Team logo helper ────────────────────────────────────────────────────────
 
 export function getTeamLogo(): string | null {
-  try { return localStorage.getItem("team_logo"); } catch { return null; }
+  return getCachedTeamLogo();
 }
 
 export function addLogoToPDF(doc: { addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void; getNumberOfPages: () => number; setPage: (n: number) => void; internal: { pageSize: { getWidth: () => number } } }, landscape?: boolean): void {
@@ -314,23 +316,14 @@ function puntBucketRows(athletes: string[], statsMap: Record<string, PuntAthlete
 }
 
 function loadPuntTypes(): { id: string; label: string }[] {
-  if (typeof window === "undefined") return [
+  const DEFAULTS = [
     { id: "BLUE", label: "Blue" }, { id: "RED", label: "Red" },
     { id: "POOCH_BLUE", label: "Pooch Blue" }, { id: "POOCH_RED", label: "Pooch Red" },
     { id: "BROWN", label: "Brown" },
   ];
-  try {
-    const raw = localStorage.getItem("puntSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.puntTypes && parsed.puntTypes.length > 0) return parsed.puntTypes;
-    }
-  } catch {}
-  return [
-    { id: "BLUE", label: "Blue" }, { id: "RED", label: "Red" },
-    { id: "POOCH_BLUE", label: "Pooch Blue" }, { id: "POOCH_RED", label: "Pooch Red" },
-    { id: "BROWN", label: "Brown" },
-  ];
+  const parsed = getCachedSettings<{ puntTypes?: { id: string; label: string }[] }>("puntSettings");
+  if (parsed?.puntTypes && parsed.puntTypes.length > 0) return parsed.puntTypes;
+  return DEFAULTS;
 }
 
 function puntStatsToAOA(athletes: string[], statsMap: Record<string, PuntAthleteStats>, puntTypes: { id: string; label: string }[]): Row[] {

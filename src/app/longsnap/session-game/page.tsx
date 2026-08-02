@@ -9,6 +9,7 @@ import { makePct, getSnapBenchmark } from "@/lib/stats";
 import type { LongSnapEntry, SnapAccuracy, SnapType } from "@/types";
 import clsx from "clsx";
 import { getTeamId } from "@/lib/teamData";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 
 const INIT_ROWS = 12;
 
@@ -40,12 +41,13 @@ export default function LongSnapGameSessionPage() {
   const [chartMode, setChartMode] = useState<"simple" | "detailed">("simple");
   const [missMode, setMissMode] = useState<"simple" | "detailed">("simple");
 
-  // Load settings
+  // Load settings from the DB (source of truth)
   useEffect(() => {
-    try {
-      const r = localStorage.getItem("snapSettings");
-      if (r) { const p = JSON.parse(r); setChartMode(p.chartMode === "detailed" ? "detailed" : "simple"); setMissMode(p.missMode === "detailed" ? "detailed" : "simple"); }
-    } catch {}
+    const apply = (p: { chartMode?: string; missMode?: string } | null) => {
+      if (p) { setChartMode(p.chartMode === "detailed" ? "detailed" : "simple"); setMissMode(p.missMode === "detailed" ? "detailed" : "simple"); }
+    };
+    apply(getCachedSettings("snapSettings"));
+    loadSettingsFromCloud<{ chartMode?: string; missMode?: string }>("snapSettings").then(apply);
   }, []);
 
   // Draft keys

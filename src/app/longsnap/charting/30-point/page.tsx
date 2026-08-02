@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import Link from "next/link";
 import type { LongSnapEntry, SnapAccuracy, SnapType } from "@/types";
 import clsx from "clsx";
@@ -35,11 +36,15 @@ export default function ThirtyPointGamePage() {
   const { athletes, commitPractice } = useLongSnap();
   const athleteNames = athletes.map((a) => a.name);
 
-  // Load miss mode from snap settings
-  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => {
-    try { const raw = localStorage.getItem("snapSettings"); if (raw) { const p = JSON.parse(raw); return p.missMode === "detailed" ? "detailed" : "simple"; } } catch {}
-    return "simple";
-  });
+  // Load miss mode from snap settings (DB source of truth)
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() =>
+    getCachedSettings<{ missMode?: string }>("snapSettings")?.missMode === "detailed" ? "detailed" : "simple"
+  );
+  useEffect(() => {
+    loadSettingsFromCloud<{ missMode?: string }>("snapSettings").then((cloud) => {
+      if (cloud) setMissMode(cloud.missMode === "detailed" ? "detailed" : "simple");
+    });
+  }, []);
 
   // Mode selection
   const [mode, setMode] = useState<"single" | "multi" | null>(null);

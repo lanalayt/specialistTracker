@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
@@ -58,10 +59,14 @@ function SnapAthleteChartInner() {
   const [laces, setLaces] = useState<"Good" | "1/4 Turn" | "Back" | "">("");
   const [spiral, setSpiral] = useState<"Good" | "Bad" | "">("");
   const [snapTime, setSnapTime] = useState("");
-  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => {
-    try { const raw = localStorage.getItem("snapSettings"); if (raw) { const p = JSON.parse(raw); return p.missMode === "detailed" ? "detailed" : "simple"; } } catch {}
-    return "simple";
-  });
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() =>
+    getCachedSettings<{ missMode?: string }>("snapSettings")?.missMode === "detailed" ? "detailed" : "simple"
+  );
+  useEffect(() => {
+    loadSettingsFromCloud<{ missMode?: string }>("snapSettings").then((cloud) => {
+      if (cloud) setMissMode(cloud.missMode === "detailed" ? "detailed" : "simple");
+    });
+  }, []);
   const [selectedSnapIdx, setSelectedSnapIdx] = useState<number | null>(null);
 
   const athleteNames = athletes.map((a) => a.name);

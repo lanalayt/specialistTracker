@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import { getCachedSettings, saveSettingsToCloud, loadSettingsFromCloud } from "@/lib/settingsSync";
 
 export interface ShortSnapMarker {
   x: number;
@@ -19,30 +20,30 @@ interface HolderStrikeZoneProps {
   flipped?: boolean;
 }
 
-const DEFAULT_HOLDER_ZONE = { top: 45, bottom: 78, left: 42, right: 76 };
+type HolderZone = { top: number; bottom: number; left: number; right: number };
+
+const DEFAULT_HOLDER_ZONE: HolderZone = { top: 45, bottom: 78, left: 42, right: 76 };
 const HOLDER_ZONE_KEY = "holderStrikeZoneBounds";
 
-function loadHolderZone() {
-  try { const r = localStorage.getItem(HOLDER_ZONE_KEY); if (r) { const z = JSON.parse(r); if (z.top != null) return z; } } catch {}
+function loadHolderZone(): HolderZone {
+  const z = getCachedSettings<HolderZone>(HOLDER_ZONE_KEY);
+  if (z && z.top != null) return z;
   return { ...DEFAULT_HOLDER_ZONE };
 }
-function saveHolderZone(z: typeof DEFAULT_HOLDER_ZONE) {
-  try { localStorage.setItem(HOLDER_ZONE_KEY, JSON.stringify(z)); } catch {}
+function saveHolderZone(z: HolderZone) {
+  saveSettingsToCloud(HOLDER_ZONE_KEY, z);
 }
 
-function isInZone(xPct: number, yPct: number, zone: typeof DEFAULT_HOLDER_ZONE): boolean {
+function isInZone(xPct: number, yPct: number, zone: HolderZone): boolean {
   return xPct >= zone.left && xPct <= zone.right && yPct >= zone.top && yPct <= zone.bottom;
 }
 
 function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simple" | "detailed" } {
-  try {
-    const raw = localStorage.getItem("snapSettings");
-    if (raw) {
-      const p = JSON.parse(raw);
-      return { chartMode: p.chartMode === "detailed" ? "detailed" : "simple", missMode: p.missMode === "detailed" ? "detailed" : "simple" };
-    }
-  } catch {}
-  return { chartMode: "simple", missMode: "simple" };
+  const p = getCachedSettings<{ chartMode?: string; missMode?: string }>("snapSettings");
+  return {
+    chartMode: p?.chartMode === "detailed" ? "detailed" : "simple",
+    missMode: p?.missMode === "detailed" ? "detailed" : "simple",
+  };
 }
 
 type DragEdge = "top" | "bottom" | "left" | "right" | null;
@@ -57,7 +58,17 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
   const isDetailedStrike = (chartMode ?? settings.chartMode) === "detailed";
   const isDetailedMiss = (missMode ?? settings.missMode) === "detailed";
 
-  useEffect(() => { saveHolderZone(zone); }, [zone]);
+  // Don't persist until the DB value has hydrated, so the default zone from the
+  // initial render never overwrites a real saved calibration.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    loadSettingsFromCloud<HolderZone>(HOLDER_ZONE_KEY).then((cloud) => {
+      if (cloud && cloud.top != null) setZone(cloud);
+      hydrated.current = true;
+    });
+  }, []);
+
+  useEffect(() => { if (hydrated.current) saveHolderZone(zone); }, [zone]);
 
   // Mirror zone horizontally when flipped
   const displayZone = flipped

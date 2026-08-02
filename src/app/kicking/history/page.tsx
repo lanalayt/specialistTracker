@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { makePct } from "@/lib/stats";
 import { exportFGSession, exportSessionPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
-import { loadSettingsFromCloud } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { FGFieldView } from "@/components/ui/FGFieldView";
 import type { FGKick, Session } from "@/types";
 import clsx from "clsx";
@@ -49,17 +49,9 @@ function KickingHistoryContent() {
   const isAthleteMode = pathname.startsWith("/athlete");
   const hideScore = isAthleteMode;
   const { history, updateSessionDate, updateSessionWeather, updateSessionOpponent, updateSessionEntries, deleteSession } = useFG();
-  const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() => {
-    if (typeof window === "undefined") return "detailed";
-    try {
-      const raw = localStorage.getItem("fgSettings");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return parsed.makeMode === "simple" ? "simple" : "detailed";
-      }
-    } catch {}
-    return "detailed";
-  });
+  const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() =>
+    getCachedSettings<{ makeMode?: string }>("fgSettings")?.makeMode === "simple" ? "simple" : "detailed"
+  );
 
   useEffect(() => {
     loadSettingsFromCloud<{ makeMode?: string }>("fgSettings").then((cloud) => {

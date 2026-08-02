@@ -6,6 +6,7 @@ import { useKickoff } from "@/lib/kickoffContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAthletes } from "@/lib/athleteStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import Link from "next/link";
 import clsx from "clsx";
 
@@ -46,12 +47,11 @@ interface KORow {
 
 function loadKOSettings(): { types: KOTypeConfig[]; categories: KOCategory[] } {
   try {
-    const raw = localStorage.getItem("kickoffSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const categories: KOCategory[] = parsed.kickoffCategories?.length > 0 ? parsed.kickoffCategories : DEFAULT_CATEGORIES;
-      if (parsed.kickoffTypes?.length > 0) {
-        const types: KOTypeConfig[] = parsed.kickoffTypes.map((t: Record<string, unknown>) => ({
+    const parsed = getCachedSettings<{ kickoffCategories?: KOCategory[]; kickoffTypes?: Record<string, unknown>[] }>("kickoffSettings");
+    if (parsed) {
+      const categories: KOCategory[] = (parsed.kickoffCategories?.length ?? 0) > 0 ? parsed.kickoffCategories! : DEFAULT_CATEGORIES;
+      if ((parsed.kickoffTypes?.length ?? 0) > 0) {
+        const types: KOTypeConfig[] = parsed.kickoffTypes!.map((t: Record<string, unknown>) => ({
           id: t.id as string,
           label: t.label as string,
           category: (t.category as string) ?? "DEEP",
@@ -89,9 +89,13 @@ export default function KickoffCoachesChartPage() {
   const [koCategories, setKoCategories] = useState<KOCategory[]>(DEFAULT_CATEGORIES);
 
   useEffect(() => {
-    const { types, categories } = loadKOSettings();
-    setKoTypes(types);
-    setKoCategories(categories);
+    const apply = () => {
+      const { types, categories } = loadKOSettings();
+      setKoTypes(types);
+      setKoCategories(categories);
+    };
+    apply();
+    loadSettingsFromCloud("kickoffSettings").then(apply);
   }, []);
 
   const getTypesForCategory = (catId: string) => koTypes.filter((t) => t.category === catId);

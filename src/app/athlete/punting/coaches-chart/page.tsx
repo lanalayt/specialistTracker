@@ -6,7 +6,7 @@ import { usePunt } from "@/lib/puntContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAthletes } from "@/lib/athleteStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
-import { loadSettingsFromCloud } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import Link from "next/link";
 import clsx from "clsx";
 
@@ -42,13 +42,11 @@ const DEFAULT_TYPES: PuntTypeConfig[] = [
 ];
 
 function loadPuntSettings() {
-  if (typeof window === "undefined") return { types: DEFAULT_TYPES, categories: DEFAULT_CATEGORIES };
   try {
-    const raw = localStorage.getItem("puntSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const categories = parsed.puntCategories?.length > 0 ? parsed.puntCategories : DEFAULT_CATEGORIES;
-      const types = parsed.puntTypes?.length > 0 ? parsed.puntTypes : DEFAULT_TYPES;
+    const parsed = getCachedSettings<{ puntCategories?: PuntCategory[]; puntTypes?: PuntTypeConfig[] }>("puntSettings");
+    if (parsed) {
+      const categories = (parsed.puntCategories?.length ?? 0) > 0 ? parsed.puntCategories! : DEFAULT_CATEGORIES;
+      const types = (parsed.puntTypes?.length ?? 0) > 0 ? parsed.puntTypes! : DEFAULT_TYPES;
       return { types: types as PuntTypeConfig[], categories: categories as PuntCategory[] };
     }
   } catch {}
@@ -87,21 +85,13 @@ export default function PuntCoachesChartPage() {
   const [puntCategories, setPuntCategories] = useState<PuntCategory[]>(DEFAULT_CATEGORIES);
 
   useEffect(() => {
-    const { types, categories } = loadPuntSettings();
-    setPuntTypes(types);
-    setPuntCategories(categories);
-    // Also try cloud if localStorage had no settings
-    const hasLocal = !!localStorage.getItem("puntSettings");
-    if (!hasLocal) {
-      loadSettingsFromCloud<Record<string, unknown>>("puntSettings").then((cloud) => {
-        if (cloud) {
-          try { localStorage.setItem("puntSettings", JSON.stringify(cloud)); } catch {}
-          const reloaded = loadPuntSettings();
-          setPuntTypes(reloaded.types);
-          setPuntCategories(reloaded.categories);
-        }
-      });
-    }
+    const apply = () => {
+      const { types, categories } = loadPuntSettings();
+      setPuntTypes(types);
+      setPuntCategories(categories);
+    };
+    apply();
+    loadSettingsFromCloud("puntSettings").then(apply);
   }, []);
 
   const enabledCategories = puntCategories.filter((c) => c.enabled);

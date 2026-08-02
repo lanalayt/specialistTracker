@@ -19,6 +19,7 @@ import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
 import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, syncAthleteKeys, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
+import { useSettings } from "@/lib/settingsSync";
 
 interface PuntContextValue {
   athletes: StoredAthlete[];
@@ -44,23 +45,18 @@ export function PuntProvider({ children, sportKey = "PUNTING" }: { children: Rea
   const { user } = useAuth();
 
   // Load punt type configs for stats computation
+  const puntSettings = useSettings<{ puntTypes?: Record<string, unknown>[] }>("puntSettings");
   const typeConfigs = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    try {
-      const raw = localStorage.getItem("puntSettings");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.puntTypes?.length > 0) {
-          return parsed.puntTypes.map((t: Record<string, unknown>) => ({
-            id: t.id as string,
-            metric: (t.metric as string) ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance"),
-            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
-          }));
-        }
-      }
-    } catch {}
+    const types = puntSettings?.puntTypes;
+    if (types && types.length > 0) {
+      return types.map((t) => ({
+        id: t.id as string,
+        metric: ((t.metric as string) ?? (String(t.id).toUpperCase().includes("POOCH") ? "yardline" : "distance")) as "yardline" | "distance",
+        hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !String(t.id).toUpperCase().includes("POOCH"),
+      }));
+    }
     return undefined;
-  }, []);
+  }, [puntSettings]);
 
   const stats = useMemo(() => {
     const names = athletes.map((a) => a.name);

@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft } from "@/lib/draftStore";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
@@ -181,12 +182,11 @@ const DEFAULT_KO_CATEGORIES: KOCategoryConfig[] = [
 ];
 
 function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string; score?: number }[]; directionMode: "numeric" | "field"; directionEnabled: boolean; returnYardsEnabled: boolean } {
-  if (typeof window === "undefined") return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true, returnYardsEnabled: true };
   const defaultScores = [1, 0.5, 0, -1];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parsed = getCachedSettings<any>("kickoffSettings");
   try {
-    const raw = localStorage.getItem("kickoffSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    if (parsed) {
       const mode = parsed.directionMode === "field" ? "field" as const : "numeric" as const;
       const defaultDirs = mode === "field" ? FIELD_KO_DIRS : DEFAULT_KO_DIRS;
       const rawTypes = parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_KO_TYPES;
@@ -268,30 +268,15 @@ export default function KickoffSessionPage() {
     };
   }, []);
 
-  // Load kickoff settings from cloud only if localStorage has no settings (fresh device)
+  // Ensure kickoff settings are loaded from the DB (source of truth), then apply.
   useEffect(() => {
-    const hasLocal = !!localStorage.getItem("kickoffSettings");
-    if (!hasLocal) {
-      import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
-        loadSettingsFromCloud<{ kickoffTypes?: Record<string, unknown>[]; kickoffCategories?: KOCategoryConfig[]; directionEnabled?: boolean; directionMetrics?: { id: string; label: string }[] }>("kickoffSettings").then((cloud) => {
-          if (cloud?.kickoffTypes?.length) {
-            const cats: KOCategoryConfig[] = cloud.kickoffCategories?.length ? cloud.kickoffCategories : DEFAULT_KO_CATEGORIES;
-            const enabled = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
-            setKoTypes(cloud.kickoffTypes.map((t) => ({
-              id: t.id as string,
-              label: t.label as string,
-              category: (t.category as string) ?? "DEEP",
-              metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
-              hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
-            })).filter((t) => enabled.has(t.category)));
-          }
-          if (typeof cloud?.directionEnabled === "boolean") setKoDirEnabled(cloud.directionEnabled);
-          if (cloud?.directionMetrics?.length) setKoDirs(cloud.directionMetrics);
-          // Sync to localStorage
-          if (cloud) try { localStorage.setItem("kickoffSettings", JSON.stringify(cloud)); } catch {}
-        });
-      });
-    }
+    loadSettingsFromCloud("kickoffSettings").then(() => {
+      const fresh = loadKickoffSettings();
+      setKoTypes(fresh.types);
+      setKoDirs(fresh.directions);
+      setKoDirEnabled(fresh.directionEnabled);
+      setKoReturnYardsEnabled(fresh.returnYardsEnabled);
+    });
   }, []);
 
   // ── Initialize all state from localStorage ──────────────────

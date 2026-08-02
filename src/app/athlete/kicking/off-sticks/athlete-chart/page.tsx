@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useFG } from "@/lib/fgContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
+import { getCachedSettings, saveSettingsToCloud, loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
 import { FGFieldView } from "@/components/ui/FGFieldView";
@@ -68,12 +69,13 @@ function AthleteChartInner() {
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
   const [holderEnabled, setHolderEnabled] = useState(true);
 
-  // Load holderEnabled from FG settings
+  // Load holderEnabled from FG settings (DB source of truth)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("fgSettings");
-      if (raw) { const p = JSON.parse(raw); if (typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled); }
-    } catch {}
+    const apply = (p: { holderEnabled?: boolean } | null) => {
+      if (p && typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled);
+    };
+    apply(getCachedSettings("fgSettings"));
+    loadSettingsFromCloud<{ holderEnabled?: boolean }>("fgSettings").then(apply);
   }, []);
 
   useEffect(() => {
@@ -546,7 +548,7 @@ function AthleteChartInner() {
             athletes={snapAthletes}
             holders={holderAthletes}
             holderEnabled={holderEnabled}
-            onHolderToggle={(on) => { setHolderEnabled(on); try { const raw = localStorage.getItem("fgSettings"); const s = raw ? JSON.parse(raw) : {}; s.holderEnabled = on; localStorage.setItem("fgSettings", JSON.stringify(s)); } catch {} }}
+            onHolderToggle={(on) => { setHolderEnabled(on); saveSettingsToCloud("fgSettings", { ...(getCachedSettings<Record<string, unknown>>("fgSettings") ?? {}), holderEnabled: on }); }}
             kickerName={currentPlayer}
             kickDistance={kicks[currentKickIdx]?.distance}
             kickHash={kicks[currentKickIdx]?.hash}
@@ -812,7 +814,7 @@ function AthleteChartInner() {
           athletes={snapAthletes}
           holders={holderAthletes}
           holderEnabled={holderEnabled}
-          onHolderToggle={(on) => { setHolderEnabled(on); try { const raw = localStorage.getItem("fgSettings"); const s = raw ? JSON.parse(raw) : {}; s.holderEnabled = on; localStorage.setItem("fgSettings", JSON.stringify(s)); } catch {} }}
+          onHolderToggle={(on) => { setHolderEnabled(on); saveSettingsToCloud("fgSettings", { ...(getCachedSettings<Record<string, unknown>>("fgSettings") ?? {}), holderEnabled: on }); }}
           kickerName={currentPlayer}
           kickDistance={currentKick?.distance}
           kickHash={currentKick?.hash}

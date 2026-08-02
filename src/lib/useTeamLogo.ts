@@ -2,28 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
-
-const STORAGE_KEY = "team_logo";
+import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite, getCachedTeamLogo } from "@/lib/teamSettingsStore";
 
 export function useTeamLogo() {
-  const [logo, setLogo] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
-  });
+  const [logo, setLogo] = useState<string | null>(() => getCachedTeamLogo());
 
-  // Load from teams table on mount
+  // Load from teams table (source of truth) on mount
   useEffect(() => {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       getTeamSettings(tid).then((settings) => {
-        if (settings?.logo) {
-          setLogo(settings.logo);
-          try { localStorage.setItem(STORAGE_KEY, settings.logo); } catch {}
-        } else {
-          setLogo(null);
-          try { localStorage.removeItem(STORAGE_KEY); } catch {}
-        }
+        setLogo(settings?.logo ?? null);
       });
     }
   }, []);
@@ -50,7 +39,6 @@ export function useTeamLogo() {
         ctx.drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL("image/png");
         setLogo(dataUrl);
-        try { localStorage.setItem(STORAGE_KEY, dataUrl); } catch {}
         const tid = getTeamId();
         if (tid && tid !== "local-dev") {
           stampTeamSettingsWrite();
@@ -64,7 +52,6 @@ export function useTeamLogo() {
 
   const removeLogo = useCallback(() => {
     setLogo(null);
-    try { localStorage.removeItem(STORAGE_KEY); } catch {}
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       stampTeamSettingsWrite();

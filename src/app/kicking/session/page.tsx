@@ -18,7 +18,7 @@ import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnap
 import { loadAthletes as loadAthleteList } from "@/lib/athleteStore";
 import { insertSession as insertSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
 import { genId as genSnapId } from "@/lib/stats";
-import { loadSettingsFromCloud } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
@@ -119,80 +119,47 @@ function savePracticeEntryPref(manual: boolean) {
   } catch {}
 }
 
+type FgSettings = {
+  snapDistance?: string;
+  opTimeEnabled?: boolean;
+  makeMode?: string;
+  missMode?: string;
+  scoreEnabled?: string | boolean;
+  scoreOptions?: string[];
+  holderEnabled?: boolean;
+};
+
+function fgSettings(): FgSettings | null {
+  return getCachedSettings<FgSettings>("fgSettings");
+}
+
 function loadSnapDistance(): number {
-  if (typeof window === "undefined") return 7;
-  try {
-    const raw = localStorage.getItem("fgSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return parseInt(parsed.snapDistance) || 7;
-    }
-  } catch {}
-  return 7;
+  return parseInt(String(fgSettings()?.snapDistance ?? "")) || 7;
 }
 
 function loadOpTimeEnabled(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const raw = localStorage.getItem("fgSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return parsed.opTimeEnabled !== false;
-    }
-  } catch {}
-  return true;
+  return fgSettings()?.opTimeEnabled !== false;
 }
 
 function loadMakeMode(): "simple" | "detailed" {
-  if (typeof window === "undefined") return "simple";
-  try {
-    const raw = localStorage.getItem("fgSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return parsed.makeMode === "detailed" ? "detailed" : "simple";
-    }
-  } catch {}
-  return "simple";
+  return fgSettings()?.makeMode === "detailed" ? "detailed" : "simple";
 }
 
 function loadMissMode(): "simple" | "detailed" {
-  if (typeof window === "undefined") return "detailed";
-  try {
-    const raw = localStorage.getItem("fgSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return parsed.missMode === "simple" ? "simple" : "detailed";
-    }
-  } catch {}
-  return "detailed";
+  return fgSettings()?.missMode === "simple" ? "simple" : "detailed";
 }
 
 function loadScoreMode(): "on" | "practice" | "off" {
-  if (typeof window === "undefined") return "practice";
-  try {
-    const raw = localStorage.getItem("fgSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.scoreEnabled === "on" || parsed.scoreEnabled === "practice" || parsed.scoreEnabled === "off") return parsed.scoreEnabled;
-      if (parsed.scoreEnabled === false) return "off";
-      return "practice";
-    }
-  } catch {}
+  const se = fgSettings()?.scoreEnabled;
+  if (se === "on" || se === "practice" || se === "off") return se;
+  if (se === false) return "off";
   return "practice";
 }
 
 function loadScoreOptions(): string[] {
   const DEFAULT = ["0", "1", "2", "3", "4"];
-  if (typeof window === "undefined") return DEFAULT;
-  try {
-    const raw = localStorage.getItem("fgSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.scoreOptions) && parsed.scoreOptions.length > 0) {
-        return parsed.scoreOptions;
-      }
-    }
-  } catch {}
+  const opts = fgSettings()?.scoreOptions;
+  if (Array.isArray(opts) && opts.length > 0) return opts;
   return DEFAULT;
 }
 
@@ -328,10 +295,8 @@ export default function KickingSessionPage() {
       const h = await loadAthleteList(tid, "HOLDING");
       setHolderAthletes(h.map((a) => a.name));
     })();
-    try {
-      const raw = localStorage.getItem("fgSettings");
-      if (raw) { const p = JSON.parse(raw); if (typeof p.holderEnabled === "boolean") setHolderEnabled(p.holderEnabled); }
-    } catch {}
+    const fg = fgSettings();
+    if (fg && typeof fg.holderEnabled === "boolean") setHolderEnabled(fg.holderEnabled);
   }, []);
 
   // Re-read settings — poll every 2s to catch SPA navigation changes
@@ -355,9 +320,8 @@ export default function KickingSessionPage() {
 
   // Load settings from cloud on fresh device
   useEffect(() => {
-    const hasLocal = !!localStorage.getItem("fgSettings");
     loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string; scoreEnabled?: string | boolean; scoreOptions?: string[] }>("fgSettings").then((cloud) => {
-      if (!hasLocal && !cloud) {
+      if (!cloud) {
         setShowSetupPrompt(true);
       }
       if (cloud) {
@@ -1011,12 +975,7 @@ export default function KickingSessionPage() {
       holderEnabled={holderEnabled}
       onHolderToggle={(on) => {
         setHolderEnabled(on);
-        try {
-          const raw = localStorage.getItem("fgSettings");
-          const settings = raw ? JSON.parse(raw) : {};
-          settings.holderEnabled = on;
-          localStorage.setItem("fgSettings", JSON.stringify(settings));
-        } catch {}
+        saveSettingsToCloud("fgSettings", { ...(fgSettings() ?? {}), holderEnabled: on });
       }}
       kickerName={snapKickRow?.athlete || undefined}
       kickDistance={snapKickRow?.dist ? parseInt(snapKickRow.dist) : undefined}

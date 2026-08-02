@@ -4,10 +4,8 @@
  */
 
 import { getTeamId } from "@/lib/teamData";
-import { updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
+import { updateTeamSettings, stampTeamSettingsWrite, getCachedTeamSettings } from "@/lib/teamSettingsStore";
 import { createClient } from "@/lib/supabase";
-
-const STORAGE_KEY = "st_theme";
 
 export interface ThemeColors {
   primary: string;    // accent — buttons, active states
@@ -79,9 +77,19 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// ── Custom saved themes (per-team) ──────────────────────────────────────────
+// ── In-memory caches (source of truth is the DB) ────────────────────────────
+// The active theme and the per-team saved themes are held in memory so
+// synchronous readers (initial renders, field views) can access them without
+// localStorage. Populated from the `teams` / `custom_themes` tables.
+let _themeCache: ThemeColors = DEFAULT_THEME;
+let _customThemesCache: SavedTheme[] = [];
 
-const CUSTOM_THEMES_KEY = "st_custom_themes";
+/** Synchronous read of the currently-applied theme colors. */
+export function getCurrentTheme(): ThemeColors {
+  return _themeCache;
+}
+
+// ── Custom saved themes (per-team) ──────────────────────────────────────────
 
 export interface SavedTheme {
   name: string;
@@ -89,17 +97,11 @@ export interface SavedTheme {
 }
 
 export function loadCustomThemes(): SavedTheme[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
-    if (raw) return JSON.parse(raw) as SavedTheme[];
-  } catch {}
-  return [];
+  return _customThemesCache;
 }
 
 export function saveCustomThemes(themes: SavedTheme[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));
+  _customThemesCache = themes;
   const tid = getTeamId();
   if (tid && tid !== "local-dev") {
     (async () => {
@@ -139,7 +141,7 @@ export async function loadCustomThemesFromCloud(): Promise<SavedTheme[]> {
           name: r.name,
           colors: { primary: r.color_primary, secondary: r.color_secondary, tertiary: r.color_tertiary },
         }));
-        localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));
+        _customThemesCache = themes;
         return themes;
       }
     } catch {}
@@ -149,6 +151,7 @@ export async function loadCustomThemesFromCloud(): Promise<SavedTheme[]> {
 
 /** Derive all CSS variables from the 3 user-chosen colors */
 export function applyTheme(colors: ThemeColors): void {
+  _themeCache = colors;
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.style.setProperty("--accent", colors.primary);
@@ -164,27 +167,19 @@ export function applyTheme(colors: ThemeColors): void {
   root.style.setProperty("--text", "#ffffff");
 }
 
-/** Load from localStorage immediately + apply. Cloud load is handled by AppProviders via useTeamSettingsSync. */
+/** Apply the last-known theme (from the teams-table cache) immediately. The
+ *  authoritative cloud load is handled by AppProviders via useTeamSettingsSync. */
 export function loadAndApplyTheme(): ThemeColors {
-  if (typeof window === "undefined") return DEFAULT_THEME;
-  let theme = DEFAULT_THEME;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as ThemeColors;
-      if (parsed.primary && parsed.secondary) {
-        theme = parsed;
-      }
-    }
-  } catch {}
+  const s = getCachedTeamSettings();
+  const theme: ThemeColors = s
+    ? { primary: s.colorPrimary, secondary: s.colorSecondary, tertiary: s.colorTertiary }
+    : _themeCache;
   applyTheme(theme);
   return theme;
 }
 
-/** Save theme to localStorage + teams table + apply immediately */
+/** Save theme to the teams table + apply immediately (no localStorage) */
 export function saveTheme(colors: ThemeColors): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(colors));
   applyTheme(colors);
   const tid = getTeamId();
   if (tid && tid !== "local-dev") {

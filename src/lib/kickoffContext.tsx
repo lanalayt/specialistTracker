@@ -9,6 +9,7 @@ import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
 import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, syncAthleteKeys, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
+import { useSettings } from "@/lib/settingsSync";
 
 interface KickoffContextValue {
   athletes: StoredAthlete[];
@@ -33,23 +34,18 @@ export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: 
   const [sessions, setSessions] = useState<Session[]>([]);
   const { user } = useAuth();
 
+  const koSettings = useSettings<{ kickoffTypes?: Record<string, unknown>[] }>("kickoffSettings");
   const koTypeConfigs = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    try {
-      const raw = localStorage.getItem("kickoffSettings");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.kickoffTypes?.length > 0) {
-          return parsed.kickoffTypes.map((t: Record<string, unknown>) => ({
-            id: t.id as string,
-            metric: (t.metric as string) ?? "distance",
-            hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
-          }));
-        }
-      }
-    } catch {}
+    const types = koSettings?.kickoffTypes;
+    if (types && types.length > 0) {
+      return types.map((t) => ({
+        id: t.id as string,
+        metric: ((t.metric as string) ?? "distance") as "yardline" | "distance" | "none",
+        hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+      }));
+    }
     return undefined;
-  }, []);
+  }, [koSettings]);
 
   const stats = useMemo(() => {
     const names = athletes.map((a) => a.name);

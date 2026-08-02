@@ -1,12 +1,17 @@
 import { createClient } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 
-// Map legacy localStorage-era keys to sport identifiers in the user_settings table.
+// Map legacy localStorage-era keys to per-user rows (the `sport` column) in the
+// user_settings table. This is the single source of truth for these keys —
+// nothing lives in localStorage. The sport column is free-form TEXT, so
+// per-device calibrations (strike zones) get their own rows here too.
 const SPORT_MAP: Record<string, string> = {
   fgSettings: "fg",
   puntSettings: "punt",
   kickoffSettings: "kickoff",
   snapSettings: "snap",
+  strikeZoneBounds_v5: "punt_strike_zone",
+  holderStrikeZoneBounds: "holder_strike_zone",
 };
 
 function getSport(localKey: string): string | null {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { getTeamId } from "@/lib/teamData";
+import { getCachedSettings } from "@/lib/settingsSync";
 import type { SnapType } from "@/types";
 import clsx from "clsx";
 
@@ -40,14 +41,11 @@ export function clearSnapOverlayData(snapType: "PUNT" | "FG") {
 }
 
 function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simple" | "detailed" } {
-  try {
-    const raw = localStorage.getItem("snapSettings");
-    if (raw) {
-      const p = JSON.parse(raw);
-      return { chartMode: p.chartMode === "detailed" ? "detailed" : "simple", missMode: p.missMode === "detailed" ? "detailed" : "simple" };
-    }
-  } catch {}
-  return { chartMode: "simple", missMode: "simple" };
+  const p = getCachedSettings<{ chartMode?: string; missMode?: string }>("snapSettings");
+  return {
+    chartMode: p?.chartMode === "detailed" ? "detailed" : "simple",
+    missMode: p?.missMode === "detailed" ? "detailed" : "simple",
+  };
 }
 
 export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOverlayProps) {
@@ -64,7 +62,6 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
         if (cloud) {
           if (cloud.chartMode === "detailed" || cloud.chartMode === "simple") setChartMode(cloud.chartMode);
           if (cloud.missMode === "detailed" || cloud.missMode === "simple") setMissMode(cloud.missMode);
-          try { localStorage.setItem("snapSettings", JSON.stringify({ chartMode: cloud.chartMode, missMode: cloud.missMode })); } catch {}
         }
       });
     });

@@ -36,12 +36,6 @@ export default function OnboardPage() {
         enabledSports: sports,
       });
     }
-    // Also cache in localStorage for instant load
-    localStorage.setItem("st_team_v1", JSON.stringify({
-      name: teamName || "My Team",
-      school: school || "My School",
-      config: { enabledSports: sports },
-    }));
     router.push("/dashboard");
   };
 

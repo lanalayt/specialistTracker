@@ -10,6 +10,7 @@ import clsx from "clsx";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportPuntStats, exportPuntStatsPDF } from "@/lib/exportStats";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { ExportButton } from "@/components/ui/ExportButton";
 
 interface PuntTypeConfig { id: string; label: string; category: string; metric: "distance" | "yardline"; hangTime: boolean }
@@ -53,14 +54,12 @@ function migrateType(t: Record<string, unknown>): PuntTypeConfig {
 }
 
 function loadPuntSettings(): { types: PuntTypeConfig[]; categories: PuntCategoryConfig[] } {
-  if (typeof window === "undefined") return { types: DEFAULT_PUNT_TYPES, categories: DEFAULT_CATEGORIES };
   try {
-    const raw = localStorage.getItem("puntSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const categories: PuntCategoryConfig[] = parsed.puntCategories?.length > 0 ? parsed.puntCategories : DEFAULT_CATEGORIES;
-      const types = parsed.puntTypes?.length > 0
-        ? (parsed.puntTypes as Record<string, unknown>[]).map(migrateType)
+    const parsed = getCachedSettings<{ puntCategories?: PuntCategoryConfig[]; puntTypes?: Record<string, unknown>[] }>("puntSettings");
+    if (parsed) {
+      const categories: PuntCategoryConfig[] = (parsed.puntCategories?.length ?? 0) > 0 ? parsed.puntCategories! : DEFAULT_CATEGORIES;
+      const types = (parsed.puntTypes?.length ?? 0) > 0
+        ? parsed.puntTypes!.map(migrateType)
         : DEFAULT_PUNT_TYPES;
       return { types, categories };
     }
@@ -660,6 +659,7 @@ export default function PuntingStatisticsPage() {
       setTypeMetrics(metrics);
     };
     reload();
+    loadSettingsFromCloud("puntSettings").then(reload);
     window.addEventListener("settingsChanged", reload);
     return () => window.removeEventListener("settingsChanged", reload);
   }, []);

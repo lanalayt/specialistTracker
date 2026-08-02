@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { saveSettingsToCloud, loadSettingsFromCloud } from "@/lib/settingsSync";
+import { saveSettingsToCloud, loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 
 export interface SnapMarker {
   x: number;
@@ -34,15 +34,12 @@ const DEFAULT_ZONE: ZoneBounds = { top: 34, bottom: 68, left: 38, right: 62 };
 const ZONE_STORAGE_KEY = "strikeZoneBounds_v5";
 
 function loadZone(): ZoneBounds {
-  try {
-    const raw = localStorage.getItem(ZONE_STORAGE_KEY);
-    if (raw) { const z = JSON.parse(raw); if (z.top != null) return z; }
-  } catch {}
+  const z = getCachedSettings<ZoneBounds>(ZONE_STORAGE_KEY);
+  if (z && z.top != null) return z;
   return { ...DEFAULT_ZONE };
 }
 
 function saveZone(z: ZoneBounds) {
-  try { localStorage.setItem(ZONE_STORAGE_KEY, JSON.stringify(z)); } catch {}
   saveSettingsToCloud(ZONE_STORAGE_KEY, z);
 }
 
@@ -109,17 +106,21 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
   const [zone, setZone] = useState<ZoneBounds>(loadZone);
   const [dragEdge, setDragEdge] = useState<DragEdge>(null);
   const [isEditing, setIsEditing] = useState(false);
+  // Don't persist until the DB value has hydrated, so the default zone from the
+  // initial render never overwrites a real saved calibration.
+  const hydrated = useRef(false);
 
   // Load from cloud on mount
   useEffect(() => {
     loadSettingsFromCloud<ZoneBounds>(ZONE_STORAGE_KEY).then((cloud) => {
-      if (cloud && cloud.top != null) { setZone(cloud); try { localStorage.setItem(ZONE_STORAGE_KEY, JSON.stringify(cloud)); } catch {} }
+      if (cloud && cloud.top != null) setZone(cloud);
+      hydrated.current = true;
     });
   }, []);
   const isDetailedStrike = chartMode === "detailed";
   const isDetailedMiss = missMode === "detailed";
 
-  useEffect(() => { saveZone(zone); }, [zone]);
+  useEffect(() => { if (hydrated.current) saveZone(zone); }, [zone]);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isEditing || dragEdge) return; // Don't place markers while editing zone

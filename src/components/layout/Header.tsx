@@ -93,7 +93,6 @@ export function Header({ title: _title }: { title?: string }) {
 
   const handleModeChange = (mode: "team" | "scout" | "athlete") => {
     setAppMode(mode);
-    localStorage.setItem("st_app_mode", mode);
     if (mode === "team" && (isScoutRoute || isAthleteRoute)) router.push("/dashboard");
     if (mode === "scout" && !isScoutRoute) router.push("/scout");
     if (mode === "athlete" && !isAthleteRoute) router.push("/athlete");

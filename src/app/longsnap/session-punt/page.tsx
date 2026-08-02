@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { LongSnapCommitModal } from "@/components/ui/LongSnapCommitModal";
 
 const SNAP_TYPE = "PUNT" as const;
@@ -47,41 +48,31 @@ export default function LongSnapPuntSessionPage() {
   const [showCommit, setShowCommit] = useState(false);
   const [committed, setCommitted] = useState(false);
   const [snapMarkers, setSnapMarkers] = useState<SnapMarker[]>([]);
-  const [chartMode, setChartMode] = useState<"simple" | "detailed">(() => {
-    if (typeof window === "undefined") return "simple";
-    try { const r = localStorage.getItem("snapSettings"); if (r) return JSON.parse(r).chartMode === "detailed" ? "detailed" : "simple"; } catch {}
-    return "simple";
-  });
-  const [missMode, setMissMode] = useState<"simple" | "detailed">(() => {
-    if (typeof window === "undefined") return "simple";
-    try { const r = localStorage.getItem("snapSettings"); if (r) return JSON.parse(r).missMode === "detailed" ? "detailed" : "simple"; } catch {}
-    return "simple";
-  });
+  const [chartMode, setChartMode] = useState<"simple" | "detailed">(() =>
+    getCachedSettings<{ chartMode?: string }>("snapSettings")?.chartMode === "detailed" ? "detailed" : "simple"
+  );
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() =>
+    getCachedSettings<{ missMode?: string }>("snapSettings")?.missMode === "detailed" ? "detailed" : "simple"
+  );
 
   // Load from cloud on mount to ensure correct settings
   useEffect(() => {
-    import("@/lib/settingsSync").then(({ loadSettingsFromCloud }) => {
-      loadSettingsFromCloud<{ chartMode?: string; missMode?: string }>("snapSettings").then((cloud) => {
-        if (cloud) {
-          if (cloud.chartMode === "detailed" || cloud.chartMode === "simple") setChartMode(cloud.chartMode);
-          if (cloud.missMode === "detailed" || cloud.missMode === "simple") setMissMode(cloud.missMode);
-          try { localStorage.setItem("snapSettings", JSON.stringify({ chartMode: cloud.chartMode, missMode: cloud.missMode })); } catch {}
-        }
-      });
+    loadSettingsFromCloud<{ chartMode?: string; missMode?: string }>("snapSettings").then((cloud) => {
+      if (cloud) {
+        if (cloud.chartMode === "detailed" || cloud.chartMode === "simple") setChartMode(cloud.chartMode);
+        if (cloud.missMode === "detailed" || cloud.missMode === "simple") setMissMode(cloud.missMode);
+      }
     });
   }, []);
 
   // Re-read settings when changed
   useEffect(() => {
     const reload = () => {
-      try {
-        const r = localStorage.getItem("snapSettings");
-        if (r) {
-          const p = JSON.parse(r);
-          setChartMode(p.chartMode === "detailed" ? "detailed" : "simple");
-          setMissMode(p.missMode === "detailed" ? "detailed" : "simple");
-        }
-      } catch {}
+      const p = getCachedSettings<{ chartMode?: string; missMode?: string }>("snapSettings");
+      if (p) {
+        setChartMode(p.chartMode === "detailed" ? "detailed" : "simple");
+        setMissMode(p.missMode === "detailed" ? "detailed" : "simple");
+      }
     };
     window.addEventListener("focus", reload);
     window.addEventListener("settingsChanged", reload);

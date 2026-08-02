@@ -13,7 +13,7 @@ import { insertSession as insertSnapSession, stampSessionWrite as stampSnapWrite
 import { genId as genSnapId } from "@/lib/stats";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
-import { loadSettingsFromCloud } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
@@ -223,13 +223,12 @@ const DEFAULT_CATEGORIES: PuntCategoryConfig[] = [
 ];
 
 function loadPuntTypes(): { types: PuntTypeConfig[]; categories: PuntCategoryConfig[] } {
-  if (typeof window === "undefined") return { types: DEFAULT_PUNT_TYPES, categories: DEFAULT_CATEGORIES };
   try {
-    const raw = localStorage.getItem("puntSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = getCachedSettings<any>("puntSettings");
+    if (parsed) {
       const categories: PuntCategoryConfig[] = parsed.puntCategories?.length > 0 ? parsed.puntCategories : DEFAULT_CATEGORIES;
-      const enabledCats = new Set(categories.filter((c) => c.enabled).map((c) => c.id));
+      const enabledCats = new Set(categories.filter((c: PuntCategoryConfig) => c.enabled).map((c: PuntCategoryConfig) => c.id));
       if (parsed.puntTypes && parsed.puntTypes.length > 0) {
         const allTypes: PuntTypeConfig[] = parsed.puntTypes.map((t: Record<string, unknown>) => {
           const id = t.id as string;
@@ -284,29 +283,19 @@ const FIELD_DA_OPTIONS = [
 ];
 
 function loadOpTimeEnabled(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const raw = localStorage.getItem("puntSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return parsed.opTimeEnabled !== false;
-    }
-  } catch {}
-  return true;
+  return getCachedSettings<{ opTimeEnabled?: boolean }>("puntSettings")?.opTimeEnabled !== false;
 }
 
 function loadDirectionSettings(): { enabled: boolean; mode: "numeric" | "field"; options: { value: string; label: string; score?: number }[] } {
-  if (typeof window === "undefined") return { enabled: true, mode: "numeric", options: DEFAULT_DA_OPTIONS };
   const defaultScores = [1, 0.5, 0];
   try {
-    const raw = localStorage.getItem("puntSettings");
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    const parsed = getCachedSettings<{ directionEnabled?: boolean; directionMode?: string; directionOptions?: { id: string; label: string; score?: number }[] }>("puntSettings");
+    if (parsed) {
       const enabled = parsed.directionEnabled !== false;
       const mode: "numeric" | "field" = parsed.directionMode === "field" ? "field" : "numeric";
       const defaultOpts = mode === "field" ? FIELD_DA_OPTIONS : DEFAULT_DA_OPTIONS;
-      const options = parsed.directionOptions?.length > 0
-        ? parsed.directionOptions.map((d: { id: string; label: string; score?: number }, i: number) => ({
+      const options = (parsed.directionOptions?.length ?? 0) > 0
+        ? parsed.directionOptions!.map((d: { id: string; label: string; score?: number }, i: number) => ({
             value: d.id,
             label: d.label,
             score: d.score ?? (mode === "field" ? defaultScores[i] ?? 0 : undefined),
@@ -429,39 +418,13 @@ export default function PuntingSessionPage() {
     };
   }, []);
 
-  // Load punt settings from cloud only if localStorage has no settings (fresh device)
+  // Ensure punt settings are loaded from the DB (source of truth), then apply.
   useEffect(() => {
-    const hasLocal = !!localStorage.getItem("puntSettings");
-    if (!hasLocal) {
-      loadSettingsFromCloud<Record<string, unknown>>("puntSettings").then((cloud) => {
-        if (cloud?.puntTypes && (cloud.puntTypes as unknown[]).length > 0) {
-          const cats = (cloud.puntCategories as PuntCategoryConfig[])?.length ? cloud.puntCategories as PuntCategoryConfig[] : DEFAULT_CATEGORIES;
-          const enabledCats = new Set(cats.filter((c) => c.enabled).map((c) => c.id));
-          const types = (cloud.puntTypes as Record<string, unknown>[]).map((t) => {
-            const id = t.id as string;
-            const upper = id.toUpperCase();
-            let category = (t.category as string) ?? "DIRECTIONAL";
-            if (!t.category) {
-              if (upper.includes("POOCH")) category = "POOCH";
-              else if (upper.includes("BANANA")) category = "BANANA";
-              else if (upper.includes("RUGBY")) category = "RUGBY";
-            }
-            return {
-              id,
-              label: t.label as string,
-              category,
-              metric: (t.metric as "distance" | "yardline") ?? (upper.includes("POOCH") ? "yardline" : "distance"),
-              hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
-            };
-          }).filter((t) => enabledCats.has(t.category));
-          setPuntTypes(types);
-          // Sync full cloud settings → localStorage (preserves direction, opTime, etc.)
-          try { localStorage.setItem("puntSettings", JSON.stringify(cloud)); } catch {}
-          // Reload direction settings from the now-populated localStorage
-          setDirSettings(loadDirectionSettings());
-        }
-      });
-    }
+    loadSettingsFromCloud("puntSettings").then(() => {
+      setPuntTypes(loadPuntTypes().types);
+      setDirSettings(loadDirectionSettings());
+      setOpTimeEnabled(loadOpTimeEnabled());
+    });
 
     // Load draft from cloud if local is empty
     const tid = getTeamId();

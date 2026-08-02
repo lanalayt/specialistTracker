@@ -99,15 +99,14 @@ function DashboardContent() {
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("st_team_v1");
-      if (raw) {
-        const t = JSON.parse(raw);
-        if (t.school) setSchoolName(t.school);
-        else if (t.name) setSchoolName(t.name);
-        if (t.dashTitle) setDashTitle(t.dashTitle);
+    // Apply the last-known settings instantly from the in-memory cache
+    import("@/lib/teamSettingsStore").then(({ getCachedTeamSettings }) => {
+      const cached = getCachedTeamSettings();
+      if (cached) {
+        setSchoolName(cached.school || cached.name);
+        if (cached.dashTitle) setDashTitle(cached.dashTitle);
       }
-    } catch {}
+    });
     // Load from teams table (source of truth)
     import("@/lib/teamData").then(({ getTeamId }) => {
       import("@/lib/teamSettingsStore").then(({ getTeamSettings }) => {
@@ -140,11 +139,7 @@ function DashboardContent() {
     setDashTitle(title);
     setEditingTitle(false);
     try {
-      const raw = localStorage.getItem("st_team_v1");
-      const team = raw ? JSON.parse(raw) : {};
-      team.dashTitle = title;
-      localStorage.setItem("st_team_v1", JSON.stringify(team));
-      // Save to teams table
+      // Save to teams table (source of truth)
       const { getTeamId } = await import("@/lib/teamData");
       const { updateTeamSettings, stampTeamSettingsWrite } = await import("@/lib/teamSettingsStore");
       const tid = getTeamId();
