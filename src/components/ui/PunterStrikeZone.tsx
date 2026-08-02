@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { saveSettingsToCloud, loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
+import { saveSettingsToCloud, getCachedSettings, useSettings } from "@/lib/settingsSync";
 
 export interface SnapMarker {
   x: number;
@@ -106,21 +106,22 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
   const [zone, setZone] = useState<ZoneBounds>(loadZone);
   const [dragEdge, setDragEdge] = useState<DragEdge>(null);
   const [isEditing, setIsEditing] = useState(false);
-  // Don't persist until the DB value has hydrated, so the default zone from the
-  // initial render never overwrites a real saved calibration.
-  const hydrated = useRef(false);
+  // Once the user edits, stop adopting the DB value and start persisting.
+  const userEdited = useRef(false);
 
-  // Load from cloud on mount
+  // The DB (user_settings) is the source of truth. Subscribe so the saved zone
+  // is adopted whenever it arrives — including after the first paint, when the
+  // cache is warmed by preload/realtime — until the user starts editing.
+  const dbZone = useSettings<ZoneBounds>(ZONE_STORAGE_KEY);
   useEffect(() => {
-    loadSettingsFromCloud<ZoneBounds>(ZONE_STORAGE_KEY).then((cloud) => {
-      if (cloud && cloud.top != null) setZone(cloud);
-      hydrated.current = true;
-    });
-  }, []);
+    if (!userEdited.current && dbZone && dbZone.top != null) setZone(dbZone);
+  }, [dbZone]);
+
   const isDetailedStrike = chartMode === "detailed";
   const isDetailedMiss = missMode === "detailed";
 
-  useEffect(() => { if (hydrated.current) saveZone(zone); }, [zone]);
+  // Persist only the user's own edits (never echo an adopted DB value back).
+  useEffect(() => { if (userEdited.current) saveZone(zone); }, [zone]);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isEditing || dragEdge) return; // Don't place markers while editing zone
@@ -141,6 +142,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
     const rect = containerRef.current.getBoundingClientRect();
     const yPct = Math.max(5, Math.min(95, ((pt.clientY - rect.top) / rect.height) * 100));
     const xPct = Math.max(5, Math.min(95, ((pt.clientX - rect.left) / rect.width) * 100));
+    userEdited.current = true;
     setZone((prev) => {
       if (dragEdge === "top") return { ...prev, top: Math.min(yPct, prev.bottom - 10) };
       if (dragEdge === "bottom") return { ...prev, bottom: Math.max(yPct, prev.top + 10) };
@@ -166,7 +168,7 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
     };
   }, [dragEdge, handleEdgeDrag]);
 
-  const resetZone = () => { setZone({ ...DEFAULT_ZONE }); };
+  const resetZone = () => { userEdited.current = true; setZone({ ...DEFAULT_ZONE }); };
 
   const handleStyle = "absolute bg-red-500/60 hover:bg-red-500 transition-colors z-20";
 

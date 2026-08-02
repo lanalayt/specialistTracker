@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { getCachedSettings, saveSettingsToCloud, loadSettingsFromCloud } from "@/lib/settingsSync";
+import { getCachedSettings, saveSettingsToCloud, useSettings } from "@/lib/settingsSync";
 
 export interface ShortSnapMarker {
   x: number;
@@ -58,17 +58,19 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
   const isDetailedStrike = (chartMode ?? settings.chartMode) === "detailed";
   const isDetailedMiss = (missMode ?? settings.missMode) === "detailed";
 
-  // Don't persist until the DB value has hydrated, so the default zone from the
-  // initial render never overwrites a real saved calibration.
-  const hydrated = useRef(false);
-  useEffect(() => {
-    loadSettingsFromCloud<HolderZone>(HOLDER_ZONE_KEY).then((cloud) => {
-      if (cloud && cloud.top != null) setZone(cloud);
-      hydrated.current = true;
-    });
-  }, []);
+  // Once the user edits, stop adopting the DB value and start persisting.
+  const userEdited = useRef(false);
 
-  useEffect(() => { if (hydrated.current) saveHolderZone(zone); }, [zone]);
+  // The DB (user_settings) is the source of truth. Subscribe so the saved zone
+  // is adopted whenever it arrives — including after the first paint — until the
+  // user starts editing.
+  const dbZone = useSettings<HolderZone>(HOLDER_ZONE_KEY);
+  useEffect(() => {
+    if (!userEdited.current && dbZone && dbZone.top != null) setZone(dbZone);
+  }, [dbZone]);
+
+  // Persist only the user's own edits (never echo an adopted DB value back).
+  useEffect(() => { if (userEdited.current) saveHolderZone(zone); }, [zone]);
 
   // Mirror zone horizontally when flipped
   const displayZone = flipped
@@ -92,6 +94,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
     const rect = containerRef.current.getBoundingClientRect();
     const yPct = Math.max(5, Math.min(95, ((pt.clientY - rect.top) / rect.height) * 100));
     const xPct = Math.max(5, Math.min(95, ((pt.clientX - rect.left) / rect.width) * 100));
+    userEdited.current = true;
     setZone((prev: typeof DEFAULT_HOLDER_ZONE) => {
       if (dragEdge === "top") return { ...prev, top: Math.min(yPct, prev.bottom - 10) };
       if (dragEdge === "bottom") return { ...prev, bottom: Math.max(yPct, prev.top + 10) };
@@ -204,7 +207,7 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
       {editable && (
         <div className="flex gap-1 justify-center mt-1">
           <button onClick={() => setIsEditing((v) => !v)} className={`text-[8px] px-1.5 py-0.5 rounded border font-semibold transition-all ${isEditing ? "border-accent/50 text-accent bg-accent/10" : "border-border/50 text-muted/60 hover:text-white"}`}>{isEditing ? "Done" : "Edit Zone"}</button>
-          {isEditing && <button onClick={() => setZone({ ...DEFAULT_HOLDER_ZONE })} className="text-[8px] px-1.5 py-0.5 rounded border border-border/50 text-muted/60 hover:text-white font-semibold transition-all">Reset</button>}
+          {isEditing && <button onClick={() => { userEdited.current = true; setZone({ ...DEFAULT_HOLDER_ZONE }); }} className="text-[8px] px-1.5 py-0.5 rounded border border-border/50 text-muted/60 hover:text-white font-semibold transition-all">Reset</button>}
         </div>
       )}
     </div>

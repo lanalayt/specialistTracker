@@ -25,6 +25,41 @@ const SPORT_OPTIONS: { id: string; label: string; icon?: string; iconEl?: React.
   { id: "LONGSNAP", label: "Long Snapping", iconEl: <SnapperIcon size={20} /> },
 ];
 
+// Rendered as its own component so its hooks are never called conditionally.
+// (Previously an inline IIFE gated by `isCoach && user` — that changed the hook
+// count between renders as auth resolved, throwing React error #310.)
+function InviteCodesCard({ userId }: { userId: string }) {
+  const [codes, setCodes] = useState<{ coachCode: string; athleteCode: string } | null>(null);
+  useEffect(() => {
+    import("@/components/ui/InvitePopup").then(({ getOrCreateInviteCodes }) => {
+      getOrCreateInviteCodes(userId).then(setCodes);
+    });
+  }, [userId]);
+  return (
+    <div className="card space-y-3">
+      <p className="text-xs font-semibold text-muted uppercase tracking-wider">Invite Codes</p>
+      <p className="text-xs text-muted">Share these codes so others can join your team during sign up.</p>
+      <div className="space-y-2">
+        <div>
+          <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Coach Code</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-surface-2 border border-border rounded-input px-3 py-2 text-sm font-mono text-accent select-all tracking-widest">{codes?.coachCode ?? "..."}</code>
+            <button onClick={() => { if (codes) { navigator.clipboard.writeText(codes.coachCode); } }} className="btn-ghost text-xs py-2 px-4">Copy</button>
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Athlete Code</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-surface-2 border border-sky-500/30 rounded-input px-3 py-2 text-sm font-mono text-sky-400 select-all tracking-widest">{codes?.athleteCode ?? "..."}</code>
+            <button onClick={() => { if (codes) { navigator.clipboard.writeText(codes.athleteCode); } }} className="btn-ghost text-xs py-2 px-4">Copy</button>
+          </div>
+        </div>
+      </div>
+      <p className="text-[10px] text-muted">The old team ID code still works for existing users.</p>
+    </div>
+  );
+}
+
 function SettingsContent() {
   const { user, isCoach } = useAuth();
   const fg = useFG();
@@ -412,37 +447,9 @@ function SettingsContent() {
           </div>
 
           {/* Invite Codes */}
-          {isCoach && user?.id && user.id !== "local-dev" && (() => {
-            const [codes, setCodes] = useState<{ coachCode: string; athleteCode: string } | null>(null);
-            useEffect(() => {
-              import("@/components/ui/InvitePopup").then(({ getOrCreateInviteCodes }) => {
-                getOrCreateInviteCodes(user.id).then(setCodes);
-              });
-            }, []);
-            return (
-              <div className="card space-y-3">
-                <p className="text-xs font-semibold text-muted uppercase tracking-wider">Invite Codes</p>
-                <p className="text-xs text-muted">Share these codes so others can join your team during sign up.</p>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Coach Code</p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 bg-surface-2 border border-border rounded-input px-3 py-2 text-sm font-mono text-accent select-all tracking-widest">{codes?.coachCode ?? "..."}</code>
-                      <button onClick={() => { if (codes) { navigator.clipboard.writeText(codes.coachCode); } }} className="btn-ghost text-xs py-2 px-4">Copy</button>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted uppercase tracking-wider mb-1">Athlete Code</p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 bg-surface-2 border border-sky-500/30 rounded-input px-3 py-2 text-sm font-mono text-sky-400 select-all tracking-widest">{codes?.athleteCode ?? "..."}</code>
-                      <button onClick={() => { if (codes) { navigator.clipboard.writeText(codes.athleteCode); } }} className="btn-ghost text-xs py-2 px-4">Copy</button>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-[10px] text-muted">The old team ID code still works for existing users.</p>
-              </div>
-            );
-          })()}
+          {isCoach && user?.id && user.id !== "local-dev" && (
+            <InviteCodesCard userId={user.id} />
+          )}
 
           {/* Archive Stats */}
           <div className="card space-y-3">
