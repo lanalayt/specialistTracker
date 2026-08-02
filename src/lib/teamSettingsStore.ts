@@ -1,34 +1,26 @@
 import { createClient } from "@/lib/supabase";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { TEAM_DEFAULTS as DEFAULTS, rowToTeamSettings, type TeamSettings } from "@/lib/teamSettingsTypes";
 
-export interface TeamSettings {
-  id: string;
-  name: string;
-  school: string;
-  dashTitle: string;
-  colorPrimary: string;
-  colorSecondary: string;
-  colorTertiary: string;
-  logo: string | null;
-  enabledSports: string[];
-}
+export type { TeamSettings };
 
-const DEFAULTS: Omit<TeamSettings, "id"> = {
-  name: "My Team",
-  school: "My School",
-  dashTitle: "Special Teams Dashboard",
-  colorPrimary: "#00d4a0",
-  colorSecondary: "#0a0f14",
-  colorTertiary: "#1f2f42",
-  logo: null,
-  enabledSports: ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP"],
-};
-
-// ─── In-memory cache ─────────────────────────────────────────────────────────
+// ─── In-memory cache + subscriptions ─────────────────────────────────────────
 // The `teams` table is the single source of truth; this cache lets non-React
 // code (e.g. exportStats) and synchronous initial renders read the last-known
-// settings without hitting the DB or localStorage. Populated by every load.
-let _cache: TeamSettings | null = null;
+// settings without hitting the DB or localStorage. Seeded from the server-
+// injected bootstrap (app/layout) so the first paint is already correct, then
+// kept fresh by every load + realtime; subscribers re-render on any change.
+function getInitialTeamSettings(): TeamSettings | null {
+  if (typeof window !== "undefined") {
+    const boot = (window as unknown as { __ST_BOOTSTRAP__?: { team?: TeamSettings | null } }).__ST_BOOTSTRAP__;
+    if (boot?.team?.id) return boot.team;
+  }
+  return null;
+}
+
+let _cache: TeamSettings | null = getInitialTeamSettings();
+const _subs = new Set<() => void>();
+function notify() { _subs.forEach((fn) => { try { fn(); } catch {} }); }
 
 /** Synchronous read of the last-loaded team settings (null until first load). */
 export function getCachedTeamSettings(): TeamSettings | null {
@@ -40,20 +32,29 @@ export function getCachedTeamLogo(): string | null {
   return _cache?.logo ?? null;
 }
 
+/** Optimistically merge a partial into the cache + notify (for instant UI before
+ *  the DB write resolves). No-op if the cache isn't loaded yet. */
+export function patchTeamSettingsCache(partial: Partial<Omit<TeamSettings, "id">>): void {
+  if (_cache) { _cache = { ..._cache, ...partial }; notify(); }
+}
+
+/** Reactive hook: current team settings, re-rendering on any load/update. */
+export function useTeamSettings(): TeamSettings | null {
+  const [val, setVal] = useState<TeamSettings | null>(() => _cache);
+  useEffect(() => {
+    const update = () => setVal(_cache);
+    _subs.add(update);
+    update();
+    return () => { _subs.delete(update); };
+  }, []);
+  return val;
+}
+
 /** Map DB snake_case row to camelCase TeamSettings (and refresh the cache) */
 function rowToSettings(row: Record<string, unknown>): TeamSettings {
-  const settings: TeamSettings = {
-    id: row.id as string,
-    name: row.name as string,
-    school: row.school as string,
-    dashTitle: row.dash_title as string,
-    colorPrimary: row.color_primary as string,
-    colorSecondary: row.color_secondary as string,
-    colorTertiary: row.color_tertiary as string,
-    logo: (row.logo as string) ?? null,
-    enabledSports: (row.enabled_sports as string[]) ?? DEFAULTS.enabledSports,
-  };
+  const settings = rowToTeamSettings(row);
   _cache = settings;
+  notify();
   return settings;
 }
 
@@ -125,7 +126,7 @@ export async function updateTeamSettings(
     cols.updated_at = new Date().toISOString();
     const { error } = await supabase.from("teams").update(cols).eq("id", teamId);
     if (error) throw error;
-    if (_cache && _cache.id === teamId) _cache = { ..._cache, ...partial };
+    if (_cache && _cache.id === teamId) { _cache = { ..._cache, ...partial }; notify(); }
     return true;
   } catch (err) {
     console.warn("[TeamSettings] update failed:", err);

@@ -1,18 +1,6 @@
 import { createClient } from "@/lib/supabase";
 import { useEffect, useState } from "react";
-
-// Map legacy localStorage-era keys to per-user rows (the `sport` column) in the
-// user_settings table. This is the single source of truth for these keys —
-// nothing lives in localStorage. The sport column is free-form TEXT, so
-// per-device calibrations (strike zones) get their own rows here too.
-const SPORT_MAP: Record<string, string> = {
-  fgSettings: "fg",
-  puntSettings: "punt",
-  kickoffSettings: "kickoff",
-  snapSettings: "snap",
-  strikeZoneBounds_v5: "punt_strike_zone",
-  holderStrikeZoneBounds: "holder_strike_zone",
-};
+import { SPORT_MAP, localKeyForSport } from "@/lib/settingsKeys";
 
 function getSport(localKey: string): string | null {
   return SPORT_MAP[localKey] ?? null;
@@ -24,7 +12,17 @@ function getSport(localKey: string): string | null {
 // callback, or a non-React module like exportStats) can read them
 // synchronously — the browser cannot read the DB synchronously, and settings
 // are read outside React render in several places. There is NO localStorage.
-const _cache: Record<string, unknown> = {};
+// Seed from the server-injected bootstrap (app/layout) so synchronous readers
+// get the correct values on the very first paint — no flash, no client storage.
+function initialCache(): Record<string, unknown> {
+  if (typeof window !== "undefined") {
+    const boot = (window as unknown as { __ST_BOOTSTRAP__?: { settings?: Record<string, unknown> } }).__ST_BOOTSTRAP__;
+    if (boot?.settings) return { ...boot.settings };
+  }
+  return {};
+}
+
+const _cache: Record<string, unknown> = initialCache();
 const _subs = new Set<() => void>();
 
 function notify() { _subs.forEach((fn) => { try { fn(); } catch {} }); }
@@ -128,7 +126,7 @@ export function subscribeSettingsRealtime(userId: string): () => void {
       (payload) => {
         const row = (payload.new ?? null) as { sport?: string; settings?: unknown } | null;
         if (!row?.sport) return;
-        const localKey = Object.keys(SPORT_MAP).find((k) => SPORT_MAP[k] === row.sport);
+        const localKey = localKeyForSport(row.sport);
         if (localKey && row.settings !== undefined) {
           _cache[localKey] = row.settings;
           notify();

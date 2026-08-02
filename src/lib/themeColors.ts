@@ -57,8 +57,12 @@ export const PRESETS: { name: string; colors: ThemeColors }[] = [
 // client storage. Falls back to the default when logged out / not injected.
 function getInitialTheme(): ThemeColors {
   if (typeof window !== "undefined") {
-    const injected = (window as unknown as { __ST_THEME__?: ThemeColors }).__ST_THEME__;
-    if (injected?.primary && injected?.secondary && injected?.tertiary) return injected;
+    const team = (window as unknown as {
+      __ST_BOOTSTRAP__?: { team?: { colorPrimary?: string; colorSecondary?: string; colorTertiary?: string } | null };
+    }).__ST_BOOTSTRAP__?.team;
+    if (team?.colorPrimary && team?.colorSecondary && team?.colorTertiary) {
+      return { primary: team.colorPrimary, secondary: team.colorSecondary, tertiary: team.colorTertiary };
+    }
   }
   return DEFAULT_THEME;
 }

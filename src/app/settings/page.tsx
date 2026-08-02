@@ -10,20 +10,11 @@ import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { createArchive } from "@/lib/archiveManager";
 import { getTeamId } from "@/lib/teamData";
-import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite, getCachedTeamSettings } from "@/lib/teamSettingsStore";
+import { updateTeamSettings, stampTeamSettingsWrite, patchTeamSettingsCache, useTeamSettings } from "@/lib/teamSettingsStore";
 import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, loadCustomThemes, saveCustomThemes, loadCustomThemesFromCloud, type ThemeColors, type SavedTheme } from "@/lib/themeColors";
 import { useTeamLogo } from "@/lib/useTeamLogo";
 import clsx from "clsx";
-
-import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import React from "react";
-
-const SPORT_OPTIONS: { id: string; label: string; icon?: string; iconEl?: React.ReactNode }[] = [
-  { id: "KICKING", label: "FG Kicking", iconEl: <KickerIcon size={20} /> },
-  { id: "PUNTING", label: "Punting", iconEl: <PuntFootIcon size={20} /> },
-  { id: "KICKOFF", label: "Kickoff", iconEl: <KickoffTeeIcon size={20} /> },
-  { id: "LONGSNAP", label: "Long Snapping", iconEl: <SnapperIcon size={20} /> },
-];
 
 // Rendered as its own component so its hooks are never called conditionally.
 // (Previously an inline IIFE gated by `isCoach && user` — that changed the hook
@@ -67,9 +58,12 @@ function SettingsContent() {
   const kickoff = useKickoff();
   const { logo, uploadLogo, removeLogo } = useTeamLogo();
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const [teamName, setTeamName] = useState("Special Teams");
-  const [school, setSchool] = useState("My School");
-  const [enabledSports, setEnabledSports] = useState<string[]>(["KICKING", "PUNTING", "KICKOFF", "LONGSNAP"]);
+  // Reactive team profile (seeded by the SSR bootstrap; adopted from the store
+  // until the user edits a field).
+  const team = useTeamSettings();
+  const [teamName, setTeamName] = useState(team?.name ?? "Special Teams");
+  const [school, setSchool] = useState(team?.school ?? "My School");
+  const profileEdited = useRef(false);
   const [saved, setSaved] = useState(false);
 
   // Theme
@@ -150,44 +144,23 @@ function SettingsContent() {
   };
 
 
+  // Adopt DB values whenever they arrive, until the user edits a field.
   useEffect(() => {
-    // Apply the last-known settings instantly from the in-memory cache
-    const cached = getCachedTeamSettings();
-    if (cached) {
-      setTeamName(cached.name);
-      setSchool(cached.school);
-      setEnabledSports(cached.enabledSports);
+    if (!profileEdited.current && team) {
+      setTeamName(team.name);
+      setSchool(team.school);
     }
-
-    // Then load from teams table (source of truth)
-    (async () => {
-      let tid = getTeamId();
-      for (let i = 0; i < 15 && !tid; i++) {
-        await new Promise((r) => setTimeout(r, 100));
-        tid = getTeamId();
-      }
-      if (!tid || tid === "local-dev") return;
-      const settings = await getTeamSettings(tid);
-      if (settings) {
-        setTeamName(settings.name);
-        setSchool(settings.school);
-        setEnabledSports(settings.enabledSports);
-      }
-    })();
-  }, []);
-
-  const toggleSport = (id: string) =>
-    setEnabledSports((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    );
+  }, [team?.name, team?.school]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = () => {
     // Save to teams table (source of truth). Only these columns change; other
     // fields like dashTitle are left intact server-side.
+    patchTeamSettingsCache({ name: teamName, school }); // instant + reactive
+    profileEdited.current = false;
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       stampTeamSettingsWrite();
-      updateTeamSettings(tid, { name: teamName, school, enabledSports });
+      updateTeamSettings(tid, { name: teamName, school });
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -217,7 +190,7 @@ function SettingsContent() {
                 <input
                   className="input"
                   value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
+                  onChange={(e) => { profileEdited.current = true; setTeamName(e.target.value); }}
                 />
               </div>
               <div>
@@ -225,7 +198,7 @@ function SettingsContent() {
                 <input
                   className="input"
                   value={school}
-                  onChange={(e) => setSchool(e.target.value)}
+                  onChange={(e) => { profileEdited.current = true; setSchool(e.target.value); }}
                 />
               </div>
             </div>
@@ -388,38 +361,6 @@ function SettingsContent() {
               </div>
             )}
 
-          </div>
-
-          {/* Enabled sports */}
-          <div className="card space-y-3">
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">
-              Enabled Sport Modules
-            </p>
-            <div className="space-y-2">
-              {SPORT_OPTIONS.map((s) => (
-                <label
-                  key={s.id}
-                  className={clsx(
-                    "flex items-center gap-3 p-3 rounded-input border cursor-pointer transition-all",
-                    enabledSports.includes(s.id)
-                      ? "border-accent/40 bg-accent/5"
-                      : "border-border hover:border-border/80"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={enabledSports.includes(s.id)}
-                    onChange={() => toggleSport(s.id)}
-                    className="accent-accent"
-                  />
-                  {s.iconEl ?? <span className="text-xl">{s.icon}</span>}
-                  <span className="text-sm font-medium text-slate-200">{s.label}</span>
-                  {enabledSports.includes(s.id) && (
-                    <span className="badge-make ml-auto">Enabled</span>
-                  )}
-                </label>
-              ))}
-            </div>
           </div>
 
           {/* Account info */}

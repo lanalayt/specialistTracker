@@ -1,21 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { getTeamId } from "@/lib/teamData";
-import { getTeamSettings, updateTeamSettings, stampTeamSettingsWrite, getCachedTeamLogo } from "@/lib/teamSettingsStore";
+import { updateTeamSettings, stampTeamSettingsWrite, patchTeamSettingsCache, useTeamSettings } from "@/lib/teamSettingsStore";
 
 export function useTeamLogo() {
-  const [logo, setLogo] = useState<string | null>(() => getCachedTeamLogo());
-
-  // Load from teams table (source of truth) on mount
-  useEffect(() => {
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
-      getTeamSettings(tid).then((settings) => {
-        setLogo(settings?.logo ?? null);
-      });
-    }
-  }, []);
+  // Reactive: sourced from the teams-table cache (seeded by the SSR bootstrap,
+  // kept fresh by loads + realtime), so the logo shows on first paint and
+  // updates without navigating.
+  const logo = useTeamSettings()?.logo ?? null;
 
   const uploadLogo = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -38,7 +31,7 @@ export function useTeamLogo() {
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL("image/png");
-        setLogo(dataUrl);
+        patchTeamSettingsCache({ logo: dataUrl }); // instant UI
         const tid = getTeamId();
         if (tid && tid !== "local-dev") {
           stampTeamSettingsWrite();
@@ -51,7 +44,7 @@ export function useTeamLogo() {
   }, []);
 
   const removeLogo = useCallback(() => {
-    setLogo(null);
+    patchTeamSettingsCache({ logo: null }); // instant UI
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       stampTeamSettingsWrite();

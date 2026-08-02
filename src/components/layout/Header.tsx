@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTeamLogo } from "@/lib/useTeamLogo";
+import { useTeamSettings } from "@/lib/teamSettingsStore";
 import { useTutorial } from "@/components/ui/Tutorial";
 import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import { InvitePopup } from "@/components/ui/InvitePopup";
@@ -64,7 +65,8 @@ export function Header({ title: _title }: { title?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [teamCode, setTeamCode] = useState("");
-  const [teamName, setTeamName] = useState("");
+  // Reactive team name (seeded by the SSR bootstrap; updates without navigating).
+  const teamName = useTeamSettings()?.name ?? "";
 
   useEffect(() => {
     async function loadTeamInfo() {
@@ -75,8 +77,8 @@ export function Header({ title: _title }: { title?: string }) {
       if (!tid && user?.id) tid = user.id;
       if (tid) {
         setTeamCode(tid);
-        const s = await getTeamSettings(tid);
-        if (s?.name) setTeamName(s.name);
+        // Warm the store so useTeamSettings has the latest (name, etc.).
+        await getTeamSettings(tid);
       }
     }
     loadTeamInfo();

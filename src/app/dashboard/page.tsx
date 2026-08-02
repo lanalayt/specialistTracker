@@ -9,6 +9,7 @@ import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
+import { useTeamSettings } from "@/lib/teamSettingsStore";
 import { makePct } from "@/lib/stats";
 import Link from "next/link";
 import React from "react";
@@ -93,39 +94,19 @@ function DashboardContent() {
   const punt = usePunt();
   const kickoff = useKickoff();
 
-  const [schoolName, setSchoolName] = useState("Special Teams");
-  const [dashTitle, setDashTitle] = useState("Special Teams Dashboard");
+  // Reactive team settings (seeded by the SSR bootstrap; kept fresh by
+  // AppProviders + realtime) so school name / dashboard title are correct on the
+  // first paint and update without navigating.
+  const team = useTeamSettings();
+  const schoolName = team?.school || team?.name || "Special Teams";
+  const [dashTitle, setDashTitle] = useState(team?.dashTitle ?? "Special Teams Dashboard");
   const [editingTitle, setEditingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+  // Adopt the DB title whenever it arrives, until the user is editing it.
   useEffect(() => {
-    // Apply the last-known settings instantly from the in-memory cache
-    import("@/lib/teamSettingsStore").then(({ getCachedTeamSettings }) => {
-      const cached = getCachedTeamSettings();
-      if (cached) {
-        setSchoolName(cached.school || cached.name);
-        if (cached.dashTitle) setDashTitle(cached.dashTitle);
-      }
-    });
-    // Load from teams table (source of truth)
-    import("@/lib/teamData").then(({ getTeamId }) => {
-      import("@/lib/teamSettingsStore").then(({ getTeamSettings }) => {
-        (async () => {
-          let tid = getTeamId();
-          for (let i = 0; i < 15 && !tid; i++) {
-            await new Promise((r) => setTimeout(r, 100));
-            tid = getTeamId();
-          }
-          if (!tid || tid === "local-dev") return;
-          const settings = await getTeamSettings(tid);
-          if (settings) {
-            setSchoolName(settings.school || settings.name);
-            setDashTitle(settings.dashTitle);
-          }
-        })();
-      });
-    });
-  }, []);
+    if (!editingTitle && team?.dashTitle) setDashTitle(team.dashTitle);
+  }, [team?.dashTitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (editingTitle && titleInputRef.current) {
@@ -139,9 +120,9 @@ function DashboardContent() {
     setDashTitle(title);
     setEditingTitle(false);
     try {
-      // Save to teams table (source of truth)
       const { getTeamId } = await import("@/lib/teamData");
-      const { updateTeamSettings, stampTeamSettingsWrite } = await import("@/lib/teamSettingsStore");
+      const { updateTeamSettings, stampTeamSettingsWrite, patchTeamSettingsCache } = await import("@/lib/teamSettingsStore");
+      patchTeamSettingsCache({ dashTitle: title }); // instant + reactive
       const tid = getTeamId();
       if (tid && tid !== "local-dev") {
         stampTeamSettingsWrite();
