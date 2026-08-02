@@ -13,7 +13,8 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
-import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft } from "@/lib/draftStore";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
@@ -353,7 +354,7 @@ export default function KickoffSessionPage() {
   useEffect(() => {
     const tid = getTeamId();
     if (tid && tid !== "local-dev" && sessionMode) {
-      teamGet<SessionDraft>(tid, `kickoff_session_draft_${sessionMode}`).then((cloudDraft) => {
+      loadDraft<SessionDraft>(tid, `kickoff_session_draft_${sessionMode}`).then((cloudDraft) => {
         if (cloudDraft && cloudDraft.rows) {
           const localDraft = loadDraftForMode(sessionMode);
           const localHasData = localDraft?.rows?.some((r) => r.athlete || r.distance || r.type);
@@ -874,7 +875,7 @@ export default function KickoffSessionPage() {
     };
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamSet(tid, `kickoff_session_draft_${sessionMode}`, draft);
+      saveDraft(tid, `kickoff_session_draft_${sessionMode}`, draft);
       setDraftSaved(true);
       setTimeout(() => setDraftSaved(false), 2000);
     }

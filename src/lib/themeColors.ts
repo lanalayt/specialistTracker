@@ -1,11 +1,11 @@
 /**
  * Theme color customization with 3 school colors.
- * Syncs to team_data so all devices on the same account share the same theme.
+ * Syncs to the teams/custom_themes tables so all devices on the same account share the theme.
  */
 
 import { getTeamId } from "@/lib/teamData";
 import { updateTeamSettings, stampTeamSettingsWrite } from "@/lib/teamSettingsStore";
-import { saveSettingsToCloud, loadSettingsFromCloud } from "@/lib/settingsSync";
+import { createClient } from "@/lib/supabase";
 
 const STORAGE_KEY = "st_theme";
 
@@ -100,33 +100,49 @@ export function loadCustomThemes(): SavedTheme[] {
 export function saveCustomThemes(themes: SavedTheme[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));
-  // Save per-team so other teams don't see these
   const tid = getTeamId();
   if (tid && tid !== "local-dev") {
-    import("@/lib/teamData").then(({ teamSet }) => {
-      teamSet(tid, CUSTOM_THEMES_KEY, { themes });
-    });
+    (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.from("custom_themes").delete().eq("team_id", tid);
+        for (let i = 0; i < themes.length; i++) {
+          await supabase.from("custom_themes").upsert(
+            {
+              team_id: tid,
+              name: themes[i].name,
+              color_primary: themes[i].colors.primary,
+              color_secondary: themes[i].colors.secondary,
+              color_tertiary: themes[i].colors.tertiary,
+              sort_order: i,
+            },
+            { onConflict: "team_id,name" }
+          );
+        }
+      } catch {}
+    })();
   }
 }
 
 export async function loadCustomThemesFromCloud(): Promise<SavedTheme[]> {
-  // Load per-team first
   const tid = getTeamId();
   if (tid && tid !== "local-dev") {
     try {
-      const { teamGet } = await import("@/lib/teamData");
-      const teamData = await teamGet<{ themes: SavedTheme[] }>(tid, CUSTOM_THEMES_KEY);
-      if (teamData?.themes?.length) {
-        localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(teamData.themes));
-        return teamData.themes;
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("custom_themes")
+        .select("name, color_primary, color_secondary, color_tertiary")
+        .eq("team_id", tid)
+        .order("sort_order", { ascending: true });
+      if (data?.length) {
+        const themes: SavedTheme[] = data.map((r) => ({
+          name: r.name,
+          colors: { primary: r.color_primary, secondary: r.color_secondary, tertiary: r.color_tertiary },
+        }));
+        localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));
+        return themes;
       }
     } catch {}
-  }
-  // Fall back to legacy user_data
-  const cloud = await loadSettingsFromCloud<{ themes: SavedTheme[] }>(CUSTOM_THEMES_KEY);
-  if (cloud?.themes?.length) {
-    localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(cloud.themes));
-    return cloud.themes;
   }
   return loadCustomThemes();
 }

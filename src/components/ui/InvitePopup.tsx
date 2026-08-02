@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { teamGet, teamSet, getTeamId } from "@/lib/teamData";
+import { createClient } from "@/lib/supabase";
+import { getTeamId } from "@/lib/teamData";
 import clsx from "clsx";
 
 interface InvitePopupProps {
@@ -20,16 +21,32 @@ function generateCode(): string {
 interface InviteCodes { coachCode: string; athleteCode: string }
 
 export async function getOrCreateInviteCodes(teamId: string): Promise<InviteCodes> {
-  const existing = await teamGet<InviteCodes>(teamId, "invite_codes");
-  if (existing?.coachCode && existing?.athleteCode) return existing;
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("invite_codes")
+    .select("coach_code, athlete_code")
+    .eq("team_id", teamId)
+    .maybeSingle();
+
+  if (data?.coach_code && data?.athlete_code) {
+    return { coachCode: data.coach_code, athleteCode: data.athlete_code };
+  }
+
   const codes: InviteCodes = {
-    coachCode: existing?.coachCode || generateCode(),
-    athleteCode: existing?.athleteCode || generateCode(),
+    coachCode: data?.coach_code || generateCode(),
+    athleteCode: data?.athlete_code || generateCode(),
   };
-  // Write immediately — invite codes are critical and must be in the DB
-  // before an athlete tries to use them
-  const { teamSetImmediate } = await import("@/lib/teamData");
-  await teamSetImmediate(teamId, "invite_codes", codes);
+
+  await supabase.from("invite_codes").upsert(
+    {
+      team_id: teamId,
+      coach_code: codes.coachCode,
+      athlete_code: codes.athleteCode,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "team_id" }
+  );
+
   return codes;
 }
 

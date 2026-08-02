@@ -15,19 +15,10 @@ import {
   genId,
   sessionLabel,
 } from "@/lib/stats";
-import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
-import { cloudGet } from "@/lib/supabaseData";
-import { teamGet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
 import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, syncAthleteKeys, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
-
-interface FGStateData {
-  athletes: string[];
-  stats: Record<string, AthleteStats>;
-  snapshot: Session[] | null;
-  history: Session[];
-}
 
 interface FGContextValue {
   athletes: StoredAthlete[];
@@ -50,7 +41,6 @@ const FGContext = createContext<FGContextValue | null>(null);
 export function FGProvider({ children, sportKey = "KICKING" }: { children: React.ReactNode; sportKey?: string }) {
   const [athletes, setAthletes] = useState<StoredAthlete[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [migrated, setMigrated] = useState(false);
   const { user } = useAuth();
 
   // Stats computed on the fly from practice sessions
@@ -70,11 +60,8 @@ export function FGProvider({ children, sportKey = "KICKING" }: { children: React
     [sessions]
   );
 
-  // ─── Load + migrate ──────────────────────────────────────────────
+  // ─── Load data ──────────────────────────────────────────────────
   useEffect(() => {
-    const userId = user?.id;
-    if (userId) setCloudUserId(userId);
-
     async function loadData() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) {
@@ -82,85 +69,12 @@ export function FGProvider({ children, sportKey = "KICKING" }: { children: React
         tid = getTeamId();
       }
 
-      // Load athletes from athletes table
       if (tid && tid !== "local-dev") {
-        // Sync disabled — athletes page handles both keys on add/remove
         const dbAthletes = await loadAthletes(tid, sportKey);
-        if (dbAthletes.length > 0) {
-          setAthletes(dbAthletes);
-        }
-      }
+        if (dbAthletes.length > 0) setAthletes(dbAthletes);
 
-      // Load sessions from sessions table
-      if (tid && tid !== "local-dev") {
         const dbSessions = await loadSessions(tid, sportKey);
-        if (dbSessions.length > 0) {
-          setSessions(dbSessions);
-          setMigrated(true);
-          return;
-        }
-      }
-
-      // ─── Migration: blob → tables ──────────────────────────────
-      let blob: FGStateData | null = null;
-      if (tid && tid !== "local-dev") {
-        blob = await teamGet<FGStateData>(tid, "fg_data");
-      }
-      if (!blob && userId && userId !== "local-dev") {
-        blob = await cloudGet<FGStateData>(userId, getCloudKey("FG"));
-      }
-      if (!blob) {
-        blob = localGet<FGStateData>("FG");
-      }
-
-      // Also check localStorage for sessions that might only exist locally
-      const localBlob = localGet<FGStateData>("FG");
-
-      if (blob || localBlob) {
-        const source = blob ?? localBlob!;
-        const localHistory = localBlob?.history ?? [];
-        const blobHistory = blob?.history ?? [];
-
-        // Merge both histories by ID
-        const sessionMap = new Map<string, Session>();
-        for (const s of localHistory) sessionMap.set(s.id, s);
-        for (const s of blobHistory) {
-          const existing = sessionMap.get(s.id);
-          if (!existing || (Array.isArray(s.entries) ? s.entries.length : 0) >= (Array.isArray(existing.entries) ? existing.entries.length : 0)) {
-            sessionMap.set(s.id, s);
-          }
-        }
-        const allSessions = Array.from(sessionMap.values()).sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-
-        // Migrate athletes to athletes table
-        const athleteNames = source.athletes ?? [];
-        if (tid && tid !== "local-dev" && athleteNames.length > 0) {
-          const existing = await loadAthletes(tid, sportKey);
-          const existingNames = new Set(existing.map((a) => a.name));
-          const toInsert = athleteNames.filter((n) => !existingNames.has(n));
-          const inserted: StoredAthlete[] = [...existing];
-          for (const name of toInsert) {
-            const result = await insertAthlete(tid, sportKey, name);
-            if (result) inserted.push(result);
-          }
-          setAthletes(inserted);
-        }
-
-        // Migrate sessions to sessions table
-        if (tid && tid !== "local-dev" && allSessions.length > 0) {
-          for (const s of allSessions) {
-            await insertSession(tid, { ...s, sport: sportKey as Session["sport"], teamId: tid });
-          }
-          // Re-load from DB to get consistent data
-          const dbSessions = await loadSessions(tid, sportKey);
-          setSessions(dbSessions);
-        } else {
-          setSessions(allSessions);
-        }
-
-        setMigrated(true);
+        if (dbSessions.length > 0) setSessions(dbSessions);
       }
     }
 

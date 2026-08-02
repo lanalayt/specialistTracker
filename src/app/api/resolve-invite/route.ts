@@ -11,7 +11,37 @@ export async function POST(req: Request) {
     }
     const supabase = createClient(url, serviceKey);
 
-    const { code } = await req.json();
+    const body = await req.json();
+    const { code, action } = body;
+
+    // ─── Action: register-member ──────────────────────────────────
+    // Called after signup to insert the new user into the members table
+    // server-side (bypasses RLS via service role key).
+    if (action === "register-member") {
+      const { userId, teamId, email, name, role, access } = body;
+      if (!userId || !teamId || !email || !name) {
+        return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+      }
+      const { error: memberError } = await supabase.from("members").upsert(
+        {
+          id: userId,
+          team_id: teamId,
+          email,
+          name,
+          role: role || "athlete",
+          access: access || "view",
+          last_seen: new Date().toISOString(),
+        },
+        { onConflict: "team_id,id" }
+      );
+      if (memberError) {
+        console.error("resolve-invite: member insert failed:", memberError);
+        return NextResponse.json({ error: "Member registration failed" }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // ─── Action: resolve invite code ──────────────────────────────
     if (!code || typeof code !== "string") {
       return NextResponse.json({ error: "Missing code" }, { status: 400 });
     }
@@ -21,23 +51,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid code" }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from("team_data")
-      .select("team_id, data")
-      .eq("data_key", "invite_codes");
-
-    if (error || !data) {
-      return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
+    // Try new invite_codes table first (indexed lookup)
+    const { data: byCoach } = await supabase
+      .from("invite_codes")
+      .select("team_id")
+      .eq("coach_code", clean)
+      .maybeSingle();
+    if (byCoach) {
+      return NextResponse.json({ teamId: byCoach.team_id, role: "coach" });
     }
 
-    for (const row of data) {
-      const codes = row.data as { coachCode?: string; athleteCode?: string };
-      if (codes.coachCode === clean) {
-        return NextResponse.json({ teamId: row.team_id, role: "coach" });
-      }
-      if (codes.athleteCode === clean) {
-        return NextResponse.json({ teamId: row.team_id, role: "athlete" });
-      }
+    const { data: byAthlete } = await supabase
+      .from("invite_codes")
+      .select("team_id")
+      .eq("athlete_code", clean)
+      .maybeSingle();
+    if (byAthlete) {
+      return NextResponse.json({ teamId: byAthlete.team_id, role: "athlete" });
     }
 
     return NextResponse.json({ error: "Code not found" }, { status: 404 });

@@ -1,5 +1,4 @@
 import { getTeamId } from "@/lib/teamData";
-import { localGet } from "@/lib/amplify";
 import { insertSession, loadSessions } from "@/lib/sessionStore";
 import type { Session } from "@/types";
 
@@ -11,10 +10,10 @@ interface SportData {
 }
 
 const SPORT_KEYS = [
-  { local: "FG" as const, cloud: "fg_data", sport: "KICKING" },
-  { local: "PUNT" as const, cloud: "punt_data", sport: "PUNTING" },
-  { local: "KICKOFF" as const, cloud: "kickoff_data", sport: "KICKOFF" },
-  { local: "LONGSNAP" as const, cloud: "longsnap_data", sport: "LONGSNAP" },
+  { local: "st_fg_v1", sport: "KICKING" },
+  { local: "st_punt_v1", sport: "PUNTING" },
+  { local: "st_kickoff_v1", sport: "KICKOFF" },
+  { local: "st_longsnap_v1", sport: "LONGSNAP" },
 ];
 
 /**
@@ -28,7 +27,11 @@ export async function runIntegritySync(): Promise<void> {
 
   for (const { local, sport } of SPORT_KEYS) {
     try {
-      const localData = localGet<SportData>(local);
+      let localData: SportData | null = null;
+      try {
+        const raw = localStorage.getItem(local);
+        if (raw) localData = JSON.parse(raw) as SportData;
+      } catch {}
       if (!localData?.history?.length) continue;
 
       const dbSessions = await loadSessions(tid, sport);

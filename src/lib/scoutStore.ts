@@ -2,55 +2,19 @@ import { createClient } from "@/lib/supabase";
 
 /**
  * Scout Mode data persistence layer.
- * Uses the existing `sessions` table with SCOUT_* sport values
- * to keep scout data completely isolated from coach mode.
+ * The database is the single source of truth. Each concern has its own
+ * dedicated table (scout_profiles, scout_athletes, scout_numbers,
+ * scout_ranking_groups, scout_session_rankings, assigned_charts,
+ * scout_archives, scout_presets). Scout sessions use the existing `sessions`
+ * table with SCOUT_* sport values to stay isolated from coach mode.
  *
- * Persistence model (team_data keys):
- *   - Reads are CLOUD-AUTHORITATIVE: when signed in we always read the live
- *     cloud copy so changes made by other accounts/devices are visible.
- *     localStorage is only a same-device cache / offline fallback.
- *   - Writes MERGE with the current cloud copy (never blind-overwrite a whole
- *     collection) so two people editing at once don't clobber each other.
- *   - Removals go through dedicated remove* helpers so a delete on one device
- *     is not resurrected by another device's stale list.
+ * localStorage is used ONLY in local/dev mode (no real team), namespaced so it
+ * can't bleed into a real team's view.
  */
-
-/** Read a team_data key from the cloud. ok:false means the read failed (offline / error). */
-async function cloudGet<T>(teamId: string, key: string): Promise<{ ok: true; value: T | null } | { ok: false }> {
-  try {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("team_data")
-      .select("data")
-      .eq("team_id", teamId)
-      .eq("data_key", key)
-      .maybeSingle();
-    if (error) return { ok: false };
-    return { ok: true, value: (data?.data ?? null) as T | null };
-  } catch {
-    return { ok: false };
-  }
-}
-
-/** Upsert a team_data key in the cloud (best effort). */
-async function cloudPut(teamId: string, key: string, value: unknown): Promise<void> {
-  try {
-    const supabase = createClient();
-    await supabase.from("team_data").upsert(
-      { team_id: teamId, data_key: key, data: value as Record<string, unknown>, updated_at: new Date().toISOString() },
-      { onConflict: "team_id,data_key" }
-    );
-  } catch {}
-}
 
 /**
  * Tenant isolation rule: for a real signed-in team, scout data is CLOUD-ONLY —
- * we never read or write localStorage. That makes it impossible for two accounts
- * used on the same browser to share a cache and leak athletes/profiles between
- * each other, and it means the cloud is always the single source of truth.
- *
- * localStorage is used ONLY in local/dev mode (no real team), where it is still
- * namespaced so it can't bleed into a real team's view.
+ * we never read or write localStorage.
  */
 function isRealTeam(teamId: string): boolean {
   return !!teamId && teamId !== "local-dev";
@@ -74,8 +38,7 @@ function cacheSet(teamId: string, key: string, value: unknown): void {
   try { localStorage.setItem(nsKey(teamId, key), JSON.stringify(value)); } catch {}
 }
 
-// One-time purge of legacy, non-team-scoped scout cache keys. These were shared
-// across all accounts on a device and could leak data between teams.
+// One-time purge of legacy, non-team-scoped scout cache keys.
 if (typeof window !== "undefined") {
   try {
     const legacy = ["scout_profiles", "scout_archives", "assigned_charts", "scout_fg_preset"];
@@ -176,9 +139,6 @@ export async function updateSessionAthleteEntries(teamId: string, sessionId: str
     const { data } = await supabase.from("sessions").select("entries").eq("team_id", teamId).eq("id", sessionId).single();
     if (!data) return false;
     const all = data.entries as Record<string, unknown>[];
-    // The session-level chart mode (e.g. "preset"/"live") is tagged on the original
-    // first entry. Capture it so editing/reordering an athlete doesn't drop the tag
-    // and silently turn a preset chart into a manual one.
     const sessionMode = (all.find((e) => (e as { chartMode?: string }).chartMode) as { chartMode?: string } | undefined)?.chartMode;
     const others = all.filter((e) => (e as { athlete?: string }).athlete !== athleteName);
     const strip = (e: Record<string, unknown>) => { const { chartMode: _cm, ...rest } = e as { chartMode?: unknown }; return rest as Record<string, unknown>; };
@@ -199,10 +159,8 @@ export async function updateSessionAthleteEntries(teamId: string, sessionId: str
 /**
  * Reassign one athlete's chart to a DIFFERENT athlete as its own separate chart.
  * The reps are removed from the source session and placed in a brand-new session
- * owned by the new athlete, so they never merge into a chart the new athlete
- * already has in the source session. The source chart's sport, label, date,
- * weather, chart-mode tag, and ranking group all carry over.
- * Returns the new session id, or null on failure.
+ * owned by the new athlete. The source chart's sport, label, date, weather,
+ * chart-mode tag, and ranking group all carry over. Returns the new session id.
  */
 export async function reassignAthleteToOwnSession(
   teamId: string,
@@ -249,13 +207,11 @@ export async function reassignAthleteToOwnSession(
     );
 
     // 3) Give the new chart the same ranking group(s) the old chart had.
-    const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
-    const m = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
+    const map = await loadSessionRankings(teamId);
     const pairKey = `${sessionId}|||${oldAthlete}`;
-    m[newId] = m[pairKey] ?? m[sessionId] ?? ["overall"];
-    delete m[pairKey];
-    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-    await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+    const carried = map[pairKey] ?? map[sessionId] ?? ["overall"];
+    await upsertSessionRanking(teamId, newId, carried);
+    await deleteSessionRankingKey(teamId, pairKey);
 
     return newId;
   } catch (err) {
@@ -303,7 +259,7 @@ export async function deleteAthleteFromSessions(teamId: string, sport: string, a
   }
 }
 
-// ── Scout Profiles (stored in team_data) ────────────────────────────────────
+// ── Scout Profiles (scout_profiles table) ────────────────────────────────────
 
 export interface ScoutProfile {
   name: string;
@@ -323,157 +279,167 @@ export interface ScoutProfile {
 const SCOUT_PROFILES_KEY = "scout_profiles";
 
 export async function loadScoutProfiles(teamId: string): Promise<Record<string, ScoutProfile>> {
-  if (!teamId || teamId === "local-dev") return cacheGet(teamId, SCOUT_PROFILES_KEY, {});
-  const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
-  if (res.ok) {
-    const profiles = res.value && typeof res.value === "object" ? res.value : {};
-    cacheSet(teamId, SCOUT_PROFILES_KEY, profiles);
-    return profiles;
+  if (!isRealTeam(teamId)) return cacheGet(teamId, SCOUT_PROFILES_KEY, {});
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("scout_profiles")
+      .select("name, profile")
+      .eq("team_id", teamId);
+    return Object.fromEntries((data ?? []).map((r) => [r.name, r.profile as ScoutProfile]));
+  } catch {
+    return {};
   }
-  // Offline / read failed — fall back to last-known cache.
-  return cacheGet(teamId, SCOUT_PROFILES_KEY, {});
 }
 
-/** Merge the given profiles into the cloud copy (adds/updates only — never removes keys). */
+/** Merge the given profiles into the table (adds/updates only — never removes). */
 export async function saveScoutProfiles(teamId: string, profiles: Record<string, ScoutProfile>): Promise<void> {
   cacheSet(teamId, SCOUT_PROFILES_KEY, profiles);
-  if (!teamId || teamId === "local-dev") return;
-  const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
-  const cloud = res.ok && res.value && typeof res.value === "object" ? res.value : {};
-  const merged = { ...cloud, ...profiles };
-  cacheSet(teamId, SCOUT_PROFILES_KEY, merged);
-  await cloudPut(teamId, SCOUT_PROFILES_KEY, merged);
+  if (!isRealTeam(teamId)) return;
+  const supabase = createClient();
+  for (const [name, profile] of Object.entries(profiles)) {
+    await supabase.from("scout_profiles").upsert(
+      { team_id: teamId, name, profile, updated_at: new Date().toISOString() },
+      { onConflict: "team_id,name" }
+    );
+  }
 }
 
-/** Remove a single profile from the cloud copy (safe delete — read/modify/write). */
 export async function deleteScoutProfile(teamId: string, name: string): Promise<void> {
-  if (!teamId || teamId === "local-dev") {
+  if (!isRealTeam(teamId)) {
     const map = cacheGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY, {});
     delete map[name];
     cacheSet(teamId, SCOUT_PROFILES_KEY, map);
     return;
   }
-  const res = await cloudGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY);
-  const cloud = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
-  delete cloud[name];
-  cacheSet(teamId, SCOUT_PROFILES_KEY, cloud);
-  await cloudPut(teamId, SCOUT_PROFILES_KEY, cloud);
+  const supabase = createClient();
+  await supabase.from("scout_profiles").delete().eq("team_id", teamId).eq("name", name);
 }
 
-// ── Presets (stored in team_data) ───────────────────────────────────────────
+// ── Presets (scout_presets table) ────────────────────────────────────────────
 
 export async function loadScoutPreset<T>(teamId: string, key: string): Promise<T | null> {
-  if (!teamId || teamId === "local-dev") return cacheGet<T | null>(teamId, key, null);
-  const res = await cloudGet<T>(teamId, key);
-  if (res.ok) {
-    if (res.value != null) cacheSet(teamId, key, res.value);
-    return res.value;
+  if (!isRealTeam(teamId)) return cacheGet<T | null>(teamId, key, null);
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("scout_presets")
+      .select("data")
+      .eq("team_id", teamId)
+      .eq("preset_key", key)
+      .maybeSingle();
+    if (data?.data) return data.data as T;
+    return null;
+  } catch {
+    return cacheGet<T | null>(teamId, key, null);
   }
-  return cacheGet<T | null>(teamId, key, null);
 }
 
 export async function saveScoutPreset<T>(teamId: string, key: string, value: T): Promise<void> {
   cacheSet(teamId, key, value);
-  if (!teamId || teamId === "local-dev") return;
+  if (!isRealTeam(teamId)) return;
   try {
     const supabase = createClient();
-    await supabase.from("team_data").upsert(
+    await supabase.from("scout_presets").upsert(
       {
         team_id: teamId,
-        data_key: key,
+        preset_key: key,
         data: value as unknown as Record<string, unknown>,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "team_id,data_key" }
+      { onConflict: "team_id,preset_key" }
     );
   } catch {}
 }
 
-// ── Scout Athletes (stored in team_data, per-sport) ─────────────────────────
+// ── Scout Athletes (scout_athletes table, per-sport) ─────────────────────────
 
 export async function loadScoutAthletes(teamId: string, sport: string): Promise<string[]> {
   const key = `scout_athletes_${sport}`;
-  if (!teamId || teamId === "local-dev") return cacheGet<string[]>(teamId, key, []);
-  const res = await cloudGet<string[]>(teamId, key);
-  if (res.ok) {
-    const names = Array.isArray(res.value) ? res.value : [];
-    cacheSet(teamId, key, names);
-    return names;
+  if (!isRealTeam(teamId)) return cacheGet<string[]>(teamId, key, []);
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("scout_athletes")
+      .select("name")
+      .eq("team_id", teamId)
+      .eq("sport", sport)
+      .order("sort_order", { ascending: true });
+    return (data ?? []).map((r) => r.name);
+  } catch {
+    return [];
   }
-  return cacheGet<string[]>(teamId, key, []);
 }
 
-/** Add athletes to a sport list, merging with the current cloud copy (never drops names). */
+/** Add athletes to a sport list, merging with the current copy (never drops names). */
 export async function saveScoutAthletes(teamId: string, sport: string, names: string[]): Promise<void> {
   const key = `scout_athletes_${sport}`;
   cacheSet(teamId, key, names);
-  if (!teamId || teamId === "local-dev") return;
-  const res = await cloudGet<string[]>(teamId, key);
-  const cloud = res.ok && Array.isArray(res.value) ? res.value : [];
-  const merged = Array.from(new Set([...cloud, ...names]));
-  cacheSet(teamId, key, merged);
-  await cloudPut(teamId, key, merged);
+  if (!isRealTeam(teamId)) return;
+  const supabase = createClient();
+  const existing = await loadScoutAthletes(teamId, sport);
+  const merged = Array.from(new Set([...existing, ...names]));
+  for (let i = 0; i < merged.length; i++) {
+    await supabase.from("scout_athletes").upsert(
+      { team_id: teamId, sport, name: merged[i], sort_order: i },
+      { onConflict: "team_id,sport,name" }
+    );
+  }
 }
 
-/** Remove one athlete from a sport list (safe delete — read/modify/write against the cloud). */
+/** Remove one athlete from a sport list. */
 export async function removeScoutAthlete(teamId: string, sport: string, name: string): Promise<void> {
   const key = `scout_athletes_${sport}`;
-  if (!teamId || teamId === "local-dev") {
+  if (!isRealTeam(teamId)) {
     cacheSet(teamId, key, cacheGet<string[]>(teamId, key, []).filter((n) => n !== name));
     return;
   }
-  const res = await cloudGet<string[]>(teamId, key);
-  const cloud = res.ok && Array.isArray(res.value) ? res.value : cacheGet<string[]>(teamId, key, []);
-  const next = cloud.filter((n) => n !== name);
-  cacheSet(teamId, key, next);
-  await cloudPut(teamId, key, next);
+  const supabase = createClient();
+  await supabase.from("scout_athletes").delete().eq("team_id", teamId).eq("sport", sport).eq("name", name);
 }
 
-// ── Scout athlete jersey numbers ─────────────────────────────────────────────
-// Jersey numbers are shared across ALL disciplines: a number set in one sport
-// tags the athlete everywhere (one team-wide map), until changed. The `sport`
-// argument is accepted for backwards compatibility but ignored.
+// ── Scout athlete jersey numbers (scout_numbers table) ───────────────────────
+// Jersey numbers are shared across ALL disciplines (one team-wide map). The
+// `sport` argument is accepted for backwards compatibility but ignored.
 
 const SCOUT_NUMBERS_KEY = "scout_numbers";
-const LEGACY_NUMBER_SPORTS = ["fg", "kickoff", "punt", "snap"];
-const _numbersMigrated = new Set<string>(); // teams whose legacy per-sport numbers were folded in this session
 
 export async function loadScoutNumbers(teamId: string, _sport: string): Promise<Record<string, string>> {
   if (!isRealTeam(teamId)) return cacheGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY, {});
-  const res = await cloudGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY);
-  if (!res.ok) return cacheGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY, {});
-  const shared: Record<string, string> = res.value && typeof res.value === "object" ? { ...res.value } : {};
-  // One-time migration: fold any legacy per-sport numbers into the shared map,
-  // then CLEAR each legacy key so a later-cleared number can't be re-imported
-  // from its stale legacy copy on the next page load.
-  if (!_numbersMigrated.has(teamId)) {
-    _numbersMigrated.add(teamId);
-    let changed = false;
-    for (const sp of LEGACY_NUMBER_SPORTS) {
-      const key = `scout_numbers_${sp}`;
-      const legacy = await cloudGet<Record<string, string>>(teamId, key);
-      if (legacy.ok && legacy.value && typeof legacy.value === "object" && Object.keys(legacy.value).length > 0) {
-        for (const [name, num] of Object.entries(legacy.value)) {
-          if (num && !(name in shared)) { shared[name] = num; changed = true; }
-        }
-        await cloudPut(teamId, key, {});
-      }
-    }
-    if (changed) await cloudPut(teamId, SCOUT_NUMBERS_KEY, shared);
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("scout_numbers")
+      .select("name, jersey_number")
+      .eq("team_id", teamId);
+    return Object.fromEntries((data ?? []).map((r) => [r.name, r.jersey_number]));
+  } catch {
+    return {};
   }
-  cacheSet(teamId, SCOUT_NUMBERS_KEY, shared);
-  return shared;
 }
 
 /**
- * Save the full (team-wide) jersey-number map. Callers pass the complete map
- * loaded cloud-fresh, so this is an authoritative write — allowing a number to
- * be cleared. The number applies across every discipline.
+ * Save the full (team-wide) jersey-number map. Authoritative write — a name
+ * absent from `numbers` is cleared. Applies across every discipline.
  */
 export async function saveScoutNumbers(teamId: string, _sport: string, numbers: Record<string, string>): Promise<void> {
   cacheSet(teamId, SCOUT_NUMBERS_KEY, numbers);
   if (!isRealTeam(teamId)) return;
-  await cloudPut(teamId, SCOUT_NUMBERS_KEY, numbers);
+  const supabase = createClient();
+  const existing = await loadScoutNumbers(teamId, _sport);
+  for (const name of Object.keys(existing)) {
+    if (!numbers[name]) {
+      await supabase.from("scout_numbers").delete().eq("team_id", teamId).eq("name", name);
+    }
+  }
+  for (const [name, num] of Object.entries(numbers)) {
+    if (num) {
+      await supabase.from("scout_numbers").upsert(
+        { team_id: teamId, name, jersey_number: num, updated_at: new Date().toISOString() },
+        { onConflict: "team_id,name" }
+      );
+    }
+  }
 }
 
 /** Display name with optional jersey number prefix */
@@ -482,7 +448,7 @@ export function scoutDisplayName(name: string, numbers?: Record<string, string>)
   return num ? `#${num} ${name}` : name;
 }
 
-/** The scout disciplines an athlete can be charted in. Keys match the per-sport athlete lists. */
+/** The scout disciplines an athlete can be charted in. */
 export const SCOUT_DISCIPLINES: { key: string; label: string }[] = [
   { key: "fg", label: "FG" },
   { key: "kickoff", label: "Kickoff" },
@@ -492,9 +458,6 @@ export const SCOUT_DISCIPLINES: { key: string; label: string }[] = [
 
 /**
  * Sync an athlete's discipline (charting) membership.
- * - Selected disciplines: the athlete is added to that sport's charting list.
- * - removeUnselected=true: also removes them from any unselected discipline
- *   (use only when `disciplines` reflects the athlete's full, current set).
  */
 export async function applyScoutDisciplines(
   teamId: string,
@@ -508,9 +471,8 @@ export async function applyScoutDisciplines(
   }
 }
 
-// ── Scout Rankings (named groups, per discipline) ────────────────────────────
-// Each discipline has its own list of rankings. "overall" always exists and is
-// the default. A saved chart (session) is tagged with one or more ranking ids.
+// ── Scout Rankings (scout_ranking_groups table) ──────────────────────────────
+// Named groups shared across disciplines. "overall" always exists (default).
 
 export interface ScoutRanking { id: string; name: string; }
 
@@ -518,9 +480,7 @@ const DEFAULT_RANKING: ScoutRanking = { id: "overall", name: "Overall" };
 
 /**
  * Virtual "all charts" ranking. Always shown first, can't be renamed or
- * deleted, and displays every chart in the discipline regardless of group
- * assignment. It is never persisted — injected for display only — so a team
- * that renamed the old "overall" group keeps that custom name.
+ * deleted, displays every chart regardless of group. Never persisted.
  */
 export const ALL_RANKING_ID = "__all__";
 export const ALL_RANKING: ScoutRanking = { id: ALL_RANKING_ID, name: "Overall" };
@@ -535,59 +495,66 @@ function ensureOverall(list: ScoutRanking[]): ScoutRanking[] {
 }
 
 const SHARED_RANKINGS_KEY = "scout_rankings_shared";
-const _rankingsMigrated = new Set<string>();
 
 export async function loadScoutRankings(teamId: string, _sport?: string): Promise<ScoutRanking[]> {
   if (!isRealTeam(teamId)) return ensureOverall(cacheGet<ScoutRanking[]>(teamId, SHARED_RANKINGS_KEY, []));
-  const res = await cloudGet<ScoutRanking[]>(teamId, SHARED_RANKINGS_KEY);
-  const shared: ScoutRanking[] = res.ok && Array.isArray(res.value) ? [...res.value] : [];
-  // One-time migration: fold any legacy per-sport rankings into the shared list,
-  // then CLEAR each legacy key. Without clearing, a group deleted from the shared
-  // list would be re-imported from its still-present legacy copy on the next page
-  // load — i.e. deleting a group then refreshing would bring it back.
-  if (!_rankingsMigrated.has(teamId)) {
-    _rankingsMigrated.add(teamId);
-    let changed = false;
-    const existingIds = new Set(shared.map((r) => r.id));
-    for (const sp of ["fg", "kickoff", "punt", "snap"]) {
-      const key = `scout_rankings_${sp}`;
-      const legacy = await cloudGet<ScoutRanking[]>(teamId, key);
-      if (legacy.ok && Array.isArray(legacy.value) && legacy.value.length > 0) {
-        for (const r of legacy.value) {
-          if (r.id !== "overall" && !existingIds.has(r.id)) {
-            shared.push(r);
-            existingIds.add(r.id);
-            changed = true;
-          }
-        }
-        // Legacy copy is now fully folded into `shared`; clear it so it can't
-        // resurrect a later-deleted group.
-        await cloudPut(teamId, key, []);
-      }
-    }
-    if (changed) await cloudPut(teamId, SHARED_RANKINGS_KEY, shared);
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("scout_ranking_groups")
+      .select("ranking_id, name, sort_order")
+      .eq("team_id", teamId)
+      .order("sort_order", { ascending: true });
+    return ensureOverall((data ?? []).map((r) => ({ id: r.ranking_id, name: r.name })));
+  } catch {
+    return ensureOverall([]);
   }
-  const list = ensureOverall(shared);
-  cacheSet(teamId, SHARED_RANKINGS_KEY, list);
-  return list;
 }
 
 export async function saveScoutRankings(teamId: string, _sport: string, rankings: ScoutRanking[]): Promise<void> {
   cacheSet(teamId, SHARED_RANKINGS_KEY, rankings);
   if (!isRealTeam(teamId)) return;
-  await cloudPut(teamId, SHARED_RANKINGS_KEY, rankings);
+  const supabase = createClient();
+  // Authoritative ordered list: delete all then re-insert.
+  await supabase.from("scout_ranking_groups").delete().eq("team_id", teamId);
+  for (let i = 0; i < rankings.length; i++) {
+    await supabase.from("scout_ranking_groups").upsert(
+      { team_id: teamId, ranking_id: rankings[i].id, name: rankings[i].name, sort_order: i },
+      { onConflict: "team_id,ranking_id" }
+    );
+  }
 }
 
-/** Map of sessionId -> ranking ids it belongs to (team-wide). Missing = ["overall"]. */
+// ── Session rankings (scout_session_rankings table) ──────────────────────────
+// lookup_key is either a sessionId (session-level assignment) or
+// `${sessionId}|||${athlete}` (per-athlete override). Missing = ["overall"].
+
+async function upsertSessionRanking(teamId: string, lookupKey: string, rankingIds: string[]): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("scout_session_rankings").upsert(
+    { team_id: teamId, lookup_key: lookupKey, ranking_ids: rankingIds, updated_at: new Date().toISOString() },
+    { onConflict: "team_id,lookup_key" }
+  );
+}
+
+async function deleteSessionRankingKey(teamId: string, lookupKey: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.from("scout_session_rankings").delete().eq("team_id", teamId).eq("lookup_key", lookupKey);
+}
+
+/** Map of lookup_key -> ranking ids it belongs to (team-wide). Missing = ["overall"]. */
 export async function loadSessionRankings(teamId: string): Promise<Record<string, string[]>> {
   if (!isRealTeam(teamId)) return cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
-  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
-  if (res.ok) {
-    const m = res.value && typeof res.value === "object" ? res.value : {};
-    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-    return m;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("scout_session_rankings")
+      .select("lookup_key, ranking_ids")
+      .eq("team_id", teamId);
+    return Object.fromEntries((data ?? []).map((r) => [r.lookup_key, r.ranking_ids as string[]]));
+  } catch {
+    return {};
   }
-  return cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
 }
 
 export async function setSessionRankings(teamId: string, sessionId: string, rankingIds: string[]): Promise<void> {
@@ -597,41 +564,31 @@ export async function setSessionRankings(teamId: string, sessionId: string, rank
     cacheSet(teamId, SESSION_RANKINGS_KEY, m);
     return;
   }
-  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
-  const m = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
-  m[sessionId] = rankingIds;
-  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+  await upsertSessionRanking(teamId, sessionId, rankingIds);
 }
 
 /**
- * Remove a single athlete's chart from one ranking (un-assign), without
- * affecting the other athletes in the same session. Writes a per-athlete
+ * Remove a single athlete's chart from one ranking (un-assign) via a per-athlete
  * override (key `sessionId|||athlete`) that takes precedence over the
- * session-level assignment used by everyone else in that session.
+ * session-level assignment.
  */
 export async function removeEntryFromRanking(teamId: string, sessionId: string, athlete: string, rankingId: string): Promise<void> {
   const pairKey = `${sessionId}|||${athlete}`;
-  const apply = (m: Record<string, string[]>) => {
+  if (!isRealTeam(teamId)) {
+    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
     const cur = m[pairKey] ?? m[sessionId] ?? ["overall"];
     m[pairKey] = cur.filter((r) => r !== rankingId);
-    return m;
-  };
-  if (!isRealTeam(teamId)) {
-    cacheSet(teamId, SESSION_RANKINGS_KEY, apply(cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {})));
+    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
     return;
   }
-  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
-  const m = apply(res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {});
-  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+  const all = await loadSessionRankings(teamId);
+  const cur = all[pairKey] ?? all[sessionId] ?? ["overall"];
+  await upsertSessionRanking(teamId, pairKey, cur.filter((r) => r !== rankingId));
 }
 
 /**
- * Set the ranking group(s) for a single athlete's chart within a session,
- * writing a per-athlete override (key `sessionId|||athlete`). Used to move one
- * chart into a different group without touching the other athletes in the same
- * session. Empty falls back to Overall.
+ * Set the ranking group(s) for a single athlete's chart within a session
+ * (per-athlete override, key `sessionId|||athlete`). Empty falls back to Overall.
  */
 export async function setEntryRankings(teamId: string, sessionId: string, athlete: string, rankingIds: string[]): Promise<void> {
   const pairKey = `${sessionId}|||${athlete}`;
@@ -642,37 +599,28 @@ export async function setEntryRankings(teamId: string, sessionId: string, athlet
     cacheSet(teamId, SESSION_RANKINGS_KEY, m);
     return;
   }
-  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
-  const m = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
-  m[pairKey] = ids;
-  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+  await upsertSessionRanking(teamId, pairKey, ids);
 }
 
 /**
  * Move a per-athlete ranking override from one athlete name to another within a
- * session. Used when a chart is re-assigned to a different athlete (renamed), so
- * the chart keeps whatever ranking group it was in.
+ * session (used when a chart is re-assigned to a renamed athlete).
  */
 export async function migrateEntryRanking(teamId: string, sessionId: string, oldAthlete: string, newAthlete: string): Promise<void> {
   if (oldAthlete === newAthlete) return;
   const oldKey = `${sessionId}|||${oldAthlete}`;
   const newKey = `${sessionId}|||${newAthlete}`;
-  const apply = (m: Record<string, string[]>) => {
-    if (m[oldKey] !== undefined) {
-      m[newKey] = m[oldKey];
-      delete m[oldKey];
-    }
-    return m;
-  };
   if (!isRealTeam(teamId)) {
-    cacheSet(teamId, SESSION_RANKINGS_KEY, apply(cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {})));
+    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
+    if (m[oldKey] !== undefined) { m[newKey] = m[oldKey]; delete m[oldKey]; }
+    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
     return;
   }
-  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
-  const m = apply(res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {});
-  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+  const all = await loadSessionRankings(teamId);
+  if (all[oldKey] !== undefined) {
+    await upsertSessionRanking(teamId, newKey, all[oldKey]);
+    await deleteSessionRankingKey(teamId, oldKey);
+  }
 }
 
 /** Remove a session from one ranking only (un-assign). Other rankings keep it. */
@@ -683,11 +631,9 @@ export async function removeSessionFromRanking(teamId: string, sessionId: string
     cacheSet(teamId, SESSION_RANKINGS_KEY, m);
     return;
   }
-  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
-  const m = res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {};
-  m[sessionId] = (m[sessionId] ?? ["overall"]).filter((r) => r !== rankingId);
-  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+  const all = await loadSessionRankings(teamId);
+  const cur = all[sessionId] ?? ["overall"];
+  await upsertSessionRanking(teamId, sessionId, cur.filter((r) => r !== rankingId));
 }
 
 /** Delete a ranking group. Its charts are kept and fall back to Overall. */
@@ -695,21 +641,27 @@ export async function deleteScoutRanking(teamId: string, sport: string, rankingI
   if (rankingId === "overall") return;
   const rankings = await loadScoutRankings(teamId, sport);
   await saveScoutRankings(teamId, sport, rankings.filter((r) => r.id !== rankingId));
-  const reassign = (m: Record<string, string[]>) => {
+
+  if (!isRealTeam(teamId)) {
+    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
     for (const k of Object.keys(m)) {
       const next = (m[k] ?? []).filter((r) => r !== rankingId);
       m[k] = next.length > 0 ? next : ["overall"];
     }
-    return m;
-  };
-  if (!isRealTeam(teamId)) {
-    cacheSet(teamId, SESSION_RANKINGS_KEY, reassign(cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {})));
+    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
     return;
   }
-  const res = await cloudGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY);
-  const m = reassign(res.ok && res.value && typeof res.value === "object" ? { ...res.value } : {});
-  cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-  await cloudPut(teamId, SESSION_RANKINGS_KEY, m);
+  // Reassign every session-ranking row that referenced this group.
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("scout_session_rankings")
+    .select("lookup_key, ranking_ids")
+    .eq("team_id", teamId)
+    .contains("ranking_ids", [rankingId]);
+  for (const row of data ?? []) {
+    const next = (row.ranking_ids as string[]).filter((r) => r !== rankingId);
+    await upsertSessionRanking(teamId, row.lookup_key, next.length > 0 ? next : ["overall"]);
+  }
 }
 
 /** Today's local date as a YYYY-MM-DD string for <input type="date"> defaults */
@@ -727,7 +679,7 @@ export function dateInputToISO(dateStr: string): string {
   return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
 }
 
-// ── Assigned Charts (stored in team_data) ────────────────────────────────────
+// ── Assigned Charts (assigned_charts table) ──────────────────────────────────
 
 export interface AssignedChart {
   id: string;
@@ -737,28 +689,67 @@ export interface AssignedChart {
   dueDate: string;
   athletes: string[];
   kicks: { distance: number; hash: string; pointValue: number }[];
-  reps?: number; // for punt/KO — total number of reps per athlete
-  puntTypes?: { type: string; count: number }[]; // punt type breakdown
-  koRows?: { typeId: string; typeLabel: string; count: number; hash: string }[]; // KO type breakdown
+  reps?: number;
+  puntTypes?: { type: string; count: number }[];
+  koRows?: { typeId: string; typeLabel: string; count: number; hash: string }[];
   completedBy: Record<string, string>;
 }
 
-const ASSIGNED_CHARTS_KEY = "assigned_charts";
-
 export async function loadAssignedCharts(teamId: string): Promise<AssignedChart[]> {
-  if (!isRealTeam(teamId)) return cacheGet<AssignedChart[]>(teamId, ASSIGNED_CHARTS_KEY, []);
-  const res = await cloudGet<AssignedChart[]>(teamId, ASSIGNED_CHARTS_KEY);
-  if (res.ok) return Array.isArray(res.value) ? res.value : [];
-  return [];
+  if (!isRealTeam(teamId)) return cacheGet<AssignedChart[]>(teamId, "assigned_charts", []);
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("assigned_charts")
+      .select("*")
+      .eq("team_id", teamId)
+      .order("created_at", { ascending: false });
+    return (data ?? []).map((r) => {
+      const config = (r.config ?? {}) as Record<string, unknown>;
+      return {
+        id: r.id,
+        sport: r.sport,
+        createdBy: r.created_by,
+        createdAt: r.created_at,
+        dueDate: r.due_date ?? "",
+        athletes: r.athletes ?? [],
+        kicks: (config.kicks as AssignedChart["kicks"]) ?? [],
+        reps: config.reps as number | undefined,
+        puntTypes: config.puntTypes as AssignedChart["puntTypes"] | undefined,
+        koRows: config.koRows as AssignedChart["koRows"] | undefined,
+        completedBy: (r.completed_by ?? {}) as Record<string, string>,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function saveAssignedCharts(teamId: string, charts: AssignedChart[]): Promise<void> {
-  cacheSet(teamId, ASSIGNED_CHARTS_KEY, charts);
+  cacheSet(teamId, "assigned_charts", charts);
   if (!isRealTeam(teamId)) return;
-  await cloudPut(teamId, ASSIGNED_CHARTS_KEY, charts);
+  const supabase = createClient();
+  // Authoritative array: delete all then re-insert.
+  await supabase.from("assigned_charts").delete().eq("team_id", teamId);
+  for (const c of charts) {
+    await supabase.from("assigned_charts").upsert(
+      {
+        team_id: teamId,
+        id: c.id,
+        sport: c.sport,
+        created_by: c.createdBy,
+        created_at: c.createdAt,
+        due_date: c.dueDate || null,
+        athletes: c.athletes,
+        config: { kicks: c.kicks, reps: c.reps, puntTypes: c.puntTypes, koRows: c.koRows },
+        completed_by: c.completedBy,
+      },
+      { onConflict: "team_id,id" }
+    );
+  }
 }
 
-// ── Scout Archives (stored in team_data) ────────────────────────────────────
+// ── Scout Archives (scout_archives table) ────────────────────────────────────
 
 export interface ScoutArchive {
   id: string;
@@ -770,17 +761,47 @@ export interface ScoutArchive {
   snap: ScoutSession[];
 }
 
-const SCOUT_ARCHIVES_KEY = "scout_archives";
-
 export async function loadScoutArchives(teamId: string): Promise<ScoutArchive[]> {
-  if (!isRealTeam(teamId)) return cacheGet<ScoutArchive[]>(teamId, SCOUT_ARCHIVES_KEY, []);
-  const res = await cloudGet<ScoutArchive[]>(teamId, SCOUT_ARCHIVES_KEY);
-  if (res.ok) return Array.isArray(res.value) ? res.value : [];
-  return [];
+  if (!isRealTeam(teamId)) return cacheGet<ScoutArchive[]>(teamId, "scout_archives", []);
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("scout_archives")
+      .select("*")
+      .eq("team_id", teamId)
+      .order("created_at", { ascending: false });
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      name: r.name,
+      createdAt: r.created_at,
+      fg: (r.fg ?? []) as ScoutSession[],
+      punt: (r.punt ?? []) as ScoutSession[],
+      kickoff: (r.kickoff ?? []) as ScoutSession[],
+      snap: (r.snap ?? []) as ScoutSession[],
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function saveScoutArchives(teamId: string, archives: ScoutArchive[]): Promise<void> {
-  cacheSet(teamId, SCOUT_ARCHIVES_KEY, archives);
+  cacheSet(teamId, "scout_archives", archives);
   if (!isRealTeam(teamId)) return;
-  await cloudPut(teamId, SCOUT_ARCHIVES_KEY, archives);
+  const supabase = createClient();
+  await supabase.from("scout_archives").delete().eq("team_id", teamId);
+  for (const a of archives) {
+    await supabase.from("scout_archives").upsert(
+      {
+        team_id: teamId,
+        id: a.id,
+        name: a.name,
+        created_at: a.createdAt,
+        fg: a.fg,
+        punt: a.punt,
+        kickoff: a.kickoff,
+        snap: a.snap,
+      },
+      { onConflict: "team_id,id" }
+    );
+  }
 }

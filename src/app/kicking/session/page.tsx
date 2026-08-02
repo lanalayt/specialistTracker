@@ -21,7 +21,8 @@ import { genId as genSnapId } from "@/lib/stats";
 import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
-import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft } from "@/lib/draftStore";
 
 const INIT_ROWS = 12;
 
@@ -374,7 +375,7 @@ export default function KickingSessionPage() {
     // Load draft from cloud if local is empty
     const tid = getTeamId();
     if (tid && tid !== "local-dev" && sessionMode) {
-      teamGet<SessionDraft>(tid, `fg_session_draft_${sessionMode}`).then((cloudDraft) => {
+      loadDraft<SessionDraft>(tid, `fg_session_draft_${sessionMode}`).then((cloudDraft) => {
         if (cloudDraft && cloudDraft.rows) {
           const localDraft = loadDraftForMode(sessionMode);
           const localHasData = localDraft?.rows?.some((r) => r.athlete || r.dist || r.pos);
@@ -968,7 +969,7 @@ export default function KickingSessionPage() {
         committedKicks: committed ? committedKicks : undefined,
         sessionMode: sessionMode ?? undefined, opponent, gameTime,
       };
-      teamSet(tid, `fg_session_draft_${sessionMode}`, draft);
+      saveDraft(tid, `fg_session_draft_${sessionMode}`, draft);
       setDraftSaved(true);
       setTimeout(() => setDraftSaved(false), 2000);
     }

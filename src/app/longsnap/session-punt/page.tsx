@@ -10,7 +10,8 @@ import type { LongSnapEntry, SnapAccuracy, SnapBenchmark } from "@/types";
 import clsx from "clsx";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { LongSnapCommitModal } from "@/components/ui/LongSnapCommitModal";
 
 const SNAP_TYPE = "PUNT" as const;
@@ -115,7 +116,7 @@ export default function LongSnapPuntSessionPage() {
     } catch {}
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamGet<{ rows: LogRow[]; weather?: string; snapMarkers?: SnapMarker[] }>(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`).then((d) => {
+      loadDraft<{ rows: LogRow[]; weather?: string; snapMarkers?: SnapMarker[] }>(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`).then((d) => {
         if (d?.rows?.length) { setRows(d.rows); if (d.weather) setWeather(d.weather); }
         if (d?.snapMarkers?.length) setSnapMarkers(d.snapMarkers);
       });
@@ -131,7 +132,7 @@ export default function LongSnapPuntSessionPage() {
   const handleSaveDraft = () => {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamSet(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`, { rows, weather, snapMarkers });
+      saveDraft(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`, { rows, weather, snapMarkers });
     }
     try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers })); } catch {}
     setDraftSaved(true);
@@ -354,7 +355,7 @@ export default function LongSnapPuntSessionPage() {
               </span>
               {!viewOnly && filledRows.length > 0 && (
                 <button
-                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); const tid = getTeamId(); if (tid && tid !== "local-dev") teamSet(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`, null); } catch {} }}
+                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`); } catch {} }}
                   className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
                 >
                   Clear Log

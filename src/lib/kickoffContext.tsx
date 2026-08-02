@@ -5,19 +5,10 @@ import React, {
 } from "react";
 import type { KickoffEntry, KickoffAthleteStats, Session, SessionMode } from "@/types";
 import { emptyKickoffStats, recomputeKickoffStats, genId, sessionLabel } from "@/lib/stats";
-import { localGet, localSet, setCloudUserId, getCloudKey } from "@/lib/amplify";
-import { cloudGet } from "@/lib/supabaseData";
-import { teamGet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
 import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, syncAthleteKeys, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
-
-interface KickoffStateData {
-  athletes: string[];
-  stats: Record<string, KickoffAthleteStats>;
-  snapshot: Session[] | null;
-  history: Session[];
-}
 
 interface KickoffContextValue {
   athletes: StoredAthlete[];
@@ -77,9 +68,6 @@ export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: 
   );
 
   useEffect(() => {
-    const userId = user?.id;
-    if (userId) setCloudUserId(userId);
-
     async function loadData() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) {
@@ -88,54 +76,11 @@ export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: 
       }
 
       if (tid && tid !== "local-dev") {
-        // Sync disabled — athletes page handles both keys on add/remove
         const dbAthletes = await loadAthletes(tid, sportKey);
         if (dbAthletes.length > 0) setAthletes(dbAthletes);
-      }
 
-      if (tid && tid !== "local-dev") {
         const dbSessions = await loadSessions(tid, sportKey);
-        if (dbSessions.length > 0) { setSessions(dbSessions); return; }
-      }
-
-      // Migration
-      let blob: KickoffStateData | null = null;
-      if (tid && tid !== "local-dev") blob = await teamGet<KickoffStateData>(tid, "kickoff_data");
-      if (!blob && userId && userId !== "local-dev") blob = await cloudGet<KickoffStateData>(userId, getCloudKey("KICKOFF"));
-      if (!blob) blob = localGet<KickoffStateData>("KICKOFF");
-      const localBlob = localGet<KickoffStateData>("KICKOFF");
-
-      if (blob || localBlob) {
-        const source = blob ?? localBlob!;
-        const sessionMap = new Map<string, Session>();
-        for (const s of (localBlob?.history ?? [])) sessionMap.set(s.id, s);
-        for (const s of (blob?.history ?? [])) {
-          const ex = sessionMap.get(s.id);
-          if (!ex || (Array.isArray(s.entries) ? s.entries.length : 0) >= (Array.isArray(ex.entries) ? ex.entries.length : 0))
-            sessionMap.set(s.id, s);
-        }
-        const allSessions = Array.from(sessionMap.values()).sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-
-        const athleteNames = source.athletes ?? [];
-        if (tid && tid !== "local-dev" && athleteNames.length > 0) {
-          const existing = await loadAthletes(tid, sportKey);
-          const existingNames = new Set(existing.map((a) => a.name));
-          const inserted: StoredAthlete[] = [...existing];
-          for (const name of athleteNames.filter((n) => !existingNames.has(n))) {
-            const result = await insertAthlete(tid, sportKey, name);
-            if (result) inserted.push(result);
-          }
-          setAthletes(inserted);
-        }
-
-        if (tid && tid !== "local-dev" && allSessions.length > 0) {
-          for (const s of allSessions) await insertSession(tid, { ...s, sport: sportKey as Session["sport"], teamId: tid });
-          setSessions(await loadSessions(tid, sportKey));
-        } else {
-          setSessions(allSessions);
-        }
+        if (dbSessions.length > 0) setSessions(dbSessions);
       }
     }
 

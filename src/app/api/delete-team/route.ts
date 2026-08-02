@@ -68,9 +68,7 @@ export async function POST() {
       ["athletes", "team_id", teamId],
       ["archives", "team_id", teamId],
       ["members", "team_id", teamId],
-      ["team_data", "team_id", teamId],
       ["teams", "id", teamId],
-      ["user_data", "user_id", teamId],
     ];
 
     for (const [table, column, value] of tables) {
@@ -82,7 +80,6 @@ export async function POST() {
 
     // 4. Delete athlete/coach auth accounts
     for (const memberId of memberIds) {
-      await admin.from("user_data").delete().eq("user_id", memberId);
       const { error } = await admin.auth.admin.deleteUser(memberId);
       if (error) {
         console.error(`[delete-team] Failed to delete auth user ${memberId}:`, error);

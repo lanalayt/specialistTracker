@@ -17,7 +17,8 @@ import { loadSettingsFromCloud } from "@/lib/settingsSync";
 import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
-import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft } from "@/lib/draftStore";
 import { loadAthletes as loadAthleteList, type StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
@@ -465,7 +466,7 @@ export default function PuntingSessionPage() {
     // Load draft from cloud if local is empty
     const tid = getTeamId();
     if (tid && tid !== "local-dev" && sessionMode) {
-      teamGet<SessionDraft>(tid, `punt_session_draft_${sessionMode}`).then((cloudDraft) => {
+      loadDraft<SessionDraft>(tid, `punt_session_draft_${sessionMode}`).then((cloudDraft) => {
         if (cloudDraft && cloudDraft.rows) {
           const localDraft = loadDraftForMode(sessionMode);
           const localHasData = localDraft?.rows?.some((r) => r.athlete || r.yards || r.type);
@@ -1157,7 +1158,7 @@ export default function PuntingSessionPage() {
     };
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
-      teamSet(tid, `punt_session_draft_${sessionMode}`, draft);
+      saveDraft(tid, `punt_session_draft_${sessionMode}`, draft);
       setDraftSaved(true);
       setTimeout(() => setDraftSaved(false), 2000);
     }

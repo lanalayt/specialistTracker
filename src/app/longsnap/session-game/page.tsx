@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { makePct, getSnapBenchmark } from "@/lib/stats";
 import type { LongSnapEntry, SnapAccuracy, SnapType } from "@/types";
 import clsx from "clsx";
-import { teamSet, teamGet, getTeamId } from "@/lib/teamData";
+import { getTeamId } from "@/lib/teamData";
 
 const INIT_ROWS = 12;
 

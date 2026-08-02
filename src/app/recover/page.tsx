@@ -139,51 +139,7 @@ function RecoverContent() {
       } catch {}
     }
 
-    // 3. Check team_data table (old blobs)
-    if (tid && tid !== "local-dev") {
-      for (const s of sports) {
-        try {
-          const { data } = await supabase
-            .from("team_data")
-            .select("data, updated_at")
-            .eq("team_id", tid)
-            .eq("data_key", s.key)
-            .single();
-          if (data?.data) {
-            all.push({
-              source: `team_data (team: ${tid.slice(0, 8)}..., key: ${s.key})`,
-              dataKey: s.key,
-              sessions: extractSessions(data.data, s.label),
-              raw: data.data,
-            });
-          }
-        } catch {}
-      }
-    }
-
-    // 4. Check user_data table (personal backup)
-    if (user && user.id !== "local-dev") {
-      for (const s of sports) {
-        try {
-          const { data } = await supabase
-            .from("user_data")
-            .select("data, updated_at")
-            .eq("user_id", user.id)
-            .eq("data_key", s.key)
-            .single();
-          if (data?.data) {
-            all.push({
-              source: `user_data (user: ${user.id.slice(0, 8)}..., key: ${s.key})`,
-              dataKey: s.key,
-              sessions: extractSessions(data.data, s.label),
-              raw: data.data,
-            });
-          }
-        } catch {}
-      }
-    }
-
-    // 5. Check archives table
+    // 3. Check archives table
     if (tid && tid !== "local-dev") {
       try {
         const { data } = await supabase
@@ -219,7 +175,7 @@ function RecoverContent() {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-100">Data Recovery Scanner</h1>
           <p className="text-sm text-muted mt-1">
-            Scanning all data sources for sessions — sessions table, localStorage, team_data blobs, and archives.
+            Scanning all data sources for sessions — sessions table, localStorage, and archives.
           </p>
         </div>
 
