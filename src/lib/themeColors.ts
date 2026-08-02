@@ -6,18 +6,10 @@
 import { getTeamId } from "@/lib/teamData";
 import { updateTeamSettings, stampTeamSettingsWrite, getCachedTeamSettings } from "@/lib/teamSettingsStore";
 import { createClient } from "@/lib/supabase";
+import { themeVarMap, themeCssText, DEFAULT_THEME, type ThemeColors } from "@/lib/themeCss";
 
-export interface ThemeColors {
-  primary: string;    // accent — buttons, active states
-  secondary: string;  // background base
-  tertiary: string;   // border / highlight accent
-}
-
-export const DEFAULT_THEME: ThemeColors = {
-  primary: "#00d4a0",
-  secondary: "#0a0f14",
-  tertiary: "#1f2f42",
-};
+export { themeVarMap, themeCssText, DEFAULT_THEME };
+export type { ThemeColors };
 
 // Real football school color combos (primary, background, borders)
 export const PRESETS: { name: string; colors: ThemeColors }[] = [
@@ -55,33 +47,23 @@ export const PRESETS: { name: string; colors: ThemeColors }[] = [
   { name: "Purple, White & Magenta", colors: { primary: "#ffffff", secondary: "#1a0a2e", tertiary: "#d6249f" } },
 ];
 
-function parseHex(hex: string): [number, number, number] {
-  const h = hex.startsWith("#") ? hex.slice(1) : hex;
-  return [
-    parseInt(h.slice(0, 2), 16) || 0,
-    parseInt(h.slice(2, 4), 16) || 0,
-    parseInt(h.slice(4, 6), 16) || 0,
-  ];
-}
-
-function lighten(hex: string, amount: number): string {
-  const [r, g, b] = parseHex(hex);
-  const lr = Math.min(255, r + Math.round((255 - r) * amount));
-  const lg = Math.min(255, g + Math.round((255 - g) * amount));
-  const lb = Math.min(255, b + Math.round((255 - b) * amount));
-  return `#${lr.toString(16).padStart(2, "0")}${lg.toString(16).padStart(2, "0")}${lb.toString(16).padStart(2, "0")}`;
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const [r, g, b] = parseHex(hex);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 // ── In-memory caches (source of truth is the DB) ────────────────────────────
 // The active theme and the per-team saved themes are held in memory so
 // synchronous readers (initial renders, field views) can access them without
 // localStorage. Populated from the `teams` / `custom_themes` tables.
-let _themeCache: ThemeColors = DEFAULT_THEME;
+// Theme injected into the initial HTML by the server (see src/lib/serverTheme.ts
+// + app/layout.tsx). Read synchronously on the client so the first render uses
+// the correct team colors with no flash — this is server-rendered HTML, not
+// client storage. Falls back to the default when logged out / not injected.
+function getInitialTheme(): ThemeColors {
+  if (typeof window !== "undefined") {
+    const injected = (window as unknown as { __ST_THEME__?: ThemeColors }).__ST_THEME__;
+    if (injected?.primary && injected?.secondary && injected?.tertiary) return injected;
+  }
+  return DEFAULT_THEME;
+}
+
+let _themeCache: ThemeColors = getInitialTheme();
 let _customThemesCache: SavedTheme[] = [];
 
 /** Synchronous read of the currently-applied theme colors. */
@@ -149,22 +131,12 @@ export async function loadCustomThemesFromCloud(): Promise<SavedTheme[]> {
   return loadCustomThemes();
 }
 
-/** Derive all CSS variables from the 3 user-chosen colors */
 export function applyTheme(colors: ThemeColors): void {
   _themeCache = colors;
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.style.setProperty("--accent", colors.primary);
-  root.style.setProperty("--accent-dim", hexToRgba(colors.primary, 0.15));
-  root.style.setProperty("--make", "#00d4a0");
-  root.style.setProperty("--bg", colors.secondary);
-  root.style.setProperty("--surface", lighten(colors.secondary, 0.06));
-  root.style.setProperty("--surface-2", lighten(colors.secondary, 0.10));
-  root.style.setProperty("--border", colors.tertiary);
-  root.style.setProperty("--muted", lighten(colors.secondary, 0.45));
-  root.style.setProperty("--miss", "#ef4444");
-  root.style.setProperty("--warn", "#f59e0b");
-  root.style.setProperty("--text", "#ffffff");
+  const vars = themeVarMap(colors);
+  for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
 }
 
 /** Apply the last-known theme (from the teams-table cache) immediately. The
@@ -173,7 +145,7 @@ export function loadAndApplyTheme(): ThemeColors {
   const s = getCachedTeamSettings();
   const theme: ThemeColors = s
     ? { primary: s.colorPrimary, secondary: s.colorSecondary, tertiary: s.colorTertiary }
-    : _themeCache;
+    : getInitialTheme();
   applyTheme(theme);
   return theme;
 }
