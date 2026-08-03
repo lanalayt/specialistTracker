@@ -8,19 +8,8 @@ import { createClient } from "@/lib/supabase";
  * scout_archives, scout_presets). Scout sessions use the existing `sessions`
  * table with SCOUT_* sport values to stay isolated from coach mode.
  *
- * Phase 5: an account is always required, so scout data is DB-only. The old
- * local/dev localStorage cache is retired — these helpers are inert no-ops kept
- * only so the (now-unreachable) local-dev branches still compile.
+ * Phase 5: an account is always required, so scout data is DB-only.
  */
-function isRealTeam(teamId: string): boolean {
-  return !!teamId && teamId !== "local-dev";
-}
-
-function cacheGet<T>(_teamId: string, _key: string, fallback: T): T {
-  return fallback;
-}
-
-function cacheSet(_teamId: string, _key: string, _value: unknown): void {}
 
 // ── Scout Sessions ──────────────────────────────────────────────────────────
 
@@ -248,10 +237,7 @@ export interface ScoutProfile {
   notes?: string;
 }
 
-const SCOUT_PROFILES_KEY = "scout_profiles";
-
 export async function loadScoutProfiles(teamId: string): Promise<Record<string, ScoutProfile>> {
-  if (!isRealTeam(teamId)) return cacheGet(teamId, SCOUT_PROFILES_KEY, {});
   try {
     const supabase = createClient();
     const { data } = await supabase
@@ -266,8 +252,6 @@ export async function loadScoutProfiles(teamId: string): Promise<Record<string, 
 
 /** Merge the given profiles into the table (adds/updates only — never removes). */
 export async function saveScoutProfiles(teamId: string, profiles: Record<string, ScoutProfile>): Promise<void> {
-  cacheSet(teamId, SCOUT_PROFILES_KEY, profiles);
-  if (!isRealTeam(teamId)) return;
   const supabase = createClient();
   for (const [name, profile] of Object.entries(profiles)) {
     await supabase.from("scout_profiles").upsert(
@@ -278,12 +262,6 @@ export async function saveScoutProfiles(teamId: string, profiles: Record<string,
 }
 
 export async function deleteScoutProfile(teamId: string, name: string): Promise<void> {
-  if (!isRealTeam(teamId)) {
-    const map = cacheGet<Record<string, ScoutProfile>>(teamId, SCOUT_PROFILES_KEY, {});
-    delete map[name];
-    cacheSet(teamId, SCOUT_PROFILES_KEY, map);
-    return;
-  }
   const supabase = createClient();
   await supabase.from("scout_profiles").delete().eq("team_id", teamId).eq("name", name);
 }
@@ -291,7 +269,6 @@ export async function deleteScoutProfile(teamId: string, name: string): Promise<
 // ── Presets (scout_presets table) ────────────────────────────────────────────
 
 export async function loadScoutPreset<T>(teamId: string, key: string): Promise<T | null> {
-  if (!isRealTeam(teamId)) return cacheGet<T | null>(teamId, key, null);
   try {
     const supabase = createClient();
     const { data } = await supabase
@@ -303,13 +280,11 @@ export async function loadScoutPreset<T>(teamId: string, key: string): Promise<T
     if (data?.data) return data.data as T;
     return null;
   } catch {
-    return cacheGet<T | null>(teamId, key, null);
+    return null;
   }
 }
 
 export async function saveScoutPreset<T>(teamId: string, key: string, value: T): Promise<void> {
-  cacheSet(teamId, key, value);
-  if (!isRealTeam(teamId)) return;
   try {
     const supabase = createClient();
     await supabase.from("scout_presets").upsert(
@@ -327,8 +302,6 @@ export async function saveScoutPreset<T>(teamId: string, key: string, value: T):
 // ── Scout Athletes (scout_athletes table, per-sport) ─────────────────────────
 
 export async function loadScoutAthletes(teamId: string, sport: string): Promise<string[]> {
-  const key = `scout_athletes_${sport}`;
-  if (!isRealTeam(teamId)) return cacheGet<string[]>(teamId, key, []);
   try {
     const supabase = createClient();
     const { data } = await supabase
@@ -345,9 +318,6 @@ export async function loadScoutAthletes(teamId: string, sport: string): Promise<
 
 /** Add athletes to a sport list, merging with the current copy (never drops names). */
 export async function saveScoutAthletes(teamId: string, sport: string, names: string[]): Promise<void> {
-  const key = `scout_athletes_${sport}`;
-  cacheSet(teamId, key, names);
-  if (!isRealTeam(teamId)) return;
   const supabase = createClient();
   const existing = await loadScoutAthletes(teamId, sport);
   const merged = Array.from(new Set([...existing, ...names]));
@@ -361,11 +331,6 @@ export async function saveScoutAthletes(teamId: string, sport: string, names: st
 
 /** Remove one athlete from a sport list. */
 export async function removeScoutAthlete(teamId: string, sport: string, name: string): Promise<void> {
-  const key = `scout_athletes_${sport}`;
-  if (!isRealTeam(teamId)) {
-    cacheSet(teamId, key, cacheGet<string[]>(teamId, key, []).filter((n) => n !== name));
-    return;
-  }
   const supabase = createClient();
   await supabase.from("scout_athletes").delete().eq("team_id", teamId).eq("sport", sport).eq("name", name);
 }
@@ -374,10 +339,7 @@ export async function removeScoutAthlete(teamId: string, sport: string, name: st
 // Jersey numbers are shared across ALL disciplines (one team-wide map). The
 // `sport` argument is accepted for backwards compatibility but ignored.
 
-const SCOUT_NUMBERS_KEY = "scout_numbers";
-
 export async function loadScoutNumbers(teamId: string, _sport: string): Promise<Record<string, string>> {
-  if (!isRealTeam(teamId)) return cacheGet<Record<string, string>>(teamId, SCOUT_NUMBERS_KEY, {});
   try {
     const supabase = createClient();
     const { data } = await supabase
@@ -395,8 +357,6 @@ export async function loadScoutNumbers(teamId: string, _sport: string): Promise<
  * absent from `numbers` is cleared. Applies across every discipline.
  */
 export async function saveScoutNumbers(teamId: string, _sport: string, numbers: Record<string, string>): Promise<void> {
-  cacheSet(teamId, SCOUT_NUMBERS_KEY, numbers);
-  if (!isRealTeam(teamId)) return;
   const supabase = createClient();
   const existing = await loadScoutNumbers(teamId, _sport);
   for (const name of Object.keys(existing)) {
@@ -456,7 +416,6 @@ const DEFAULT_RANKING: ScoutRanking = { id: "overall", name: "Overall" };
  */
 export const ALL_RANKING_ID = "__all__";
 export const ALL_RANKING: ScoutRanking = { id: ALL_RANKING_ID, name: "Overall" };
-const SESSION_RANKINGS_KEY = "scout_session_rankings";
 
 export function newRankingId(): string {
   return `r-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -466,10 +425,7 @@ function ensureOverall(list: ScoutRanking[]): ScoutRanking[] {
   return list.some((r) => r.id === "overall") ? list : [DEFAULT_RANKING, ...list];
 }
 
-const SHARED_RANKINGS_KEY = "scout_rankings_shared";
-
 export async function loadScoutRankings(teamId: string, _sport?: string): Promise<ScoutRanking[]> {
-  if (!isRealTeam(teamId)) return ensureOverall(cacheGet<ScoutRanking[]>(teamId, SHARED_RANKINGS_KEY, []));
   try {
     const supabase = createClient();
     const { data } = await supabase
@@ -484,8 +440,6 @@ export async function loadScoutRankings(teamId: string, _sport?: string): Promis
 }
 
 export async function saveScoutRankings(teamId: string, _sport: string, rankings: ScoutRanking[]): Promise<void> {
-  cacheSet(teamId, SHARED_RANKINGS_KEY, rankings);
-  if (!isRealTeam(teamId)) return;
   const supabase = createClient();
   // Authoritative ordered list: delete all then re-insert.
   await supabase.from("scout_ranking_groups").delete().eq("team_id", teamId);
@@ -516,7 +470,6 @@ async function deleteSessionRankingKey(teamId: string, lookupKey: string): Promi
 
 /** Map of lookup_key -> ranking ids it belongs to (team-wide). Missing = ["overall"]. */
 export async function loadSessionRankings(teamId: string): Promise<Record<string, string[]>> {
-  if (!isRealTeam(teamId)) return cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
   try {
     const supabase = createClient();
     const { data } = await supabase
@@ -530,12 +483,6 @@ export async function loadSessionRankings(teamId: string): Promise<Record<string
 }
 
 export async function setSessionRankings(teamId: string, sessionId: string, rankingIds: string[]): Promise<void> {
-  if (!isRealTeam(teamId)) {
-    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
-    m[sessionId] = rankingIds;
-    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-    return;
-  }
   await upsertSessionRanking(teamId, sessionId, rankingIds);
 }
 
@@ -546,13 +493,6 @@ export async function setSessionRankings(teamId: string, sessionId: string, rank
  */
 export async function removeEntryFromRanking(teamId: string, sessionId: string, athlete: string, rankingId: string): Promise<void> {
   const pairKey = `${sessionId}|||${athlete}`;
-  if (!isRealTeam(teamId)) {
-    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
-    const cur = m[pairKey] ?? m[sessionId] ?? ["overall"];
-    m[pairKey] = cur.filter((r) => r !== rankingId);
-    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-    return;
-  }
   const all = await loadSessionRankings(teamId);
   const cur = all[pairKey] ?? all[sessionId] ?? ["overall"];
   await upsertSessionRanking(teamId, pairKey, cur.filter((r) => r !== rankingId));
@@ -565,12 +505,6 @@ export async function removeEntryFromRanking(teamId: string, sessionId: string, 
 export async function setEntryRankings(teamId: string, sessionId: string, athlete: string, rankingIds: string[]): Promise<void> {
   const pairKey = `${sessionId}|||${athlete}`;
   const ids = rankingIds.length > 0 ? rankingIds : ["overall"];
-  if (!isRealTeam(teamId)) {
-    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
-    m[pairKey] = ids;
-    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-    return;
-  }
   await upsertSessionRanking(teamId, pairKey, ids);
 }
 
@@ -582,12 +516,6 @@ export async function migrateEntryRanking(teamId: string, sessionId: string, old
   if (oldAthlete === newAthlete) return;
   const oldKey = `${sessionId}|||${oldAthlete}`;
   const newKey = `${sessionId}|||${newAthlete}`;
-  if (!isRealTeam(teamId)) {
-    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
-    if (m[oldKey] !== undefined) { m[newKey] = m[oldKey]; delete m[oldKey]; }
-    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-    return;
-  }
   const all = await loadSessionRankings(teamId);
   if (all[oldKey] !== undefined) {
     await upsertSessionRanking(teamId, newKey, all[oldKey]);
@@ -597,12 +525,6 @@ export async function migrateEntryRanking(teamId: string, sessionId: string, old
 
 /** Remove a session from one ranking only (un-assign). Other rankings keep it. */
 export async function removeSessionFromRanking(teamId: string, sessionId: string, rankingId: string): Promise<void> {
-  if (!isRealTeam(teamId)) {
-    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
-    m[sessionId] = (m[sessionId] ?? ["overall"]).filter((r) => r !== rankingId);
-    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-    return;
-  }
   const all = await loadSessionRankings(teamId);
   const cur = all[sessionId] ?? ["overall"];
   await upsertSessionRanking(teamId, sessionId, cur.filter((r) => r !== rankingId));
@@ -614,15 +536,6 @@ export async function deleteScoutRanking(teamId: string, sport: string, rankingI
   const rankings = await loadScoutRankings(teamId, sport);
   await saveScoutRankings(teamId, sport, rankings.filter((r) => r.id !== rankingId));
 
-  if (!isRealTeam(teamId)) {
-    const m = cacheGet<Record<string, string[]>>(teamId, SESSION_RANKINGS_KEY, {});
-    for (const k of Object.keys(m)) {
-      const next = (m[k] ?? []).filter((r) => r !== rankingId);
-      m[k] = next.length > 0 ? next : ["overall"];
-    }
-    cacheSet(teamId, SESSION_RANKINGS_KEY, m);
-    return;
-  }
   // Reassign every session-ranking row that referenced this group.
   const supabase = createClient();
   const { data } = await supabase
@@ -668,7 +581,6 @@ export interface AssignedChart {
 }
 
 export async function loadAssignedCharts(teamId: string): Promise<AssignedChart[]> {
-  if (!isRealTeam(teamId)) return cacheGet<AssignedChart[]>(teamId, "assigned_charts", []);
   try {
     const supabase = createClient();
     const { data } = await supabase
@@ -698,8 +610,6 @@ export async function loadAssignedCharts(teamId: string): Promise<AssignedChart[
 }
 
 export async function saveAssignedCharts(teamId: string, charts: AssignedChart[]): Promise<void> {
-  cacheSet(teamId, "assigned_charts", charts);
-  if (!isRealTeam(teamId)) return;
   const supabase = createClient();
   // Authoritative array: delete all then re-insert.
   await supabase.from("assigned_charts").delete().eq("team_id", teamId);
@@ -734,7 +644,6 @@ export interface ScoutArchive {
 }
 
 export async function loadScoutArchives(teamId: string): Promise<ScoutArchive[]> {
-  if (!isRealTeam(teamId)) return cacheGet<ScoutArchive[]>(teamId, "scout_archives", []);
   try {
     const supabase = createClient();
     const { data } = await supabase
@@ -757,8 +666,6 @@ export async function loadScoutArchives(teamId: string): Promise<ScoutArchive[]>
 }
 
 export async function saveScoutArchives(teamId: string, archives: ScoutArchive[]): Promise<void> {
-  cacheSet(teamId, "scout_archives", archives);
-  if (!isRealTeam(teamId)) return;
   const supabase = createClient();
   await supabase.from("scout_archives").delete().eq("team_id", teamId);
   for (const a of archives) {

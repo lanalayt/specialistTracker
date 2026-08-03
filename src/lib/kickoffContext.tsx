@@ -7,7 +7,7 @@ import type { KickoffEntry, KickoffAthleteStats, Session, SessionMode } from "@/
 import { emptyKickoffStats, recomputeKickoffStats, genId, sessionLabel } from "@/lib/stats";
 import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
-import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, syncAthleteKeys, type StoredAthlete } from "@/lib/athleteStore";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settingsSync";
 
