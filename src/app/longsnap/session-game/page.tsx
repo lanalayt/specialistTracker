@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
@@ -9,6 +9,7 @@ import { makePct, getSnapBenchmark } from "@/lib/stats";
 import type { LongSnapEntry, SnapAccuracy, SnapType } from "@/types";
 import clsx from "clsx";
 import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 
 const INIT_ROWS = 12;
@@ -50,40 +51,50 @@ export default function LongSnapGameSessionPage() {
     loadSettingsFromCloud<{ chartMode?: string; missMode?: string }>("snapSettings").then(apply);
   }, []);
 
-  // Draft keys
-  const draftKey = (type: "punt" | "fg") => {
-    const tid = getTeamId();
-    return tid ? `longsnap_game_draft_${type}_${tid}` : `longsnap_game_draft_${type}`;
-  };
+  // Draft keys (session_drafts, DB — not localStorage)
+  const PUNT_KEY = "longsnap_game_draft_punt";
+  const FG_KEY = "longsnap_game_draft_fg";
+  const META_KEY = "longsnap_game_meta";
 
-  // Load drafts (from snap overlay saves + local)
+  // Load drafts. Hydrate first so the empty initial state can't clobber them.
+  const draftHydrated = useRef(false);
   useEffect(() => {
-    // Punt draft
-    try {
-      const raw = localStorage.getItem(draftKey("punt"));
-      if (raw) { const d = JSON.parse(raw); if (d.rows?.length) setPuntRows(d.rows); if (d.snapMarkers?.length) setPuntMarkers(d.snapMarkers); }
-    } catch {}
-    // FG draft
-    try {
-      const raw = localStorage.getItem(draftKey("fg"));
-      if (raw) { const d = JSON.parse(raw); if (d.rows?.length) setFGRows(d.rows); if (d.snapMarkers?.length) setFGMarkers(d.snapMarkers); }
-    } catch {}
-    // Load opponent/weather
-    try {
-      const raw = localStorage.getItem("longsnap_game_meta");
-      if (raw) { const d = JSON.parse(raw); if (d.opponent) setOpponent(d.opponent); if (d.gameTime) setGameTime(d.gameTime); if (d.weather) setWeather(d.weather); }
-    } catch {}
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (tid && tid !== "local-dev") {
+        const [pd, fd, meta] = await Promise.all([
+          loadDraft<{ rows?: PuntLogRow[]; snapMarkers?: SnapMarker[] }>(tid, PUNT_KEY),
+          loadDraft<{ rows?: FGLogRow[]; snapMarkers?: ShortSnapMarker[] }>(tid, FG_KEY),
+          loadDraft<{ opponent?: string; gameTime?: string; weather?: string }>(tid, META_KEY),
+        ]);
+        if (pd?.rows?.length) setPuntRows(pd.rows);
+        if (pd?.snapMarkers?.length) setPuntMarkers(pd.snapMarkers);
+        if (fd?.rows?.length) setFGRows(fd.rows);
+        if (fd?.snapMarkers?.length) setFGMarkers(fd.snapMarkers);
+        if (meta?.opponent) setOpponent(meta.opponent);
+        if (meta?.gameTime) setGameTime(meta.gameTime);
+        if (meta?.weather) setWeather(meta.weather);
+      }
+      draftHydrated.current = true;
+    })();
   }, []);
 
-  // Auto-save
+  // Auto-save (debounced) once hydrated.
   useEffect(() => {
-    try { localStorage.setItem(draftKey("punt"), JSON.stringify({ rows: puntRows, snapMarkers: puntMarkers })); } catch {}
+    if (!draftHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, PUNT_KEY, { rows: puntRows, snapMarkers: puntMarkers });
   }, [puntRows, puntMarkers]);
   useEffect(() => {
-    try { localStorage.setItem(draftKey("fg"), JSON.stringify({ rows: fgRows, snapMarkers: fgMarkers })); } catch {}
+    if (!draftHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, FG_KEY, { rows: fgRows, snapMarkers: fgMarkers });
   }, [fgRows, fgMarkers]);
   useEffect(() => {
-    try { localStorage.setItem("longsnap_game_meta", JSON.stringify({ opponent, gameTime, weather })); } catch {}
+    if (!draftHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, META_KEY, { opponent, gameTime, weather });
   }, [opponent, gameTime, weather]);
 
   const formatAutoDecimal = (raw: string): string => {
@@ -168,7 +179,7 @@ export default function LongSnapGameSessionPage() {
     setPuntMarkers([]); setFGMarkers([]);
     setOpponent(""); setGameTime(""); setWeather("");
     setCommitted(false);
-    try { localStorage.removeItem(draftKey("punt")); localStorage.removeItem(draftKey("fg")); localStorage.removeItem("longsnap_game_meta"); } catch {}
+    { const tid = getTeamId(); if (tid && tid !== "local-dev") { clearDraft(tid, PUNT_KEY); clearDraft(tid, FG_KEY); clearDraft(tid, META_KEY); } }
   };
 
   if (committed) {

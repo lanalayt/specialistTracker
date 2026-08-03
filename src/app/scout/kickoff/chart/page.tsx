@@ -106,7 +106,7 @@ function ScoutKOChartInner() {
     return () => { active = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Mirror in-progress charting to sessionStorage so a refresh can restore it.
+  // Mirror in-progress charting to session_drafts (DB) so a refresh can restore it.
   useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, kicksPerPlayer, chartDate, weather, athleteNotes, results, activePlayer }, phase !== "setup" && !saved);
 
   const togglePlayer = (name: string) => {

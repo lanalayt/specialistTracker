@@ -281,7 +281,7 @@ function ScoutFGChartInner() {
   const [weather, setWeather] = useState("");
   const [chartDate, setChartDate] = useState(todayDateInput());
 
-  // Mirror in-progress charting to sessionStorage so a refresh can restore it.
+  // Mirror in-progress charting to session_drafts (DB) so a refresh can restore it.
   useChartDraft(DRAFT_KEY, { teamId: getTeamId(), phase, selectedPlayers, presetKicks, manualKicks, athleteKicks, resultMap, athleteNotes, weather, chartDate }, (phase === "live" || phase === "results") && !saved);
 
   const handleNewChart = () => {

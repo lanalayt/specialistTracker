@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { StatCard } from "@/components/ui/StatCard";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { useLongSnap } from "@/lib/longSnapContext";
@@ -88,44 +88,35 @@ export default function LongSnapPuntSessionPage() {
   const sessionAvgTime = sessionTimes.length > 0 ? (sessionTimes.reduce((s, r) => s + parseFloat(r.time), 0) / sessionTimes.length).toFixed(2) : "—";
   const sessionPct = makePct(filledForStats.length, sessionOnTarget);
 
-  const draftKey = () => {
-    const tid = getTeamId();
-    return tid ? `longsnap_manual_draft_${DRAFT_SUFFIX}_${tid}` : `longsnap_manual_draft_${DRAFT_SUFFIX}`;
-  };
+  const CLOUD_DRAFT_KEY = `longsnap_manual_draft_${DRAFT_SUFFIX}`;
 
-  // Load draft
+  // Draft persistence in session_drafts (DB), not localStorage. Hydrate first so
+  // the empty initial state can't clobber a saved draft.
+  const draftHydrated = useRef(false);
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(draftKey());
-      if (raw) {
-        const draft = JSON.parse(raw);
-        if (draft.rows?.length) { setRows(draft.rows); if (draft.weather) setWeather(draft.weather); }
-        if (draft.snapMarkers?.length) setSnapMarkers(draft.snapMarkers);
-        if (draft.committed) setCommitted(true);
-        if (draft.rows?.length || draft.snapMarkers?.length) return;
-      }
-    } catch {}
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
-      loadDraft<{ rows: LogRow[]; weather?: string; snapMarkers?: SnapMarker[] }>(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`).then((d) => {
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (tid && tid !== "local-dev") {
+        const d = await loadDraft<{ rows?: LogRow[]; weather?: string; snapMarkers?: SnapMarker[]; committed?: boolean }>(tid, CLOUD_DRAFT_KEY);
         if (d?.rows?.length) { setRows(d.rows); if (d.weather) setWeather(d.weather); }
         if (d?.snapMarkers?.length) setSnapMarkers(d.snapMarkers);
-      });
-    }
+        if (d?.committed) setCommitted(true);
+      }
+      draftHydrated.current = true;
+    })();
   }, []);
 
-  // Auto-save draft locally
   useEffect(() => {
-    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers })); } catch {}
-  }, [rows, weather, snapMarkers]);
+    if (!draftHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, CLOUD_DRAFT_KEY, { rows, weather, snapMarkers, committed });
+  }, [rows, weather, snapMarkers, committed]);
 
   const [draftSaved, setDraftSaved] = useState(false);
   const handleSaveDraft = () => {
     const tid = getTeamId();
-    if (tid && tid !== "local-dev") {
-      saveDraft(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`, { rows, weather, snapMarkers });
-    }
-    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers })); } catch {}
+    if (tid && tid !== "local-dev") saveDraft(tid, CLOUD_DRAFT_KEY, { rows, weather, snapMarkers, committed });
     setDraftSaved(true);
     setTimeout(() => setDraftSaved(false), 2000);
   };
@@ -223,9 +214,7 @@ export default function LongSnapPuntSessionPage() {
 
     commitPractice(snaps, undefined, weather);
     setShowCommit(false);
-    setCommitted(true);
-    // Keep data in draft but mark as committed
-    try { localStorage.setItem(draftKey(), JSON.stringify({ rows, weather, snapMarkers, committed: true })); } catch {}
+    setCommitted(true); // auto-save effect persists committed=true to the DB draft
   };
 
   const handleNewSession = () => {
@@ -233,7 +222,7 @@ export default function LongSnapPuntSessionPage() {
     setSnapMarkers([]);
     setWeather("");
     setCommitted(false);
-    try { localStorage.removeItem(draftKey()); } catch {}
+    { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, CLOUD_DRAFT_KEY); }
   };
 
   return (
@@ -346,7 +335,7 @@ export default function LongSnapPuntSessionPage() {
               </span>
               {!viewOnly && filledRows.length > 0 && (
                 <button
-                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); try { localStorage.removeItem(draftKey()); const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, `longsnap_manual_draft_${DRAFT_SUFFIX}`); } catch {} }}
+                  onClick={() => { setRows(Array.from({ length: INIT_ROWS }, emptyRow)); setSnapMarkers([]); const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, CLOUD_DRAFT_KEY); }}
                   className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-miss hover:border-miss/50 font-semibold transition-all"
                 >
                   Clear Log

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useFG } from "@/lib/fgContext";
@@ -22,7 +22,7 @@ import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
-import { loadDraft, saveDraft } from "@/lib/draftStore";
+import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftStore";
 
 const INIT_ROWS = 12;
 
@@ -42,7 +42,6 @@ function checkFGOutliers(dist: number): string[] {
   return warnings;
 }
 const MAX_SCORE = 4;
-const SESSION_STORAGE_KEY = "fgSessionDraft";
 
 // ── Table row (planning phase) ────────────────────────────────
 interface LogRow {
@@ -81,23 +80,21 @@ interface SessionDraft {
 
 const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", result: "", score: "", opTime: "", starred: false });
 
-function draftKey(mode: "practice" | "game"): string {
-  const tid = getTeamId();
-  return tid ? `${SESSION_STORAGE_KEY}_${mode}_${tid}` : `${SESSION_STORAGE_KEY}_${mode}`;
+// Session drafts live in the session_drafts table (via draftStore), not
+// localStorage. Reads are synchronous off the in-memory cache (populated by the
+// mount-time load below); writes go to the DB (debounced) + cache.
+function cloudDraftKey(mode: "practice" | "game"): string {
+  return `fg_session_draft_${mode}`;
 }
 
 function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(draftKey(mode));
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return null;
+  const tid = getTeamId();
+  return tid ? getCachedDraft<SessionDraft>(tid, cloudDraftKey(mode)) : null;
 }
 
 function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(draftKey(mode), JSON.stringify(draft));
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") saveDraft(tid, cloudDraftKey(mode), draft);
 }
 
 // Remembers the practice Live/Manual choice independent of session data, so it
@@ -267,19 +264,31 @@ export default function KickingSessionPage() {
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [snapKickIdx, setSnapKickIdx] = useState(0);
-  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>(() => {
-    try { const raw = localStorage.getItem("fg_snap_draft"); if (raw) return JSON.parse(raw); } catch {}
-    return {};
-  });
+  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
   const [holderEnabled, setHolderEnabled] = useState(true);
-  // Persist snap logs to localStorage
+  // Snap logs draft in session_drafts (DB), not localStorage. Hydrate first so
+  // the empty initial state can't clobber a saved draft.
+  const snapDraftHydrated = useRef(false);
+  const mainDraftHydrated = useRef(false);
   useEffect(() => {
-    try {
-      if (Object.keys(snapLogsMap).length > 0) localStorage.setItem("fg_snap_draft", JSON.stringify(snapLogsMap));
-      else localStorage.removeItem("fg_snap_draft");
-    } catch {}
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (tid && tid !== "local-dev") {
+        const d = await loadDraft<Record<string, SnapLogEntry[]>>(tid, "fg_snap_draft");
+        if (d && Object.keys(d).length > 0) setSnapLogsMap(d);
+      }
+      snapDraftHydrated.current = true;
+    })();
+  }, []);
+  useEffect(() => {
+    if (!snapDraftHydrated.current) return;
+    const tid = getTeamId();
+    if (!tid || tid === "local-dev") return;
+    if (Object.keys(snapLogsMap).length > 0) saveDraft(tid, "fg_snap_draft", snapLogsMap);
+    else clearDraft(tid, "fg_snap_draft");
   }, [snapLogsMap]);
 
   const [showSetupPrompt, setShowSetupPrompt] = useState(false);
@@ -336,33 +345,44 @@ export default function KickingSessionPage() {
       }
     });
 
-    // Load draft from cloud if local is empty
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev" && sessionMode) {
-      loadDraft<SessionDraft>(tid, `fg_session_draft_${sessionMode}`).then((cloudDraft) => {
-        if (cloudDraft && cloudDraft.rows) {
-          const localDraft = loadDraftForMode(sessionMode);
-          const localHasData = localDraft?.rows?.some((r) => r.athlete || r.dist || r.pos);
-          if (!localHasData) {
-            setRows(cloudDraft.rows);
-            setManualEntry(cloudDraft.manualEntry);
-            setSessionActive(cloudDraft.sessionActive);
-            setPlannedKicks(cloudDraft.plannedKicks ?? []);
-            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
-            setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
-            setSessionKicks(cloudDraft.sessionKicks ?? []);
-            if (cloudDraft.partialInputs) setPartialInputs(cloudDraft.partialInputs);
-            setCommitted(cloudDraft.committed ?? false);
-            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
-          }
-        }
-      });
-    }
+    // Restore an in-progress draft from the DB. Load both modes (populating the
+    // draft cache for later mode-switches), detect which mode to resume, and
+    // apply it. Replaces the old synchronous localStorage restore.
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid || tid === "local-dev") { mainDraftHydrated.current = true; return; }
+      const [gameDraft, practiceDraft] = await Promise.all([
+        loadDraft<SessionDraft>(tid, cloudDraftKey("game")),
+        loadDraft<SessionDraft>(tid, cloudDraftKey("practice")),
+      ]);
+      let mode: "practice" | "game" | null = null;
+      if ((gameDraft?.sessionKicks?.length ?? 0) > 0 || gameDraft?.sessionActive || gameDraft?.committed) mode = "game";
+      else if ((practiceDraft?.sessionKicks?.length ?? 0) > 0 || practiceDraft?.sessionActive || practiceDraft?.committed) mode = "practice";
+      else if (practiceDraft?.rows?.some((r) => r.athlete || r.dist || r.result)) mode = "practice";
+      if (isAthleteMode) mode = "practice";
+      const d = mode === "game" ? gameDraft : mode === "practice" ? practiceDraft : null;
+      if (mode) setSessionMode(mode);
+      if (d && d.rows) {
+        setRows(d.rows);
+        setManualEntry(d.manualEntry);
+        setSessionActive(d.sessionActive);
+        setPlannedKicks(d.plannedKicks ?? []);
+        setPlannedRowIndices(d.plannedRowIndices ?? []);
+        setCurrentKickIdx(d.currentKickIdx ?? 0);
+        setSessionKicks(d.sessionKicks ?? []);
+        if (d.partialInputs) setPartialInputs(d.partialInputs);
+        setCommitted(d.committed ?? false);
+        if (d.committedWeather != null) setWeather(d.committedWeather);
+      }
+      mainDraftHydrated.current = true;
+    })();
   }, []);
 
-  // Persist draft on every relevant state change
+  // Persist draft on every relevant state change (after the DB restore has run,
+  // so the empty initial state can't clobber a saved draft).
   useEffect(() => {
-    if (!sessionMode) return;
+    if (!mainDraftHydrated.current || !sessionMode) return;
     // Merge current input fields into partialInputs for the active kick
     const mergedPartials = sessionActive && !isPlannedLogged(currentKickIdx)
       ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred } }
@@ -914,8 +934,9 @@ export default function KickingSessionPage() {
     setOpponent("");
     setGameTime("");
     // Clear the saved draft for the current mode
-    if (typeof window !== "undefined" && sessionMode) {
-      try { localStorage.removeItem(draftKey(sessionMode)); } catch {}
+    if (sessionMode) {
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(sessionMode));
     }
     setSessionMode(null);
   };

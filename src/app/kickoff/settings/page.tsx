@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import clsx from "clsx";
-import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
 import { useAuth } from "@/lib/auth";
@@ -87,9 +87,9 @@ function migrateType(t: Record<string, unknown>): KOTypeConfig {
 
 function loadSettings(): KickoffSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = getCachedSettings<any>(STORAGE_KEY);
+    if (parsed) {
       const rawTypes = parsed.kickoffTypes?.length > 0 ? parsed.kickoffTypes : DEFAULT_TYPES;
       return {
         kickoffTypes: rawTypes.map((t: Record<string, unknown>) => migrateType(t)),

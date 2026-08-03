@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import clsx from "clsx";
-import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useAuth } from "@/lib/auth";
 
@@ -41,9 +41,9 @@ function parseScoreMode(val: unknown): ScoreMode {
 
 function loadSettingsLocal(): FGSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = getCachedSettings<any>(STORAGE_KEY);
+    if (parsed) {
       return {
         snapDistance: parsed.snapDistance ?? "7",
         makeMode: parsed.makeMode ?? "detailed",
@@ -82,7 +82,7 @@ function FGSettingsContent() {
   const [savedSettings, setSavedSettings] = useState<FGSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
-    // Load from localStorage immediately, then try cloud
+    // Apply the cached value immediately, then confirm from the DB
     const local = loadSettingsLocal();
     setSnapDistance(local.snapDistance);
     setMakeMode(local.makeMode);

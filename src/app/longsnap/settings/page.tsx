@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import clsx from "clsx";
-import { saveSettingsToCloud, loadSettingsFromCloud } from "@/lib/settingsSync";
+import { saveSettingsToCloud, loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 
 const STORAGE_KEY = "snapSettings";
@@ -15,18 +15,15 @@ interface SnapSettings {
 }
 
 function loadSettings(): SnapSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        chartMode: parsed.chartMode === "detailed" ? "detailed" : "simple",
-        missMode: parsed.missMode === "detailed" ? "detailed" : "simple",
-        openSpiralIsBall: parsed.openSpiralIsBall !== false,
-        holderEnabled: parsed.holderEnabled !== false,
-      };
-    }
-  } catch {}
+  const parsed = getCachedSettings<Partial<SnapSettings>>(STORAGE_KEY);
+  if (parsed) {
+    return {
+      chartMode: parsed.chartMode === "detailed" ? "detailed" : "simple",
+      missMode: parsed.missMode === "detailed" ? "detailed" : "simple",
+      openSpiralIsBall: parsed.openSpiralIsBall !== false,
+      holderEnabled: parsed.holderEnabled !== false,
+    };
+  }
   return { chartMode: "simple", missMode: "simple", openSpiralIsBall: true, holderEnabled: true };
 }
 
@@ -58,8 +55,8 @@ function SnapSettingsContent() {
         setHolderEnabled(he);
         const synced: SnapSettings = { chartMode: cm, missMode: mm, openSpiralIsBall: osb, holderEnabled: he };
         setSavedSettings(synced);
-        // Sync cloud → localStorage so session pages pick it up
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(synced)); } catch {}
+        // loadSettingsFromCloud already updated the settingsSync cache that
+        // session pages read via getCachedSettings — no localStorage mirror needed.
       }
     });
   }, []);

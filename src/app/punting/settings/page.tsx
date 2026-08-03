@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import clsx from "clsx";
-import { loadSettingsFromCloud, saveSettingsToCloud } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
 import { useAuth } from "@/lib/auth";
@@ -88,9 +88,9 @@ function migrateType(t: Record<string, unknown>): PuntTypeConfig {
 
 function loadSettings(): PuntSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = getCachedSettings<any>(STORAGE_KEY);
+    if (parsed) {
       const mode: DirectionMode = parsed.directionMode === "field" ? "field" : "numeric";
       const defaultDirs = mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS;
       const rawTypes = parsed.puntTypes?.length > 0 ? parsed.puntTypes : DEFAULT_TYPES;

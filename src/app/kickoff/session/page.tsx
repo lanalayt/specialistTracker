@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { ZoneBarChart } from "@/components/ui/Chart";
@@ -14,7 +14,7 @@ import { useDragReorder } from "@/lib/useDragReorder";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
-import { loadDraft, saveDraft } from "@/lib/draftStore";
+import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftStore";
 import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
@@ -27,7 +27,6 @@ function checkKickoffOutliers(distance: number, hangTime: number): string[] {
   if (hangTime > 0 && (hangTime < 0.5 || hangTime > 5.0)) warnings.push(`Hang Time ${hangTime}s seems unusual (expected 0.5–5.0)`);
   return warnings;
 }
-const SESSION_STORAGE_KEY = "kickoffSessionDraft";
 
 interface LogRow {
   athlete: string;
@@ -84,23 +83,20 @@ const POS_LABELS: Record<KickoffHash, string> = {
   RH: "RH",
 };
 
-function draftKey(mode: "practice" | "game"): string {
-  const tid = getTeamId();
-  return tid ? `${SESSION_STORAGE_KEY}_${mode}_${tid}` : `${SESSION_STORAGE_KEY}_${mode}`;
+// Session drafts live in session_drafts (via draftStore), not localStorage.
+// Reads are synchronous off the in-memory cache (populated by the mount load).
+function cloudDraftKey(mode: "practice" | "game"): string {
+  return `kickoff_session_draft_${mode}`;
 }
 
 function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(draftKey(mode));
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return null;
+  const tid = getTeamId();
+  return tid ? getCachedDraft<SessionDraft>(tid, cloudDraftKey(mode)) : null;
 }
 
 function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(draftKey(mode), JSON.stringify(draft));
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") saveDraft(tid, cloudDraftKey(mode), draft);
 }
 
 // Remembers the practice Live/Manual choice independent of session data, so it
@@ -334,29 +330,38 @@ export default function KickoffSessionPage() {
   const [showReset, setShowReset] = useState(false);
   const drag = useDragReorder(rows, setRows);
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
+  const mainDraftHydrated = useRef(false);
 
-  // Load draft from cloud if local is empty
+  // Restore an in-progress draft from the DB. Load both modes (populating the
+  // draft cache for later mode-switches), detect which mode to resume, apply it.
   useEffect(() => {
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev" && sessionMode) {
-      loadDraft<SessionDraft>(tid, `kickoff_session_draft_${sessionMode}`).then((cloudDraft) => {
-        if (cloudDraft && cloudDraft.rows) {
-          const localDraft = loadDraftForMode(sessionMode);
-          const localHasData = localDraft?.rows?.some((r) => r.athlete || r.distance || r.type);
-          if (!localHasData) {
-            setRows(cloudDraft.rows);
-            setManualEntry(cloudDraft.manualEntry);
-            setSessionActive(cloudDraft.sessionActive);
-            setPlannedKicks(cloudDraft.plannedKicks ?? []);
-            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
-            setCurrentKickIdx(cloudDraft.currentKickIdx ?? 0);
-            setSessionKicks(cloudDraft.sessionKicks ?? []);
-            setCommitted(cloudDraft.committed ?? false);
-            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
-          }
-        }
-      });
-    }
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid || tid === "local-dev") { mainDraftHydrated.current = true; return; }
+      const [gameDraft, practiceDraft] = await Promise.all([
+        loadDraft<SessionDraft>(tid, cloudDraftKey("game")),
+        loadDraft<SessionDraft>(tid, cloudDraftKey("practice")),
+      ]);
+      let mode: "practice" | "game" | null = null;
+      if ((gameDraft?.sessionKicks?.length ?? 0) > 0 || gameDraft?.sessionActive || gameDraft?.committed) mode = "game";
+      else if ((practiceDraft?.sessionKicks?.length ?? 0) > 0 || practiceDraft?.sessionActive || practiceDraft?.committed) mode = "practice";
+      else if (practiceDraft?.rows?.some((r) => r.athlete || r.distance || r.hangTime)) mode = "practice";
+      const d = mode === "game" ? gameDraft : mode === "practice" ? practiceDraft : null;
+      if (mode) setSessionMode(mode);
+      if (d && d.rows) {
+        setRows(d.rows);
+        setManualEntry(d.manualEntry);
+        setSessionActive(d.sessionActive);
+        setPlannedKicks(d.plannedKicks ?? []);
+        setPlannedRowIndices(d.plannedRowIndices ?? []);
+        setCurrentKickIdx(d.currentKickIdx ?? 0);
+        setSessionKicks(d.sessionKicks ?? []);
+        setCommitted(d.committed ?? false);
+        if (d.committedWeather != null) setWeather(d.committedWeather);
+      }
+      mainDraftHydrated.current = true;
+    })();
   }, []);
 
   // Session card state
@@ -383,9 +388,10 @@ export default function KickoffSessionPage() {
     };
   }
 
-  // Persist draft on every relevant state change
+  // Persist draft on every relevant state change (after the DB restore has run,
+  // so the empty initial state can't clobber a saved draft).
   useEffect(() => {
-    if (!sessionMode) return;
+    if (!mainDraftHydrated.current || !sessionMode) return;
     saveDraftForMode({
       rows,
       manualEntry,
@@ -844,8 +850,9 @@ export default function KickoffSessionPage() {
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setOpponent("");
     setGameTime("");
-    if (typeof window !== "undefined" && sessionMode) {
-      try { localStorage.removeItem(draftKey(sessionMode)); } catch {}
+    if (sessionMode) {
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(sessionMode));
     }
     setSessionMode(null);
   };

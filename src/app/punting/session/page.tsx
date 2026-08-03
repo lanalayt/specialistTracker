@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { usePunt } from "@/lib/puntContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
@@ -18,11 +18,10 @@ import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnap
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
-import { loadDraft, saveDraft } from "@/lib/draftStore";
+import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftStore";
 import { loadAthletes as loadAthleteList, type StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
-const SESSION_STORAGE_KEY = "puntSessionDraft";
 
 // Outlier detection for punt values
 function checkPuntOutliers(yards: number, hangTime: number, opTime: number): string[] {
@@ -155,23 +154,20 @@ const emptyRow = (): LogRow => ({
   fairCatch: false,
 });
 
-function draftKey(mode: "practice" | "game"): string {
-  const tid = getTeamId();
-  return tid ? `${SESSION_STORAGE_KEY}_${mode}_${tid}` : `${SESSION_STORAGE_KEY}_${mode}`;
+// Session drafts live in session_drafts (via draftStore), not localStorage.
+// Reads are synchronous off the in-memory cache (populated by the mount load).
+function cloudDraftKey(mode: "practice" | "game"): string {
+  return `punt_session_draft_${mode}`;
 }
 
 function loadDraftForMode(mode: "practice" | "game"): SessionDraft | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(draftKey(mode));
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return null;
+  const tid = getTeamId();
+  return tid ? getCachedDraft<SessionDraft>(tid, cloudDraftKey(mode)) : null;
 }
 
 function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(draftKey(mode), JSON.stringify(draft));
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") saveDraft(tid, cloudDraftKey(mode), draft);
 }
 
 // Remembers the practice Live/Manual choice independent of session data, so it
@@ -378,17 +374,29 @@ export default function PuntingSessionPage() {
   const [weather, setWeather] = useState(draft.committedWeather ?? "");
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [snapPuntIdx, setSnapPuntIdx] = useState(0);
-  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>(() => {
-    try { const raw = localStorage.getItem("punt_snap_draft"); if (raw) return JSON.parse(raw); } catch {}
-    return {};
-  });
+  const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
-  // Persist snap logs to localStorage
+  // Snap logs draft in session_drafts (DB), not localStorage. Hydrate first so
+  // the empty initial state can't clobber a saved draft.
+  const snapDraftHydrated = useRef(false);
+  const mainDraftHydrated = useRef(false);
   useEffect(() => {
-    try {
-      if (Object.keys(snapLogsMap).length > 0) localStorage.setItem("punt_snap_draft", JSON.stringify(snapLogsMap));
-      else localStorage.removeItem("punt_snap_draft");
-    } catch {}
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (tid && tid !== "local-dev") {
+        const d = await loadDraft<Record<string, SnapLogEntry[]>>(tid, "punt_snap_draft");
+        if (d && Object.keys(d).length > 0) setSnapLogsMap(d);
+      }
+      snapDraftHydrated.current = true;
+    })();
+  }, []);
+  useEffect(() => {
+    if (!snapDraftHydrated.current) return;
+    const tid = getTeamId();
+    if (!tid || tid === "local-dev") return;
+    if (Object.keys(snapLogsMap).length > 0) saveDraft(tid, "punt_snap_draft", snapLogsMap);
+    else clearDraft(tid, "punt_snap_draft");
   }, [snapLogsMap]);
   // Load long-snapper athletes for the snap popup
   useEffect(() => {
@@ -426,28 +434,36 @@ export default function PuntingSessionPage() {
       setOpTimeEnabled(loadOpTimeEnabled());
     });
 
-    // Load draft from cloud if local is empty
-    const tid = getTeamId();
-    if (tid && tid !== "local-dev" && sessionMode) {
-      loadDraft<SessionDraft>(tid, `punt_session_draft_${sessionMode}`).then((cloudDraft) => {
-        if (cloudDraft && cloudDraft.rows) {
-          const localDraft = loadDraftForMode(sessionMode);
-          const localHasData = localDraft?.rows?.some((r) => r.athlete || r.yards || r.type);
-          if (!localHasData) {
-            setRows(cloudDraft.rows);
-            setManualEntry(cloudDraft.manualEntry);
-            setSessionActive(cloudDraft.sessionActive);
-            setPlannedPunts(cloudDraft.plannedPunts ?? []);
-            setPlannedRowIndices(cloudDraft.plannedRowIndices ?? []);
-            setCurrentPuntIdx(cloudDraft.currentPuntIdx ?? 0);
-            setSessionPunts(cloudDraft.sessionPunts ?? []);
-            if (cloudDraft.partialInputs) setPartialInputs(cloudDraft.partialInputs);
-            setCommitted(cloudDraft.committed ?? false);
-            if (cloudDraft.committedWeather != null) setWeather(cloudDraft.committedWeather);
-          }
-        }
-      });
-    }
+    // Restore an in-progress draft from the DB. Load both modes (populating the
+    // draft cache for later mode-switches), detect which mode to resume, apply it.
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid || tid === "local-dev") { mainDraftHydrated.current = true; return; }
+      const [gameDraft, practiceDraft] = await Promise.all([
+        loadDraft<SessionDraft>(tid, cloudDraftKey("game")),
+        loadDraft<SessionDraft>(tid, cloudDraftKey("practice")),
+      ]);
+      let mode: "practice" | "game" | null = null;
+      if ((gameDraft?.sessionPunts?.length ?? 0) > 0 || gameDraft?.sessionActive || gameDraft?.committed) mode = "game";
+      else if ((practiceDraft?.sessionPunts?.length ?? 0) > 0 || practiceDraft?.sessionActive || practiceDraft?.committed) mode = "practice";
+      else if (practiceDraft?.rows?.some((r) => r.athlete || r.yards || r.hangTime)) mode = "practice";
+      const d = mode === "game" ? gameDraft : mode === "practice" ? practiceDraft : null;
+      if (mode) setSessionMode(mode);
+      if (d && d.rows) {
+        setRows(d.rows);
+        setManualEntry(d.manualEntry);
+        setSessionActive(d.sessionActive);
+        setPlannedPunts(d.plannedPunts ?? []);
+        setPlannedRowIndices(d.plannedRowIndices ?? []);
+        setCurrentPuntIdx(d.currentPuntIdx ?? 0);
+        setSessionPunts(d.sessionPunts ?? []);
+        if (d.partialInputs) setPartialInputs(d.partialInputs);
+        setCommitted(d.committed ?? false);
+        if (d.committedWeather != null) setWeather(d.committedWeather);
+      }
+      mainDraftHydrated.current = true;
+    })();
   }, []);
 
   // Auto-decimal: user types digits, we insert decimal 2 places from right
@@ -489,9 +505,10 @@ export default function PuntingSessionPage() {
   // Pooch punt only: yard line where ball landed (practice log mode)
   const [poochYL, setPoochYL] = useState<string>(initPartial?.poochYL ?? "");
 
-  // Persist draft on every relevant state change
+  // Persist draft on every relevant state change (after the DB restore has run,
+  // so the empty initial state can't clobber a saved draft).
   useEffect(() => {
-    if (!sessionMode) return;
+    if (!mainDraftHydrated.current || !sessionMode) return;
     // Merge current input fields into partialInputs for the active punt
     const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
       ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }
@@ -1076,8 +1093,9 @@ export default function PuntingSessionPage() {
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setOpponent("");
     setGameTime("");
-    if (typeof window !== "undefined" && sessionMode) {
-      try { localStorage.removeItem(draftKey(sessionMode)); } catch {}
+    if (sessionMode) {
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(sessionMode));
     }
     setSessionMode(null);
   };

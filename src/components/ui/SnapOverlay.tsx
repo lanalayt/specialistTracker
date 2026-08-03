@@ -47,7 +47,7 @@ function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simp
 }
 
 export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOverlayProps) {
-  // Load snapping athletes from localStorage (same source as longSnapContext)
+  // Load snapping athletes (same source as longSnapContext)
   const [athleteNames, setAthleteNames] = useState<string[]>([]);
 
   const [chartMode, setChartMode] = useState(() => loadSnapSettings().chartMode);
