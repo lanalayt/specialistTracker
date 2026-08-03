@@ -97,7 +97,7 @@ export default function ScoutShortSnapsPage() {
       if (!active) return;
       setAthleteNames(names);
       setScoutNumbers(nums);
-      const d = isPageReload() ? readChartDraft<ShortSnapDraft>(DRAFT_KEY, tid) : null;
+      const d = isPageReload() ? await readChartDraft<ShortSnapDraft>(DRAFT_KEY, tid) : null;
       if (d && d.phase && d.phase !== "setup" && (d.results?.length ?? 0) > 0) {
         setSelectedPlayers(d.selectedPlayers ?? []);
         setSnapsPerPlayer(d.snapsPerPlayer ?? "10");

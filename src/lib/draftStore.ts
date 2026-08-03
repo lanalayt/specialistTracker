@@ -5,6 +5,18 @@ const DEBOUNCE_MS = 500;
 const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 const pendingWrites: Record<string, { teamId: string; draftKey: string; data: unknown }> = {};
 
+// In-memory mirror of the last-seen draft per (team, key). Lets callers that
+// need a synchronous read (e.g. switching practice/game mid-session) get the
+// latest without another round-trip, after the async load has populated it.
+const _cache: Record<string, unknown> = {};
+const cacheKey = (teamId: string, draftKey: string) => `${teamId}:${draftKey}`;
+
+/** Synchronous read of the last-loaded/saved draft (null until first load). */
+export function getCachedDraft<T>(teamId: string, draftKey: string): T | null {
+  if (!teamId || teamId === "local-dev") return null;
+  return (_cache[cacheKey(teamId, draftKey)] as T) ?? null;
+}
+
 /** Load a draft from the session_drafts table. */
 export async function loadDraft<T>(teamId: string, draftKey: string): Promise<T | null> {
   if (!teamId || teamId === "local-dev") return null;
@@ -16,16 +28,20 @@ export async function loadDraft<T>(teamId: string, draftKey: string): Promise<T 
       .eq("team_id", teamId)
       .eq("draft_key", draftKey)
       .maybeSingle();
-    if (data?.data) return data.data as T;
+    if (data?.data) {
+      _cache[cacheKey(teamId, draftKey)] = data.data;
+      return data.data as T;
+    }
     return null;
   } catch {
     return null;
   }
 }
 
-/** Save a draft (debounced). */
+/** Save a draft (debounced). Updates the in-memory cache immediately. */
 export function saveDraft<T>(teamId: string, draftKey: string, data: T): void {
   if (!teamId || teamId === "local-dev") return;
+  _cache[cacheKey(teamId, draftKey)] = data;
 
   const timerKey = `draft:${teamId}:${draftKey}`;
   if (debounceTimers[timerKey]) clearTimeout(debounceTimers[timerKey]);
@@ -61,6 +77,7 @@ export async function clearDraft(teamId: string, draftKey: string): Promise<void
     delete debounceTimers[timerKey];
   }
   delete pendingWrites[timerKey];
+  delete _cache[cacheKey(teamId, draftKey)];
 
   try {
     const supabase = createClient();

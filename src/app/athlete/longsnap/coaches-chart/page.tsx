@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
+import { usePendingChart } from "@/lib/pendingChart";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { loadAthletes } from "@/lib/athleteStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import Link from "next/link";
@@ -16,6 +18,7 @@ interface SnapRow {
 
 export default function SnapCoachesChartPage() {
   const { user, isCoach } = useAuth();
+  const pendingChart = usePendingChart();
   const { athletes } = useLongSnap();
   const [teamRoster, setTeamRoster] = useState<Set<string> | null>(null);
 
@@ -35,13 +38,8 @@ export default function SnapCoachesChartPage() {
 
   const DRAFT_KEY = "snap_coaches_chart_draft";
 
-  const [snapRows, setSnapRows] = useState<SnapRow[]>(() => {
-    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); if (d?.snapRows?.length) return d.snapRows; } catch {}
-    return [{ snapType: "FG", count: 10 }];
-  });
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(() => {
-    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); return d?.selectedPlayers ?? []; } catch {} return [];
-  });
+  const [snapRows, setSnapRows] = useState<SnapRow[]>([{ snapType: "FG", count: 10 }]);
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
   const [dueDate, setDueDate] = useState("");
   const [saved, setSaved] = useState(false);
@@ -53,8 +51,28 @@ export default function SnapCoachesChartPage() {
 
   const totalSnaps = snapRows.reduce((s, r) => s + r.count, 0);
 
+  // Draft persistence in session_drafts (DB), not localStorage. Don't save until
+  // the DB draft has hydrated, so the initial state can't clobber it.
+  const draftHydrated = useRef(false);
   useEffect(() => {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ snapRows, selectedPlayers })); } catch {}
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (tid && tid !== "local-dev") {
+        const d = await loadDraft<{ snapRows?: SnapRow[]; selectedPlayers?: string[] }>(tid, DRAFT_KEY);
+        if (d) {
+          if (d.snapRows?.length) setSnapRows(d.snapRows);
+          if (d.selectedPlayers) setSelectedPlayers(d.selectedPlayers);
+        }
+      }
+      draftHydrated.current = true;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, DRAFT_KEY, { snapRows, selectedPlayers });
   }, [snapRows, selectedPlayers]);
 
   useEffect(() => { loadChartsData(); }, [user?.id]);
@@ -87,15 +105,15 @@ export default function SnapCoachesChartPage() {
     };
     const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, DRAFT_KEY); }
     setSaved(true);
     loadChartsData();
   };
 
   const handleChartNow = () => {
     const rows = snapRows.map((r) => ({ snapType: r.snapType, count: r.count }));
-    localStorage.setItem("coach_snap_chart_now", JSON.stringify({ reps: totalSnaps, snapRows: rows, players: selectedPlayers }));
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    pendingChart?.set("snap", { reps: totalSnaps, snapRows: rows, players: selectedPlayers });
+    { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, DRAFT_KEY); }
   };
 
   const handleDeleteChart = async (chartId: string) => {

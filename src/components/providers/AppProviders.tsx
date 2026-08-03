@@ -11,6 +11,7 @@ import { TutorialProvider } from "@/components/ui/Tutorial";
 import { upsertMember, loadMembers, useMemberSync } from "@/lib/memberStore";
 import { hardDeleteExpired } from "@/lib/sessionStore";
 import { BootstrapProvider, type Bootstrap } from "@/lib/bootstrapContext";
+import { PendingChartProvider } from "@/lib/pendingChart";
 import type { AuthUser, UserRole } from "@/types";
 
 function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
@@ -221,9 +222,11 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
       }}
     >
       <BootstrapProvider value={bootstrap}>
-        <TutorialProvider>
-          {children}
-        </TutorialProvider>
+        <PendingChartProvider>
+          <TutorialProvider>
+            {children}
+          </TutorialProvider>
+        </PendingChartProvider>
       </BootstrapProvider>
     </AuthContext.Provider>
   );

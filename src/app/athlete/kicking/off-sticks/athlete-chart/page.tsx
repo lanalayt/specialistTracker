@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { usePendingChart } from "@/lib/pendingChart";
 import { useFG } from "@/lib/fgContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
@@ -32,17 +33,12 @@ function AthleteChartInner() {
   const { user } = useAuth();
   const { athletes, commitPractice } = useFG();
 
-  // Check for "Chart Now" data before initial state
-  const [chartNowData] = useState(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = localStorage.getItem("coach_fg_chart_now");
-      if (raw) {
-        localStorage.removeItem("coach_fg_chart_now");
-        const data = JSON.parse(raw);
-        if (data.kicks?.length > 0 && data.players?.length > 0) return data;
-      }
-    } catch {}
+  // Check for "Chart Now" handoff (in-memory) before initial state
+  const pendingChart = usePendingChart();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [chartNowData] = useState<any>(() => {
+    const data = pendingChart?.take("fg");
+    if (data && (data.kicks as unknown[])?.length > 0 && (data.players as unknown[])?.length > 0) return data;
     return null;
   });
 

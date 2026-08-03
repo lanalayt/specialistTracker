@@ -90,7 +90,7 @@ function ScoutKOChartInner() {
       setAthleteNames(names);
       setScoutNumbers(nums);
       // Restore an in-progress chart after an accidental refresh.
-      const d = isPageReload() ? readChartDraft<KODraft>(DRAFT_KEY, tid) : null;
+      const d = isPageReload() ? await readChartDraft<KODraft>(DRAFT_KEY, tid) : null;
       if (d && d.phase && d.phase !== "setup" && (d.results?.length ?? 0) > 0) {
         setSelectedPlayers(d.selectedPlayers ?? []);
         setKicksPerPlayer(d.kicksPerPlayer ?? "5");

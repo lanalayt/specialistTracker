@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { usePendingChart } from "@/lib/pendingChart";
 import { useKickoff } from "@/lib/kickoffContext";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
@@ -27,16 +28,11 @@ function KOAthleteChartInner() {
   const { user } = useAuth();
   const { athletes, commitPractice } = useKickoff();
 
-  const [chartNowData] = useState(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = localStorage.getItem("coach_ko_chart_now");
-      if (raw) {
-        localStorage.removeItem("coach_ko_chart_now");
-        const data = JSON.parse(raw);
-        if (data.players?.length > 0) return data;
-      }
-    } catch {}
+  const pendingChart = usePendingChart();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [chartNowData] = useState<any>(() => {
+    const data = pendingChart?.take("ko");
+    if (data && (data.players as unknown[])?.length > 0) return data;
     return null;
   });
 

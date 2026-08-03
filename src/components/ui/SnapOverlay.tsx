@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
 import { getTeamId } from "@/lib/teamData";
 import { getCachedSettings } from "@/lib/settingsSync";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import type { SnapType } from "@/types";
 import clsx from "clsx";
 
@@ -28,16 +29,13 @@ interface SnapRow {
   spiral: string;
 }
 
-const STORAGE_PREFIX = "snapOverlay_";
+const overlayDraftKey = (snapType: string) => `snap_overlay_${snapType}`;
+const emptySnapRow = (): SnapRow => ({ snapper: "", time: "", accuracy: "", laces: "", spiral: "" });
 
 /** Call this to clear snap overlay data when the parent log is cleared */
 export function clearSnapOverlayData(snapType: "PUNT" | "FG") {
-  const key = `${STORAGE_PREFIX}${snapType}`;
-  try {
-    localStorage.removeItem(key);
-    localStorage.removeItem(key + "_markers");
-    localStorage.removeItem(key + "_savedCount");
-  } catch {}
+  const tid = getTeamId();
+  if (tid && tid !== "local-dev") clearDraft(tid, overlayDraftKey(snapType));
 }
 
 function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simple" | "detailed" } {
@@ -67,25 +65,27 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
     });
   }, []);
 
-  const storageKey = `${STORAGE_PREFIX}${snapType}`;
+  const storageKey = overlayDraftKey(snapType);
 
-  const [rows, setRows] = useState<SnapRow[]>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  });
-
-  const [snapMarkers, setSnapMarkers] = useState<SnapMarker[]>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey + "_markers");
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  });
-
+  const [rows, setRows] = useState<SnapRow[]>([]);
+  const [snapMarkers, setSnapMarkers] = useState<SnapMarker[]>([]);
   const [athlete, setAthlete] = useState<string>("");
+
+  // Restore an in-progress overlay from session_drafts (DB). Don't persist until
+  // this has hydrated, so the empty initial state can't clobber the saved draft.
+  const overlayHydrated = useRef(false);
+  useEffect(() => {
+    (async () => {
+      const tid = getTeamId();
+      if (tid && tid !== "local-dev") {
+        const d = await loadDraft<{ rows?: SnapRow[]; markers?: SnapMarker[] }>(tid, storageKey);
+        const saved = d?.rows ?? [];
+        setRows(saved.length >= entryCount ? saved : [...saved, ...Array.from({ length: entryCount - saved.length }, emptySnapRow)]);
+        if (d?.markers) setSnapMarkers(d.markers);
+      }
+      overlayHydrated.current = true;
+    })();
+  }, [storageKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load snapping athletes
   useEffect(() => {
@@ -110,14 +110,12 @@ export function SnapOverlay({ snapType, entryCount, onClose, kickInfos }: SnapOv
     });
   }, [entryCount]);
 
-  // Auto-save
+  // Auto-save to session_drafts (debounced) once hydrated.
   useEffect(() => {
-    try { localStorage.setItem(storageKey, JSON.stringify(rows)); } catch {}
-  }, [rows, storageKey]);
-
-  useEffect(() => {
-    try { localStorage.setItem(storageKey + "_markers", JSON.stringify(snapMarkers)); } catch {}
-  }, [snapMarkers, storageKey]);
+    if (!overlayHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, storageKey, { rows, markers: snapMarkers });
+  }, [rows, snapMarkers, storageKey]);
 
   const formatAutoDecimal = (raw: string): string => {
     const digits = raw.replace(/\D/g, "");

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
+import { usePendingChart } from "@/lib/pendingChart";
 import { useKickoff } from "@/lib/kickoffContext";
 import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { loadAthletes } from "@/lib/athleteStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
@@ -68,6 +70,7 @@ function loadKOSettings(): { types: KOTypeConfig[]; categories: KOCategory[] } {
 
 export default function KickoffCoachesChartPage() {
   const { user, isCoach } = useAuth();
+  const pendingChart = usePendingChart();
   const { athletes, history } = useKickoff();
   const [teamRoster, setTeamRoster] = useState<Set<string> | null>(null);
 
@@ -102,23 +105,36 @@ export default function KickoffCoachesChartPage() {
 
   const KO_DRAFT_KEY = "ko_coaches_chart_draft";
 
-  const [koRows, setKoRows] = useState<KORow[]>(() => {
-    try { const d = JSON.parse(localStorage.getItem(KO_DRAFT_KEY) ?? ""); if (d?.koRows?.length) return d.koRows; } catch {}
-    return [{ category: "DEEP", count: 5, typeId: "DEEP_LEFT", hash: "M" }];
-  });
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(() => {
-    try { const d = JSON.parse(localStorage.getItem(KO_DRAFT_KEY) ?? ""); return d?.selectedPlayers ?? []; } catch {} return [];
-  });
-  const [chartAction, setChartAction] = useState<"assign" | "now">(() => {
-    try { const d = JSON.parse(localStorage.getItem(KO_DRAFT_KEY) ?? ""); return d?.chartAction ?? "assign"; } catch {} return "assign";
-  });
-  const [dueDate, setDueDate] = useState(() => {
-    try { const d = JSON.parse(localStorage.getItem(KO_DRAFT_KEY) ?? ""); return d?.dueDate ?? ""; } catch {} return "";
-  });
+  const [koRows, setKoRows] = useState<KORow[]>([{ category: "DEEP", count: 5, typeId: "DEEP_LEFT", hash: "M" }]);
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
+  const [dueDate, setDueDate] = useState("");
   const [saved, setSaved] = useState(false);
 
+  // Draft persistence in session_drafts (DB), not localStorage. Don't save until
+  // the DB draft has hydrated, so the initial state can't clobber it.
+  const draftHydrated = useRef(false);
   useEffect(() => {
-    try { localStorage.setItem(KO_DRAFT_KEY, JSON.stringify({ koRows, selectedPlayers, chartAction, dueDate })); } catch {}
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (tid && tid !== "local-dev") {
+        const d = await loadDraft<{ koRows?: KORow[]; selectedPlayers?: string[]; chartAction?: "assign" | "now"; dueDate?: string }>(tid, KO_DRAFT_KEY);
+        if (d) {
+          if (d.koRows?.length) setKoRows(d.koRows);
+          if (d.selectedPlayers) setSelectedPlayers(d.selectedPlayers);
+          if (d.chartAction) setChartAction(d.chartAction);
+          if (d.dueDate) setDueDate(d.dueDate);
+        }
+      }
+      draftHydrated.current = true;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, KO_DRAFT_KEY, { koRows, selectedPlayers, chartAction, dueDate });
   }, [koRows, selectedPlayers, chartAction, dueDate]);
   const [charts, setCharts] = useState<AssignedChart[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -178,7 +194,7 @@ export default function KickoffCoachesChartPage() {
     };
     const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
-    try { localStorage.removeItem(KO_DRAFT_KEY); } catch {}
+    { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, KO_DRAFT_KEY); }
     setSaved(true);
     loadChartsData();
   };
@@ -188,8 +204,8 @@ export default function KickoffCoachesChartPage() {
       const t = koTypes.find((t) => t.id === r.typeId);
       return { typeId: r.typeId, typeLabel: t?.label ?? r.typeId, count: r.count, hash: r.hash };
     });
-    localStorage.setItem("coach_ko_chart_now", JSON.stringify({ reps: totalReps, players: selectedPlayers, koRows: rows }));
-    try { localStorage.removeItem(KO_DRAFT_KEY); } catch {}
+    pendingChart?.set("ko", { reps: totalReps, players: selectedPlayers, koRows: rows });
+    { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, KO_DRAFT_KEY); }
   };
 
   const handleDeleteAssignedChart = async (chartId: string) => {

@@ -97,7 +97,7 @@ export default function ScoutLongSnapsPage() {
       if (!active) return;
       setAthleteNames(names);
       setScoutNumbers(nums);
-      const d = isPageReload() ? readChartDraft<LongSnapDraft>(DRAFT_KEY, tid) : null;
+      const d = isPageReload() ? await readChartDraft<LongSnapDraft>(DRAFT_KEY, tid) : null;
       if (d && d.phase && d.phase !== "setup" && (d.snaps?.length ?? 0) > 0) {
         setSelectedPlayers(d.selectedPlayers ?? []);
         setSnapsPerPlayer(d.snapsPerPlayer ?? "10");

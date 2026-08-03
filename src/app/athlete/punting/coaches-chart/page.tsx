@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
+import { usePendingChart } from "@/lib/pendingChart";
 import { usePunt } from "@/lib/puntContext";
 import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { loadAthletes } from "@/lib/athleteStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
@@ -63,6 +65,7 @@ interface PuntRow {
 
 export default function PuntCoachesChartPage() {
   const { user, isCoach } = useAuth();
+  const pendingChart = usePendingChart();
   const { athletes } = usePunt();
   const [teamRoster, setTeamRoster] = useState<Set<string> | null>(null);
 
@@ -99,24 +102,36 @@ export default function PuntCoachesChartPage() {
 
   const DRAFT_KEY = "punt_coaches_chart_draft";
 
-  const [puntRows, setPuntRows] = useState<PuntRow[]>(() => {
-    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); if (d?.puntRows?.length) return d.puntRows; } catch {}
-    return [{ category: "DIRECTIONAL", count: 5, typeId: "DIR_STRAIGHT", hash: "M" }];
-  });
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(() => {
-    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); return d?.selectedPlayers ?? []; } catch {} return [];
-  });
-  const [chartAction, setChartAction] = useState<"assign" | "now">(() => {
-    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); return d?.chartAction ?? "assign"; } catch {} return "assign";
-  });
-  const [dueDate, setDueDate] = useState(() => {
-    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? ""); return d?.dueDate ?? ""; } catch {} return "";
-  });
+  const [puntRows, setPuntRows] = useState<PuntRow[]>([{ category: "DIRECTIONAL", count: 5, typeId: "DIR_STRAIGHT", hash: "M" }]);
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
+  const [dueDate, setDueDate] = useState("");
   const [saved, setSaved] = useState(false);
 
-  // Persist draft
+  // Draft persistence in session_drafts (DB), not localStorage. Don't save until
+  // the DB draft has hydrated, so the initial state can't clobber it.
+  const draftHydrated = useRef(false);
   useEffect(() => {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ puntRows, selectedPlayers, chartAction, dueDate })); } catch {}
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (tid && tid !== "local-dev") {
+        const d = await loadDraft<{ puntRows?: PuntRow[]; selectedPlayers?: string[]; chartAction?: "assign" | "now"; dueDate?: string }>(tid, DRAFT_KEY);
+        if (d) {
+          if (d.puntRows?.length) setPuntRows(d.puntRows);
+          if (d.selectedPlayers) setSelectedPlayers(d.selectedPlayers);
+          if (d.chartAction) setChartAction(d.chartAction);
+          if (d.dueDate) setDueDate(d.dueDate);
+        }
+      }
+      draftHydrated.current = true;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, DRAFT_KEY, { puntRows, selectedPlayers, chartAction, dueDate });
   }, [puntRows, selectedPlayers, chartAction, dueDate]);
 
   const [charts, setCharts] = useState<AssignedChart[]>([]);
@@ -184,7 +199,7 @@ export default function PuntCoachesChartPage() {
     const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
     setSaved(true);
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+    { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, DRAFT_KEY); }
     loadCharts();
   };
 
@@ -351,8 +366,8 @@ export default function PuntCoachesChartPage() {
                   const catConfig = puntCategories.find((c) => c.id === r.category);
                   return { type: catConfig?.label ?? r.category, typeId: r.typeId, typeLabel: typeConfig?.label ?? r.typeId, count: r.count, hash: r.hash, yardLine: r.yardLine || undefined };
                 });
-                localStorage.setItem("coach_punt_chart_now", JSON.stringify({ reps: totalReps, puntRows: rows, players: selectedPlayers }));
-                try { localStorage.removeItem(DRAFT_KEY); } catch {}
+                pendingChart?.set("punt", { reps: totalReps, puntRows: rows, players: selectedPlayers });
+                { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, DRAFT_KEY); }
               }}
               className={clsx("btn-primary w-full py-3 text-sm font-bold text-center block", (totalReps <= 0 || selectedPlayers.length === 0) && "opacity-40 pointer-events-none")}
             >

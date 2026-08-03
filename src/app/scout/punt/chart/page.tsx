@@ -132,7 +132,7 @@ function ScoutPuntChartInner() {
       if (!active) return;
       setAthleteNames(names);
       setScoutNumbers(nums);
-      const d = isPageReload() ? readChartDraft<PuntDraft>(DRAFT_KEY, tid) : null;
+      const d = isPageReload() ? await readChartDraft<PuntDraft>(DRAFT_KEY, tid) : null;
       if (d && d.phase && d.phase !== "setup" && (d.results?.length ?? 0) > 0) {
         setSelectedPlayers(d.selectedPlayers ?? []);
         setPuntsPerPlayer(d.puntsPerPlayer ?? "5");

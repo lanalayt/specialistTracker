@@ -156,7 +156,7 @@ function ScoutFGChartInner() {
       if (preset && active) setPresetKicks(preset);
       setPresetLoaded(true);
       // Restore an in-progress chart after an accidental refresh.
-      const d = isPageReload() ? readChartDraft<FGDraft>(DRAFT_KEY, tid) : null;
+      const d = isPageReload() ? await readChartDraft<FGDraft>(DRAFT_KEY, tid) : null;
       if (d && (d.phase === "live" || d.phase === "results") && (d.selectedPlayers?.length ?? 0) > 0) {
         setSelectedPlayers(d.selectedPlayers ?? []);
         setPresetKicks(d.presetKicks ?? []);

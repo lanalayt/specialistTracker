@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { usePendingChart } from "@/lib/pendingChart";
 import { useFG } from "@/lib/fgContext";
 import { getTeamId } from "@/lib/teamData";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import { loadAthletes } from "@/lib/athleteStore";
 import Link from "next/link";
@@ -24,6 +26,7 @@ interface PresetKick {
 export default function CoachesChartPage() {
   const router = useRouter();
   const { user, isCoach } = useAuth();
+  const pendingChart = usePendingChart();
   const { athletes, history } = useFG();
   const [teamRoster, setTeamRoster] = useState<Set<string> | null>(null);
 
@@ -43,24 +46,38 @@ export default function CoachesChartPage() {
 
   const FG_DRAFT_KEY = "fg_coaches_chart_draft";
 
-  const [kicks, setKicks] = useState<PresetKick[]>(() => {
-    try { const d = JSON.parse(localStorage.getItem(FG_DRAFT_KEY) ?? ""); return d?.kicks ?? []; } catch {} return [];
-  });
+  const [kicks, setKicks] = useState<PresetKick[]>([]);
   const [newDist, setNewDist] = useState("30");
   const [newHash, setNewHash] = useState("M");
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>(() => {
-    try { const d = JSON.parse(localStorage.getItem(FG_DRAFT_KEY) ?? ""); return d?.selectedPlayers ?? []; } catch {} return [];
-  });
-  const [chartAction, setChartAction] = useState<"assign" | "now">(() => {
-    try { const d = JSON.parse(localStorage.getItem(FG_DRAFT_KEY) ?? ""); return d?.chartAction ?? "assign"; } catch {} return "assign";
-  });
-  const [dueDate, setDueDate] = useState(() => {
-    try { const d = JSON.parse(localStorage.getItem(FG_DRAFT_KEY) ?? ""); return d?.dueDate ?? ""; } catch {} return "";
-  });
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [chartAction, setChartAction] = useState<"assign" | "now">("assign");
+  const [dueDate, setDueDate] = useState("");
   const [saved, setSaved] = useState(false);
 
+  // Draft persistence in session_drafts (DB), not localStorage. Don't save until
+  // the DB draft has hydrated, so the empty initial state can't clobber it.
+  const draftHydrated = useRef(false);
   useEffect(() => {
-    try { localStorage.setItem(FG_DRAFT_KEY, JSON.stringify({ kicks, selectedPlayers, chartAction, dueDate })); } catch {}
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (tid && tid !== "local-dev") {
+        const d = await loadDraft<{ kicks?: PresetKick[]; selectedPlayers?: string[]; chartAction?: "assign" | "now"; dueDate?: string }>(tid, FG_DRAFT_KEY);
+        if (d) {
+          if (d.kicks) setKicks(d.kicks);
+          if (d.selectedPlayers) setSelectedPlayers(d.selectedPlayers);
+          if (d.chartAction) setChartAction(d.chartAction);
+          if (d.dueDate) setDueDate(d.dueDate);
+        }
+      }
+      draftHydrated.current = true;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated.current) return;
+    const tid = getTeamId();
+    if (tid && tid !== "local-dev") saveDraft(tid, FG_DRAFT_KEY, { kicks, selectedPlayers, chartAction, dueDate });
   }, [kicks, selectedPlayers, chartAction, dueDate]);
 
   // Recent charts
@@ -119,7 +136,7 @@ export default function CoachesChartPage() {
     };
     const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
-    try { localStorage.removeItem(FG_DRAFT_KEY); } catch {}
+    { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, FG_DRAFT_KEY); }
     setSaved(true);
     loadCharts();
   };
@@ -243,8 +260,8 @@ export default function CoachesChartPage() {
           ) : (
             <button
               onClick={() => {
-                localStorage.setItem("coach_fg_chart_now", JSON.stringify({ kicks, players: selectedPlayers }));
-                try { localStorage.removeItem(FG_DRAFT_KEY); } catch {}
+                pendingChart?.set("fg", { kicks, players: selectedPlayers });
+                { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, FG_DRAFT_KEY); }
                 router.push("/athlete/kicking/off-sticks/athlete-chart");
               }}
               disabled={kicks.length === 0 || selectedPlayers.length === 0}
