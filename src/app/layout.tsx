@@ -42,7 +42,7 @@ export default async function RootLayout({
         )}
       </head>
       <body className="bg-bg text-slate-100 antialiased">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders bootstrap={boot}>{children}</AppProviders>
       </body>
     </html>
   );

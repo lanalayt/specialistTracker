@@ -10,6 +10,7 @@ import { preloadSettings, subscribeSettingsRealtime } from "@/lib/settingsSync";
 import { TutorialProvider } from "@/components/ui/Tutorial";
 import { upsertMember, loadMembers, useMemberSync } from "@/lib/memberStore";
 import { hardDeleteExpired } from "@/lib/sessionStore";
+import { BootstrapProvider, type Bootstrap } from "@/lib/bootstrapContext";
 import type { AuthUser, UserRole } from "@/types";
 
 function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
@@ -23,7 +24,7 @@ function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?:
   };
 }
 
-export function AppProviders({ children }: { children: React.ReactNode }) {
+export function AppProviders({ children, bootstrap = null }: { children: React.ReactNode; bootstrap?: Bootstrap | null }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [athleteAccess, setAthleteAccess] = useState<"view" | "edit">("view");
@@ -219,9 +220,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         setDemoRole,
       }}
     >
-      <TutorialProvider>
-        {children}
-      </TutorialProvider>
+      <BootstrapProvider value={bootstrap}>
+        <TutorialProvider>
+          {children}
+        </TutorialProvider>
+      </BootstrapProvider>
     </AuthContext.Provider>
   );
 }

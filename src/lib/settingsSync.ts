@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { SPORT_MAP, localKeyForSport } from "@/lib/settingsKeys";
+import { useBootstrap } from "@/lib/bootstrapContext";
 
 function getSport(localKey: string): string | null {
   return SPORT_MAP[localKey] ?? null;
@@ -101,14 +102,16 @@ export function saveSettingsToCloud<T>(localKey: string, data: T): void {
  * when it changes (local save or realtime update from another device).
  */
 export function useSettings<T>(localKey: string): T | null {
-  const [val, setVal] = useState<T | null>(() => getCachedSettings<T>(localKey));
+  const boot = useBootstrap();
+  const fromBoot = () => (boot?.settings?.[localKey] as T) ?? null;
+  const [val, setVal] = useState<T | null>(() => getCachedSettings<T>(localKey) ?? fromBoot());
   useEffect(() => {
-    const update = () => setVal(getCachedSettings<T>(localKey));
+    const update = () => setVal(getCachedSettings<T>(localKey) ?? fromBoot());
     _subs.add(update);
     update();                       // sync to current cache on mount
     loadSettingsFromCloud<T>(localKey); // ensure it's loaded
     return () => { _subs.delete(update); };
-  }, [localKey]);
+  }, [localKey]); // eslint-disable-line react-hooks/exhaustive-deps
   return val;
 }
 

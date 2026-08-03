@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase";
 import { useEffect, useRef, useState } from "react";
 import { TEAM_DEFAULTS as DEFAULTS, rowToTeamSettings, type TeamSettings } from "@/lib/teamSettingsTypes";
+import { useBootstrap } from "@/lib/bootstrapContext";
 
 export type { TeamSettings };
 
@@ -38,15 +39,18 @@ export function patchTeamSettingsCache(partial: Partial<Omit<TeamSettings, "id">
   if (_cache) { _cache = { ..._cache, ...partial }; notify(); }
 }
 
-/** Reactive hook: current team settings, re-rendering on any load/update. */
+/** Reactive hook: current team settings, re-rendering on any load/update.
+ *  Initial value comes from the server bootstrap context so the SSR render (and
+ *  the matching first client render) already have the correct values. */
 export function useTeamSettings(): TeamSettings | null {
-  const [val, setVal] = useState<TeamSettings | null>(() => _cache);
+  const boot = useBootstrap();
+  const [val, setVal] = useState<TeamSettings | null>(() => _cache ?? boot?.team ?? null);
   useEffect(() => {
-    const update = () => setVal(_cache);
+    const update = () => setVal(_cache ?? boot?.team ?? null);
     _subs.add(update);
     update();
     return () => { _subs.delete(update); };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return val;
 }
 
