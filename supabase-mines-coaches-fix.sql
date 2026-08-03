@@ -1,43 +1,45 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Make yboone + preston_kyle coaches of "Colorado School of Mines", not their
--- legacy solo teams.
+-- Bind yon (yboone, COACH) and preston_kyle (ATHLETE) to "Colorado School of
+-- Mines" instead of their legacy solo teams.
 --
--- Background: a coach's account resolves to the team they JOINED (metadata.teamId)
+-- Background: a user's account resolves to the team they JOINED (metadata.teamId)
 -- if set, else their own account id. yboone (daf47a48…) and preston (2ef484f3…)
 -- each also own a legacy solo team whose id equals their user id, so without an
 -- explicit teamId they load that legacy roster instead of Mines.
 --
 -- Requires the app code change that resolves ALL users to metadata.teamId when
--- present (deployed on the phase2-localstorage branch). After running this, both
--- users must sign out and back in (or refresh) so the new metadata is read.
+-- present (deployed with this branch). After running this, both users must sign
+-- out and back in (or refresh) so the new metadata is read.
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Constants (Mines team + the two user ids)
+-- Constants:
 --   team  9187f370-0164-410c-b91b-837083ffcd59  = Colorado School of Mines
---   yboone   daf47a48-d3e6-4baf-982d-550ba22a7df0
---   preston  2ef484f3-1abb-41cc-b3e5-88e3f2bbda2f
+--   yon/yboone   daf47a48-d3e6-4baf-982d-550ba22a7df0  (COACH)
+--   preston      2ef484f3-1abb-41cc-b3e5-88e3f2bbda2f  (ATHLETE)
 
--- 1) Point their auth metadata at Mines and mark them coaches.
+-- 1a) yon → Mines COACH (auth metadata).
 UPDATE auth.users
 SET raw_user_meta_data =
   COALESCE(raw_user_meta_data, '{}'::jsonb)
-  || jsonb_build_object(
-       'teamId', '9187f370-0164-410c-b91b-837083ffcd59',
-       'role', 'coach'
-     )
-WHERE id IN (
-  'daf47a48-d3e6-4baf-982d-550ba22a7df0',
-  '2ef484f3-1abb-41cc-b3e5-88e3f2bbda2f'
-);
+  || jsonb_build_object('teamId', '9187f370-0164-410c-b91b-837083ffcd59', 'role', 'coach')
+WHERE id = 'daf47a48-d3e6-4baf-982d-550ba22a7df0';
 
--- 2) Make their Mines membership a coach with edit access.
-UPDATE members
-SET role = 'coach', access = 'edit'
+-- 1b) preston → Mines ATHLETE (auth metadata).
+UPDATE auth.users
+SET raw_user_meta_data =
+  COALESCE(raw_user_meta_data, '{}'::jsonb)
+  || jsonb_build_object('teamId', '9187f370-0164-410c-b91b-837083ffcd59', 'role', 'athlete')
+WHERE id = '2ef484f3-1abb-41cc-b3e5-88e3f2bbda2f';
+
+-- 2a) yon's Mines membership = coach / edit.
+UPDATE members SET role = 'coach', access = 'edit'
 WHERE team_id = '9187f370-0164-410c-b91b-837083ffcd59'
-  AND id IN (
-    'daf47a48-d3e6-4baf-982d-550ba22a7df0',
-    '2ef484f3-1abb-41cc-b3e5-88e3f2bbda2f'
-  );
+  AND id = 'daf47a48-d3e6-4baf-982d-550ba22a7df0';
+
+-- 2b) preston's Mines membership = athlete / view.
+UPDATE members SET role = 'athlete', access = 'view'
+WHERE team_id = '9187f370-0164-410c-b91b-837083ffcd59'
+  AND id = '2ef484f3-1abb-41cc-b3e5-88e3f2bbda2f';
 
 -- 3) Verify.
 SELECT u.id, u.email,
