@@ -72,7 +72,9 @@ ON CONFLICT (team_id, sport) DO NOTHING;
 -- (e.g. a co-coach), the owner's row may be empty/default. Those coaches just
 -- open the settings page once and re-save; it writes to team_sport_settings.
 
--- 6) (Optional, AFTER verifying the app reads the team table) clean up the old
---    per-user copies so they can't drift. Leave commented until confirmed.
--- DELETE FROM public.user_settings
--- WHERE sport IN ('fg','punt','kickoff','snap','punt_strike_zone','holder_strike_zone');
+-- 6) Cleanup (run AFTER verifying the app reads the team table — done in prod).
+--    Removes the old per-user copies so they can't drift. Also drops the legacy
+--    `strikeZone` sport (pre-rename orphan that no code reads). After this,
+--    user_settings holds only the per-user `app` bucket.
+DELETE FROM public.user_settings
+WHERE sport IN ('fg','punt','kickoff','snap','punt_strike_zone','holder_strike_zone','strikeZone');
