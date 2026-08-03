@@ -48,7 +48,7 @@ SELECT u.id, u.email,
        m.role AS member_role, m.access AS member_access
 FROM auth.users u
 LEFT JOIN members m
-  ON m.id = u.id AND m.team_id = '9187f370-0164-410c-b91b-837083ffcd59'
+  ON m.id = u.id::text AND m.team_id = '9187f370-0164-410c-b91b-837083ffcd59'
 WHERE u.id IN (
   'daf47a48-d3e6-4baf-982d-550ba22a7df0',
   '2ef484f3-1abb-41cc-b3e5-88e3f2bbda2f'
