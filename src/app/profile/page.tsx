@@ -132,10 +132,10 @@ function ProfileContent() {
         setDeleting(false);
         return;
       }
-      // Sign out locally then redirect
+      // Sign out locally then redirect. Nothing authoritative lives in the
+      // browser anymore, so there's no localStorage to clear.
       const supabase = createClient();
       await supabase.auth.signOut();
-      localStorage.clear();
       window.location.href = "/login";
     } catch {
       setDeleteError("Failed to delete account. Please try again.");

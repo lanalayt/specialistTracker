@@ -25,7 +25,6 @@ export default function AthleteDashboardPage() {
       let tid = getTeamId();
       for (let i = 0; i < 20 && !tid; i++) { await new Promise((r) => setTimeout(r, 200)); tid = getTeamId(); }
       if (!tid) return;
-      // Try cloud first, then fall back to localStorage
       const all = await loadAssignedCharts(tid);
       setCharts(all);
     }

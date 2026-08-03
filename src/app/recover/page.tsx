@@ -123,23 +123,7 @@ function RecoverContent() {
       } catch {}
     }
 
-    // 2. Check localStorage (old blobs)
-    for (const s of sports) {
-      try {
-        const raw = localStorage.getItem(s.lsKey);
-        if (raw) {
-          const data = JSON.parse(raw);
-          all.push({
-            source: `localStorage (${s.lsKey})`,
-            dataKey: s.key,
-            sessions: extractSessions(data, s.label),
-            raw: data,
-          });
-        }
-      } catch {}
-    }
-
-    // 3. Check archives table
+    // 2. Check archives table
     if (tid && tid !== "local-dev") {
       try {
         const { data } = await supabase
@@ -175,7 +159,7 @@ function RecoverContent() {
         <div>
           <h1 className="text-2xl font-extrabold text-slate-100">Data Recovery Scanner</h1>
           <p className="text-sm text-muted mt-1">
-            Scanning all data sources for sessions — sessions table, localStorage, and archives.
+            Scanning all data sources for sessions — the sessions table and archives.
           </p>
         </div>
 

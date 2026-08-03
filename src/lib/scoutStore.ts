@@ -2,53 +2,25 @@ import { createClient } from "@/lib/supabase";
 
 /**
  * Scout Mode data persistence layer.
- * The database is the single source of truth. Each concern has its own
+ * The database is the single source of truth — every concern has its own
  * dedicated table (scout_profiles, scout_athletes, scout_numbers,
  * scout_ranking_groups, scout_session_rankings, assigned_charts,
  * scout_archives, scout_presets). Scout sessions use the existing `sessions`
  * table with SCOUT_* sport values to stay isolated from coach mode.
  *
- * localStorage is used ONLY in local/dev mode (no real team), namespaced so it
- * can't bleed into a real team's view.
- */
-
-/**
- * Tenant isolation rule: for a real signed-in team, scout data is CLOUD-ONLY —
- * we never read or write localStorage.
+ * Phase 5: an account is always required, so scout data is DB-only. The old
+ * local/dev localStorage cache is retired — these helpers are inert no-ops kept
+ * only so the (now-unreachable) local-dev branches still compile.
  */
 function isRealTeam(teamId: string): boolean {
   return !!teamId && teamId !== "local-dev";
 }
 
-function nsKey(teamId: string, key: string): string {
-  return `scout::${isRealTeam(teamId) ? teamId : "local"}::${key}`;
-}
-
-function cacheGet<T>(teamId: string, key: string, fallback: T): T {
-  if (isRealTeam(teamId)) return fallback; // real teams never read the device cache
-  try {
-    const raw = localStorage.getItem(nsKey(teamId, key));
-    if (raw) return JSON.parse(raw) as T;
-  } catch {}
+function cacheGet<T>(_teamId: string, _key: string, fallback: T): T {
   return fallback;
 }
 
-function cacheSet(teamId: string, key: string, value: unknown): void {
-  if (isRealTeam(teamId)) return; // real teams never write the device cache
-  try { localStorage.setItem(nsKey(teamId, key), JSON.stringify(value)); } catch {}
-}
-
-// One-time purge of legacy, non-team-scoped scout cache keys.
-if (typeof window !== "undefined") {
-  try {
-    const legacy = ["scout_profiles", "scout_archives", "assigned_charts", "scout_fg_preset"];
-    for (const k of Object.keys(localStorage)) {
-      if (legacy.includes(k) || k.startsWith("scout_athletes_") || k.startsWith("scout_numbers_")) {
-        localStorage.removeItem(k);
-      }
-    }
-  } catch {}
-}
+function cacheSet(_teamId: string, _key: string, _value: unknown): void {}
 
 // ── Scout Sessions ──────────────────────────────────────────────────────────
 

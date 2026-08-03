@@ -136,10 +136,7 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
 
   // Listen for auth state changes
   useEffect(() => {
-    const isLocal =
-      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-
-    // Get initial session
+    // Get initial session. An account is required — no local-dev fallback user.
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const u = mapSupabaseUser(session.user);
@@ -149,13 +146,6 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
         // otherwise their own account is the team (owner). Prevents a joined coach
         // from loading their empty/legacy solo team instead of the real team.
         setTeamId(u.teamId ? u.teamId : u.id);
-      } else if (isLocal) {
-        setUser({
-          id: "local-dev",
-          email: "dev@localhost",
-          name: "Coach (Local)",
-          role: "coach",
-        });
       }
       setIsLoading(false);
     });

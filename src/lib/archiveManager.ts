@@ -32,7 +32,8 @@ function genArchiveId(): string {
 
 export async function loadArchives(): Promise<StatArchive[]> {
   const tid = getTeamId();
-  if (tid && tid !== "local-dev") {
+  if (!tid || tid === "local-dev") return [];
+  {
     const stored = await loadFromStore(tid);
     return stored.map((s) => ({
       id: s.id,
@@ -42,16 +43,6 @@ export async function loadArchives(): Promise<StatArchive[]> {
       punt: (s.punt as unknown as ArchivedPhaseData<PuntAthleteStats>) ?? { athletes: [], stats: {}, history: [] },
       kickoff: (s.kickoff as unknown as ArchivedPhaseData<KickoffAthleteStats>) ?? { athletes: [], stats: {}, history: [] },
     }));
-  }
-  // Fallback to localStorage
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem("statArchives");
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
   }
 }
 
@@ -80,11 +71,6 @@ export async function createArchive(
       punt: archive.punt as unknown as Record<string, unknown>,
       kickoff: archive.kickoff as unknown as Record<string, unknown>,
     });
-  } else {
-    // Fallback localStorage
-    const existing = await loadArchives();
-    const next = [...existing, archive];
-    try { localStorage.setItem("statArchives", JSON.stringify(next)); } catch {}
   }
 
   return archive;
@@ -94,9 +80,5 @@ export async function deleteArchive(id: string): Promise<void> {
   const tid = getTeamId();
   if (tid && tid !== "local-dev") {
     await deleteFromStore(tid, id);
-  } else {
-    const existing = await loadArchives();
-    const next = existing.filter((a) => a.id !== id);
-    try { localStorage.setItem("statArchives", JSON.stringify(next)); } catch {}
   }
 }
