@@ -9,7 +9,7 @@ import { PuntFieldStrip } from "@/components/ui/PuntFieldStrip";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, PuntType, PuntHash, PuntLandingZone } from "@/types";
 import { PUNT_HASHES } from "@/types";
-import { insertSession as insertSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
+import { insertSession as insertSnapSession, updateSession as updateSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
 import { genId as genSnapId } from "@/lib/stats";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
@@ -367,6 +367,9 @@ export default function PuntingSessionPage() {
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [snapPuntIdx, setSnapPuntIdx] = useState(0);
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
+  // Id of the LONGSNAP session saved at commit — kept so a snap added on the
+  // committed recap page updates that same session instead of creating a dupe.
+  const [committedSnapId, setCommittedSnapId] = useState<string | null>(null);
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   // Snap logs draft in session_drafts (DB), not localStorage. Hydrate first so
   // the empty initial state can't clobber a saved draft.
@@ -1048,10 +1051,11 @@ export default function PuntingSessionPage() {
     if (allSnapEntries.length > 0) {
       const tid = getTeamId();
       if (tid) {
+        const snapId = genSnapId();
         const snapperNames = [...new Set(allSnapEntries.map((e) => e.athlete))].join(", ");
         stampSnapWrite(tid);
         const snapSession = {
-          id: genSnapId(), teamId: tid, sport: "LONGSNAP",
+          id: snapId, teamId: tid, sport: "LONGSNAP",
           label: `Long Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
           date: new Date().toISOString(),
           // Tag snaps from a game session as game so they land in game stats.
@@ -1059,13 +1063,41 @@ export default function PuntingSessionPage() {
           entries: allSnapEntries,
         };
         await insertSnapSession(tid, snapSession as never);
+        // Remember the session so a snap added on the recap updates it in place.
+        setCommittedSnapId(snapId);
       }
-      setSnapLogsMap({});
     }
     setCommittedPunts(pendingPunts);
     setPendingPunts(null);
     setCommitted(true);
     setSessionActive(false);
+    // NOTE: snapLogsMap is intentionally kept so a snap missed before submitting
+    // can still be added on the committed recap (see persistCommittedSnaps).
+    // It is reset in handleNewSession when the coach starts a fresh session.
+  };
+
+  // Persist snaps edited on the committed recap. If a LONGSNAP session was saved
+  // at commit, update it in place (insertSession ignores conflicts, so we must
+  // update); otherwise create one now for the first snap added after commit.
+  const persistCommittedSnaps = async () => {
+    const tid = getTeamId();
+    if (!tid || tid === "local-dev") return;
+    if (allSnapEntries.length === 0) return;
+    const snapperNames = [...new Set(allSnapEntries.map((e) => e.athlete))].join(", ");
+    stampSnapWrite(tid);
+    if (committedSnapId) {
+      await updateSnapSession(tid, committedSnapId, { entries: allSnapEntries });
+    } else {
+      const snapId = genSnapId();
+      setCommittedSnapId(snapId);
+      await insertSnapSession(tid, {
+        id: snapId, teamId: tid, sport: "LONGSNAP",
+        label: `Long Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
+        date: new Date().toISOString(),
+        mode: sessionMode === "game" ? "game" : "practice",
+        entries: allSnapEntries,
+      } as never);
+    }
   };
 
   const handleBackToLog = () => {
@@ -1085,12 +1117,55 @@ export default function PuntingSessionPage() {
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setOpponent("");
     setGameTime("");
+    // Reset snap state (kept through the recap so late snaps could be added).
+    setSnapLogsMap({});
+    setCommittedSnapId(null);
     if (sessionMode) {
       const tid = getTeamId();
       if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(sessionMode));
     }
     setSessionMode(null);
   };
+
+  // Snap overlay, defined once so every return branch (live session, committed
+  // recap, and the planning table) can render the same popup.
+  const snapPuntRow = rows[snapPuntIdx];
+  const snapOverlay = showSnapOverlay ? (
+    <AthleteSnapPopup
+      snapType="PUNT"
+      athletes={snapAthletes}
+      kickerName={snapPuntRow?.athlete || undefined}
+      previousSnaps={snapLogsMap[String(snapPuntIdx)]}
+      onClose={() => {
+        setShowSnapOverlay(false);
+        // After commit the snap session already exists (or none did); persist any
+        // snap the coach just added on the recap so the late entry isn't lost.
+        if (committed) void persistCommittedSnaps();
+      }}
+      onSaved={(entry) => {
+        const key = String(snapPuntIdx);
+        const wasLogged = (snapLogsMap[key]?.length ?? 0) > 0;
+        // One snap per punt: replace (also covers editing).
+        setSnapLogsMap((prev) => ({ ...prev, [key]: [entry] }));
+        // Only auto-advance when adding a NEW snap; when editing, stay put.
+        if (!wasLogged) {
+          const currentFilledIdx = filledRows.findIndex(({ i }) => i === snapPuntIdx);
+          const nextUnlogged = filledRows.slice(currentFilledIdx + 1).find(({ i }) => !(snapLogsMap[String(i)]?.length) && i !== snapPuntIdx);
+          if (nextUnlogged) setSnapPuntIdx(nextUnlogged.i);
+        }
+      }}
+      kickList={filledRows.map(({ r, i }, fi) => ({
+        idx: i,
+        kickNum: fi + 1,
+        athlete: r.athlete || "?",
+        dist: r.yards || "?",
+        pos: r.hash || "?",
+        hasSnap: (snapLogsMap[String(i)]?.length ?? 0) > 0,
+        isActive: snapPuntIdx === i,
+      }))}
+      onKickSelect={(idx) => setSnapPuntIdx(idx)}
+    />
+  ) : null;
 
   const [clearUndoData, setClearUndoData] = useState<{ rows: typeof rows; sessionPunts: typeof sessionPunts; plannedPunts: typeof plannedPunts; plannedRowIndices: number[]; partialInputs: typeof partialInputs } | null>(null);
 
@@ -1637,6 +1712,26 @@ export default function PuntingSessionPage() {
                     </div>
                     )}
 
+                    {/* Log Snap — mirrors the FG live card so a snap can be
+                        logged for the punt currently on screen. */}
+                    {!viewOnly && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Snap keys are row indices; map the on-screen plan
+                            // position to its row so the key matches the overlay.
+                            const rowIdx = plannedRowIndices[currentPuntIdx] ?? currentPuntIdx;
+                            setSnapPuntIdx(rowIdx);
+                            setShowSnapOverlay(true);
+                          }}
+                          className="px-2.5 py-2 rounded-input bg-accent/15 border border-accent text-accent hover:bg-accent/25 active:scale-95 text-xs font-bold transition-all whitespace-nowrap"
+                        >
+                          Log Snap
+                        </button>
+                      </div>
+                    )}
+
                     {/* Star + Log button + Remove */}
                     <div className="flex gap-2">
                       <button
@@ -1827,6 +1922,7 @@ export default function PuntingSessionPage() {
             onWeatherChange={setWeather}
           />
         )}
+        {snapOverlay}
       </>
     );
   }
@@ -1979,6 +2075,18 @@ export default function PuntingSessionPage() {
             </table>
           </div>
 
+          {!viewOnly && filledCount > 0 && (
+            <button
+              onClick={() => {
+                const firstUnlogged = filledRows.findIndex(({ i }) => !snapLogsMap[String(i)]?.length);
+                setSnapPuntIdx(firstUnlogged >= 0 ? filledRows[firstUnlogged].i : (filledRows[0]?.i ?? 0));
+                setShowSnapOverlay(true);
+              }}
+              className="w-full py-3 text-sm font-bold rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all"
+            >
+              Log Snap
+            </button>
+          )}
           <button
             onClick={handleNewSession}
             className="btn-primary w-full py-3 text-sm font-bold"
@@ -1986,6 +2094,7 @@ export default function PuntingSessionPage() {
             ← Back to Log
           </button>
         </div>
+        {snapOverlay}
       </main>
     );
   }
@@ -2719,40 +2828,7 @@ export default function PuntingSessionPage() {
         />
       )}
 
-      {showSnapOverlay && (() => {
-        const snapPuntRow = rows[snapPuntIdx];
-        return (
-          <AthleteSnapPopup
-            snapType="PUNT"
-            athletes={snapAthletes}
-            kickerName={snapPuntRow?.athlete || undefined}
-            previousSnaps={snapLogsMap[String(snapPuntIdx)]}
-            onClose={() => setShowSnapOverlay(false)}
-            onSaved={(entry) => {
-              const key = String(snapPuntIdx);
-              const wasLogged = (snapLogsMap[key]?.length ?? 0) > 0;
-              // One snap per punt: replace (also covers editing).
-              setSnapLogsMap((prev) => ({ ...prev, [key]: [entry] }));
-              // Only auto-advance when adding a NEW snap; when editing, stay put.
-              if (!wasLogged) {
-                const currentFilledIdx = filledRows.findIndex(({ i }) => i === snapPuntIdx);
-                const nextUnlogged = filledRows.slice(currentFilledIdx + 1).find(({ i }) => !(snapLogsMap[String(i)]?.length) && i !== snapPuntIdx);
-                if (nextUnlogged) setSnapPuntIdx(nextUnlogged.i);
-              }
-            }}
-            kickList={filledRows.map(({ r, i }, fi) => ({
-              idx: i,
-              kickNum: fi + 1,
-              athlete: r.athlete || "?",
-              dist: r.yards || "?",
-              pos: r.hash || "?",
-              hasSnap: (snapLogsMap[String(i)]?.length ?? 0) > 0,
-              isActive: snapPuntIdx === i,
-            }))}
-            onKickSelect={(idx) => setSnapPuntIdx(idx)}
-          />
-        );
-      })()}
+      {snapOverlay}
     </>
   );
 }
