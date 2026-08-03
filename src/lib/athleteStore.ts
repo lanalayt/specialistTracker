@@ -64,12 +64,21 @@ export async function removeAthlete(teamId: string, athleteId: string): Promise<
   if (!teamId || teamId === "local-dev") return false;
   try {
     const supabase = createClient();
-    const { error } = await supabase
+    // Delete by id only — do NOT also filter on team_id. A row whose stored
+    // team_id drifted (null/empty/legacy or a different team the user belongs to)
+    // would be visible but survive a team-scoped delete, "coming back" on reload.
+    // RLS (is_team_member(team_id)) still guarantees the user can only delete
+    // rows in their own team(s). `.select()` lets us confirm a row was removed.
+    const { data, error } = await supabase
       .from("athletes")
       .delete()
-      .eq("team_id", teamId)
-      .eq("id", athleteId);
+      .eq("id", athleteId)
+      .select("id");
     if (error) throw error;
+    if (!data || data.length === 0) {
+      console.warn("[AthleteStore] removeAthlete deleted 0 rows (id:", athleteId, ") — likely an orphaned/foreign team_id blocked by RLS");
+      return false;
+    }
     return true;
   } catch (err) {
     console.warn("[AthleteStore] removeAthlete failed:", err);
