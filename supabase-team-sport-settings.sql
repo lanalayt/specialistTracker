@@ -48,14 +48,23 @@ CREATE POLICY "coach_delete" ON public.team_sport_settings
   FOR DELETE TO authenticated USING (is_team_coach(team_id));
 
 -- 4) Realtime (so a coach's change pushes to athletes' open sessions).
-ALTER PUBLICATION supabase_realtime ADD TABLE public.team_sport_settings;
+--    Idempotent so the whole script can be re-run safely.
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public'
+      AND tablename = 'team_sport_settings'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.team_sport_settings;
+  END IF;
+END $$;
 
 -- 5) Migrate: seed each team from the team OWNER's existing per-user rows.
 --    (A team's owner is the user whose id == team id.)
 INSERT INTO public.team_sport_settings (team_id, sport, settings, updated_at)
-SELECT us.user_id, us.sport, us.settings, COALESCE(us.updated_at, now())
+SELECT us.user_id::text, us.sport, us.settings, COALESCE(us.updated_at, now())
 FROM public.user_settings us
-JOIN public.teams t ON t.id = us.user_id
+JOIN public.teams t ON t.id = us.user_id::text
 WHERE us.sport IN ('fg','punt','kickoff','snap','punt_strike_zone','holder_strike_zone')
 ON CONFLICT (team_id, sport) DO NOTHING;
 
