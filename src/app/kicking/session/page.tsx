@@ -16,7 +16,7 @@ import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
 import { loadAthletes as loadAthleteList } from "@/lib/athleteStore";
-import { insertSession as insertSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
+import { insertSession as insertSnapSession, updateSession as updateSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
 import { genId as genSnapId } from "@/lib/stats";
 import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
@@ -257,6 +257,9 @@ export default function KickingSessionPage() {
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [snapKickIdx, setSnapKickIdx] = useState(0);
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
+  // Id of the LONGSNAP session saved at commit — kept so a snap added on the
+  // committed recap page updates that same session instead of creating a dupe.
+  const [committedSnapId, setCommittedSnapId] = useState<string | null>(null);
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
   const [holderEnabled, setHolderEnabled] = useState(true);
@@ -874,6 +877,13 @@ export default function KickingSessionPage() {
     .flatMap(([, arr]) => arr)
     .map((s) => s.dbEntry);
 
+  // Snap entries keyed to the kicks actually shown (works for both the live plan
+  // and manual-entry rows, where sessionKicks may be empty). Used for the recap
+  // Log Snap re-save so a late snap in either mode persists.
+  const committedSnapEntries = snapKicks
+    .flatMap((k) => snapLogsMap[String(k.idx)] ?? [])
+    .map((s) => s.dbEntry);
+
   const handleConfirmCommit = async () => {
     if (!pendingKicks) return;
     // Attach holder from snap logs to each kick
@@ -887,9 +897,10 @@ export default function KickingSessionPage() {
     if (allSnapEntries.length > 0) {
       const tid = getTeamId();
       if (tid) {
+        const snapId = genSnapId();
         const snapperNames = [...new Set(allSnapEntries.map((e) => e.athlete))].join(", ");
         const snapSession = {
-          id: genSnapId(), teamId: tid, sport: "LONGSNAP",
+          id: snapId, teamId: tid, sport: "LONGSNAP",
           label: `Short Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
           date: new Date().toISOString(),
           // Tag snaps from a game session as game so they land in game stats.
@@ -898,13 +909,41 @@ export default function KickingSessionPage() {
         };
         stampSnapWrite(tid);
         await insertSnapSession(tid, snapSession as any);
+        // Remember the session so a snap added on the recap updates it in place.
+        setCommittedSnapId(snapId);
       }
     }
     setCommittedKicks(enrichedKicks);
     setPendingKicks(null);
     setCommitted(true);
     setSessionActive(false);
-    setSnapLogsMap({});
+    // NOTE: snapLogsMap is intentionally kept so a snap missed before submitting
+    // can still be added on the committed recap (see persistCommittedSnaps).
+    // It is reset in handleNewSession when the coach starts a fresh session.
+  };
+
+  // Persist snaps edited on the committed recap. If a LONGSNAP session was saved
+  // at commit, update it in place (insertSession ignores conflicts, so we must
+  // update); otherwise create one now for the first snap added after commit.
+  const persistCommittedSnaps = async () => {
+    const tid = getTeamId();
+    if (!tid || tid === "local-dev") return;
+    if (committedSnapEntries.length === 0) return;
+    const snapperNames = [...new Set(committedSnapEntries.map((e) => e.athlete))].join(", ");
+    stampSnapWrite(tid);
+    if (committedSnapId) {
+      await updateSnapSession(tid, committedSnapId, { entries: committedSnapEntries });
+    } else {
+      const snapId = genSnapId();
+      setCommittedSnapId(snapId);
+      await insertSnapSession(tid, {
+        id: snapId, teamId: tid, sport: "LONGSNAP",
+        label: `Short Snap — ${new Date().toLocaleDateString()} — ${snapperNames}`,
+        date: new Date().toISOString(),
+        mode: sessionMode === "game" ? "game" : "practice",
+        entries: committedSnapEntries,
+      } as any);
+    }
   };
 
   const handleBackToLog = () => {
@@ -925,6 +964,9 @@ export default function KickingSessionPage() {
     setRows(Array.from({ length: INIT_ROWS }, emptyRow));
     setOpponent("");
     setGameTime("");
+    // Reset snap state (kept through the recap so late snaps could be added).
+    setSnapLogsMap({});
+    setCommittedSnapId(null);
     // Clear the saved draft for the current mode
     if (sessionMode) {
       const tid = getTeamId();
@@ -994,7 +1036,12 @@ export default function KickingSessionPage() {
       kickDistance={snapKickRow?.dist ? parseInt(snapKickRow.dist) : undefined}
       kickHash={snapKickRow?.pos || undefined}
       previousSnaps={snapLogsMap[String(snapKickIdx)]}
-      onClose={() => setShowSnapOverlay(false)}
+      onClose={() => {
+        setShowSnapOverlay(false);
+        // After commit the snap session already exists (or none did); persist any
+        // snap the coach just added on the recap so the late entry isn't lost.
+        if (committed) void persistCommittedSnaps();
+      }}
       onSaved={(entry) => {
         const key = String(snapKickIdx);
         const wasLogged = (snapLogsMap[key]?.length ?? 0) > 0;
@@ -1805,8 +1852,21 @@ export default function KickingSessionPage() {
               </tbody>
             </table>
           </div>
+          {!viewOnly && snapKicks.length > 0 && (
+            <button
+              onClick={() => {
+                const firstUnlogged = snapKicks.findIndex((k) => !snapLogsMap[String(k.idx)]?.length);
+                setSnapKickIdx(firstUnlogged >= 0 ? snapKicks[firstUnlogged].idx : (snapKicks[0]?.idx ?? 0));
+                setShowSnapOverlay(true);
+              }}
+              className="w-full py-3 text-sm font-bold rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all"
+            >
+              Log Snap
+            </button>
+          )}
           <button onClick={handleNewSession} className="btn-primary w-full py-3 text-sm font-bold">← Back to Log</button>
         </div>
+        {snapOverlay}
       </main>
     );
   }
