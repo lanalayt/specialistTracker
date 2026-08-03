@@ -10,9 +10,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
+import { getAppPref, setAppPref } from "@/lib/settingsSync";
 
-const STORAGE_KEY = "st_tutorial_seen";
-const STEP_KEY = "st_tutorial_step";
+const SEEN_PREF = "tutorialSeen";
 
 /* ── Context ─────────────────────────────────────────────────────────────── */
 
@@ -177,37 +177,30 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Auto-show on first visit only, and only on dashboard (not login/signup)
+  // Auto-show on first visit only, and only on dashboard (not login/signup).
+  // "Seen" is a per-user pref in user_settings (app bucket), not localStorage.
   useEffect(() => {
     if (pathname !== "/dashboard") return;
-    try {
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        // Mark as seen immediately so it never auto-shows again
-        localStorage.setItem(STORAGE_KEY, "1");
-        const t = setTimeout(() => {
-          setActive(true);
-          setStep(0);
-        }, 600);
-        return () => clearTimeout(t);
-      }
-    } catch {}
+    if (!getAppPref<boolean>(SEEN_PREF)) {
+      // Mark as seen immediately so it never auto-shows again
+      setAppPref(SEEN_PREF, true);
+      const t = setTimeout(() => {
+        setActive(true);
+        setStep(0);
+      }, 600);
+      return () => clearTimeout(t);
+    }
   }, [pathname]);
 
   const show = useCallback(() => {
     setStep(0);
     setActive(true);
-    try {
-      localStorage.removeItem(STEP_KEY);
-    } catch {}
   }, []);
 
   const close = useCallback(() => {
     setActive(false);
     setStep(0);
-    try {
-      localStorage.setItem(STORAGE_KEY, "1");
-      localStorage.removeItem(STEP_KEY);
-    } catch {}
+    setAppPref(SEEN_PREF, true);
   }, []);
 
   const advance = useCallback(() => {
@@ -222,9 +215,6 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       router.push(current.navigateTo);
     }
     setStep(nextStep);
-    try {
-      localStorage.setItem(STEP_KEY, String(nextStep));
-    } catch {}
   }, [step, close, router]);
 
   const goBack = useCallback(() => {

@@ -10,6 +10,9 @@ export const SPORT_MAP: Record<string, string> = {
   snapSettings: "snap",
   strikeZoneBounds_v5: "punt_strike_zone",
   holderStrikeZoneBounds: "holder_strike_zone",
+  // Reserved bucket for assorted per-user UI prefs (tutorial, blocked athletes,
+  // exclude-live-reps toggles, entry-mode default) stored as one JSON object.
+  appSettings: "app",
 };
 
 /** Reverse lookup: user_settings.sport -> local key (null if unknown). */

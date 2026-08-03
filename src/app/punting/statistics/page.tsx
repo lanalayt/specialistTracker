@@ -10,7 +10,7 @@ import clsx from "clsx";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportPuntStats, exportPuntStatsPDF } from "@/lib/exportStats";
-import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
 import { ExportButton } from "@/components/ui/ExportButton";
 
 interface PuntTypeConfig { id: string; label: string; category: string; metric: "distance" | "yardline"; hangTime: boolean }
@@ -634,17 +634,11 @@ export default function PuntingStatisticsPage() {
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
   const dateFilter = useDateRangeFilter();
 
-  const [excludeLiveReps, setExcludeLiveReps] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      const v = localStorage.getItem("punt_exclude_live_reps");
-      return v === "true";
-    } catch { return false; }
-  });
+  const [excludeLiveReps, setExcludeLiveReps] = useState(() => getAppPref<boolean>("puntExcludeLiveReps") === true);
 
   const toggleExcludeLiveReps = (val: boolean) => {
     setExcludeLiveReps(val);
-    try { localStorage.setItem("punt_exclude_live_reps", String(val)); } catch {}
+    setAppPref("puntExcludeLiveReps", val);
   };
 
   useEffect(() => {

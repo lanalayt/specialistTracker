@@ -4,16 +4,15 @@ import { useState, useEffect } from "react";
 import { usePunt } from "@/lib/puntContext";
 import { getTeamId } from "@/lib/teamData";
 import { createClient } from "@/lib/supabase";
+import { getAppPref, setAppPref } from "@/lib/settingsSync";
 
 const MIRROR_KEY = "PUNTING";
-const BLOCK_KEY = "blocked_athletes_ATHLETE_PUNTING";
+const BLOCK_PREF = "blockedAthletesPunting";
 
 export default function AthletePuntingAthletesPage() {
   const { athletes, addAthletes, removeAthlete } = usePunt();
   const [input, setInput] = useState("");
-  const [blocked, setBlocked] = useState<Set<string>>(() => {
-    try { const b = JSON.parse(localStorage.getItem(BLOCK_KEY) ?? "[]"); return new Set(b); } catch { return new Set(); }
-  });
+  const [blocked, setBlocked] = useState<Set<string>>(() => new Set(getAppPref<string[]>(BLOCK_PREF) ?? []));
 
   const visibleAthletes = athletes.filter((a) => !blocked.has(a.name));
 
@@ -25,7 +24,7 @@ export default function AthletePuntingAthletesPage() {
       const next = new Set(blocked);
       next.delete(name);
       setBlocked(next);
-      try { localStorage.setItem(BLOCK_KEY, JSON.stringify([...next])); } catch {}
+      setAppPref(BLOCK_PREF, [...next]);
     }
     addAthletes([name]);
     setInput("");
@@ -37,7 +36,7 @@ export default function AthletePuntingAthletesPage() {
     const next = new Set(blocked);
     next.add(name);
     setBlocked(next);
-    try { localStorage.setItem(BLOCK_KEY, JSON.stringify([...next])); } catch {}
+    setAppPref(BLOCK_PREF, [...next]);
     const tid = getTeamId();
     if (tid) {
       const supabase = createClient();

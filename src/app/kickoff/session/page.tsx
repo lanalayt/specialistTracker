@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftStore";
-import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
 import type { StoredAthlete } from "@/lib/athleteStore";
 
 const INIT_ROWS = 12;
@@ -101,21 +101,13 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
 
 // Remembers the practice Live/Manual choice independent of session data, so it
 // survives leaving and returning even when no reps were entered.
-const ENTRY_MODE_PREF_KEY = "ko_practice_entry_mode"; // "live" | "manual"
+const ENTRY_MODE_PREF = "kickoffEntryManual"; // per-user app pref: true = manual entry
 function loadPracticeEntryPref(): boolean {
   // Returns the default manualEntry value (true = manual entry).
-  if (typeof window === "undefined") return true;
-  try {
-    return localStorage.getItem(ENTRY_MODE_PREF_KEY) !== "live";
-  } catch {
-    return true;
-  }
+  return getAppPref<boolean>(ENTRY_MODE_PREF) !== false;
 }
 function savePracticeEntryPref(manual: boolean) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(ENTRY_MODE_PREF_KEY, manual ? "manual" : "live");
-  } catch {}
+  setAppPref(ENTRY_MODE_PREF, manual);
 }
 
 interface KOTypeConfig {

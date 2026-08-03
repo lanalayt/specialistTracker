@@ -5,19 +5,28 @@ import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
 import Link from "next/link";
 
-const REMEMBER_KEY = "st_remember_email";
+// "Remember email" is pre-auth (no signed-in user yet), so it can't live in the
+// per-user DB. Stored in a cookie — not localStorage — holding only the email.
+const REMEMBER_COOKIE = "st_email";
+function readRememberedEmail(): string {
+  if (typeof document === "undefined") return "";
+  const m = document.cookie.match(/(?:^|;\s*)st_email=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : "";
+}
+function writeRememberedEmail(email: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${REMEMBER_COOKIE}=${encodeURIComponent(email)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+}
+function clearRememberedEmail() {
+  if (typeof document === "undefined") return;
+  document.cookie = `${REMEMBER_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}
 
 export default function LoginPage() {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try { return localStorage.getItem(REMEMBER_KEY) ?? ""; } catch { return ""; }
-  });
+  const [email, setEmail] = useState(() => readRememberedEmail());
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try { return !!localStorage.getItem(REMEMBER_KEY); } catch { return false; }
-  });
+  const [rememberMe, setRememberMe] = useState(() => !!readRememberedEmail());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resetSent, setResetSent] = useState(false);
@@ -29,9 +38,9 @@ export default function LoginPage() {
     setError("");
     try {
       if (rememberMe) {
-        localStorage.setItem(REMEMBER_KEY, email);
+        writeRememberedEmail(email);
       } else {
-        localStorage.removeItem(REMEMBER_KEY);
+        clearRememberedEmail();
       }
       await signIn(email, password);
       window.location.href = "/dashboard";

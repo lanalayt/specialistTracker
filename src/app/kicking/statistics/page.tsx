@@ -10,7 +10,7 @@ import clsx from "clsx";
 import { DateRangeFilter, useDateRangeFilter } from "@/components/ui/DateRangeFilter";
 import { exportFGStats, exportFGStatsPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
-import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
 
 const POS_LABELS: Record<FGPosition, string> = {
   LH: "Left Hash",
@@ -345,17 +345,11 @@ export default function KickingStatisticsPage() {
     });
   }, []);
 
-  const [excludeLiveReps, setExcludeLiveReps] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      const v = localStorage.getItem("fg_exclude_live_reps");
-      return v === "true";
-    } catch { return false; }
-  });
+  const [excludeLiveReps, setExcludeLiveReps] = useState(() => getAppPref<boolean>("fgExcludeLiveReps") === true);
 
   const toggleExcludeLiveReps = (val: boolean) => {
     setExcludeLiveReps(val);
-    try { localStorage.setItem("fg_exclude_live_reps", String(val)); } catch {}
+    setAppPref("fgExcludeLiveReps", val);
   };
 
   const modeHistory = useMemo(() => {

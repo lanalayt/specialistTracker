@@ -115,6 +115,29 @@ export function useSettings<T>(localKey: string): T | null {
   return val;
 }
 
+// ─── App prefs bucket ────────────────────────────────────────────────────────
+// Assorted per-user UI prefs that aren't sport settings live together in one
+// user_settings row (sport = "app") as a JSON object, read/written by sub-key.
+const APP_KEY = "appSettings";
+
+/** Synchronous read of a single app pref (null until loaded / unset). */
+export function getAppPref<T>(key: string): T | null {
+  const app = getCachedSettings<Record<string, unknown>>(APP_KEY);
+  return (app?.[key] as T) ?? null;
+}
+
+/** Merge a single app pref into the "app" bucket and persist it. */
+export function setAppPref(key: string, value: unknown): void {
+  const app = (getCachedSettings<Record<string, unknown>>(APP_KEY)) ?? {};
+  saveSettingsToCloud(APP_KEY, { ...app, [key]: value });
+}
+
+/** Reactive hook for a single app pref. */
+export function useAppPref<T>(key: string): T | null {
+  const app = useSettings<Record<string, unknown>>(APP_KEY);
+  return (app?.[key] as T) ?? null;
+}
+
 /**
  * Subscribe to user_settings realtime for the signed-in user so cross-device
  * settings changes propagate into the store. Returns an unsubscribe fn.

@@ -18,7 +18,7 @@ import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnap
 import { loadAthletes as loadAthleteList } from "@/lib/athleteStore";
 import { insertSession as insertSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
 import { genId as genSnapId } from "@/lib/stats";
-import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
@@ -99,21 +99,13 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
 
 // Remembers the practice Live/Manual choice independent of session data, so it
 // survives leaving and returning even when no reps were entered.
-const ENTRY_MODE_PREF_KEY = "fg_practice_entry_mode"; // "live" | "manual"
+const ENTRY_MODE_PREF = "fgEntryManual"; // per-user app pref: true = manual entry
 function loadPracticeEntryPref(): boolean {
   // Returns the default manualEntry value (true = manual entry).
-  if (typeof window === "undefined") return true;
-  try {
-    return localStorage.getItem(ENTRY_MODE_PREF_KEY) !== "live";
-  } catch {
-    return true;
-  }
+  return getAppPref<boolean>(ENTRY_MODE_PREF) !== false;
 }
 function savePracticeEntryPref(manual: boolean) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(ENTRY_MODE_PREF_KEY, manual ? "manual" : "live");
-  } catch {}
+  setAppPref(ENTRY_MODE_PREF, manual);
 }
 
 type FgSettings = {

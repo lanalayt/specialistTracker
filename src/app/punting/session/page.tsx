@@ -13,7 +13,7 @@ import { insertSession as insertSnapSession, stampSessionWrite as stampSnapWrite
 import { genId as genSnapId } from "@/lib/stats";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
-import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
+import { loadSettingsFromCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
 import { AthleteSnapPopup, type SnapLogEntry } from "@/components/ui/AthleteSnapPopup";
 import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
@@ -172,21 +172,13 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
 
 // Remembers the practice Live/Manual choice independent of session data, so it
 // survives leaving and returning even when no reps were entered.
-const ENTRY_MODE_PREF_KEY = "punt_practice_entry_mode"; // "live" | "manual"
+const ENTRY_MODE_PREF = "puntEntryManual"; // per-user app pref: true = manual entry
 function loadPracticeEntryPref(): boolean {
   // Returns the default manualEntry value (true = manual entry).
-  if (typeof window === "undefined") return true;
-  try {
-    return localStorage.getItem(ENTRY_MODE_PREF_KEY) !== "live";
-  } catch {
-    return true;
-  }
+  return getAppPref<boolean>(ENTRY_MODE_PREF) !== false;
 }
 function savePracticeEntryPref(manual: boolean) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(ENTRY_MODE_PREF_KEY, manual ? "manual" : "live");
-  } catch {}
+  setAppPref(ENTRY_MODE_PREF, manual);
 }
 
 interface PuntTypeConfig {
