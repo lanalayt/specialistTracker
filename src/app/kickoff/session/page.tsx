@@ -1172,45 +1172,36 @@ export default function KickoffSessionPage() {
                       </div>
                     </div>
 
-                    {/* Editable: Type + Position */}
-                    <div className="flex gap-6 items-start flex-wrap">
+                    {/* Editable: Type + Position — dropdowns so the row never
+                        overflows horizontally regardless of how many types exist. */}
+                    <div className="flex gap-3 items-end">
                       <div className="flex-1 min-w-0">
                         <p className="label">Type</p>
-                        <div className="flex flex-wrap gap-1.5">
+                        <select
+                          value={currentPlan.type}
+                          onChange={(e) => updateCurrentPlan("type", e.target.value)}
+                          disabled={viewOnly}
+                          className="input text-sm py-2 w-full"
+                        >
+                          {!currentPlan.type && <option value="">Select…</option>}
                           {koTypes.map(({ id, label }) => (
-                            <button
-                              key={id}
-                              onClick={() => updateCurrentPlan("type", id)}
-                              className={clsx(
-                                "px-3 py-2 rounded-input text-xs font-semibold text-center transition-all",
-                                currentPlan.type === id
-                                  ? "bg-accent/20 text-accent border border-accent/50"
-                                  : "bg-surface-2 text-muted border border-border hover:text-white"
-                              )}
-                            >
-                              {label}
-                            </button>
+                            <option key={id} value={id}>{label}</option>
                           ))}
-                        </div>
+                        </select>
                       </div>
-                      <div className="shrink-0">
+                      <div className="w-28 shrink-0">
                         <p className="label">Position</p>
-                        <div className="flex gap-1.5">
+                        <select
+                          value={currentPlan.hash}
+                          onChange={(e) => updateCurrentPlan("hash", e.target.value)}
+                          disabled={viewOnly}
+                          className="input text-sm py-2 w-full"
+                        >
+                          {!currentPlan.hash && <option value="">—</option>}
                           {KICKOFF_HASHES.map((h) => (
-                            <button
-                              key={h}
-                              onClick={() => updateCurrentPlan("hash", h)}
-                              className={clsx(
-                                "w-10 py-2 rounded-input text-xs font-semibold text-center transition-all",
-                                currentPlan.hash === h
-                                  ? "bg-accent/20 text-accent border border-accent/50"
-                                  : "bg-surface-2 text-muted border border-border hover:text-white"
-                              )}
-                            >
-                              {POS_LABELS[h]}
-                            </button>
+                            <option key={h} value={h}>{POS_LABELS[h]}</option>
                           ))}
-                        </div>
+                        </select>
                       </div>
                     </div>
 

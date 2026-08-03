@@ -1373,43 +1373,31 @@ export default function KickingSessionPage() {
                           </div>
                         </div>
                       )}
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="label text-slate-100">Position</p>
-                        <div className="flex gap-1.5">
-                          {POSITIONS.map((p) => (
-                            <button
-                              key={p}
-                              onClick={() => {
-                                updateCurrentPlan("pos", p);
-                                updateCurrentPlan("isPAT", false);
-                              }}
-                              className={clsx(
-                                "flex-1 py-2 rounded-input text-xs font-semibold text-center transition-all",
-                                currentPlan.pos === p && !currentPlan.isPAT
-                                  ? "bg-accent/20 text-accent border border-accent/50"
-                                  : "bg-surface-2 text-muted border border-border hover:text-white"
-                              )}
-                            >
-                              {p}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => {
+                        <select
+                          value={currentPlan.isPAT ? "PAT" : currentPlan.pos}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "PAT") {
                               updateCurrentPlan("pos", "PAT" as FGPosition);
                               updateCurrentPlan("isPAT", true);
                               updateCurrentPlan("dist", 0);
                               setDistInput("");
-                            }}
-                            className={clsx(
-                              "flex-1 py-2 rounded-input text-xs font-semibold text-center transition-all",
-                              currentPlan.isPAT
-                                ? "bg-amber-500/20 text-amber-400 border border-amber-500/50"
-                                : "bg-surface-2 text-muted border border-border hover:text-white"
-                            )}
-                          >
-                            PAT
-                          </button>
-                        </div>
+                            } else {
+                              updateCurrentPlan("pos", v);
+                              updateCurrentPlan("isPAT", false);
+                            }
+                          }}
+                          disabled={viewOnly}
+                          className="input text-sm py-2 w-full"
+                        >
+                          {!currentPlan.pos && !currentPlan.isPAT && <option value="">—</option>}
+                          {POSITIONS.map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                          <option value="PAT">PAT</option>
+                        </select>
                       </div>
                     </div>
 
