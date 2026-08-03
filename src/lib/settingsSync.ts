@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase";
 import { useEffect, useState } from "react";
-import { SPORT_MAP, localKeyForSport } from "@/lib/settingsKeys";
+import { SPORT_MAP, localKeyForSport, isTeamScoped } from "@/lib/settingsKeys";
 import { useBootstrap } from "@/lib/bootstrapContext";
+import { getTeamId } from "@/lib/teamData";
 
 function getSport(localKey: string): string | null {
   return SPORT_MAP[localKey] ?? null;
@@ -38,18 +39,34 @@ async function fetchSport<T>(localKey: string): Promise<T | null> {
   if (!sport) return null;
   try {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    const { data } = await supabase
-      .from("user_settings")
-      .select("settings")
-      .eq("user_id", user.id)
-      .eq("sport", sport)
-      .maybeSingle();
-    if (data?.settings) {
-      _cache[localKey] = data.settings;
+    let settings: unknown = null;
+    if (isTeamScoped(localKey)) {
+      // Team charting config — read from the per-team table (RLS: team members).
+      const teamId = getTeamId();
+      if (!teamId || teamId === "local-dev") return null;
+      const { data } = await supabase
+        .from("team_sport_settings")
+        .select("settings")
+        .eq("team_id", teamId)
+        .eq("sport", sport)
+        .maybeSingle();
+      settings = data?.settings ?? null;
+    } else {
+      // Per-user pref — read from user_settings.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("user_settings")
+        .select("settings")
+        .eq("user_id", user.id)
+        .eq("sport", sport)
+        .maybeSingle();
+      settings = data?.settings ?? null;
+    }
+    if (settings) {
+      _cache[localKey] = settings;
       notify();
-      return data.settings as T;
+      return settings as T;
     }
   } catch {}
   return null;
@@ -76,19 +93,36 @@ export function saveSettingsToCloud<T>(localKey: string, data: T): void {
   const sport = getSport(localKey);
   if (sport) {
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) {
-        await supabase.from("user_settings").upsert(
+    if (isTeamScoped(localKey)) {
+      // Team charting config — write to the per-team table. RLS allows only
+      // coaches; an athlete's write silently affects 0 rows (that's the guard).
+      const teamId = getTeamId();
+      if (teamId && teamId !== "local-dev") {
+        supabase.from("team_sport_settings").upsert(
           {
-            user_id: user.id,
+            team_id: teamId,
             sport,
             settings: data as unknown as Record<string, unknown>,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: "user_id,sport" }
-        );
+          { onConflict: "team_id,sport" }
+        ).then(() => {}, () => {});
       }
-    }).catch(() => {});
+    } else {
+      supabase.auth.getUser().then(async ({ data: { user } }) => {
+        if (user) {
+          await supabase.from("user_settings").upsert(
+            {
+              user_id: user.id,
+              sport,
+              settings: data as unknown as Record<string, unknown>,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,sport" }
+          );
+        }
+      }).catch(() => {});
+    }
   }
 
   // Legacy notifier for any listeners not yet migrated to useSettings().
@@ -139,26 +173,46 @@ export function useAppPref<T>(key: string): T | null {
 }
 
 /**
- * Subscribe to user_settings realtime for the signed-in user so cross-device
- * settings changes propagate into the store. Returns an unsubscribe fn.
+ * Subscribe to settings realtime so changes propagate into the store:
+ *  - user_settings for THIS user (per-user prefs, cross-device), and
+ *  - team_sport_settings for the user's TEAM, so a coach's charting-config change
+ *    reaches every athlete's open session live.
+ * Returns an unsubscribe fn.
  */
 export function subscribeSettingsRealtime(userId: string): () => void {
   const supabase = createClient();
-  const channel = supabase
+  const apply = (row: { sport?: string; settings?: unknown } | null) => {
+    if (!row?.sport) return;
+    const localKey = localKeyForSport(row.sport);
+    if (localKey && row.settings !== undefined) {
+      _cache[localKey] = row.settings;
+      notify();
+    }
+  };
+
+  const userChannel = supabase
     .channel(`user_settings:${userId}`)
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "user_settings", filter: `user_id=eq.${userId}` },
-      (payload) => {
-        const row = (payload.new ?? null) as { sport?: string; settings?: unknown } | null;
-        if (!row?.sport) return;
-        const localKey = localKeyForSport(row.sport);
-        if (localKey && row.settings !== undefined) {
-          _cache[localKey] = row.settings;
-          notify();
-        }
-      }
+      (payload) => apply((payload.new ?? null) as { sport?: string; settings?: unknown } | null)
     )
     .subscribe();
-  return () => { try { supabase.removeChannel(channel); } catch {} };
+
+  const teamId = getTeamId();
+  const teamChannel = teamId && teamId !== "local-dev"
+    ? supabase
+        .channel(`team_sport_settings:${teamId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "team_sport_settings", filter: `team_id=eq.${teamId}` },
+          (payload) => apply((payload.new ?? null) as { sport?: string; settings?: unknown } | null)
+        )
+        .subscribe()
+    : null;
+
+  return () => {
+    try { supabase.removeChannel(userChannel); } catch {}
+    if (teamChannel) { try { supabase.removeChannel(teamChannel); } catch {} }
+  };
 }
