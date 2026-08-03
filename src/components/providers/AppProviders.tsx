@@ -144,7 +144,11 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
       if (session?.user) {
         const u = mapSupabaseUser(session.user);
         setUser(u);
-        setTeamId(u.role === "athlete" && u.teamId ? u.teamId : u.id);
+        // A user's active team is the one they JOINED (teamId in metadata) if set
+        // — this covers athletes AND co-coaches who joined another coach's team —
+        // otherwise their own account is the team (owner). Prevents a joined coach
+        // from loading their empty/legacy solo team instead of the real team.
+        setTeamId(u.teamId ? u.teamId : u.id);
       } else if (isLocal) {
         setUser({
           id: "local-dev",
@@ -162,7 +166,11 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
         if (session?.user) {
           const u = mapSupabaseUser(session.user);
           setUser(u);
-          setTeamId(u.role === "athlete" && u.teamId ? u.teamId : u.id);
+          // A user's active team is the one they JOINED (teamId in metadata) if set
+        // — this covers athletes AND co-coaches who joined another coach's team —
+        // otherwise their own account is the team (owner). Prevents a joined coach
+        // from loading their empty/legacy solo team instead of the real team.
+        setTeamId(u.teamId ? u.teamId : u.id);
         } else {
           setUser(null);
           setTeamId(null);
