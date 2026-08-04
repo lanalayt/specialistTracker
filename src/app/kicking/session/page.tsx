@@ -100,6 +100,9 @@ function saveDraftForMode(draft: SessionDraft, mode: "practice" | "game") {
 // Remembers the practice Live/Manual choice independent of session data, so it
 // survives leaving and returning even when no reps were entered.
 const ENTRY_MODE_PREF = "fgEntryManual"; // per-user app pref: true = manual entry
+// Per-user app pref: the "Set Up FG Settings First" prompt has been shown once.
+// After that we assume the coach knows FG Settings exist and never nag again.
+const FG_SETUP_SEEN_PREF = "fgSetupPromptSeen";
 function loadPracticeEntryPref(): boolean {
   // Returns the default manualEntry value (true = manual entry).
   return getAppPref<boolean>(ENTRY_MODE_PREF) !== false;
@@ -326,7 +329,14 @@ export default function KickingSessionPage() {
   useEffect(() => {
     loadSettingsFromCloud<{ snapDistance?: string; makeMode?: string; missMode?: string; scoreEnabled?: string | boolean; scoreOptions?: string[] }>("fgSettings").then((cloud) => {
       if (!cloud) {
-        setShowSetupPrompt(true);
+        // Only show the setup prompt the FIRST time ever. Once the coach has seen
+        // it, assume they know FG Settings exist and don't nag again — even if
+        // they skipped without configuring. "Seen" is a per-user pref in
+        // user_settings (app bucket), mirroring the Tutorial's show-once behavior.
+        if (!getAppPref<boolean>(FG_SETUP_SEEN_PREF)) {
+          setAppPref(FG_SETUP_SEEN_PREF, true); // mark seen immediately (persists to DB)
+          setShowSetupPrompt(true);
+        }
       }
       if (cloud) {
         if (cloud.snapDistance) setSnapDistance(parseInt(cloud.snapDistance) || 7);
