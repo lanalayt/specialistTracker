@@ -10,7 +10,7 @@ import { upsertMember, loadMembers, updateMemberAccess, removeMember, type Store
 import clsx from "clsx";
 
 function ProfileContent() {
-  const { user, isCoach, isAdmin, signOut } = useAuth();
+  const { user, isCoach, isAdmin, isAthlete, signOut } = useAuth();
 
   // Team members
   const [members, setMembers] = useState<StoredMember[]>([]);
@@ -23,8 +23,10 @@ function ProfileContent() {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  // Delete account
+  // Delete account. "team" tears down the whole team (owner/admin); "self"
+  // deletes only the current user's own account (athlete / joined member).
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<"team" | "self">("team");
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -125,7 +127,8 @@ function ProfileContent() {
     setDeleteError("");
     setDeleting(true);
     try {
-      const res = await fetch("/api/delete-team", { method: "POST" });
+      const endpoint = deleteMode === "self" ? "/api/delete-account" : "/api/delete-team";
+      const res = await fetch(endpoint, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setDeleteError(data.error || "Failed to delete account");
@@ -321,10 +324,28 @@ function ProfileContent() {
               Permanently delete this team account and all associated data. This will also remove all athlete accounts linked to this team. This action cannot be undone.
             </p>
             <button
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={() => { setDeleteMode("team"); setShowDeleteConfirm(true); }}
               className="w-full py-2.5 rounded-input text-sm font-semibold text-miss bg-miss/10 border border-miss/40 hover:bg-miss/20 transition-all"
             >
               Delete Account
+            </button>
+          </div>
+        )}
+
+        {/* Delete my account — athletes (joined members) */}
+        {isAthlete && user && user.id !== "local-dev" && (
+          <div className="card space-y-3">
+            <p className="text-xs font-semibold text-miss uppercase tracking-wider">
+              Danger Zone
+            </p>
+            <p className="text-xs text-muted">
+              Permanently delete your account. You&apos;ll be removed from your team and your login and personal settings will be erased. Reps you&apos;ve logged stay with the team. This action cannot be undone.
+            </p>
+            <button
+              onClick={() => { setDeleteMode("self"); setShowDeleteConfirm(true); }}
+              className="w-full py-2.5 rounded-input text-sm font-semibold text-miss bg-miss/10 border border-miss/40 hover:bg-miss/20 transition-all"
+            >
+              Delete My Account
             </button>
           </div>
         )}
@@ -335,19 +356,34 @@ function ProfileContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="card max-w-sm w-full space-y-4">
             <div>
-              <p className="text-xs font-semibold text-miss uppercase tracking-wider">Delete Account</p>
+              <p className="text-xs font-semibold text-miss uppercase tracking-wider">
+                {deleteMode === "self" ? "Delete My Account" : "Delete Account"}
+              </p>
               <h3 className="text-base font-bold text-slate-100 mt-1">Are you sure?</h3>
             </div>
             <p className="text-xs text-muted">
               This will permanently delete:
             </p>
-            <ul className="text-xs text-muted list-disc pl-4 space-y-1">
-              <li>All team settings, theme, and logo</li>
-              <li>All sessions, stats, and archives</li>
-              <li>All athlete rosters</li>
-              <li>All athlete accounts linked to this team</li>
-              <li>Your admin account</li>
-            </ul>
+            {deleteMode === "self" ? (
+              <ul className="text-xs text-muted list-disc pl-4 space-y-1">
+                <li>Your account and login</li>
+                <li>Your personal app settings</li>
+                <li>Your spot on the team roster</li>
+              </ul>
+            ) : (
+              <ul className="text-xs text-muted list-disc pl-4 space-y-1">
+                <li>All team settings, theme, and logo</li>
+                <li>All sessions, stats, and archives</li>
+                <li>All athlete rosters</li>
+                <li>All athlete accounts linked to this team</li>
+                <li>Your admin account</li>
+              </ul>
+            )}
+            {deleteMode === "self" && (
+              <p className="text-[11px] text-muted">
+                Reps you&apos;ve logged stay with the team. To rejoin later you&apos;ll need a new invite.
+              </p>
+            )}
             <p className="text-xs text-muted">
               Type <span className="text-miss font-bold">DELETE</span> to confirm:
             </p>
@@ -380,7 +416,7 @@ function ProfileContent() {
                 disabled={deleting || deleteConfirmText !== "DELETE"}
                 className="flex-1 py-2 rounded-input text-sm font-bold bg-miss text-white hover:bg-red-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {deleting ? "Deleting..." : "Delete Everything"}
+                {deleting ? "Deleting..." : deleteMode === "self" ? "Delete My Account" : "Delete Everything"}
               </button>
             </div>
           </div>
