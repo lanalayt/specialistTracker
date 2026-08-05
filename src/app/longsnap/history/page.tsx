@@ -155,6 +155,64 @@ export default function LongSnapHistoryPage() {
     updateSessionEntries(selected.id, updated);
   }
 
+  // ── Drag-to-reorder snaps within an athlete's list (edit mode) ──
+  // Snaps of all athletes share one array; dragging only permutes the dragged
+  // athlete's snaps among their own slots, leaving other athletes untouched.
+  const [dragSnap, setDragSnap] = useState<number | null>(null);
+  const [overSnap, setOverSnap] = useState<number | null>(null);
+
+  function onSnapDragStart(e: React.PointerEvent, globalIdx: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+    setDragSnap(globalIdx);
+    setOverSnap(globalIdx);
+  }
+  function onSnapDragMove(e: React.PointerEvent) {
+    if (dragSnap == null || typeof document === "undefined") return;
+    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const row = el?.closest("[data-snap-idx]") as HTMLElement | null;
+    if (!row) return;
+    const idx = Number(row.dataset.snapIdx);
+    if (!Number.isNaN(idx) && row.dataset.athlete === snaps[dragSnap]?.athlete) setOverSnap(idx);
+  }
+  function onSnapDragEnd(e: React.PointerEvent) {
+    const from = dragSnap;
+    const to = overSnap;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+    setDragSnap(null);
+    setOverSnap(null);
+    if (from == null || to == null || from === to || !selected) return;
+    const athlete = snaps[from]?.athlete;
+    const positions = snaps.map((s, i) => (s.athlete === athlete ? i : -1)).filter((i) => i >= 0);
+    const fromLocal = positions.indexOf(from);
+    const toLocal = positions.indexOf(to);
+    if (fromLocal < 0 || toLocal < 0) return;
+    const sub = positions.map((i) => snaps[i]);
+    const [item] = sub.splice(fromLocal, 1);
+    sub.splice(toLocal, 0, item);
+    const next = [...snaps];
+    positions.forEach((gpos, k) => { next[gpos] = sub[k]; });
+    setSelectedSnapIdx(null);
+    updateSessionEntries(selected.id, next);
+  }
+
+  // Grip handle that starts a drag for the snap at the given global index.
+  const dragGrip = (gi: number) => (
+    <span
+      onPointerDown={(e) => onSnapDragStart(e, gi)}
+      onPointerMove={onSnapDragMove}
+      onPointerUp={onSnapDragEnd}
+      onClick={(e) => e.stopPropagation()}
+      className="cursor-grab active:cursor-grabbing touch-none text-muted/40 hover:text-muted shrink-0"
+      title="Drag to reorder"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+        <circle cx="6" cy="3.5" r="1.1" /><circle cx="10" cy="3.5" r="1.1" /><circle cx="6" cy="8" r="1.1" /><circle cx="10" cy="8" r="1.1" /><circle cx="6" cy="12.5" r="1.1" /><circle cx="10" cy="12.5" r="1.1" />
+      </svg>
+    </span>
+  );
+
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
       {/* Session list — hidden on mobile when a session is selected */}
@@ -381,14 +439,19 @@ export default function LongSnapHistoryPage() {
                                   return (
                                     <tr
                                       key={i}
+                                      data-snap-idx={snapIdx}
+                                      data-athlete={a}
                                       onClick={editing ? () => setSelectedSnapIdx(snapIdx) : undefined}
-                                      className={clsx("border-t border-border/30", editing && "cursor-pointer", editing && selectedSnapIdx === snapIdx && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                                      className={clsx("border-t border-border/30", editing && "cursor-pointer", editing && dragSnap === snapIdx && "opacity-40", editing && overSnap === snapIdx && dragSnap !== snapIdx && "ring-1 ring-accent", editing && selectedSnapIdx === snapIdx && "bg-amber-500/10 ring-1 ring-amber-500/40")}
                                     >
                                       {editing && (
                                         <td className="py-1 px-1">
-                                          <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
-                                          </button>
+                                          <div className="flex items-center gap-1">
+                                            {dragGrip(snapIdx)}
+                                            <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
+                                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                            </button>
+                                          </div>
                                         </td>
                                       )}
                                       <td className="text-muted py-1 px-1">{i + 1}</td>
@@ -484,14 +547,19 @@ export default function LongSnapHistoryPage() {
                                   return (
                                     <tr
                                       key={i}
+                                      data-snap-idx={snapIdx}
+                                      data-athlete={a}
                                       onClick={editing ? () => setSelectedSnapIdx(snapIdx) : undefined}
-                                      className={clsx("border-t border-border/30", editing && "cursor-pointer", editing && selectedSnapIdx === snapIdx && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                                      className={clsx("border-t border-border/30", editing && "cursor-pointer", editing && dragSnap === snapIdx && "opacity-40", editing && overSnap === snapIdx && dragSnap !== snapIdx && "ring-1 ring-accent", editing && selectedSnapIdx === snapIdx && "bg-amber-500/10 ring-1 ring-amber-500/40")}
                                     >
                                       {editing && (
                                         <td className="py-1 px-1">
-                                          <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
-                                          </button>
+                                          <div className="flex items-center gap-1">
+                                            {dragGrip(snapIdx)}
+                                            <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
+                                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                            </button>
+                                          </div>
                                         </td>
                                       )}
                                       <td className="text-muted py-1 px-1">{i + 1}</td>
@@ -607,14 +675,19 @@ export default function LongSnapHistoryPage() {
                                   return (
                                     <tr
                                       key={i}
+                                      data-snap-idx={i}
+                                      data-athlete={a}
                                       onClick={editing ? () => setSelectedSnapIdx(i) : undefined}
-                                      className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                                      className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && dragSnap === i && "opacity-40", editing && overSnap === i && dragSnap !== i && "ring-1 ring-accent", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
                                     >
                                       {editing && (
                                         <td className="table-cell">
-                                          <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${li + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
-                                          </button>
+                                          <div className="flex items-center gap-1.5">
+                                            {dragGrip(i)}
+                                            <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${li + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
+                                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                            </button>
+                                          </div>
                                         </td>
                                       )}
                                       <td className="table-cell text-left text-muted">{li + 1}</td>
@@ -723,14 +796,19 @@ export default function LongSnapHistoryPage() {
                                 return (
                                   <tr
                                     key={i}
+                                    data-snap-idx={i}
+                                    data-athlete={a}
                                     onClick={editing ? () => setSelectedSnapIdx(i) : undefined}
-                                    className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                                    className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && dragSnap === i && "opacity-40", editing && overSnap === i && dragSnap !== i && "ring-1 ring-accent", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
                                   >
                                     {editing && (
                                       <td className="table-cell">
-                                        <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${li + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
-                                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
-                                        </button>
+                                        <div className="flex items-center gap-1.5">
+                                          {dragGrip(i)}
+                                          <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${li + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                          </button>
+                                        </div>
                                       </td>
                                     )}
                                     <td className="table-cell text-left text-muted">{li + 1}</td>
