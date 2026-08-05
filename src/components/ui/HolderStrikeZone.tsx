@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import clsx from "clsx";
 import { getCachedSettings, saveSettingsToCloud, useSettings } from "@/lib/settingsSync";
 
 export interface ShortSnapMarker {
@@ -8,7 +9,12 @@ export interface ShortSnapMarker {
   y: number;
   num: number;
   inZone: boolean;
+  /** Stable identity for edit interactions (e.g. the snap's index). */
+  id?: number;
 }
+
+/** Single-direction result of where a marker landed relative to the zone. */
+export type SnapDir = "ON_TARGET" | "HIGH" | "LOW" | "LEFT" | "RIGHT";
 
 interface HolderStrikeZoneProps {
   markers?: ShortSnapMarker[];
@@ -18,6 +24,23 @@ interface HolderStrikeZoneProps {
   missMode?: "simple" | "detailed";
   editable?: boolean;
   flipped?: boolean;
+  /** Enable moving existing markers: tap a marker to select, tap the field to move it. */
+  editableMarkers?: boolean;
+  /** Id of the currently selected marker (highlighted). */
+  selectedId?: number | null;
+  /** Called when a marker is tapped. */
+  onMarkerSelect?: (id: number) => void;
+  /** Called when the field is tapped while a marker is selected — new location. */
+  onPlace?: (x: number, y: number, inZone: boolean, dir: SnapDir) => void;
+}
+
+function dirFromPoint(xPct: number, yPct: number, zone: HolderZone): SnapDir {
+  if (isInZone(xPct, yPct, zone)) return "ON_TARGET";
+  if (yPct < zone.top) return "HIGH";
+  if (yPct > zone.bottom) return "LOW";
+  if (xPct < zone.left) return "LEFT";
+  if (xPct > zone.right) return "RIGHT";
+  return "HIGH";
 }
 
 type HolderZone = { top: number; bottom: number; left: number; right: number };
@@ -48,7 +71,7 @@ function loadSnapSettings(): { chartMode: "simple" | "detailed"; missMode: "simp
 
 type DragEdge = "top" | "bottom" | "left" | "right" | null;
 
-export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode, missMode, editable = false, flipped = false }: HolderStrikeZoneProps) {
+export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode, missMode, editable = false, flipped = false, editableMarkers = false, selectedId = null, onMarkerSelect, onPlace }: HolderStrikeZoneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zone, setZone] = useState(loadHolderZone);
   const [dragEdge, setDragEdge] = useState<DragEdge>(null);
@@ -79,11 +102,17 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isEditing || dragEdge) return;
-    if (!onSnap || !containerRef.current) return;
+    if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
     const inZone2 = isInZone(xPct, yPct, displayZone);
+    // Edit mode: relocate the selected marker instead of adding a new one.
+    if (editableMarkers) {
+      if (onPlace) onPlace(xPct, yPct, inZone2, dirFromPoint(xPct, yPct, displayZone));
+      return;
+    }
+    if (!onSnap) return;
     onSnap({ x: xPct, y: yPct, num: nextNum, inZone: inZone2 });
   };
 
@@ -173,24 +202,33 @@ export function HolderStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode,
         </div>
 
         {/* Snap markers */}
-        {markers.map((m) => (
-          <div
-            key={m.num}
-            className="absolute pointer-events-none flex items-center justify-center"
-            style={{
-              left: `${m.x}%`,
-              top: `${m.y}%`,
-              transform: "translate(-50%, -50%)",
-              width: 26,
-              height: 26,
-              borderRadius: "50%",
-              backgroundColor: m.inZone ? "rgba(0, 212, 160, 0.85)" : "rgba(239, 68, 68, 0.85)",
-              border: `2px solid ${m.inZone ? "#00d4a0" : "#ef4444"}`,
-            }}
-          >
-            <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
-          </div>
-        ))}
+        {markers.map((m) => {
+          const selected = editableMarkers && m.id != null && m.id === selectedId;
+          return (
+            <div
+              key={m.id ?? m.num}
+              onClick={editableMarkers ? (e) => { e.stopPropagation(); if (m.id != null) onMarkerSelect?.(m.id); } : undefined}
+              className={clsx(
+                "absolute flex items-center justify-center",
+                editableMarkers ? "pointer-events-auto cursor-pointer" : "pointer-events-none"
+              )}
+              style={{
+                left: `${m.x}%`,
+                top: `${m.y}%`,
+                transform: `translate(-50%, -50%) scale(${selected ? 1.15 : 1})`,
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                backgroundColor: m.inZone ? "rgba(0, 212, 160, 0.85)" : "rgba(239, 68, 68, 0.85)",
+                border: selected ? "2px solid #ffffff" : `2px solid ${m.inZone ? "#00d4a0" : "#ef4444"}`,
+                boxShadow: selected ? "0 0 0 2px #fbbf24" : undefined,
+                zIndex: selected ? 10 : undefined,
+              }}
+            >
+              <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
+            </div>
+          );
+        })}
 
         {/* Drag handles when editing */}
         {isEditing && (

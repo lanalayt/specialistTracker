@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useLongSnap } from "@/lib/longSnapContext";
 import { useAuth } from "@/lib/auth";
-import { HolderStrikeZone, type ShortSnapMarker } from "@/components/ui/HolderStrikeZone";
+import { HolderStrikeZone, type ShortSnapMarker, type SnapDir } from "@/components/ui/HolderStrikeZone";
 import { PunterStrikeZone, type SnapMarker } from "@/components/ui/PunterStrikeZone";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { exportLongSnapSession, exportSessionPDF } from "@/lib/exportStats";
@@ -94,6 +94,10 @@ export default function LongSnapHistoryPage() {
   const [tab, setTab] = useState<"practice" | "charting">("practice");
   const [snapTypeTab, setSnapTypeTab] = useState<"short" | "long">("short");
   const [editing, setEditing] = useState(false);
+  // Which snap is selected for location editing (index into the session's snaps).
+  const [selectedSnapIdx, setSelectedSnapIdx] = useState<number | null>(null);
+  // Clear the location-edit selection when leaving edit mode or switching session.
+  useEffect(() => { setSelectedSnapIdx(null); }, [editing, selectedId]);
 
   const baseFiltered = tab === "charting"
     ? history.filter((s) => s.label?.startsWith("30 Point Game") || s.label?.startsWith("Balls & Strikes"))
@@ -123,7 +127,19 @@ export default function LongSnapHistoryPage() {
   function deleteSnap(snapIndex: number) {
     if (!selected) return;
     const updated = snaps.filter((_, i) => i !== snapIndex);
+    setSelectedSnapIdx(null); // indices shift after a delete — drop the selection
     updateSessionEntries(selected.id, updated);
+  }
+
+  // Move a snap's marker to a new spot on the diagram. Keeps accuracy (and, for
+  // short-snap scoring, the point total) in sync with the new location.
+  function moveSnapLocation(snapIndex: number, x: number, y: number, inZone: boolean, dir: SnapDir, short: boolean) {
+    const s = snaps[snapIndex];
+    if (!s) return;
+    const accuracy = dir as LongSnapEntry["accuracy"];
+    const patch: Partial<LongSnapEntry> = { markerX: x, markerY: y, markerInZone: inZone, accuracy };
+    if (short) patch.score = calc30PtScore({ ...s, accuracy, markerInZone: inZone });
+    updateSnap(snapIndex, patch);
   }
 
   return (
@@ -314,12 +330,24 @@ export default function LongSnapHistoryPage() {
                   <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${athleteList.length}, minmax(0, 1fr))` }}>
                     {athleteList.map((a) => {
                       const ps = snaps.filter((s) => s.athlete === a);
-                      const pm: ShortSnapMarker[] = ps.filter((s) => s.markerX != null).map((s, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? s.accuracy === "ON_TARGET" }));
+                      const pm: ShortSnapMarker[] = ps.filter((s) => s.markerX != null).map((s) => ({ x: s.markerX!, y: s.markerY!, num: ps.indexOf(s) + 1, inZone: s.markerInZone ?? s.accuracy === "ON_TARGET", id: snaps.indexOf(s) }));
                       const pts = ps.reduce((sum, s) => sum + (s.score || 0), 0);
+                      const selHere = editing && selectedSnapIdx != null && snaps[selectedSnapIdx]?.athlete === a;
                       return (
                         <div key={a} className="space-y-3">
                           <p className="text-sm font-bold text-slate-200 text-center">{a}</p>
-                          <HolderStrikeZone markers={pm} />
+                          <HolderStrikeZone
+                            markers={pm}
+                            editableMarkers={editing}
+                            selectedId={selHere ? selectedSnapIdx : null}
+                            onMarkerSelect={(id) => setSelectedSnapIdx(id)}
+                            onPlace={selHere ? (x, y, inZone, dir) => moveSnapLocation(selectedSnapIdx!, x, y, inZone, dir, true) : undefined}
+                          />
+                          {editing && (
+                            <p className="text-[10px] text-center text-muted">
+                              {selHere ? "Tap the diagram to move snap #" + (selectedSnapIdx != null ? ps.indexOf(snaps[selectedSnapIdx]) + 1 : "") : "Tap a snap dot or row, then tap the diagram to move it."}
+                            </p>
+                          )}
                           <div className="card-2 text-center py-2">
                             <p className="text-2xl font-black text-accent">{pts}</p>
                             <p className="text-[10px] text-muted">/ {ps.length * 3}</p>
@@ -338,10 +366,14 @@ export default function LongSnapHistoryPage() {
                                 {ps.map((s, i) => {
                                   const snapIdx = snaps.indexOf(s);
                                   return (
-                                    <tr key={i} className="border-t border-border/30">
+                                    <tr
+                                      key={i}
+                                      onClick={editing ? () => setSelectedSnapIdx(snapIdx) : undefined}
+                                      className={clsx("border-t border-border/30", editing && "cursor-pointer", editing && selectedSnapIdx === snapIdx && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                                    >
                                       {editing && (
                                         <td className="py-1 px-1">
-                                          <button onClick={() => { if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
+                                          <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
                                           </button>
                                         </td>
@@ -476,8 +508,9 @@ export default function LongSnapHistoryPage() {
                 const maxScore = snaps.length * 3;
                 const scorePct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
                 const markers: ShortSnapMarker[] = snaps
-                  .filter((s) => s.markerX != null && s.markerY != null)
-                  .map((s, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? false }));
+                  .map((s, gi) => ({ s, gi }))
+                  .filter(({ s }) => s.markerX != null && s.markerY != null)
+                  .map(({ s, gi }, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? false, id: gi }));
                 return (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -489,11 +522,22 @@ export default function LongSnapHistoryPage() {
                     </div>
 
                     {/* Strike zone diagram with all snap dots */}
-                    {markers.length > 0 && (
-                      <div className="card-2 flex justify-center">
+                    {(markers.length > 0 || editing) && (
+                      <div className="card-2 flex flex-col items-center gap-1.5">
                         <div className="w-full max-w-[280px]">
-                          <HolderStrikeZone markers={markers} />
+                          <HolderStrikeZone
+                            markers={markers}
+                            editableMarkers={editing}
+                            selectedId={editing ? selectedSnapIdx : null}
+                            onMarkerSelect={(id) => setSelectedSnapIdx(id)}
+                            onPlace={editing && selectedSnapIdx != null ? (x, y, inZone, dir) => moveSnapLocation(selectedSnapIdx, x, y, inZone, dir, true) : undefined}
+                          />
                         </div>
+                        {editing && (
+                          <p className="text-[10px] text-center text-muted">
+                            {selectedSnapIdx != null ? `Tap the diagram to move snap #${selectedSnapIdx + 1}.` : "Tap a snap dot or row, then tap the diagram to move where it landed."}
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -512,10 +556,14 @@ export default function LongSnapHistoryPage() {
                         </thead>
                         <tbody>
                           {snaps.map((s, i) => (
-                            <tr key={i} className="hover:bg-surface/30">
+                            <tr
+                              key={i}
+                              onClick={editing ? () => setSelectedSnapIdx(i) : undefined}
+                              className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                            >
                               {editing && (
                                 <td className="table-cell">
-                                  <button onClick={() => { if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
+                                  <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
                                   </button>
                                 </td>
