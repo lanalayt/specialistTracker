@@ -43,6 +43,13 @@ function checkFGOutliers(dist: number): string[] {
 }
 const MAX_SCORE = 4;
 
+/** Initials for the compact holder chips, e.g. "John Smith" → "JS". */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 // ── Table row (planning phase) ────────────────────────────────
 interface LogRow {
   athlete: string;
@@ -59,6 +66,7 @@ interface PartialKickInput {
   score: number;
   opTime: string;
   starred: boolean;
+  holder?: string;
 }
 
 interface SessionDraft {
@@ -235,6 +243,10 @@ export default function KickingSessionPage() {
   const [score, setScore] = useState<number>(draft.partialInputs?.[draft.currentKickIdx]?.score ?? 0);
   const [starred, setStarred] = useState(draft.partialInputs?.[draft.currentKickIdx]?.starred ?? false);
   const [opTime, setOpTime] = useState(draft.partialInputs?.[draft.currentKickIdx]?.opTime ?? "");
+  // Holder for the kick on screen (moved from the snap popup to the main card).
+  // `lastHolder` makes the choice sticky across kicks — most sessions use one holder.
+  const [holder, setHolder] = useState<string>(draft.partialInputs?.[draft.currentKickIdx]?.holder ?? "");
+  const [lastHolder, setLastHolder] = useState<string>("");
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedKicks, setCommittedKicks] = useState<FGKick[]>(draft.committedKicks ?? []);
@@ -390,7 +402,7 @@ export default function KickingSessionPage() {
     if (!mainDraftHydrated.current || !sessionMode) return;
     // Merge current input fields into partialInputs for the active kick
     const mergedPartials = sessionActive && !isPlannedLogged(currentKickIdx)
-      ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred } }
+      ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred, holder } }
       : partialInputs;
     saveDraftForMode({
       rows,
@@ -408,14 +420,14 @@ export default function KickingSessionPage() {
       opponent,
       gameTime,
     }, sessionMode);
-  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, partialInputs, result, score, opTime, starred, committed, committedKicks, weather, sessionMode, opponent, gameTime]);
+  }, [rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices, currentKickIdx, sessionKicks, partialInputs, result, score, opTime, starred, holder, committed, committedKicks, weather, sessionMode, opponent, gameTime]);
 
   // ── Switch between practice / game mode with independent drafts ──
   const switchMode = (newMode: "practice" | "game") => {
     if (newMode === sessionMode) return;
     // Save current state to current mode's draft
     const mergedPartials = sessionActive
-      ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred } }
+      ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred, holder } }
       : partialInputs;
     const currentDraft: SessionDraft = {
       rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices,
@@ -438,6 +450,7 @@ export default function KickingSessionPage() {
     setResult(nd?.partialInputs?.[nd?.currentKickIdx ?? 0]?.result ?? null);
     setScore(nd?.partialInputs?.[nd?.currentKickIdx ?? 0]?.score ?? 0);
     setStarred(nd?.partialInputs?.[nd?.currentKickIdx ?? 0]?.starred ?? false);
+    setHolder(nd?.partialInputs?.[nd?.currentKickIdx ?? 0]?.holder ?? "");
     setPendingKicks(null);
     setCommitted(nd?.committed ?? false);
     setCommittedKicks(nd?.committedKicks ?? []);
@@ -598,6 +611,7 @@ export default function KickingSessionPage() {
     setResult(null);
     setScore(0);
     setStarred(!!planned[startIdx >= 0 ? startIdx : 0]?.starred);
+    setHolder(defaultHolder(planned[startIdx >= 0 ? startIdx : 0]?.athlete));
     setSessionActive(true);
   };
 
@@ -704,11 +718,18 @@ export default function KickingSessionPage() {
   // Track whether we're editing a previously logged kick
   const [editingKickIdx, setEditingKickIdx] = useState<number | null>(null);
 
+  // Sticky holder default for a kick: reuse the last holder unless it's the kicker
+  // (a kicker can't hold for themselves).
+  const defaultHolder = (kickerName: string | undefined) =>
+    lastHolder && lastHolder !== kickerName ? lastHolder : "";
+
   // ── Session card: log current kick ───────────────────────────
   const handleLogKick = () => {
     if (!result) return;
     const plan = plannedKicks[currentKickIdx];
     const otVal = parseFloat(opTime) || 0;
+    // A kicker can't hold for themselves — drop the holder if it's the kicker.
+    const kickHolder = holder && holder !== plan.athlete ? holder : undefined;
     const kick: FGKick = {
       athleteId: plan.athlete,
       athlete: plan.athlete,
@@ -719,8 +740,10 @@ export default function KickingSessionPage() {
       opTime: otVal > 0 ? otVal : undefined,
       isPAT: plan.isPAT || undefined,
       starred: starred || undefined,
+      holder: kickHolder,
       kickNum: currentKickIdx + 1,
     };
+    if (kickHolder) setLastHolder(kickHolder);
 
     // Outlier check (skip for PATs)
     const warnings = plan.isPAT ? [] : checkFGOutliers(plan.dist);
@@ -770,11 +793,13 @@ export default function KickingSessionPage() {
       setScore(nextPartial.score);
       setOpTime(nextPartial.opTime ?? "");
       setStarred(nextPartial.starred);
+      setHolder(nextPartial.holder ?? defaultHolder(plannedKicks[advanceIdx]?.athlete));
     } else {
       setResult(null);
       setScore(0);
       setOpTime("");
       setStarred(!!plannedKicks[advanceIdx]?.starred);
+      setHolder(defaultHolder(plannedKicks[advanceIdx]?.athlete));
     }
     setShowAthleteDropdown(false);
   };
@@ -896,10 +921,11 @@ export default function KickingSessionPage() {
 
   const handleConfirmCommit = async () => {
     if (!pendingKicks) return;
-    // Attach holder from snap logs to each kick
+    // Holder now comes from the kick itself (set on the main card). Fall back to a
+    // snap-log holder only for older kicks that never had one set on the card.
     const enrichedKicks = pendingKicks.map((k, i) => {
       const snapLog = snapLogsMap[String(i)];
-      const holder = snapLog?.[0]?.holder || undefined;
+      const holder = k.holder || snapLog?.[0]?.holder || undefined;
       return holder ? { ...k, holder } : k;
     });
     commitPractice(enrichedKicks, undefined, weather, sessionMode ?? undefined, opponent, gameTime);
@@ -989,7 +1015,7 @@ export default function KickingSessionPage() {
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       const mergedPartials = sessionActive && !isPlannedLogged(currentKickIdx)
-        ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred } }
+        ? { ...partialInputs, [currentKickIdx]: { result, score, opTime, starred, holder } }
         : partialInputs;
       const draft: SessionDraft = {
         rows, manualEntry, sessionActive, plannedKicks, plannedRowIndices,
@@ -1038,6 +1064,7 @@ export default function KickingSessionPage() {
       athletes={snapAthletes}
       holders={holderAthletes}
       holderEnabled={holderEnabled}
+      hideHolderPicker
       onHolderToggle={(on) => {
         setHolderEnabled(on);
         saveSettingsToCloud("fgSettings", { ...(fgSettings() ?? {}), holderEnabled: on });
@@ -1307,7 +1334,7 @@ export default function KickingSessionPage() {
                             onClick={() => {
                               // Save current partial input before switching
                               if (!isPlannedLogged(currentKickIdx)) {
-                                setPartialInputs((prev) => ({ ...prev, [currentKickIdx]: { result, score, opTime, starred } }));
+                                setPartialInputs((prev) => ({ ...prev, [currentKickIdx]: { result, score, opTime, starred, holder } }));
                               }
                               setCurrentKickIdx(i);
                               setDistInput(plannedKicks[i].isPAT ? "" : plannedKicks[i].dist.toString());
@@ -1317,6 +1344,7 @@ export default function KickingSessionPage() {
                                 setResult(logged.result);
                                 setScore(logged.score);
                                 setStarred(!!logged.starred);
+                                setHolder(logged.holder ?? "");
                                 setEditingKickIdx(getLoggedKickArrayIdx(i));
                               } else {
                                 const partial = partialInputs[i];
@@ -1324,10 +1352,12 @@ export default function KickingSessionPage() {
                                   setResult(partial.result);
                                   setScore(partial.score);
                                   setStarred(partial.starred);
+                                  setHolder(partial.holder ?? defaultHolder(plannedKicks[i]?.athlete));
                                 } else {
                                   setResult(null);
                                   setScore(0);
                                   setStarred(!!plannedKicks[i]?.starred);
+                                  setHolder(defaultHolder(plannedKicks[i]?.athlete));
                                 }
                                 setEditingKickIdx(null);
                               }
@@ -1390,6 +1420,39 @@ export default function KickingSessionPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Holder — moved here from the snap popup. A kicker can't
+                        hold for themselves, so the current kicker is excluded. */}
+                    {holderEnabled && (
+                      <div>
+                        <p className="label text-slate-100">Holder</p>
+                        <div className="flex gap-1 flex-wrap items-center">
+                          {holderAthletes.filter((h) => h !== currentPlan.athlete).map((h) => (
+                            <button
+                              key={h}
+                              onClick={() => { setHolder(h); setLastHolder(h); }}
+                              title={h}
+                              className={clsx(
+                                "min-w-[2rem] h-9 px-2 rounded-full text-xs font-bold transition-all",
+                                holder === h ? "bg-sky-500 text-slate-900" : "bg-surface-2 text-muted border border-border hover:border-sky-500/50"
+                              )}
+                            >
+                              {initialsOf(h)}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => setHolder("")}
+                            title="No holder"
+                            className={clsx(
+                              "min-w-[2rem] h-9 px-2 rounded-full text-xs font-bold transition-all",
+                              holder === "" ? "bg-miss/30 text-miss border border-miss/50" : "bg-surface-2 text-miss/60 border border-border hover:text-miss"
+                            )}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* LOS + Distance + Position */}
                     <div className="flex gap-4 items-start">
@@ -2326,10 +2389,12 @@ export default function KickingSessionPage() {
                                         setResult(logged.result);
                                         setScore(logged.score);
                                         setStarred(!!logged.starred);
+                                        setHolder(logged.holder ?? "");
                                       } else {
                                         setResult(null);
                                         setScore(0);
                                         setStarred(!!planned[filledIdx]?.starred);
+                                        setHolder(defaultHolder(planned[filledIdx]?.athlete));
                                       }
                                       setSessionActive(true);
                                     }}

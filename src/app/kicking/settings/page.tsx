@@ -351,7 +351,7 @@ function FGSettingsContent() {
           </button>
         </div>
         <p className="text-xs text-muted">
-          When enabled, holder selection appears in the snap log during FG charting. Stats will include a By Holder breakdown.
+          When enabled, holder selection appears on the live FG kick card. Stats will include a By Holder breakdown.
         </p>
       </div>
 

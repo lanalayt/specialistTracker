@@ -20,6 +20,7 @@ interface Props {
   athletes: string[]; // snappers
   holders?: string[]; // holders (falls back to athletes if not provided)
   holderEnabled?: boolean; // show holder selection (default true for FG)
+  hideHolderPicker?: boolean; // hide holder selection entirely (holder now chosen on the main card)
   kickerName?: string; // who's kicking
   kickDistance?: number; // distance of the kick
   kickHash?: string; // hash of the kick
@@ -38,10 +39,10 @@ function getInitials(name: string): string {
   return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
-export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, initialSnapTime, onClose, onSaved, onHolderToggle, kickList, onKickSelect }: Props) {
+export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, hideHolderPicker = false, kickerName, kickDistance, kickHash, previousSnaps, initialSnapTime, onClose, onSaved, onHolderToggle, kickList, onKickSelect }: Props) {
   const isFG = snapType === "FG";
   const [localHolderOn, setLocalHolderOn] = useState(holderEnabled);
-  const showHolder = isFG && localHolderOn;
+  const showHolder = isFG && localHolderOn && !hideHolderPicker;
   const holderList = holdersProp && holdersProp.length > 0 ? holdersProp : athletes;
 
   const [holderSide, setHolderSide] = useState<"right" | "left">("right");
@@ -136,7 +137,7 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
     };
 
     const logEntry: SnapLogEntry = {
-      snapper, holder: isFG ? holder : "",
+      snapper, holder: isFG && !hideHolderPicker ? holder : "",
       accuracy: isFG ? (marker?.inZone ? "Strike" : "Ball") : (puntMarker?.inZone ? "Strike" : "Ball"),
       laces: isFG ? laces || undefined : undefined,
       spiral: spiral === "Good" ? "Tight" : "Open",
@@ -186,8 +187,8 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
                   ))}
                 </div>
               </div>
-              {isFG && <div className="w-px self-stretch bg-accent/60 mx-0.5" />}
-              {isFG && <div>
+              {isFG && !hideHolderPicker && <div className="w-px self-stretch bg-accent/60 mx-0.5" />}
+              {isFG && !hideHolderPicker && <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <p className="text-[8px] text-muted uppercase tracking-wider">Holder</p>
                   <button onClick={() => { const next = !localHolderOn; setLocalHolderOn(next); onHolderToggle?.(next); }} className={clsx("w-7 h-3.5 rounded-full transition-colors relative", localHolderOn ? "bg-accent" : "bg-border")}>
