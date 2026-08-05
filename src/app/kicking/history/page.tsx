@@ -9,8 +9,18 @@ import { exportFGSession, exportSessionPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { FGFieldView } from "@/components/ui/FGFieldView";
+import { loadAthletes as loadAthleteList } from "@/lib/athleteStore";
+import { getTeamId } from "@/lib/teamData";
 import type { FGKick, Session } from "@/types";
 import clsx from "clsx";
+
+/** Compress a name to initials for the compact holder column, e.g. "John Smith" → "JS". */
+function toInitials(name?: string): string {
+  if (!name || !name.trim()) return "—";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 function formatResult(result: string, makeMode: "simple" | "detailed"): string {
   if (result.startsWith("Y")) {
@@ -87,6 +97,17 @@ function KickingHistoryContent() {
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
+  // Team holders, for reassigning a kick's holder after the fact.
+  const [holders, setHolders] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      if (!tid) return;
+      const h = await loadAthleteList(tid, "HOLDING");
+      setHolders(h.map((a) => a.name));
+    })();
+  }, []);
 
   // Re-select when history loads (context async) and a session param is present
   useEffect(() => {
@@ -107,6 +128,14 @@ function KickingHistoryContent() {
   const cancelEditing = () => { setEditing(false); setEditEntries([]); };
   const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); } };
   const updateEntry = (idx: number, field: keyof FGKick, value: unknown) => { setEditEntries((prev) => prev.map((k, i) => i === idx ? { ...k, [field]: value } : k)); };
+  // Reassign a kick's holder. During a bulk edit it goes into the draft; otherwise
+  // it's a standalone quick fix that persists immediately.
+  const changeHolder = (idx: number, value: string) => {
+    if (editing) { updateEntry(idx, "holder", value || undefined); return; }
+    if (!selected) return;
+    const next = kicks.map((k, i) => (i === idx ? { ...k, holder: value || undefined } : k));
+    updateSessionEntries(selected.id, next);
+  };
   const kicks = (selected?.entries ?? []) as FGKick[];
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
 
@@ -531,6 +560,7 @@ function KickingHistoryContent() {
                   <tr>
                     <th className="table-header text-left">#</th>
                     <th className="table-header text-left">Athlete</th>
+                    <th className="table-header">Holder</th>
                     <th className="table-header">Dist</th>
                     <th className="table-header">Pos</th>
                     <th className="table-header">Result</th>
@@ -543,6 +573,34 @@ function KickingHistoryContent() {
                     <tr key={i} className="hover:bg-surface/30 transition-colors">
                       <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}{k.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                       <td className="table-name">{k.athlete}</td>
+                      <td className="table-cell p-1">
+                        {viewOnly ? (
+                          <span className="text-xs text-muted" title={k.holder || "No holder"}>{toInitials(k.holder)}</span>
+                        ) : (
+                          <div className="relative inline-flex">
+                            <span
+                              className={clsx(
+                                "inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded text-xs font-bold border",
+                                k.holder ? "border-accent/40 text-accent" : "border-border text-muted"
+                              )}
+                              title={k.holder || "Set holder"}
+                            >
+                              {toInitials(k.holder)}
+                            </span>
+                            <select
+                              value={k.holder ?? ""}
+                              onChange={(e) => changeHolder(i, e.target.value)}
+                              aria-label="Change holder"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            >
+                              <option value="">— None</option>
+                              {[...new Set([...holders, ...(k.holder ? [k.holder] : [])])]
+                                .sort((a, b) => a.localeCompare(b))
+                                .map((h) => <option key={h} value={h}>{h}</option>)}
+                            </select>
+                          </div>
+                        )}
+                      </td>
                       {editing ? (
                         <>
                           <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.dist || ""} onChange={(e) => updateEntry(i, "dist", parseInt(e.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
