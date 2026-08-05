@@ -14,9 +14,10 @@ import { getTeamId } from "@/lib/teamData";
 import type { FGKick, Session } from "@/types";
 import clsx from "clsx";
 
-/** Compress a name to initials for the compact holder column, e.g. "John Smith" → "JS". */
+/** Compress a name to initials for the compact holder column, e.g. "John Smith" → "JS".
+ *  Returns "" when there's no holder — a blank cell, not a placeholder. */
 function toInitials(name?: string): string {
-  if (!name || !name.trim()) return "—";
+  if (!name || !name.trim()) return "";
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -580,12 +581,12 @@ function KickingHistoryContent() {
                           <div className="relative inline-flex">
                             <span
                               className={clsx(
-                                "inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded text-xs font-bold border",
-                                k.holder ? "border-accent/40 text-accent" : "border-border text-muted"
+                                "inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded text-xs font-bold",
+                                k.holder ? "border border-accent/40 text-accent" : "text-transparent"
                               )}
                               title={k.holder || "Set holder"}
                             >
-                              {toInitials(k.holder)}
+                              {k.holder ? toInitials(k.holder) : " "}
                             </span>
                             <select
                               value={k.holder ?? ""}
