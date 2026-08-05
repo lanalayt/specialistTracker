@@ -543,212 +543,243 @@ export default function LongSnapHistoryPage() {
               const isShort = snaps.every((s) => s.snapType === "FG" || s.snapType === "PAT");
               const isLong = snaps.every((s) => s.snapType === "PUNT");
               if (isShort) {
-                const strikes = snaps.filter((s) => s.accuracy === "ON_TARGET").length;
-                const totalScore = snaps.reduce((s, e) => s + (e.score ?? 0), 0);
-                const maxScore = snaps.length * 3;
-                const scorePct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-                const markers: ShortSnapMarker[] = snaps
-                  .map((s, gi) => ({ s, gi }))
-                  .filter(({ s }) => s.markerX != null && s.markerY != null)
-                  .map(({ s, gi }, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? false, id: gi }));
+                // One chart per athlete, stacked — so two snappers logged in the
+                // same session each get their own diagram + table.
+                const athleteList = [...new Set(snaps.map((s) => s.athlete))];
                 return (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-accent uppercase tracking-wider">FG / Short Snap</span>
-                      <span className="text-xs text-muted">·</span>
-                      <span className="text-xs text-muted">{strikes}/{snaps.length} Strikes</span>
-                      <span className="text-xs text-muted">·</span>
-                      <span className="text-xs text-sky-400 font-semibold">{totalScore}/{maxScore} ({scorePct}%)</span>
-                    </div>
+                  <div className="space-y-6">
+                    {athleteList.map((a) => {
+                      const ps = snaps.filter((s) => s.athlete === a);
+                      const strikes = ps.filter((s) => s.accuracy === "ON_TARGET").length;
+                      const totalScore = ps.reduce((sum, e) => sum + (e.score ?? 0), 0);
+                      const maxScore = ps.length * 3;
+                      const scorePct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+                      const markers: ShortSnapMarker[] = ps
+                        .filter((s) => s.markerX != null && s.markerY != null)
+                        .map((s) => ({ x: s.markerX!, y: s.markerY!, num: ps.indexOf(s) + 1, inZone: s.markerInZone ?? false, id: snaps.indexOf(s) }));
+                      const selHere = editing && selectedSnapIdx != null && snaps[selectedSnapIdx]?.athlete === a;
+                      return (
+                        <div key={a} className="space-y-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-slate-200">{a}</span>
+                            <span className="text-xs text-muted">·</span>
+                            <span className="text-xs font-bold text-accent uppercase tracking-wider">FG / Short Snap</span>
+                            <span className="text-xs text-muted">·</span>
+                            <span className="text-xs text-muted">{strikes}/{ps.length} Strikes</span>
+                            <span className="text-xs text-muted">·</span>
+                            <span className="text-xs text-sky-400 font-semibold">{totalScore}/{maxScore} ({scorePct}%)</span>
+                          </div>
 
-                    {/* Strike zone diagram with all snap dots */}
-                    {(markers.length > 0 || editing) && (
-                      <div className="card-2 flex flex-col items-center gap-1.5">
-                        <div className="w-full max-w-[280px]">
-                          <HolderStrikeZone
-                            markers={markers}
-                            editableMarkers={editing}
-                            selectedId={editing ? selectedSnapIdx : null}
-                            onMarkerSelect={(id) => setSelectedSnapIdx(id)}
-                            onPlace={editing && selectedSnapIdx != null ? (x, y, inZone, dir) => moveSnapLocation(selectedSnapIdx, x, y, inZone, dir, true) : undefined}
-                          />
-                        </div>
-                        {editing && (
-                          <p className="text-[10px] text-center text-muted">
-                            {selectedSnapIdx != null ? `Tap the diagram to move snap #${selectedSnapIdx + 1}.` : "Tap a snap dot or row, then tap the diagram to move where it landed."}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="card-2 overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr>
-                            {editing && <th className="table-header w-8"></th>}
-                            <th className="table-header text-left">#</th>
-                            <th className="table-header text-left">Athlete</th>
-                            <th className="table-header">Acc</th>
-                            <th className="table-header">Laces</th>
-                            <th className="table-header">Spiral</th>
-                            <th className="table-header">Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {snaps.map((s, i) => (
-                            <tr
-                              key={i}
-                              onClick={editing ? () => setSelectedSnapIdx(i) : undefined}
-                              className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
-                            >
+                          {(markers.length > 0 || editing) && (
+                            <div className="card-2 flex flex-col items-center gap-1.5">
+                              <div className="w-full max-w-[280px]">
+                                <HolderStrikeZone
+                                  markers={markers}
+                                  editableMarkers={editing}
+                                  selectedId={selHere ? selectedSnapIdx : null}
+                                  onMarkerSelect={(id) => setSelectedSnapIdx(id)}
+                                  onPlace={selHere ? (x, y, inZone, dir) => moveSnapLocation(selectedSnapIdx!, x, y, inZone, dir, true) : undefined}
+                                />
+                              </div>
                               {editing && (
-                                <td className="table-cell">
-                                  <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
-                                  </button>
-                                </td>
+                                <p className="text-[10px] text-center text-muted">
+                                  {selHere ? `Tap the diagram to move snap #${selectedSnapIdx != null ? ps.indexOf(snaps[selectedSnapIdx]) + 1 : ""}.` : "Tap a snap dot or row, then tap the diagram to move where it landed."}
+                                </p>
                               )}
-                              <td className="table-cell text-left text-muted">{i + 1}</td>
-                              <td className="table-name">{s.athlete}</td>
-                              <td className="table-cell">
-                                {editing ? (
-                                  <select value={s.accuracy} onChange={(e) => { const acc = e.target.value as LongSnapEntry["accuracy"]; const updated = { ...s, accuracy: acc, markerInZone: acc === "ON_TARGET" }; updateSnap(i, { accuracy: acc, markerInZone: acc === "ON_TARGET", score: calc30PtScore(updated) }); }} className={SEL}>
-                                    {ACC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                  </select>
-                                ) : (
-                                  <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                    {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
-                                  </span>
-                                )}
-                              </td>
-                              <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>
-                                {editing ? (
-                                  <select value={s.laces || "Good"} onChange={(e) => { const laces = e.target.value; const updated = { ...s, laces }; updateSnap(i, { laces, score: calc30PtScore(updated) }); }} className={SEL}>
-                                    {LACES_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                  </select>
-                                ) : (s.laces === "Good" ? "Perfect" : s.laces || "—")}
-                              </td>
-                              <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
-                                {editing ? (
-                                  <select value={s.spiral || "Good"} onChange={(e) => { const spiral = e.target.value; const updated = { ...s, spiral }; updateSnap(i, { spiral, score: calc30PtScore(updated) }); }} className={SEL}>
-                                    {SPIRAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                  </select>
-                                ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
-                              </td>
-                              <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {editing && (
-                      <button onClick={() => addSnap((selectedSnapIdx != null ? snaps[selectedSnapIdx]?.athlete : undefined) ?? snaps[0]?.athlete ?? "", true)} className="w-full py-2 rounded-input text-xs font-bold border border-accent/40 text-accent hover:bg-accent/10 transition-all">
-                        + Add Snap
-                      </button>
-                    )}
+                            </div>
+                          )}
+
+                          <div className="card-2 overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr>
+                                  {editing && <th className="table-header w-8"></th>}
+                                  <th className="table-header text-left">#</th>
+                                  <th className="table-header">Acc</th>
+                                  <th className="table-header">Laces</th>
+                                  <th className="table-header">Spiral</th>
+                                  <th className="table-header">Score</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {ps.map((s, li) => {
+                                  const i = snaps.indexOf(s);
+                                  return (
+                                    <tr
+                                      key={i}
+                                      onClick={editing ? () => setSelectedSnapIdx(i) : undefined}
+                                      className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                                    >
+                                      {editing && (
+                                        <td className="table-cell">
+                                          <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${li + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                          </button>
+                                        </td>
+                                      )}
+                                      <td className="table-cell text-left text-muted">{li + 1}</td>
+                                      <td className="table-cell">
+                                        {editing ? (
+                                          <select value={s.accuracy} onClick={(e) => e.stopPropagation()} onChange={(e) => { const acc = e.target.value as LongSnapEntry["accuracy"]; const updated = { ...s, accuracy: acc, markerInZone: acc === "ON_TARGET" }; updateSnap(i, { accuracy: acc, markerInZone: acc === "ON_TARGET", score: calc30PtScore(updated) }); }} className={SEL}>
+                                            {ACC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                          </select>
+                                        ) : (
+                                          <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                            {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>
+                                        {editing ? (
+                                          <select value={s.laces || "Good"} onClick={(e) => e.stopPropagation()} onChange={(e) => { const laces = e.target.value; const updated = { ...s, laces }; updateSnap(i, { laces, score: calc30PtScore(updated) }); }} className={SEL}>
+                                            {LACES_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                          </select>
+                                        ) : (s.laces === "Good" ? "Perfect" : s.laces || "—")}
+                                      </td>
+                                      <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
+                                        {editing ? (
+                                          <select value={s.spiral || "Good"} onClick={(e) => e.stopPropagation()} onChange={(e) => { const spiral = e.target.value; const updated = { ...s, spiral }; updateSnap(i, { spiral, score: calc30PtScore(updated) }); }} className={SEL}>
+                                            {SPIRAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                          </select>
+                                        ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
+                                      </td>
+                                      <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                          {editing && (
+                            <button onClick={() => addSnap(a, true)} className="w-full py-2 rounded-input text-xs font-bold border border-accent/40 text-accent hover:bg-accent/10 transition-all">
+                              + Add Snap
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               }
-              // Long snap or mixed
+              // Long snap or mixed — one chart per athlete, stacked.
               {
-                const longMarkers: SnapMarker[] = snaps
-                  .map((s, gi) => ({ s, gi }))
-                  .filter(({ s }) => s.markerX != null && s.markerY != null)
-                  .map(({ s, gi }, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? false, id: gi }));
+                const athleteList = [...new Set(snaps.map((s) => s.athlete))];
                 return (
-                <div className="space-y-3">
-                  {isLong && <span className="text-xs font-bold text-accent uppercase tracking-wider">Punt / Long Snap</span>}
+                <div className="space-y-6">
+                  {athleteList.map((a) => {
+                    const ps = snaps.filter((s) => s.athlete === a);
+                    const strikes = ps.filter((s) => s.accuracy === "ON_TARGET").length;
+                    const times = ps.filter((s) => s.time > 0);
+                    const avgT = times.length > 0 ? (times.reduce((sum, s) => sum + s.time, 0) / times.length).toFixed(2) : "—";
+                    const longMarkers: SnapMarker[] = ps
+                      .filter((s) => s.markerX != null && s.markerY != null)
+                      .map((s) => ({ x: s.markerX!, y: s.markerY!, num: ps.indexOf(s) + 1, inZone: s.markerInZone ?? false, id: snaps.indexOf(s) }));
+                    const selHere = editing && selectedSnapIdx != null && snaps[selectedSnapIdx]?.athlete === a;
+                    return (
+                      <div key={a} className="space-y-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-slate-200">{a}</span>
+                          <span className="text-xs text-muted">·</span>
+                          {isLong && <span className="text-xs font-bold text-accent uppercase tracking-wider">Punt / Long Snap</span>}
+                          <span className="text-xs text-muted">{strikes}/{ps.length} Strikes</span>
+                          <span className="text-xs text-muted">·</span>
+                          <span className="text-xs text-slate-300">Avg {avgT}s</span>
+                        </div>
 
-                  {(longMarkers.length > 0 || editing) && (
-                    <div className="card-2 flex flex-col items-center gap-1.5">
-                      <div className="w-full max-w-[280px]">
-                        <PunterStrikeZone
-                          markers={longMarkers}
-                          editableMarkers={editing}
-                          selectedId={editing ? selectedSnapIdx : null}
-                          onMarkerSelect={(id) => setSelectedSnapIdx(id)}
-                          onPlace={editing && selectedSnapIdx != null ? (x, y, inZone, dir) => moveSnapLocation(selectedSnapIdx, x, y, inZone, dir, false) : undefined}
-                        />
-                      </div>
-                      {editing && (
-                        <p className="text-[10px] text-center text-muted">
-                          {selectedSnapIdx != null ? `Tap the diagram to move snap #${selectedSnapIdx + 1}.` : "Tap a snap dot or row, then tap the diagram to move where it landed."}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="card-2 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr>
-                          {editing && <th className="table-header w-8"></th>}
-                          <th className="table-header text-left">#</th>
-                          <th className="table-header text-left">Athlete</th>
-                          {!isLong && <th className="table-header">Type</th>}
-                          <th className="table-header">Time</th>
-                          <th className="table-header">Accuracy</th>
-                          <th className="table-header">Spiral</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {snaps.map((s, i) => (
-                          <tr
-                            key={i}
-                            onClick={editing ? () => setSelectedSnapIdx(i) : undefined}
-                            className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
-                          >
+                        {(longMarkers.length > 0 || editing) && (
+                          <div className="card-2 flex flex-col items-center gap-1.5">
+                            <div className="w-full max-w-[280px]">
+                              <PunterStrikeZone
+                                markers={longMarkers}
+                                editableMarkers={editing}
+                                selectedId={selHere ? selectedSnapIdx : null}
+                                onMarkerSelect={(id) => setSelectedSnapIdx(id)}
+                                onPlace={selHere ? (x, y, inZone, dir) => moveSnapLocation(selectedSnapIdx!, x, y, inZone, dir, false) : undefined}
+                              />
+                            </div>
                             {editing && (
-                              <td className="table-cell">
-                                <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
-                                </button>
-                              </td>
+                              <p className="text-[10px] text-center text-muted">
+                                {selHere ? `Tap the diagram to move snap #${selectedSnapIdx != null ? ps.indexOf(snaps[selectedSnapIdx]) + 1 : ""}.` : "Tap a snap dot or row, then tap the diagram to move where it landed."}
+                              </p>
                             )}
-                            <td className="table-cell text-left text-muted">{i + 1}</td>
-                            <td className="table-name">{s.athlete}</td>
-                            {!isLong && <td className="table-cell text-muted">{s.snapType}</td>}
-                            <td className="table-cell font-bold">
-                              {editing ? (
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  onClick={(e) => e.stopPropagation()}
-                                  value={s.time > 0 ? s.time : ""}
-                                  onChange={(e) => updateSnap(i, { time: parseFloat(e.target.value) || 0 })}
-                                  className="w-16 bg-surface-2 border border-border text-slate-200 text-center text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60"
-                                  placeholder="0.00"
-                                />
-                              ) : (s.time > 0 ? `${s.time.toFixed(2)}s` : "—")}
-                            </td>
-                            <td className="table-cell">
-                              {editing ? (
-                                <select value={s.accuracy} onChange={(e) => { const acc = e.target.value as LongSnapEntry["accuracy"]; updateSnap(i, { accuracy: acc, markerInZone: acc === "ON_TARGET" }); }} className={SEL}>
-                                  {ACC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
-                              ) : (
-                                <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
-                                  {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s, false); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
-                                </span>
-                              )}
-                            </td>
-                            <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
-                              {editing ? (
-                                <select value={s.spiral || "Good"} onChange={(e) => updateSnap(i, { spiral: e.target.value })} className={SEL}>
-                                  {SPIRAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
-                              ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {editing && (
-                    <button onClick={() => addSnap((selectedSnapIdx != null ? snaps[selectedSnapIdx]?.athlete : undefined) ?? snaps[0]?.athlete ?? "", false)} className="w-full py-2 rounded-input text-xs font-bold border border-accent/40 text-accent hover:bg-accent/10 transition-all">
-                      + Add Snap
-                    </button>
-                  )}
+                          </div>
+                        )}
+
+                        <div className="card-2 overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr>
+                                {editing && <th className="table-header w-8"></th>}
+                                <th className="table-header text-left">#</th>
+                                {!isLong && <th className="table-header">Type</th>}
+                                <th className="table-header">Time</th>
+                                <th className="table-header">Accuracy</th>
+                                <th className="table-header">Spiral</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ps.map((s, li) => {
+                                const i = snaps.indexOf(s);
+                                return (
+                                  <tr
+                                    key={i}
+                                    onClick={editing ? () => setSelectedSnapIdx(i) : undefined}
+                                    className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                                  >
+                                    {editing && (
+                                      <td className="table-cell">
+                                        <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${li + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
+                                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
+                                        </button>
+                                      </td>
+                                    )}
+                                    <td className="table-cell text-left text-muted">{li + 1}</td>
+                                    {!isLong && <td className="table-cell text-muted">{s.snapType}</td>}
+                                    <td className="table-cell font-bold">
+                                      {editing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          onClick={(e) => e.stopPropagation()}
+                                          value={s.time > 0 ? s.time : ""}
+                                          onChange={(e) => updateSnap(i, { time: parseFloat(e.target.value) || 0 })}
+                                          className="w-16 bg-surface-2 border border-border text-slate-200 text-center text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60"
+                                          placeholder="0.00"
+                                        />
+                                      ) : (s.time > 0 ? `${s.time.toFixed(2)}s` : "—")}
+                                    </td>
+                                    <td className="table-cell">
+                                      {editing ? (
+                                        <select value={s.accuracy} onClick={(e) => e.stopPropagation()} onChange={(e) => { const acc = e.target.value as LongSnapEntry["accuracy"]; updateSnap(i, { accuracy: acc, markerInZone: acc === "ON_TARGET" }); }} className={SEL}>
+                                          {ACC_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                        </select>
+                                      ) : (
+                                        <span className={clsx("text-xs font-semibold", s.accuracy === "ON_TARGET" ? "text-make" : "text-miss")}>
+                                          {s.accuracy === "ON_TARGET" ? "Strike" : (() => { const ml = getMissLabel(s, false); return ml ? `Ball ${MISS_ARROWS[ml] ?? ""}` : "Ball"; })()}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
+                                      {editing ? (
+                                        <select value={s.spiral || "Good"} onClick={(e) => e.stopPropagation()} onChange={(e) => updateSnap(i, { spiral: e.target.value })} className={SEL}>
+                                          {SPIRAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                        </select>
+                                      ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {editing && (
+                          <button onClick={() => addSnap(a, false)} className="w-full py-2 rounded-input text-xs font-bold border border-accent/40 text-accent hover:bg-accent/10 transition-all">
+                            + Add Snap
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
                 );
               }
