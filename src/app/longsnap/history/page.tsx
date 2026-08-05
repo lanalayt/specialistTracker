@@ -142,6 +142,19 @@ export default function LongSnapHistoryPage() {
     updateSnap(snapIndex, patch);
   }
 
+  // Add a new snap to the session for a given athlete, then select it so its
+  // location can be placed on the diagram right away. Seeded as an on-target
+  // strike at the diagram's center — everything is editable.
+  function addSnap(athlete: string, short: boolean) {
+    if (!selected) return;
+    const newSnap: LongSnapEntry = short
+      ? { athleteId: athlete, athlete, snapType: "FG", time: 0, accuracy: "ON_TARGET", laces: "Good", spiral: "Good", markerX: 50, markerY: 55, markerInZone: true, score: 3 }
+      : { athleteId: athlete, athlete, snapType: "PUNT", time: 0, accuracy: "ON_TARGET", spiral: "Good", markerX: 50, markerY: 45, markerInZone: true, score: 0 };
+    const updated = [...snaps, newSnap];
+    setSelectedSnapIdx(updated.length - 1);
+    updateSessionEntries(selected.id, updated);
+  }
+
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
       {/* Session list — hidden on mobile when a session is selected */}
@@ -407,6 +420,11 @@ export default function LongSnapHistoryPage() {
                               </tbody>
                             </table>
                           </div>
+                          {editing && (
+                            <button onClick={() => addSnap(a, true)} className="w-full py-1.5 rounded-input text-[10px] font-bold border border-accent/40 text-accent hover:bg-accent/10 transition-all">
+                              + Add Snap
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -421,16 +439,28 @@ export default function LongSnapHistoryPage() {
                   <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${athleteList.length}, minmax(0, 1fr))` }}>
                     {athleteList.map((a) => {
                       const ps = snaps.filter((s) => s.athlete === a);
-                      const pm: SnapMarker[] = ps.filter((s) => s.markerX != null).map((s, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? s.accuracy === "ON_TARGET" }));
+                      const pm: SnapMarker[] = ps.filter((s) => s.markerX != null).map((s) => ({ x: s.markerX!, y: s.markerY!, num: ps.indexOf(s) + 1, inZone: s.markerInZone ?? s.accuracy === "ON_TARGET", id: snaps.indexOf(s) }));
                       const str = ps.filter((s) => s.accuracy === "ON_TARGET").length;
                       const balls = ps.length - str;
                       const pct = ps.length > 0 ? Math.round((str / ps.length) * 100) : 0;
                       const times = ps.filter((s) => s.time > 0);
                       const avgT = times.length > 0 ? (times.reduce((sum, s) => sum + s.time, 0) / times.length).toFixed(2) : "—";
+                      const selHere = editing && selectedSnapIdx != null && snaps[selectedSnapIdx]?.athlete === a;
                       return (
                         <div key={a} className="space-y-3">
                           <p className="text-sm font-bold text-slate-200 text-center">{a}</p>
-                          <PunterStrikeZone markers={pm} />
+                          <PunterStrikeZone
+                            markers={pm}
+                            editableMarkers={editing}
+                            selectedId={selHere ? selectedSnapIdx : null}
+                            onMarkerSelect={(id) => setSelectedSnapIdx(id)}
+                            onPlace={selHere ? (x, y, inZone, dir) => moveSnapLocation(selectedSnapIdx!, x, y, inZone, dir, false) : undefined}
+                          />
+                          {editing && (
+                            <p className="text-[10px] text-center text-muted">
+                              {selHere ? "Tap the diagram to move snap #" + (selectedSnapIdx != null ? ps.indexOf(snaps[selectedSnapIdx]) + 1 : "") : "Tap a snap dot or row, then tap the diagram to move it."}
+                            </p>
+                          )}
                           <div className="card-2 text-center py-2">
                             <div className="flex justify-center gap-4">
                               <div><p className="text-xl font-black text-make">{str}</p><p className="text-[10px] text-muted">Strikes</p></div>
@@ -452,10 +482,14 @@ export default function LongSnapHistoryPage() {
                                 {ps.map((s, i) => {
                                   const snapIdx = snaps.indexOf(s);
                                   return (
-                                    <tr key={i} className="border-t border-border/30">
+                                    <tr
+                                      key={i}
+                                      onClick={editing ? () => setSelectedSnapIdx(snapIdx) : undefined}
+                                      className={clsx("border-t border-border/30", editing && "cursor-pointer", editing && selectedSnapIdx === snapIdx && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                                    >
                                       {editing && (
                                         <td className="py-1 px-1">
-                                          <button onClick={() => { if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
+                                          <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(snapIdx); }} className="text-miss/60 hover:text-miss transition-colors">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
                                           </button>
                                         </td>
@@ -466,6 +500,7 @@ export default function LongSnapHistoryPage() {
                                           <input
                                             type="number"
                                             step="0.01"
+                                            onClick={(e) => e.stopPropagation()}
                                             value={s.time > 0 ? s.time : ""}
                                             onChange={(e) => updateSnap(snapIdx, { time: parseFloat(e.target.value) || 0 })}
                                             className="w-16 bg-surface-2 border border-border text-slate-200 text-center text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60"
@@ -493,6 +528,11 @@ export default function LongSnapHistoryPage() {
                               </tbody>
                             </table>
                           </div>
+                          {editing && (
+                            <button onClick={() => addSnap(a, false)} className="w-full py-1.5 rounded-input text-[10px] font-bold border border-accent/40 text-accent hover:bg-accent/10 transition-all">
+                              + Add Snap
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -601,23 +641,40 @@ export default function LongSnapHistoryPage() {
                         </tbody>
                       </table>
                     </div>
+                    {editing && (
+                      <button onClick={() => addSnap((selectedSnapIdx != null ? snaps[selectedSnapIdx]?.athlete : undefined) ?? snaps[0]?.athlete ?? "", true)} className="w-full py-2 rounded-input text-xs font-bold border border-accent/40 text-accent hover:bg-accent/10 transition-all">
+                        + Add Snap
+                      </button>
+                    )}
                   </div>
                 );
               }
               // Long snap or mixed
               {
-                const longMarkers = snaps
-                  .filter((s) => s.markerX != null && s.markerY != null)
-                  .map((s, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? false }));
+                const longMarkers: SnapMarker[] = snaps
+                  .map((s, gi) => ({ s, gi }))
+                  .filter(({ s }) => s.markerX != null && s.markerY != null)
+                  .map(({ s, gi }, i) => ({ x: s.markerX!, y: s.markerY!, num: i + 1, inZone: s.markerInZone ?? false, id: gi }));
                 return (
                 <div className="space-y-3">
                   {isLong && <span className="text-xs font-bold text-accent uppercase tracking-wider">Punt / Long Snap</span>}
 
-                  {longMarkers.length > 0 && (
-                    <div className="card-2 flex justify-center">
+                  {(longMarkers.length > 0 || editing) && (
+                    <div className="card-2 flex flex-col items-center gap-1.5">
                       <div className="w-full max-w-[280px]">
-                        <PunterStrikeZone markers={longMarkers} />
+                        <PunterStrikeZone
+                          markers={longMarkers}
+                          editableMarkers={editing}
+                          selectedId={editing ? selectedSnapIdx : null}
+                          onMarkerSelect={(id) => setSelectedSnapIdx(id)}
+                          onPlace={editing && selectedSnapIdx != null ? (x, y, inZone, dir) => moveSnapLocation(selectedSnapIdx, x, y, inZone, dir, false) : undefined}
+                        />
                       </div>
+                      {editing && (
+                        <p className="text-[10px] text-center text-muted">
+                          {selectedSnapIdx != null ? `Tap the diagram to move snap #${selectedSnapIdx + 1}.` : "Tap a snap dot or row, then tap the diagram to move where it landed."}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -636,10 +693,14 @@ export default function LongSnapHistoryPage() {
                       </thead>
                       <tbody>
                         {snaps.map((s, i) => (
-                          <tr key={i} className="hover:bg-surface/30">
+                          <tr
+                            key={i}
+                            onClick={editing ? () => setSelectedSnapIdx(i) : undefined}
+                            className={clsx("hover:bg-surface/30", editing && "cursor-pointer", editing && selectedSnapIdx === i && "bg-amber-500/10 ring-1 ring-amber-500/40")}
+                          >
                             {editing && (
                               <td className="table-cell">
-                                <button onClick={() => { if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
+                                <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete snap #${i + 1}?`)) deleteSnap(i); }} className="text-miss/60 hover:text-miss transition-colors">
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.28 4.22a.75.75 0 00-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 101.06 1.06L8 9.06l2.72 2.72a.75.75 0 101.06-1.06L9.06 8l2.72-2.72a.75.75 0 00-1.06-1.06L8 6.94 5.28 4.22z"/></svg>
                                 </button>
                               </td>
@@ -652,6 +713,7 @@ export default function LongSnapHistoryPage() {
                                 <input
                                   type="number"
                                   step="0.01"
+                                  onClick={(e) => e.stopPropagation()}
                                   value={s.time > 0 ? s.time : ""}
                                   onChange={(e) => updateSnap(i, { time: parseFloat(e.target.value) || 0 })}
                                   className="w-16 bg-surface-2 border border-border text-slate-200 text-center text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60"
@@ -682,6 +744,11 @@ export default function LongSnapHistoryPage() {
                       </tbody>
                     </table>
                   </div>
+                  {editing && (
+                    <button onClick={() => addSnap((selectedSnapIdx != null ? snaps[selectedSnapIdx]?.athlete : undefined) ?? snaps[0]?.athlete ?? "", false)} className="w-full py-2 rounded-input text-xs font-bold border border-accent/40 text-accent hover:bg-accent/10 transition-all">
+                      + Add Snap
+                    </button>
+                  )}
                 </div>
                 );
               }

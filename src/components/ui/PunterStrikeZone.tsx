@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import clsx from "clsx";
 import { saveSettingsToCloud, getCachedSettings, useSettings } from "@/lib/settingsSync";
+import type { SnapDir } from "@/components/ui/HolderStrikeZone";
 
 export interface SnapMarker {
   x: number;
@@ -10,6 +12,8 @@ export interface SnapMarker {
   inZone: boolean;
   zoneCell?: string;
   missCell?: string;
+  /** Stable identity for edit interactions (e.g. the snap's index). */
+  id?: number;
 }
 
 export interface ZoneBounds {
@@ -26,6 +30,23 @@ interface PunterStrikeZoneProps {
   chartMode?: "simple" | "detailed";
   missMode?: "simple" | "detailed";
   editable?: boolean;
+  /** Enable moving existing markers: tap a marker to select, tap the field to move it. */
+  editableMarkers?: boolean;
+  /** Id of the currently selected marker (highlighted). */
+  selectedId?: number | null;
+  /** Called when a marker is tapped. */
+  onMarkerSelect?: (id: number) => void;
+  /** Called when the field is tapped while a marker is selected — new location. */
+  onPlace?: (x: number, y: number, inZone: boolean, dir: SnapDir) => void;
+}
+
+function dirFromPoint(xPct: number, yPct: number, zone: ZoneBounds): SnapDir {
+  if (isInZone(xPct, yPct, zone)) return "ON_TARGET";
+  if (yPct < zone.top) return "HIGH";
+  if (yPct > zone.bottom) return "LOW";
+  if (xPct < zone.left) return "LEFT";
+  if (xPct > zone.right) return "RIGHT";
+  return "HIGH";
 }
 
 // Default strike zone — preset. Narrowed width (v5) while keeping the same
@@ -101,7 +122,7 @@ function getMissCell(xPct: number, yPct: number, zone: ZoneBounds): string {
 
 type DragEdge = "top" | "bottom" | "left" | "right" | null;
 
-export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode = "simple", missMode = "simple", editable = false }: PunterStrikeZoneProps) {
+export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode = "simple", missMode = "simple", editable = false, editableMarkers = false, selectedId = null, onMarkerSelect, onPlace }: PunterStrikeZoneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zone, setZone] = useState<ZoneBounds>(loadZone);
   const [dragEdge, setDragEdge] = useState<DragEdge>(null);
@@ -125,11 +146,17 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isEditing || dragEdge) return; // Don't place markers while editing zone
-    if (!onSnap || !containerRef.current) return;
+    if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
     const inZone = isInZone(xPct, yPct, zone);
+    // Edit mode: relocate the selected marker instead of adding a new one.
+    if (editableMarkers) {
+      if (onPlace) onPlace(xPct, yPct, inZone, dirFromPoint(xPct, yPct, zone));
+      return;
+    }
+    if (!onSnap) return;
     const zoneCell = isDetailedStrike && inZone ? getZoneCell(xPct, yPct, zone) : undefined;
     const missCell = isDetailedMiss && !inZone ? getMissCell(xPct, yPct, zone) : undefined;
     onSnap({ x: xPct, y: yPct, num: nextNum, inZone, zoneCell, missCell });
@@ -260,24 +287,33 @@ export function PunterStrikeZone({ markers = [], onSnap, nextNum = 1, chartMode 
           )}
 
           {/* Snap markers */}
-          {markers.map((m) => (
-            <div
-              key={m.num}
-              className="absolute pointer-events-none flex items-center justify-center"
-              style={{
-                left: `${m.x}%`,
-                top: `${m.y}%`,
-                transform: "translate(-50%, -50%)",
-                width: 26,
-                height: 26,
-                borderRadius: "50%",
-                backgroundColor: m.inZone ? "rgba(0, 212, 160, 0.85)" : "rgba(239, 68, 68, 0.85)",
-                border: `2px solid ${m.inZone ? "#00d4a0" : "#ef4444"}`,
-              }}
-            >
-              <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
-            </div>
-          ))}
+          {markers.map((m) => {
+            const selected = editableMarkers && m.id != null && m.id === selectedId;
+            return (
+              <div
+                key={m.id ?? m.num}
+                onClick={editableMarkers ? (e) => { e.stopPropagation(); if (m.id != null) onMarkerSelect?.(m.id); } : undefined}
+                className={clsx(
+                  "absolute flex items-center justify-center",
+                  editableMarkers ? "pointer-events-auto cursor-pointer" : "pointer-events-none"
+                )}
+                style={{
+                  left: `${m.x}%`,
+                  top: `${m.y}%`,
+                  transform: `translate(-50%, -50%) scale(${selected ? 1.15 : 1})`,
+                  width: 26,
+                  height: 26,
+                  borderRadius: "50%",
+                  backgroundColor: m.inZone ? "rgba(0, 212, 160, 0.85)" : "rgba(239, 68, 68, 0.85)",
+                  border: selected ? "2px solid #ffffff" : `2px solid ${m.inZone ? "#00d4a0" : "#ef4444"}`,
+                  boxShadow: selected ? "0 0 0 2px #fbbf24" : undefined,
+                  zIndex: selected ? 10 : undefined,
+                }}
+              >
+                <span className="text-[10px] font-black text-white leading-none">{m.num}</span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Edit controls */}
