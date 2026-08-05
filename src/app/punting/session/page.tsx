@@ -1128,6 +1128,96 @@ export default function PuntingSessionPage() {
     setDirectionalAccuracy(defaultDA);
   };
 
+  // ── Insert a new punt right after the current one (live session) ──
+  // For on-the-fly reps ("redo this punt"). The new punt copies the current
+  // punt's athlete/type/hash as sensible defaults — all editable from the card —
+  // and lands as the next punt to log. Every following logged punt, planned row,
+  // and partial input shifts down one so kickNum ↔ planned position stays in
+  // sync (mirrors handleRemoveFromPlan in reverse). The planning-table row is
+  // inserted at the matching position (not appended) so row order stays aligned
+  // with plan order — otherwise a Back-to-Log → Continue rebuild, which derives
+  // the plan from row order, would remap kickNums onto the wrong punts.
+  const handleInsertPunt = () => {
+    const base = plannedPunts[currentPuntIdx];
+    if (!base) return;
+    const insertAt = currentPuntIdx + 1;
+    const curRowIdx = plannedRowIndices[currentPuntIdx];
+    const rowInsertPos = (curRowIdx != null ? curRowIdx : rows.length - 1) + 1;
+
+    // Preserve the current punt's in-flight entry-card values before navigating.
+    if (!isPlannedLogged(currentPuntIdx)) {
+      setPartialInputs((prev) => ({
+        ...prev,
+        [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, poochYL },
+      }));
+    }
+
+    // Insert a fresh planning-table row at the aligned position, seeded with the
+    // copied defaults.
+    setRows((prev) => {
+      const next = [...prev];
+      next.splice(rowInsertPos, 0, {
+        ...emptyRow(),
+        athlete: base.athlete,
+        type: String(base.type),
+        hash: String(base.hash),
+      });
+      return next;
+    });
+
+    setPlannedPunts((prev) => {
+      const next = [...prev];
+      next.splice(insertAt, 0, { athlete: base.athlete, type: base.type, hash: base.hash });
+      return next;
+    });
+    // Existing rows at/after the insert point shift up one; then point the new
+    // plan slot at the freshly inserted row.
+    setPlannedRowIndices((prev) => {
+      const shifted = prev.map((ri) => (ri >= rowInsertPos ? ri + 1 : ri));
+      shifted.splice(insertAt, 0, rowInsertPos);
+      return shifted;
+    });
+    // Captured stopwatch snap times are keyed by row index — shift keys at/after
+    // the insert point so an already-captured snap stays with its punt.
+    setPendingSnapTime((prev) => {
+      const shifted: Record<string, string> = {};
+      Object.entries(prev).forEach(([k, v]) => {
+        const ri = Number(k);
+        shifted[String(ri >= rowInsertPos ? ri + 1 : ri)] = v;
+      });
+      return shifted;
+    });
+
+    // Shift logged punts after the insert point up one so kickNum stays aligned.
+    setSessionPunts((prev) =>
+      prev.map((p) => (p.kickNum != null && p.kickNum >= insertAt + 1 ? { ...p, kickNum: p.kickNum + 1 } : p))
+    );
+
+    // Shift partial inputs keyed at/after the insert point up one.
+    setPartialInputs((prev) => {
+      const shifted: Record<number, PartialPuntInput> = {};
+      Object.entries(prev).forEach(([k, v]) => {
+        const idx = Number(k);
+        shifted[idx >= insertAt ? idx + 1 : idx] = v;
+      });
+      return shifted;
+    });
+
+    // Navigate to the new punt with a clean entry card.
+    setCurrentPuntIdx(insertAt);
+    setEditingPuntIdx(null);
+    setYards("");
+    setHangTime("");
+    setOpTime("");
+    setDirectionalAccuracy(defaultDA);
+    setStarred(false);
+    setPoochYL("");
+    setLos("");
+    setLandingYL("");
+    setReturnYardsInput("");
+    setShowAthleteDropdown(false);
+  };
+
   const handleCommitReady = () => {
     if (sessionPunts.length === 0) return;
     setPendingPunts(sessionPunts);
@@ -1579,6 +1669,18 @@ export default function PuntingSessionPage() {
                         );
                       });
                     })()}
+                    {!viewOnly && (
+                      <button
+                        onClick={handleInsertPunt}
+                        title="Insert a punt after this one"
+                        className="flex flex-col items-center gap-0.5 cursor-pointer transition-all"
+                      >
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold border border-dashed border-accent/60 text-accent hover:bg-accent/10 transition-colors">
+                          +
+                        </div>
+                        <span className="text-[8px] font-semibold leading-none text-accent">Add</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
