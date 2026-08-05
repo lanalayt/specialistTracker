@@ -177,7 +177,7 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signUp = useCallback(async (email: string, password: string, name: string, role: UserRole = "coach", teamId?: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -185,6 +185,34 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
       },
     });
     if (error) throw new Error(error.message);
+
+    // When joining an existing team (athlete or co-coach), create the members
+    // row immediately via the service-role endpoint. This is what links the user
+    // to the school: without a members row, is_team_member() is false for them
+    // (their uid ≠ the team owner's id) and RLS blocks all of the team's data.
+    // Doing it here — rather than relying on the client-side self-register on
+    // first login — makes it work regardless of client RLS quirks and even when
+    // email confirmation defers the session (we pass the new user id explicitly).
+    const newUserId = data.user?.id;
+    if (teamId && newUserId) {
+      try {
+        await fetch("/api/resolve-invite", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "register-member",
+            userId: newUserId,
+            teamId,
+            email,
+            name,
+            role: role === "athlete" ? "athlete" : "coach",
+            access: role === "athlete" ? "view" : "edit",
+          }),
+        });
+      } catch {
+        // Non-fatal: the client-side auto-register on first login is the fallback.
+      }
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = useCallback(async () => {
