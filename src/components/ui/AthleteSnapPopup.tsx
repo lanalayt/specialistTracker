@@ -24,6 +24,7 @@ interface Props {
   kickDistance?: number; // distance of the kick
   kickHash?: string; // hash of the kick
   previousSnaps?: SnapLogEntry[]; // snaps already logged for this kick
+  initialSnapTime?: string; // punt only — pre-fill snap time (e.g. from the live stopwatch)
   onClose: () => void;
   onSaved?: (entry: SnapLogEntry) => void;
   onHolderToggle?: (enabled: boolean) => void;
@@ -37,7 +38,7 @@ function getInitials(name: string): string {
   return parts.map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2);
 }
 
-export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, onClose, onSaved, onHolderToggle, kickList, onKickSelect }: Props) {
+export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, holderEnabled = true, kickerName, kickDistance, kickHash, previousSnaps, initialSnapTime, onClose, onSaved, onHolderToggle, kickList, onKickSelect }: Props) {
   const isFG = snapType === "FG";
   const [localHolderOn, setLocalHolderOn] = useState(holderEnabled);
   const showHolder = isFG && localHolderOn;
@@ -82,6 +83,9 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
         } else {
           setPuntMarker(null);
         }
+        // Restore the saved snap time when editing; fall back to a pending
+        // stopwatch capture if this snap didn't have a time yet.
+        setSnapTime(last.dbEntry.time ? last.dbEntry.time.toFixed(2) : (initialSnapTime ?? ""));
       }
     } else {
       // Clear for empty kick — default spiral to Open (Bad) for long snaps
@@ -89,8 +93,10 @@ export function AthleteSnapPopup({ snapType, athletes, holders: holdersProp, hol
       setPuntMarker(null);
       setLaces("");
       setSpiral(isFG ? "" : "Bad");
+      // Pre-fill the snap time from the live stopwatch (punt), if captured.
+      setSnapTime(initialSnapTime ?? "");
     }
-  }, [previousSnaps]);
+  }, [previousSnaps, initialSnapTime]);
 
   const canSave = isFG
     ? !!marker && !!laces && !!spiral && !!snapper
