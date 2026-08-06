@@ -13,6 +13,7 @@ import Link from "next/link";
 import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { LongSnapCommitModal } from "@/components/ui/LongSnapCommitModal";
+import { SnapSessionSummary } from "@/components/ui/SnapSessionSummary";
 
 const DRAFT_SUFFIX = "fg";
 const INIT_ROWS = 12;
@@ -133,11 +134,14 @@ export default function LongSnapFGSessionPage() {
   const filledRows = rows.filter((r) => r.athlete || r.dist || r.accuracy || r.laces || r.spiral);
 
 
-  const handleCommit = () => {
+  // Build the committed snap entries from the current rows + diagram markers.
+  // Derived (not stored) so the post-commit summary survives a page reload —
+  // rows and markers are persisted in the draft, committedSnaps state isn't.
+  const buildSnaps = (): LongSnapEntry[] => {
     // Markers are keyed by row position (num = row index + 1); attach each
-    // one to its snap so the diagram can be redrawn per athlete in history.
+    // one to its snap so the diagram can be redrawn per athlete.
     const markerByRow = new Map(snapMarkers.map((m) => [m.num - 1, m]));
-    const snaps: LongSnapEntry[] = rows
+    return rows
       .map((r, i) => ({ r, i }))
       .filter(({ r }) => r.athlete || r.dist || r.accuracy || r.laces || r.spiral)
       .map(({ r, i }) => {
@@ -158,8 +162,11 @@ export default function LongSnapFGSessionPage() {
           markerInZone: m?.inZone,
         };
       });
-    if (snaps.length === 0) return;
+  };
 
+  const handleCommit = () => {
+    const snaps = buildSnaps();
+    if (snaps.length === 0) return;
     commitPractice(snaps, undefined, weather);
     setShowCommit(false);
     setCommitted(true); // auto-save effect persists committed=true to the DB draft
@@ -172,6 +179,28 @@ export default function LongSnapFGSessionPage() {
     setCommitted(false);
     { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, CLOUD_DRAFT_KEY); }
   };
+
+  // After committing, show a per-athlete summary instead of staying on the log.
+  if (committed) {
+    const summarySnaps = buildSnaps();
+    return (
+      <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <div className="max-w-2xl mx-auto space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-100">Session Summary</h2>
+              <p className="text-xs text-make font-semibold mt-0.5">Committed · {summarySnaps.length} snap{summarySnaps.length !== 1 ? "s" : ""}</p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Link href="/longsnap/history" className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all self-center">View in History</Link>
+              {!viewOnly && <button onClick={handleNewSession} className="btn-primary text-xs py-2 px-5">New Session</button>}
+            </div>
+          </div>
+          <SnapSessionSummary snaps={summarySnaps} />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
