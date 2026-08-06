@@ -31,10 +31,10 @@ interface LogRow {
   athlete: string;
   time: string;
   accuracy: string;
-  critical?: boolean;
+  spiral?: string; // "Good" = Tight, "Bad" = Open
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", time: "", accuracy: "", critical: false });
+const emptyRow = (): LogRow => ({ athlete: "", time: "", accuracy: "", spiral: "" });
 
 export default function LongSnapPuntSessionPage() {
   const pathname = usePathname();
@@ -208,7 +208,7 @@ export default function LongSnapPuntSessionPage() {
         accuracy,
         score: 0,
         benchmark: getSnapBenchmark(SNAP_TYPE, time),
-        critical: !!r.critical,
+        spiral: r.spiral || undefined,
       };
     });
 
@@ -250,7 +250,7 @@ export default function LongSnapPuntSessionPage() {
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center border-b border-border">Athlete</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Time</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Crit</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Spiral</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
               </tr>
             </thead>
@@ -302,13 +302,18 @@ export default function LongSnapPuntSessionPage() {
                     )}
                   </td>
                   <td className="py-1 px-1 text-center">
-                    <input
-                      type="checkbox"
-                      checked={!!row.critical}
+                    <select
+                      value={row.spiral ?? ""}
+                      onChange={(e) => updateRow(idx, "spiral", e.target.value)}
                       disabled={viewOnly}
-                      onChange={(e) => updateRow(idx, "critical", e.target.checked)}
-                      className="w-4 h-4 accent-miss cursor-pointer disabled:cursor-not-allowed"
-                    />
+                      className={clsx("w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs font-semibold focus:outline-none focus:border-accent/60 disabled:opacity-60",
+                        row.spiral === "Good" ? "text-make" : row.spiral === "Bad" ? "text-miss" : "text-slate-200"
+                      )}
+                    >
+                      <option value="">—</option>
+                      <option value="Good">Tight</option>
+                      <option value="Bad">Open</option>
+                    </select>
                   </td>
                   <td className="py-1 px-1 text-center">
                     {!viewOnly && (
