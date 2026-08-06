@@ -30,15 +30,12 @@ const LACES_OPTIONS = ["Good", "1/4 Out", "1/4 In", "Back"];
 
 interface LogRow {
   athlete: string;
-  dist: string;
-  pos: string;
   accuracy: string;
   laces: string;
   spiral: string;
-  critical?: boolean;
 }
 
-const emptyRow = (): LogRow => ({ athlete: "", dist: "", pos: "", accuracy: "", laces: "", spiral: "", critical: false });
+const emptyRow = (): LogRow => ({ athlete: "", accuracy: "", laces: "", spiral: "" });
 
 export default function LongSnapFGSessionPage() {
   const pathname = usePathname();
@@ -131,7 +128,7 @@ export default function LongSnapFGSessionPage() {
     setRows((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const filledRows = rows.filter((r) => r.athlete || r.dist || r.accuracy || r.laces || r.spiral);
+  const filledRows = rows.filter((r) => r.athlete || r.accuracy || r.laces || r.spiral);
 
 
   // Build the committed snap entries from the current rows + diagram markers.
@@ -143,7 +140,7 @@ export default function LongSnapFGSessionPage() {
     const markerByRow = new Map(snapMarkers.map((m) => [m.num - 1, m]));
     return rows
       .map((r, i) => ({ r, i }))
-      .filter(({ r }) => r.athlete || r.dist || r.accuracy || r.laces || r.spiral)
+      .filter(({ r }) => r.athlete || r.accuracy || r.laces || r.spiral)
       .map(({ r, i }) => {
         const accuracy: SnapAccuracy = r.accuracy === "Strike" || r.accuracy.startsWith("✓") ? "ON_TARGET" : r.accuracy === "Ball" || r.accuracy.startsWith("✗") ? "HIGH" : (r.accuracy || "ON_TARGET") as SnapAccuracy;
         const m = markerByRow.get(i);
@@ -154,7 +151,6 @@ export default function LongSnapFGSessionPage() {
           time: 0,
           accuracy,
           score: 0,
-          critical: !!r.critical,
           laces: r.laces || undefined,
           spiral: r.spiral || undefined,
           markerX: m?.x,
@@ -223,12 +219,9 @@ export default function LongSnapFGSessionPage() {
               <tr className="sticky top-0 z-10">
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border">#</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center border-b border-border">Athlete</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-12 border-b border-border">Dist</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Pos</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-16 border-b border-border">Acc</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Laces</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">✓Spiral</th>
-                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border">Crit</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Acc</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-24 border-b border-border">Laces</th>
+                <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-20 border-b border-border">Spiral</th>
                 <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-7 border-b border-border" />
               </tr>
             </thead>
@@ -240,20 +233,6 @@ export default function LongSnapFGSessionPage() {
                     <select value={row.athlete} onChange={(e) => updateRow(idx, "athlete", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
                       <option value="">—</option>
                       {athleteNames.map((a) => <option key={a} value={a}>{a}</option>)}
-                    </select>
-                  </td>
-                  <td className="py-1 px-1">
-                    <input type="text" inputMode="numeric" placeholder="yd" value={row.dist} onChange={(e) => updateRow(idx, "dist", e.target.value)} readOnly={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-accent/60" />
-                  </td>
-                  <td className="py-1 px-1">
-                    <select value={row.pos} onChange={(e) => updateRow(idx, "pos", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
-                      <option value="">—</option>
-                      <option value="LH">LH</option>
-                      <option value="LM">LM</option>
-                      <option value="M">M</option>
-                      <option value="RM">RM</option>
-                      <option value="RH">RH</option>
-                      <option value="PAT">PAT</option>
                     </select>
                   </td>
                   <td className="py-1 px-1 text-center">
@@ -281,22 +260,18 @@ export default function LongSnapFGSessionPage() {
                     </select>
                   </td>
                   <td className="py-1 px-1 text-center">
-                    <input
-                      type="checkbox"
-                      checked={row.spiral === "Good"}
+                    <select
+                      value={row.spiral ?? ""}
+                      onChange={(e) => updateRow(idx, "spiral", e.target.value)}
                       disabled={viewOnly}
-                      onChange={(e) => updateRow(idx, "spiral", e.target.checked ? "Good" : "")}
-                      className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
-                    />
-                  </td>
-                  <td className="py-1 px-1 text-center">
-                    <input
-                      type="checkbox"
-                      checked={!!row.critical}
-                      disabled={viewOnly}
-                      onChange={(e) => updateRow(idx, "critical", e.target.checked)}
-                      className="w-4 h-4 accent-miss cursor-pointer disabled:cursor-not-allowed"
-                    />
+                      className={clsx("w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs font-semibold focus:outline-none focus:border-accent/60 disabled:opacity-60",
+                        row.spiral === "Good" ? "text-make" : row.spiral === "Bad" ? "text-miss" : "text-slate-200"
+                      )}
+                    >
+                      <option value="">—</option>
+                      <option value="Good">Tight</option>
+                      <option value="Bad">Open</option>
+                    </select>
                   </td>
                   <td className="py-1 px-1 text-center">
                     {!viewOnly && (
