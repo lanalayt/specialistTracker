@@ -7,8 +7,51 @@ import { useAuth } from "@/lib/auth";
 import { exportPuntSession, exportSessionPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
+import { getCachedSettings, loadSettingsFromCloud } from "@/lib/settingsSync";
 import type { PuntEntry, Session } from "@/types";
 import clsx from "clsx";
+
+interface PuntTypeConfig { id: string; label: string; category: string }
+
+const DEFAULT_PUNT_TYPES: PuntTypeConfig[] = [
+  { id: "DIR_LEFT", label: "Left", category: "DIRECTIONAL" },
+  { id: "DIR_STRAIGHT", label: "Straight", category: "DIRECTIONAL" },
+  { id: "DIR_RIGHT", label: "Right", category: "DIRECTIONAL" },
+  { id: "POOCH_LEFT", label: "Pooch Left", category: "POOCH" },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle", category: "POOCH" },
+  { id: "POOCH_RIGHT", label: "Pooch Right", category: "POOCH" },
+  { id: "BANANA_LEFT", label: "Banana Left", category: "BANANA" },
+  { id: "BANANA_RIGHT", label: "Banana Right", category: "BANANA" },
+  { id: "RUGBY", label: "Rugby", category: "RUGBY" },
+];
+
+// Read the team's configured punt types (falling back to the defaults). Only
+// enabled categories are offered, mirroring the live session picker.
+function loadPuntTypes(): PuntTypeConfig[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = getCachedSettings<any>("puntSettings");
+    if (parsed?.puntTypes?.length > 0) {
+      const cats = parsed.puntCategories?.length > 0 ? parsed.puntCategories : null;
+      const enabled: Set<string> | null = cats
+        ? new Set(cats.filter((c: { enabled: boolean }) => c.enabled).map((c: { id: string }) => c.id))
+        : null;
+      const types: PuntTypeConfig[] = parsed.puntTypes.map((t: Record<string, unknown>) => {
+        const id = t.id as string;
+        const upper = (id ?? "").toUpperCase();
+        let category = (t.category as string) ?? "DIRECTIONAL";
+        if (!t.category) {
+          if (upper.includes("POOCH")) category = "POOCH";
+          else if (upper.includes("BANANA")) category = "BANANA";
+          else if (upper.includes("RUGBY")) category = "RUGBY";
+        }
+        return { id, label: (t.label as string) ?? id, category };
+      });
+      return enabled ? types.filter((t) => enabled.has(t.category)) : types;
+    }
+  } catch {}
+  return DEFAULT_PUNT_TYPES;
+}
 
 function formatDateForInput(iso: string): string {
   const d = new Date(iso);
@@ -56,6 +99,14 @@ function PuntHistoryContent() {
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingWeatherId, setEditingWeatherId] = useState<string | null>(null);
+
+  // Punt types available for the Type dropdown when editing history entries.
+  const [puntTypes, setPuntTypes] = useState<PuntTypeConfig[]>(() => loadPuntTypes());
+  useEffect(() => {
+    loadSettingsFromCloud("puntSettings").then(() => setPuntTypes(loadPuntTypes()));
+  }, []);
+  const typeLabels: Record<string, string> = {};
+  puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
 
   useEffect(() => {
     if (sessionParam && history.length > 0 && !filteredHistory.some((s) => s.id === selectedId)) {
@@ -559,7 +610,26 @@ function PuntHistoryContent() {
                         <tr key={i} className="hover:bg-surface/30">
                           <td className="table-cell text-left text-muted">{p.kickNum ?? i + 1}{p.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
                           <td className="table-name">{p.athlete}</td>
-                          <td className="table-cell text-muted">{p.type || "—"}</td>
+                          {editing ? (
+                            <td className="table-cell p-1">
+                              <select
+                                value={p.type ?? ""}
+                                onChange={(e) => updateEntry(i, "type", e.target.value)}
+                                className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200 max-w-[120px]"
+                              >
+                                {!p.type && <option value="">—</option>}
+                                {/* Keep the current value selectable even if its category is disabled or custom */}
+                                {p.type && !puntTypes.some((t) => t.id === p.type) && (
+                                  <option value={p.type}>{typeLabels[p.type] ?? p.type}</option>
+                                )}
+                                {puntTypes.map((t) => (
+                                  <option key={t.id} value={t.id}>{t.label}</option>
+                                ))}
+                              </select>
+                            </td>
+                          ) : (
+                            <td className="table-cell text-muted">{p.type ? (typeLabels[p.type] ?? p.type) : "—"}</td>
+                          )}
                           {editing ? (
                             <>
                               <td className="table-cell p-1">
