@@ -144,13 +144,20 @@ export default function LongSnapFGSessionPage() {
       .map(({ r, i }) => {
         const accuracy: SnapAccuracy = r.accuracy === "Strike" || r.accuracy.startsWith("✓") ? "ON_TARGET" : r.accuracy === "Ball" || r.accuracy.startsWith("✗") ? "HIGH" : (r.accuracy || "ON_TARGET") as SnapAccuracy;
         const m = markerByRow.get(i);
+        // 30-point FG snap scoring, same as the FG snap popup: strike +1,
+        // laces Good +1 (any 1/4 turn +0.5), spiral Good +1 — max 3.
+        let score = 0;
+        if (accuracy === "ON_TARGET") score += 1;
+        if (r.laces === "Good") score += 1;
+        else if (r.laces && r.laces.startsWith("1/4")) score += 0.5;
+        if (r.spiral === "Good") score += 1;
         return {
           athleteId: r.athlete,
           athlete: r.athlete,
           snapType: "FG" as SnapType,
           time: 0,
           accuracy,
-          score: 0,
+          score,
           laces: r.laces || undefined,
           spiral: r.spiral || undefined,
           markerX: m?.x,

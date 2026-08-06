@@ -30,6 +30,9 @@ export function SnapSessionSummary({ snaps }: { snaps: LongSnapEntry[] }) {
         const tights = ps.filter((s) => s.spiral === "Good").length;
         const hasLaces = ps.some((s) => s.laces);
         const withMarkers = ps.filter((s) => s.markerX != null && s.markerY != null);
+        // Short snaps carry a 0–3 score per snap; show the athlete's total.
+        const scoreTotal = ps.reduce((sum, s) => sum + (s.score ?? 0), 0);
+        const maxScore = ps.length * 3;
 
         return (
           <div key={a} className="space-y-3">
@@ -39,6 +42,7 @@ export function SnapSessionSummary({ snaps }: { snaps: LongSnapEntry[] }) {
               <span className="text-xs font-bold text-accent uppercase tracking-wider">{isShort ? "FG / Short Snap" : "Punt / Long Snap"}</span>
               <span className="text-xs text-muted">·</span>
               <span className="text-xs text-muted">{strikes}/{ps.length} Strikes</span>
+              {isShort && (<><span className="text-xs text-muted">·</span><span className="text-xs text-sky-400 font-semibold">{scoreTotal % 1 === 0 ? scoreTotal : scoreTotal.toFixed(1)}/{maxScore}</span></>)}
               {avgT && (<><span className="text-xs text-muted">·</span><span className="text-xs text-slate-300">Avg {avgT}s</span></>)}
               {hasSpiral && (<><span className="text-xs text-muted">·</span><span className="text-xs text-slate-300">{tights}/{ps.length} Tight</span></>)}
             </div>
@@ -68,6 +72,7 @@ export function SnapSessionSummary({ snaps }: { snaps: LongSnapEntry[] }) {
                     {!isShort && <th className="table-header">Time</th>}
                     {hasLaces && <th className="table-header">Laces</th>}
                     {hasSpiral && <th className="table-header">Spiral</th>}
+                    {isShort && <th className="table-header">Score</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -84,6 +89,7 @@ export function SnapSessionSummary({ snaps }: { snaps: LongSnapEntry[] }) {
                           {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
                         </td>
                       )}
+                      {isShort && <td className="table-cell text-sky-400 font-semibold">{(s.score ?? 0) % 1 === 0 ? (s.score ?? 0) : (s.score ?? 0).toFixed(1)}/3</td>}
                     </tr>
                   ))}
                 </tbody>
