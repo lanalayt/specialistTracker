@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { saveSettingsToCloud, loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
+import { Toggle } from "@/components/ui/Toggle";
 import { useAuth } from "@/lib/auth";
 
 const STORAGE_KEY = "snapSettings";
@@ -109,12 +110,7 @@ function SnapSettingsContent() {
         </p>
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-slate-200">Open Spiral = Ball</p>
-          <button
-            onClick={() => setOpenSpiralIsBall(!openSpiralIsBall)}
-            className={clsx("w-10 h-5 rounded-full transition-colors relative", openSpiralIsBall ? "bg-accent" : "bg-surface-2 border border-border")}
-          >
-            <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", openSpiralIsBall ? "left-5" : "left-0.5")} />
-          </button>
+          <Toggle checked={openSpiralIsBall} onChange={setOpenSpiralIsBall} label="Toggle open spiral counts as ball" />
         </div>
       </div>
 
@@ -125,12 +121,7 @@ function SnapSettingsContent() {
         </p>
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-slate-200">Holder Enabled</p>
-          <button
-            onClick={() => setHolderEnabled(!holderEnabled)}
-            className={clsx("w-10 h-5 rounded-full transition-colors relative", holderEnabled ? "bg-accent" : "bg-surface-2 border border-border")}
-          >
-            <div className={clsx("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all", holderEnabled ? "left-5" : "left-0.5")} />
-          </button>
+          <Toggle checked={holderEnabled} onChange={setHolderEnabled} label="Toggle holder" />
         </div>
       </div>
 

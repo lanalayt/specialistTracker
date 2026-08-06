@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { Toggle } from "@/components/ui/Toggle";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
 import { useAuth } from "@/lib/auth";
 
@@ -292,21 +293,11 @@ function PuntSettingsContent() {
           <div key={cat.id} className="card space-y-4">
             <div className="flex items-center justify-between">
               <p className="label mb-0">{cat.label}</p>
-              <button
-                onClick={() => setCategories(categories.map((c) => c.id === cat.id ? { ...c, enabled: !c.enabled } : c))}
-                className={clsx(
-                  "relative w-11 h-6 rounded-full transition-colors",
-                  cat.enabled ? "bg-accent" : "bg-border"
-                )}
-                aria-label={`Toggle ${cat.label}`}
-              >
-                <span
-                  className={clsx(
-                    "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                    cat.enabled ? "left-[22px]" : "left-0.5"
-                  )}
-                />
-              </button>
+              <Toggle
+                checked={cat.enabled}
+                onChange={() => setCategories(categories.map((c) => c.id === cat.id ? { ...c, enabled: !c.enabled } : c))}
+                label={`Toggle ${cat.label}`}
+              />
             </div>
             {cat.enabled && (
               <>
@@ -397,21 +388,7 @@ function PuntSettingsContent() {
       <div className="card space-y-4">
         <div className="flex items-center justify-between">
           <p className="label mb-0">Direction Score<Tooltip text="Track how accurate each punt's direction is. Score each punt as 1.0 (on target), 0.5 (close), or 0 (critical miss). Stats show your directional accuracy percentage." /></p>
-          <button
-            onClick={() => setDirEnabled((v) => !v)}
-            className={clsx(
-              "relative w-11 h-6 rounded-full transition-colors",
-              dirEnabled ? "bg-accent" : "bg-border"
-            )}
-            aria-label="Toggle direction scoring"
-          >
-            <span
-              className={clsx(
-                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                dirEnabled ? "left-[22px]" : "left-0.5"
-              )}
-            />
-          </button>
+          <Toggle checked={dirEnabled} onChange={setDirEnabled} label="Toggle direction scoring" />
         </div>
         <p className="text-xs text-muted">
           Enable to track directional accuracy on each punt. Disable to hide direction everywhere.
@@ -506,21 +483,7 @@ function PuntSettingsContent() {
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <p className="label mb-0">Operation Time<Tooltip text="Snap-to-punt time in seconds. Measures how fast the ball goes from the snap to off the punter's foot." /></p>
-          <button
-            onClick={() => setOpTimeEnabled((v) => !v)}
-            className={clsx(
-              "relative w-11 h-6 rounded-full transition-colors",
-              opTimeEnabled ? "bg-accent" : "bg-border"
-            )}
-            aria-label="Toggle operation time"
-          >
-            <span
-              className={clsx(
-                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                opTimeEnabled ? "left-[22px]" : "left-0.5"
-              )}
-            />
-          </button>
+          <Toggle checked={opTimeEnabled} onChange={setOpTimeEnabled} label="Toggle operation time" />
         </div>
         <p className="text-xs text-muted">
           Track punter operation time on each punt. Existing op time data is preserved in stats even when disabled.

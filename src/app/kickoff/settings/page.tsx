@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { Toggle } from "@/components/ui/Toggle";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
 import { useAuth } from "@/lib/auth";
 
@@ -272,21 +273,11 @@ function KickoffSettingsContent() {
           <div key={cat.id} className="card space-y-4">
             <div className="flex items-center justify-between">
               <p className="label mb-0">{cat.label}</p>
-              <button
-                onClick={() => setCategories(categories.map((c) => c.id === cat.id ? { ...c, enabled: !c.enabled } : c))}
-                className={clsx(
-                  "relative w-11 h-6 rounded-full transition-colors",
-                  cat.enabled ? "bg-accent" : "bg-border"
-                )}
-                aria-label={`Toggle ${cat.label}`}
-              >
-                <span
-                  className={clsx(
-                    "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                    cat.enabled ? "left-[22px]" : "left-0.5"
-                  )}
-                />
-              </button>
+              <Toggle
+                checked={cat.enabled}
+                onChange={() => setCategories(categories.map((c) => c.id === cat.id ? { ...c, enabled: !c.enabled } : c))}
+                label={`Toggle ${cat.label}`}
+              />
             </div>
             {cat.enabled && (
               <>
@@ -374,21 +365,7 @@ function KickoffSettingsContent() {
       <div className="card space-y-4">
         <div className="flex items-center justify-between">
           <p className="label mb-0">Direction Score<Tooltip text="Track how accurate each kickoff's direction is. Score each kick as 1.0 (on target), 0.5 (close), or 0 (critical miss). Stats show your directional accuracy percentage." /></p>
-          <button
-            onClick={() => setDirEnabled((v) => !v)}
-            className={clsx(
-              "relative w-11 h-6 rounded-full transition-colors",
-              dirEnabled ? "bg-accent" : "bg-border"
-            )}
-            aria-label="Toggle direction scoring"
-          >
-            <span
-              className={clsx(
-                "absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform",
-                dirEnabled ? "left-[22px]" : "left-0.5"
-              )}
-            />
-          </button>
+          <Toggle checked={dirEnabled} onChange={setDirEnabled} label="Toggle direction scoring" />
         </div>
         <p className="text-xs text-muted">
           Enable to track directional accuracy on each kickoff. Disable to hide direction everywhere.
@@ -488,12 +465,7 @@ function KickoffSettingsContent() {
             <p className="text-xs font-semibold text-muted uppercase tracking-wider">Return Yards</p>
             <p className="text-[10px] text-muted mt-0.5">Show return yards input in game mode</p>
           </div>
-          <button
-            onClick={() => setReturnYardsEnabled((v) => !v)}
-            className={clsx("px-3 py-1.5 rounded-input text-xs font-bold border transition-all", returnYardsEnabled ? "bg-accent text-slate-900 border-accent" : "bg-surface-2 text-muted border-border")}
-          >
-            {returnYardsEnabled ? "On" : "Off"}
-          </button>
+          <Toggle checked={returnYardsEnabled} onChange={setReturnYardsEnabled} label="Toggle return yards" />
         </div>
       </div>
 

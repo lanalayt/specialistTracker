@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { Toggle } from "@/components/ui/Toggle";
 import { useAuth } from "@/lib/auth";
 
 const SNAP_DISTANCES = ["6", "7", "8"];
@@ -317,17 +318,7 @@ function FGSettingsContent() {
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <p className="label mb-0">Operation Time<Tooltip text="Snap-to-kick time in seconds. Measures how fast the ball goes from the snap to off the kicker's foot. Target is typically 1.2-1.4 seconds." /></p>
-          <button
-            onClick={() => setOpTimeEnabled((v) => !v)}
-            className={clsx(
-              "flex items-center rounded-full text-[10px] font-bold transition-colors w-14 h-6 px-0.5",
-              opTimeEnabled ? "bg-accent" : "bg-border"
-            )}
-            aria-label="Toggle operation time"
-          >
-            <span className={clsx("w-5 h-5 rounded-full bg-white transition-all flex-shrink-0", opTimeEnabled ? "ml-auto" : "")} />
-            <span className={clsx("absolute w-14 text-center", opTimeEnabled ? "text-slate-900" : "text-muted")}>{opTimeEnabled ? "On" : "Off"}</span>
-          </button>
+          <Toggle checked={opTimeEnabled} onChange={setOpTimeEnabled} label="Toggle operation time" />
         </div>
         <p className="text-xs text-muted">
           Track snap-to-kick operation time on each attempt. Existing op time data is preserved in stats even when disabled.
@@ -338,17 +329,7 @@ function FGSettingsContent() {
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <p className="label mb-0">Include Holder</p>
-          <button
-            onClick={() => setHolderEnabled((v) => !v)}
-            className={clsx(
-              "flex items-center rounded-full text-[10px] font-bold transition-colors w-14 h-6 px-0.5",
-              holderEnabled ? "bg-accent" : "bg-border"
-            )}
-            aria-label="Toggle holder"
-          >
-            <span className={clsx("w-5 h-5 rounded-full bg-white transition-all flex-shrink-0", holderEnabled ? "ml-auto" : "")} />
-            <span className={clsx("absolute w-14 text-center", holderEnabled ? "text-slate-900" : "text-muted")}>{holderEnabled ? "On" : "Off"}</span>
-          </button>
+          <Toggle checked={holderEnabled} onChange={setHolderEnabled} label="Toggle holder" />
         </div>
         <p className="text-xs text-muted">
           When enabled, holder selection appears on the live FG kick card. Stats will include a By Holder breakdown.
