@@ -4,8 +4,9 @@ import clsx from "clsx";
 
 /**
  * On/off switch used across the settings pages.
- * Colored (accent) with an "On" label when enabled; white with an "Off"
- * label when disabled — so the state reads clearly at a glance.
+ * Colored (accent) with an "On" label when enabled; the team's border color
+ * with an "Off" label when disabled — so it always matches the theme chosen
+ * in Settings. The white knob keeps the state readable on either track.
  */
 export function Toggle({
   checked,
@@ -27,7 +28,7 @@ export function Toggle({
       onClick={() => onChange(!checked)}
       className={clsx(
         "relative inline-flex items-center shrink-0 w-16 h-7 rounded-full border transition-colors",
-        checked ? "bg-accent border-accent" : "bg-white border-border",
+        checked ? "bg-accent border-accent" : "bg-border border-border",
         className
       )}
     >
@@ -35,15 +36,15 @@ export function Toggle({
       <span
         className={clsx(
           "absolute text-[10px] font-bold uppercase tracking-wide transition-all",
-          checked ? "left-2.5 text-slate-900" : "right-2.5 text-slate-500"
+          checked ? "left-2.5 text-slate-900" : "right-2.5 text-muted"
         )}
       >
         {checked ? "On" : "Off"}
       </span>
       <span
         className={clsx(
-          "absolute top-0.5 w-6 h-6 rounded-full shadow transition-all",
-          checked ? "left-[38px] bg-white" : "left-0.5 bg-slate-400"
+          "absolute top-0.5 w-6 h-6 rounded-full bg-white shadow ring-1 ring-black/10 transition-all",
+          checked ? "left-[38px]" : "left-0.5"
         )}
       />
     </button>
