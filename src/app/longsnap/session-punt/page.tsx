@@ -197,20 +197,30 @@ export default function LongSnapPuntSessionPage() {
     const filled = rows.filter((r) => r.athlete && r.time);
     if (filled.length === 0) return;
 
-    const snaps: LongSnapEntry[] = filled.map((r) => {
-      const time = parseFloat(r.time) || 0;
-      const accuracy: SnapAccuracy = r.accuracy === "Strike" || r.accuracy.startsWith("✓") ? "ON_TARGET" : r.accuracy === "Ball" || r.accuracy.startsWith("✗") ? "HIGH" : (r.accuracy || "ON_TARGET") as SnapAccuracy;
-      return {
-        athleteId: r.athlete,
-        athlete: r.athlete,
-        snapType: SNAP_TYPE,
-        time,
-        accuracy,
-        score: 0,
-        benchmark: getSnapBenchmark(SNAP_TYPE, time),
-        spiral: r.spiral || undefined,
-      };
-    });
+    // Markers are keyed by row position (num = row index + 1); attach each
+    // one to its snap so the diagram can be redrawn per athlete in history.
+    const markerByRow = new Map(snapMarkers.map((m) => [m.num - 1, m]));
+    const snaps: LongSnapEntry[] = rows
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => filled.includes(r))
+      .map(({ r, i }) => {
+        const time = parseFloat(r.time) || 0;
+        const accuracy: SnapAccuracy = r.accuracy === "Strike" || r.accuracy.startsWith("✓") ? "ON_TARGET" : r.accuracy === "Ball" || r.accuracy.startsWith("✗") ? "HIGH" : (r.accuracy || "ON_TARGET") as SnapAccuracy;
+        const m = markerByRow.get(i);
+        return {
+          athleteId: r.athlete,
+          athlete: r.athlete,
+          snapType: SNAP_TYPE,
+          time,
+          accuracy,
+          score: 0,
+          benchmark: getSnapBenchmark(SNAP_TYPE, time),
+          spiral: r.spiral || undefined,
+          markerX: m?.x,
+          markerY: m?.y,
+          markerInZone: m?.inZone,
+        };
+      });
 
     commitPractice(snaps, undefined, weather);
     setShowCommit(false);
