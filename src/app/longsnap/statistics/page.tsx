@@ -101,9 +101,12 @@ export default function LongSnapStatisticsPage() {
       snaps.forEach((s) => {
         if (s.snapType !== "FG" && s.snapType !== "PAT") return;
         if (!result[s.athlete]) result[s.athlete] = { totalScore: 0, att: 0 };
-        result[s.athlete].totalScore += s.score ?? 0;
+        // Recompute the 30-point score from accuracy/laces/spiral so older
+        // sessions (saved with score 0) count correctly. Matches the popup.
+        const snapScore = (s.accuracy === "ON_TARGET" ? 1 : 0) + (lacesScore(s.laces) ?? 0) + (s.spiral === "Good" ? 1 : 0);
+        result[s.athlete].totalScore += snapScore;
         result[s.athlete].att += 1;
-        allScore += s.score ?? 0;
+        allScore += snapScore;
         allAtt += 1;
       });
     });

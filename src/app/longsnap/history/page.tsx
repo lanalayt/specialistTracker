@@ -45,12 +45,22 @@ const BM_COLORS: Record<SnapBenchmark, string> = {
 };
 
 // Recalculate 30-point score: 1pt location + 1pt laces + 1pt spiral
+// 30-point FG snap score, same formula as the FG snap popup and the snap log:
+// strike +1, laces Good +1 (any 1/4 turn +0.5), spiral Good +1 — max 3.
+// Derived from accuracy/laces/spiral so it's correct even for older sessions
+// that were saved before scoring was computed (their stored score is 0).
 function calc30PtScore(s: LongSnapEntry): number {
   let score = 0;
   if (s.accuracy === "ON_TARGET") score += 1;
   if (s.laces === "Good") score += 1;
+  else if (s.laces && s.laces.startsWith("1/4")) score += 0.5;
   if (s.spiral === "Good") score += 1;
   return score;
+}
+
+/** Format a 0–3 score without a trailing ".0" (e.g. 2, 1.5). */
+function fmtScore(n: number): string {
+  return n % 1 === 0 ? String(n) : n.toFixed(1);
 }
 
 const SEL = "bg-surface-2 border border-border text-slate-200 text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60 appearance-none cursor-pointer";
@@ -315,8 +325,8 @@ export default function LongSnapHistoryPage() {
                         "%": as.length > 0 ? `${Math.round((aStr / as.length) * 100)}%` : "—",
                       };
                       if (isShort) {
-                        const sc = as.reduce((sum, s) => sum + (s.score ?? 0), 0);
-                        stats["Score"] = `${sc}/${as.length * 3}`;
+                        const sc = as.reduce((sum, s) => sum + calc30PtScore(s), 0);
+                        stats["Score"] = `${fmtScore(sc)}/${as.length * 3}`;
                       } else {
                         const timed = as.filter((s) => s.time > 0);
                         if (timed.length > 0) stats["Avg Time"] = `${(timed.reduce((sum, s) => sum + s.time, 0) / timed.length).toFixed(2)}s`;
@@ -335,7 +345,7 @@ export default function LongSnapHistoryPage() {
                       `Snap Session — ${selected.label}`,
                       hdrs,
                       snaps.map((s, i) => isShort
-                        ? [String(i + 1), s.athlete, s.accuracy === "ON_TARGET" ? "Strike" : "Ball", s.laces === "Good" ? "Perfect" : s.laces || "—", s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—", `${s.score ?? 0}/3`]
+                        ? [String(i + 1), s.athlete, s.accuracy === "ON_TARGET" ? "Strike" : "Ball", s.laces === "Good" ? "Perfect" : s.laces || "—", s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—", `${fmtScore(calc30PtScore(s))}/3`]
                         : [String(i + 1), s.athlete, s.time > 0 ? s.time.toFixed(2) : "—", s.accuracy === "ON_TARGET" ? "Strike" : "Ball", s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"]
                       ),
                       summary,
@@ -402,7 +412,7 @@ export default function LongSnapHistoryPage() {
                     {athleteList.map((a) => {
                       const ps = snaps.filter((s) => s.athlete === a);
                       const pm: ShortSnapMarker[] = ps.filter((s) => s.markerX != null).map((s) => ({ x: s.markerX!, y: s.markerY!, num: ps.indexOf(s) + 1, inZone: s.markerInZone ?? s.accuracy === "ON_TARGET", id: snaps.indexOf(s) }));
-                      const pts = ps.reduce((sum, s) => sum + (s.score || 0), 0);
+                      const pts = ps.reduce((sum, s) => sum + calc30PtScore(s), 0);
                       const selHere = editing && selectedSnapIdx != null && snaps[selectedSnapIdx]?.athlete === a;
                       return (
                         <div key={a} className="space-y-3">
@@ -420,7 +430,7 @@ export default function LongSnapHistoryPage() {
                             </p>
                           )}
                           <div className="card-2 text-center py-2">
-                            <p className="text-2xl font-black text-accent">{pts}</p>
+                            <p className="text-2xl font-black text-accent">{fmtScore(pts)}</p>
                             <p className="text-[10px] text-muted">/ {ps.length * 3}</p>
                           </div>
                           <div className="card-2 overflow-x-auto text-xs">
@@ -476,7 +486,7 @@ export default function LongSnapHistoryPage() {
                                           </select>
                                         ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
                                       </td>
-                                      <td className="text-right py-1 px-1 font-bold text-accent">{s.score ?? "—"}</td>
+                                      <td className="text-right py-1 px-1 font-bold text-accent">{fmtScore(calc30PtScore(s))}</td>
                                     </tr>
                                   );
                                 })}
@@ -619,7 +629,7 @@ export default function LongSnapHistoryPage() {
                     {athleteList.map((a) => {
                       const ps = snaps.filter((s) => s.athlete === a);
                       const strikes = ps.filter((s) => s.accuracy === "ON_TARGET").length;
-                      const totalScore = ps.reduce((sum, e) => sum + (e.score ?? 0), 0);
+                      const totalScore = ps.reduce((sum, e) => sum + calc30PtScore(e), 0);
                       const maxScore = ps.length * 3;
                       const scorePct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
                       const markers: ShortSnapMarker[] = ps
@@ -635,7 +645,7 @@ export default function LongSnapHistoryPage() {
                             <span className="text-xs text-muted">·</span>
                             <span className="text-xs text-muted">{strikes}/{ps.length} Strikes</span>
                             <span className="text-xs text-muted">·</span>
-                            <span className="text-xs text-sky-400 font-semibold">{totalScore}/{maxScore} ({scorePct}%)</span>
+                            <span className="text-xs text-sky-400 font-semibold">{fmtScore(totalScore)}/{maxScore} ({scorePct}%)</span>
                           </div>
 
                           {(markers.length > 0 || editing) && (
@@ -716,7 +726,7 @@ export default function LongSnapHistoryPage() {
                                           </select>
                                         ) : (s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—")}
                                       </td>
-                                      <td className="table-cell font-bold text-sky-400">{s.score ?? 0}/3</td>
+                                      <td className="table-cell font-bold text-sky-400">{fmtScore(calc30PtScore(s))}/3</td>
                                     </tr>
                                   );
                                 })}
