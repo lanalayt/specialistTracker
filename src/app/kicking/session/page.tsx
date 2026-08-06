@@ -243,6 +243,10 @@ export default function KickingSessionPage() {
   const [score, setScore] = useState<number>(draft.partialInputs?.[draft.currentKickIdx]?.score ?? 0);
   const [starred, setStarred] = useState(draft.partialInputs?.[draft.currentKickIdx]?.starred ?? false);
   const [opTime, setOpTime] = useState(draft.partialInputs?.[draft.currentKickIdx]?.opTime ?? "");
+  // Live op-time stopwatch: press to start counting, press again to stop; the
+  // elapsed time drops straight into the OT (operation time) box.
+  const [swStart, setSwStart] = useState<number | null>(null); // start (ms); running when non-null
+  const [swNow, setSwNow] = useState(0); // current time (ms) for the running display
   // Holder for the kick on screen (moved from the snap popup to the main card).
   // `lastHolder` makes the choice sticky across kicks — most sessions use one holder.
   const [holder, setHolder] = useState<string>(draft.partialInputs?.[draft.currentKickIdx]?.holder ?? "");
@@ -802,12 +806,39 @@ export default function KickingSessionPage() {
       setHolder(defaultHolder(plannedKicks[advanceIdx]?.athlete));
     }
     setShowAthleteDropdown(false);
+    setSwStart(null);
+    setSwNow(0);
   };
 
   const allKicksLogged = plannedKicks.length > 0 && sessionKicks.length >= plannedKicks.length;
   const isEditing = editingKickIdx !== null;
   const showEntryCard = (!allKicksLogged || isEditing) && plannedKicks[currentKickIdx];
   const currentPlan = plannedKicks[currentKickIdx];
+
+  // ── Live op-time stopwatch ───────────────────────────────────
+  const swElapsed = swStart != null ? Math.max(0, (swNow - swStart) / 1000) : 0;
+
+  // Tick the display while the stopwatch is running.
+  useEffect(() => {
+    if (swStart == null) return;
+    const id = setInterval(() => setSwNow(Date.now()), 50);
+    return () => clearInterval(id);
+  }, [swStart]);
+
+  const handleStopwatchPress = () => {
+    const now = Date.now();
+    if (swStart == null) {
+      // Start counting up from 0.
+      setSwStart(now);
+      setSwNow(now);
+    } else {
+      // Stop: whatever the elapsed time is drops into OT (operation time).
+      const v = Math.max(0, Math.round(((now - swStart) / 1000) * 100) / 100);
+      if (v > 0) setOpTime(v.toFixed(2));
+      setSwStart(null);
+      setSwNow(0);
+    }
+  };
 
   // Snap kick list. In a live session with a plan, always show ALL planned kicks
   // (not just the ones logged so far) so a snap can be logged for each as you go.
@@ -1605,6 +1636,42 @@ export default function KickingSessionPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Live op-time stopwatch — tap to start, tap again to stop;
+                        the elapsed time drops into OT (still editable). */}
+                    {!viewOnly && opTimeEnabled && (
+                      <div className="rounded-input border border-accent/40 bg-accent/5 p-2.5">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={handleStopwatchPress}
+                            className={clsx(
+                              "shrink-0 w-14 h-14 rounded-full flex items-center justify-center font-black transition-all active:scale-90 border-2",
+                              swStart != null
+                                ? "bg-accent text-white border-accent shadow-md"
+                                : "bg-surface-2 text-accent border-accent/60 hover:bg-accent/15"
+                            )}
+                            title={swStart != null ? "Tap to stop — time goes to Op Time" : "Tap to start the op timer"}
+                          >
+                            {swStart != null
+                              ? <span className="text-lg leading-none">■</span>
+                              : <span className="text-2xl leading-none">▶</span>}
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            {swStart != null ? (
+                              <div className="text-3xl font-black tabular-nums text-accent leading-none">
+                                {swElapsed.toFixed(2)}<span className="text-lg">s</span>
+                              </div>
+                            ) : (
+                              <div className="text-sm font-bold text-muted">Op timer</div>
+                            )}
+                            <div className="mt-1 text-[11px] text-muted">
+                              {swStart != null ? "Tap ■ when the ball is kicked to record op time" : "Tap ▶ at the snap, ■ at the kick"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Score + Op Time + Log Snap — the row always renders so the
                         Log Snap button is available even with Score/OT disabled. */}
