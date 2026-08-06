@@ -194,7 +194,8 @@ function PuntStatTable({
 function computeFilteredPuntStats(
   athletes: { id: string; name: string }[],
   history: { entries?: PuntEntry[] }[],
-  filter: (p: PuntEntry) => boolean
+  filter: (p: PuntEntry) => boolean,
+  typeConfigs?: { id: string; metric: "distance" | "yardline"; hangTime: boolean }[]
 ): Record<string, PuntAthleteStats> {
   let statsMap: Record<string, PuntAthleteStats> = {};
   athletes.forEach((a) => { statsMap[a.name] = emptyPuntStats(); });
@@ -202,7 +203,11 @@ function computeFilteredPuntStats(
   history.forEach((session) => {
     const punts = (session.entries ?? []) as PuntEntry[];
     punts.filter((p) => !GAME_TYPES.has(p.type) && filter(p)).forEach((p) => {
-      statsMap = processPunt(p, statsMap);
+      // Pass the type's config so yard-line types (e.g. a custom "Brown"/rugby
+      // set to yard line) are averaged correctly — without it processPunt falls
+      // back to the "POOCH"-in-name heuristic and drops the Avg YL.
+      const tc = typeConfigs?.find((t) => t.id === p.type);
+      statsMap = processPunt(p, statsMap, tc);
     });
   });
   return statsMap;
@@ -221,6 +226,7 @@ function CategorySection({
   poochYLStats,
   history,
   puntFilter,
+  typeConfigs,
 }: {
   title: string;
   athletes: { id: string; name: string }[];
@@ -234,6 +240,7 @@ function CategorySection({
   poochYLStats: Record<string, { att: number; total: number }>;
   history: { entries?: PuntEntry[] }[];
   puntFilter?: (p: PuntEntry) => boolean;
+  typeConfigs?: { id: string; metric: "distance" | "yardline"; hangTime: boolean }[];
 }) {
   // Types that actually have data
   const activeTypes = catTypeIds.filter((type) => athletes.some((a) => statsMap[a.name]?.byType[type]?.att > 0));
@@ -249,11 +256,12 @@ function CategorySection({
       result[type] = computeFilteredPuntStats(
         athletes,
         history,
-        (p) => p.type === type && (puntFilter ? puntFilter(p) : true)
+        (p) => p.type === type && (puntFilter ? puntFilter(p) : true),
+        typeConfigs
       );
     });
     return result;
-  }, [athletes, history, activeTypes, puntFilter]);
+  }, [athletes, history, activeTypes, puntFilter, typeConfigs]);
 
   return (
     <div className="space-y-3">
@@ -427,6 +435,11 @@ function PuntStatsView({
     };
   }, [puntTypes]);
 
+  const typeConfigs = useMemo(
+    () => puntTypes.map((t) => ({ id: t.id, metric: t.metric, hangTime: t.hangTime })),
+    [puntTypes]
+  );
+
   // Compute per-category overall stats
   const categoryStats = useMemo(() => {
     const result: Record<string, Record<string, PuntAthleteStats>> = {};
@@ -434,11 +447,12 @@ function PuntStatsView({
       result[cat.id] = computeFilteredPuntStats(
         athletes,
         history,
-        (p) => typeToCategory(p.type) === cat.id && (puntFilter ? puntFilter(p) : true)
+        (p) => typeToCategory(p.type) === cat.id && (puntFilter ? puntFilter(p) : true),
+        typeConfigs
       );
     });
     return result;
-  }, [athletes, history, puntCategories, puntFilter, typeToCategory]);
+  }, [athletes, history, puntCategories, puntFilter, typeToCategory, typeConfigs]);
   // Discover all type IDs that have data (includes legacy types not in config)
   const allTypeIds = useMemo(() => {
     const configIds = new Set(puntTypes.map((t) => t.id));
@@ -616,6 +630,7 @@ function PuntStatsView({
           poochYLStats={poochYLStats}
           history={history}
           puntFilter={puntFilter}
+          typeConfigs={typeConfigs}
         />
       )}
     </div>
@@ -672,20 +687,27 @@ export default function PuntingStatisticsPage() {
     );
   }, [filteredHistory]);
 
+  // Per-type metric/hangTime configs, so filtered recomputes match the main
+  // stats (yard-line types keep their Avg YL in every breakdown).
+  const typeConfigs = useMemo(
+    () => puntTypes.map((t) => ({ id: t.id, metric: t.metric, hangTime: t.hangTime })),
+    [puntTypes]
+  );
+
   const baseStats = useMemo(() => {
     if (gameMode === "practice" && dateFilter.mode === "all") return stats;
-    return computeFilteredPuntStats(athletes, filteredHistory, () => true);
-  }, [gameMode, dateFilter.mode, filteredHistory, stats, athletes]);
+    return computeFilteredPuntStats(athletes, filteredHistory, () => true, typeConfigs);
+  }, [gameMode, dateFilter.mode, filteredHistory, stats, athletes, typeConfigs]);
 
   const displayStats = useMemo(() => {
     if (!hasStarred || !excludeLiveReps) return baseStats;
-    return computeFilteredPuntStats(athletes, filteredHistory, (p) => !p.starred);
-  }, [baseStats, hasStarred, excludeLiveReps, athletes, filteredHistory]);
+    return computeFilteredPuntStats(athletes, filteredHistory, (p) => !p.starred, typeConfigs);
+  }, [baseStats, hasStarred, excludeLiveReps, athletes, filteredHistory, typeConfigs]);
 
   const starredStats = useMemo(() => {
     if (!hasStarred) return null;
-    return computeFilteredPuntStats(athletes, filteredHistory, (p) => !!p.starred);
-  }, [hasStarred, athletes, filteredHistory]);
+    return computeFilteredPuntStats(athletes, filteredHistory, (p) => !!p.starred, typeConfigs);
+  }, [hasStarred, athletes, filteredHistory, typeConfigs]);
 
   const hasAnyData = history.length > 0;
 
