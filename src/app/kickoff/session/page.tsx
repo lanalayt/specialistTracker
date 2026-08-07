@@ -1210,8 +1210,9 @@ export default function KickoffSessionPage() {
                         the landing; the elapsed time drops into Hang Time. */}
                     {!viewOnly && koTracksHangTime(currentPlan?.type, koTypes) && (
                       <IntervalStopwatch
-                        title="Hang"
-                        steps={["Kick", "Landing"]}
+                        title="Hang Timer"
+                        instruction="Press at kick and landing"
+                        taps={2}
                         onIntervals={([hang]) => { if (hang != null && hang > 0) setHangTime(hang.toFixed(2)); }}
                       />
                     )}

@@ -1698,8 +1698,9 @@ export default function PuntingSessionPage() {
                         landing; the two intervals fill Op Time and Hang Time. */}
                     {!viewOnly && (
                       <IntervalStopwatch
-                        title="Op + Hang"
-                        steps={["Catch", "Punt", "Landing"]}
+                        title="Opp & Hang Timer"
+                        instruction="Press at catch, punt and landing"
+                        taps={3}
                         onIntervals={applyPuntStopwatch}
                       />
                     )}

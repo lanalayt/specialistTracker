@@ -1611,8 +1611,9 @@ export default function KickingSessionPage() {
                         kick; the elapsed time drops into OT (still editable). */}
                     {!viewOnly && opTimeEnabled && (
                       <IntervalStopwatch
-                        title="Op Time"
-                        steps={["Snap", "Kick"]}
+                        title="Opp Timer"
+                        instruction="Press at snap and then at kick"
+                        taps={2}
                         onIntervals={([op]) => { if (op != null && op > 0) setOpTime(op.toFixed(2)); }}
                       />
                     )}
