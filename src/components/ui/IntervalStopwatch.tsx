@@ -7,23 +7,28 @@ import clsx from "clsx";
  * A tap-sequence stopwatch. Instead of a running clock, the coach taps the big
  * button at each cue point (e.g. snap, then kick). The button shows the timer
  * name in big letters with the tap instructions beneath. Each tap flashes for
- * feedback; when the sequence finishes, the elapsed time between consecutive
- * taps is handed back as `intervals` (seconds, one fewer than `taps`).
+ * feedback.
+ *
+ * Each gap between consecutive taps fires `onInterval` immediately (seconds),
+ * so a partial capture still records — e.g. if the op-time window is missed,
+ * the punter can start at the punt and tap at the landing to grab just the
+ * hang. After `taps` taps the sequence auto-resets for the next rep; Reset
+ * clears it early.
  */
 export function IntervalStopwatch({
   taps,
   title,
   instruction,
-  onIntervals,
+  onInterval,
 }: {
-  taps: number; // number of taps in the full sequence
+  taps: number; // taps in a full sequence (used for auto-reset)
   title: string; // big label, e.g. "Opp Timer"
   instruction: string; // small label, e.g. "Press at snap and then at kick"
-  onIntervals: (intervals: number[]) => void; // seconds between consecutive taps
+  onInterval: (seconds: number) => void; // fired per gap, as it happens
 }) {
   const [count, setCount] = useState(0); // taps recorded so far in this sequence
   const [flash, setFlash] = useState<null | "step" | "done">(null);
-  const times = useRef<number[]>([]);
+  const last = useRef<number | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doFlash = (kind: "step" | "done") => {
@@ -35,19 +40,19 @@ export function IntervalStopwatch({
   const press = () => {
     const now = Date.now();
     if (count === 0) {
-      times.current = [now];
+      last.current = now;
       setCount(1);
       doFlash("step");
       return;
     }
-    times.current.push(now);
+    // Apply the gap since the previous tap right away, rounded to hundredths.
+    if (last.current != null) {
+      const secs = Math.round(((now - last.current) / 1000) * 100) / 100;
+      if (secs > 0) onInterval(secs);
+    }
+    last.current = now;
     if (count + 1 >= taps) {
-      const intervals: number[] = [];
-      for (let i = 1; i < times.current.length; i++) {
-        intervals.push((times.current[i] - times.current[i - 1]) / 1000);
-      }
-      onIntervals(intervals);
-      times.current = [];
+      last.current = null;
       setCount(0);
       doFlash("done");
     } else {
@@ -57,7 +62,7 @@ export function IntervalStopwatch({
   };
 
   const reset = () => {
-    times.current = [];
+    last.current = null;
     setCount(0);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     setFlash(null);

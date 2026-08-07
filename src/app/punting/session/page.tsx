@@ -863,19 +863,17 @@ export default function PuntingSessionPage() {
   const currentPlan = plannedPunts[currentPuntIdx];
 
   // ── Live stopwatch ───────────────────────────────────────────
-  // Tap sequence: catch → punt → landing. Each interval is routed by its VALUE,
-  // not its position: 2.50s and under → op time, 2.51s+ → hang time. Gated by
-  // team settings (op time on, and the punt type tracking hang time).
-  const applyPuntStopwatch = (intervals: number[]) => {
-    intervals.forEach((raw) => {
-      const v = Math.round(raw * 100) / 100;
-      if (v <= 0) return;
-      if (v <= 2.5) {
-        if (opTimeEnabled) setOpTime(v.toFixed(2));
-      } else if (tracksHangTime(currentPlan?.type, puntTypes)) {
-        setHangTime(v.toFixed(2));
-      }
-    });
+  // Tap sequence: catch → punt → landing. Each gap is routed by its VALUE, not
+  // its position, and applied as it happens: 2.50s and under → op time, 2.51s+
+  // → hang time. So a missed op-time window still lets you grab just the hang
+  // (start at the punt, tap at the landing). Gated by team settings.
+  const applyPuntStopwatch = (v: number) => {
+    if (v <= 0) return;
+    if (v <= 2.5) {
+      if (opTimeEnabled) setOpTime(v.toFixed(2));
+    } else if (tracksHangTime(currentPlan?.type, puntTypes)) {
+      setHangTime(v.toFixed(2));
+    }
   };
 
   const updateCurrentPlan = (field: "athlete" | "type" | "hash", value: string) => {
@@ -1708,7 +1706,7 @@ export default function PuntingSessionPage() {
                         title="Opp & Hang Timer"
                         instruction="Press at catch, punt and landing"
                         taps={3}
-                        onIntervals={applyPuntStopwatch}
+                        onInterval={applyPuntStopwatch}
                       />
                     )}
 

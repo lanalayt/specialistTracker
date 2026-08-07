@@ -1213,7 +1213,7 @@ export default function KickoffSessionPage() {
                         title="Hang Timer"
                         instruction="Press at kick and landing"
                         taps={2}
-                        onIntervals={([hang]) => { if (hang != null && hang > 0) setHangTime(hang.toFixed(2)); }}
+                        onInterval={(hang) => { if (hang > 0) setHangTime(hang.toFixed(2)); }}
                       />
                     )}
 

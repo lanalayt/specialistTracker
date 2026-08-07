@@ -1614,7 +1614,7 @@ export default function KickingSessionPage() {
                         title="Opp Timer"
                         instruction="Press at snap and then at kick"
                         taps={2}
-                        onIntervals={([op]) => { if (op != null && op > 0) setOpTime(op.toFixed(2)); }}
+                        onInterval={(op) => { if (op > 0) setOpTime(op.toFixed(2)); }}
                       />
                     )}
 
