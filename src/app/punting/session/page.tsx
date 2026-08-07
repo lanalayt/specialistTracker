@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { usePunt } from "@/lib/puntContext";
 import { StatCard } from "@/components/ui/StatCard";
+import { IntervalStopwatch } from "@/components/ui/IntervalStopwatch";
 import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
 import { PuntSessionSummary } from "@/components/ui/PuntSessionSummary";
 import { PuntFieldStrip } from "@/components/ui/PuntFieldStrip";
@@ -367,20 +368,6 @@ export default function PuntingSessionPage() {
   const [showSnapOverlay, setShowSnapOverlay] = useState(false);
   const [snapPuntIdx, setSnapPuntIdx] = useState(0);
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
-  // Live stopwatch: press to start, press again to capture the elapsed interval,
-  // reset, and immediately keep counting. Each captured interval is routed to a
-  // time field purely by its VALUE range (not press order), so if the snap is
-  // missed and the watch is started at the catch, the value still lands in the
-  // right box: <1.00s → snap time (pre-fills Log Snap), 1.00–2.50s → opp time,
-  // 2.51s+ → hang time. All destinations stay editable afterward.
-  const [swStart, setSwStart] = useState<number | null>(null); // lap start (ms); running when non-null
-  const [swNow, setSwNow] = useState(0); // current time (ms) for the running display
-  const [swCaptures, setSwCaptures] = useState(0); // intervals captured this run (max 3)
-  const [swLastCapture, setSwLastCapture] = useState<{ value: number; dest: "snap" | "opp" | "hang"; applied: boolean } | null>(null);
-  const SW_MAX_CAPTURES = 3; // stop after 3 times (4 presses: start + 3 captures)
-  // Snap times captured by the stopwatch, keyed by punt row index; pre-fills the
-  // Log Snap popup for that punt (there is no snap-time box on the live card).
-  const [pendingSnapTime, setPendingSnapTime] = useState<Record<string, string>>({});
   // Id of the LONGSNAP session saved at commit — kept so a snap added on the
   // committed recap page updates that same session instead of creating a dupe.
   const [committedSnapId, setCommittedSnapId] = useState<string | null>(null);
@@ -539,22 +526,6 @@ export default function PuntingSessionPage() {
       gameTime,
     }, sessionMode);
   }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, committedPunts, weather, sessionMode, opponent, gameTime]);
-
-  // Tick the stopwatch display while it's running.
-  useEffect(() => {
-    if (swStart == null) return;
-    const id = setInterval(() => setSwNow(Date.now()), 50);
-    return () => clearInterval(id);
-  }, [swStart]);
-
-  // Moving to another punt clears the running watch (but keeps any snap times
-  // already captured — those live in pendingSnapTime, keyed by row).
-  useEffect(() => {
-    setSwStart(null);
-    setSwNow(0);
-    setSwCaptures(0);
-    setSwLastCapture(null);
-  }, [currentPuntIdx]);
 
   // ── Switch between practice / game mode with independent drafts ──
   const switchMode = (newMode: "practice" | "game") => {
@@ -892,62 +863,12 @@ export default function PuntingSessionPage() {
   const currentPlan = plannedPunts[currentPuntIdx];
 
   // ── Live stopwatch ───────────────────────────────────────────
-  const swElapsed = swStart != null ? Math.max(0, (swNow - swStart) / 1000) : 0;
-
-  // Route a captured interval to a time field purely by its value range.
-  const routeStopwatchCapture = (raw: number) => {
-    const v = Math.round(raw * 100) / 100; // hundredths, matching the inputs
-    if (v <= 0) return;
-    const fixed = v.toFixed(2);
-    let dest: "snap" | "opp" | "hang";
-    let applied = true;
-    if (v < 1.0) {
-      // Snap time → pre-fill the Log Snap popup for the punt on screen.
-      dest = "snap";
-      const rowIdx = plannedRowIndices[currentPuntIdx] ?? currentPuntIdx;
-      setPendingSnapTime((prev) => ({ ...prev, [String(rowIdx)]: fixed }));
-    } else if (v <= 2.5) {
-      dest = "opp";
-      if (opTimeEnabled) setOpTime(fixed);
-      else applied = false; // opp time is turned off for this team
-    } else {
-      dest = "hang";
-      if (tracksHangTime(currentPlan?.type, puntTypes)) setHangTime(fixed);
-      else applied = false; // this punt type doesn't track hang time
-    }
-    setSwLastCapture({ value: v, dest, applied });
-  };
-
-  const handleStopwatchPress = () => {
-    const now = Date.now();
-    if (swStart == null) {
-      // Fresh start — counting up from 0, capture count reset.
-      setSwCaptures(0);
-      setSwStart(now);
-      setSwNow(now);
-      setSwLastCapture(null);
-    } else {
-      // Capture this interval and route it by value.
-      routeStopwatchCapture((now - swStart) / 1000);
-      const done = swCaptures + 1;
-      setSwCaptures(done);
-      if (done >= SW_MAX_CAPTURES) {
-        // Collected all 3 times — stop (4th press ends the run).
-        setSwStart(null);
-        setSwNow(0);
-      } else {
-        // Reset and keep counting for the next interval.
-        setSwStart(now);
-        setSwNow(now);
-      }
-    }
-  };
-
-  const handleStopwatchReset = () => {
-    setSwStart(null);
-    setSwNow(0);
-    setSwCaptures(0);
-    setSwLastCapture(null);
+  // Tap sequence: catch → punt → landing. The two intervals map to op time
+  // (catch→punt) and hang time (punt→landing), gated by team settings.
+  const applyPuntStopwatch = (intervals: number[]) => {
+    const [op, hang] = intervals;
+    if (op != null && op > 0 && opTimeEnabled) setOpTime(op.toFixed(2));
+    if (hang != null && hang > 0 && tracksHangTime(currentPlan?.type, puntTypes)) setHangTime(hang.toFixed(2));
   };
 
   const updateCurrentPlan = (field: "athlete" | "type" | "hash", value: string) => {
@@ -1177,16 +1098,6 @@ export default function PuntingSessionPage() {
       shifted.splice(insertAt, 0, rowInsertPos);
       return shifted;
     });
-    // Captured stopwatch snap times are keyed by row index — shift keys at/after
-    // the insert point so an already-captured snap stays with its punt.
-    setPendingSnapTime((prev) => {
-      const shifted: Record<string, string> = {};
-      Object.entries(prev).forEach(([k, v]) => {
-        const ri = Number(k);
-        shifted[String(ri >= rowInsertPos ? ri + 1 : ri)] = v;
-      });
-      return shifted;
-    });
 
     // Shift logged punts after the insert point up one so kickNum stays aligned.
     setSessionPunts((prev) =>
@@ -1315,7 +1226,6 @@ export default function PuntingSessionPage() {
       athletes={snapAthletes}
       kickerName={snapPuntRow?.athlete || undefined}
       previousSnaps={snapLogsMap[String(snapPuntIdx)]}
-      initialSnapTime={pendingSnapTime[String(snapPuntIdx)]}
       onClose={() => {
         setShowSnapOverlay(false);
         // After commit the snap session already exists (or none did); persist any
@@ -1327,14 +1237,6 @@ export default function PuntingSessionPage() {
         const wasLogged = (snapLogsMap[key]?.length ?? 0) > 0;
         // One snap per punt: replace (also covers editing).
         setSnapLogsMap((prev) => ({ ...prev, [key]: [entry] }));
-        // The stopwatch's pending snap time has now been committed to the snap;
-        // drop it so re-opening shows the saved value, not the stale pending one.
-        setPendingSnapTime((prev) => {
-          if (!(key in prev)) return prev;
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
         // Only auto-advance when adding a NEW snap; when editing, stay put.
         if (!wasLogged) {
           const currentFilledIdx = filledRows.findIndex(({ i }) => i === snapPuntIdx);
@@ -1792,67 +1694,14 @@ export default function PuntingSessionPage() {
                       </div>
                     )}
 
-                    {/* Live stopwatch — press to start; press again to capture the
-                        interval, which routes by value: <1.00s snap · 1.00–2.50s
-                        opp · 2.51s+ hang. Fields stay editable. */}
+                    {/* Live stopwatch — tap at the catch, at the punt, and at the
+                        landing; the two intervals fill Op Time and Hang Time. */}
                     {!viewOnly && (
-                      <div className="rounded-input border border-accent/40 bg-accent/5 p-2.5">
-                        <div className="flex items-center gap-3">
-                          {/* Small round start / capture button */}
-                          <button
-                            type="button"
-                            onClick={handleStopwatchPress}
-                            className={clsx(
-                              "shrink-0 w-14 h-14 rounded-full flex items-center justify-center font-black transition-all active:scale-90 border-2",
-                              swStart != null
-                                ? "bg-accent text-white border-accent shadow-md"
-                                : "bg-surface-2 text-accent border-accent/60 hover:bg-accent/15"
-                            )}
-                            title={swStart != null ? "Tap to capture this time" : "Tap to start the snap → kick timer"}
-                          >
-                            {swStart != null
-                              ? <span className="text-xl tabular-nums">{SW_MAX_CAPTURES - swCaptures}</span>
-                              : <span className="text-2xl leading-none">▶</span>}
-                          </button>
-
-                          {/* Live timer + status */}
-                          <div className="min-w-0 flex-1">
-                            {swStart != null ? (
-                              <div className="text-3xl font-black tabular-nums text-accent leading-none">
-                                {swElapsed.toFixed(2)}<span className="text-lg">s</span>
-                              </div>
-                            ) : (
-                              <div className="text-sm font-bold text-muted">
-                                {swLastCapture ? "Times captured" : "Snap → kick timer"}
-                              </div>
-                            )}
-                            <div className="mt-1 text-[11px] text-muted">
-                              {swStart != null
-                                ? `${SW_MAX_CAPTURES - swCaptures} left · <1.00 snap · 1.00–2.50 opp · 2.51+ hang`
-                                : "Tap ▶, then tap again at snap, catch & kick"}
-                            </div>
-                          </div>
-
-                          {/* Last capture feedback + reset */}
-                          {swLastCapture && (
-                            <span className={clsx("text-[11px] font-bold whitespace-nowrap", swLastCapture.applied ? "text-accent" : "text-warn")}>
-                              {swLastCapture.applied
-                                ? `→ ${swLastCapture.dest === "snap" ? "Snap" : swLastCapture.dest === "opp" ? "Opp" : "Hang"} ${swLastCapture.value.toFixed(2)}s`
-                                : `${swLastCapture.value.toFixed(2)}s · ${swLastCapture.dest === "opp" ? "Opp off" : "no hang"}`}
-                            </span>
-                          )}
-                          {(swStart != null || swLastCapture) && (
-                            <button
-                              type="button"
-                              onClick={handleStopwatchReset}
-                              className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-surface-2 border border-border text-muted hover:text-miss hover:border-miss/50 transition-all text-xs font-bold"
-                              title="Stop & reset stopwatch"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                      <IntervalStopwatch
+                        title="Op + Hang"
+                        steps={["Catch", "Punt", "Landing"]}
+                        onIntervals={applyPuntStopwatch}
+                      />
                     )}
 
                     {/* Yards + Hang Time + Opp Time */}

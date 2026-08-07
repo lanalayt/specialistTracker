@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
 import { StatCard } from "@/components/ui/StatCard";
+import { IntervalStopwatch } from "@/components/ui/IntervalStopwatch";
 import { ZoneBarChart } from "@/components/ui/Chart";
 import { KickoffSessionLog } from "@/components/ui/KickoffSessionLog";
 import { KickoffSessionSummary } from "@/components/ui/KickoffSessionSummary";
@@ -364,11 +365,6 @@ export default function KickoffSessionPage() {
   const [fairCatch, setFairCatch] = useState(false);
   // score removed — not used for kickoff
 
-  // Live hang-time stopwatch: press to start counting, press again to stop; the
-  // elapsed time drops straight into the Hang Time box (still editable after).
-  const [swStart, setSwStart] = useState<number | null>(null); // start (ms); running when non-null
-  const [swNow, setSwNow] = useState(0); // current time (ms) for the running display
-
   // Auto-decimal: user types digits, we insert decimal 2 places from right
   // e.g. "456" → "4.56", "12" → "0.12"
   function formatAutoDecimal(raw: string): string {
@@ -708,31 +704,6 @@ export default function KickoffSessionPage() {
 
   const currentPlan = plannedKicks[currentKickIdx];
 
-  // ── Live hang-time stopwatch ─────────────────────────────────
-  const swElapsed = swStart != null ? Math.max(0, (swNow - swStart) / 1000) : 0;
-
-  // Tick the display while the stopwatch is running.
-  useEffect(() => {
-    if (swStart == null) return;
-    const id = setInterval(() => setSwNow(Date.now()), 50);
-    return () => clearInterval(id);
-  }, [swStart]);
-
-  const handleStopwatchPress = () => {
-    const now = Date.now();
-    if (swStart == null) {
-      // Start counting up from 0.
-      setSwStart(now);
-      setSwNow(now);
-    } else {
-      // Stop: whatever the elapsed time is drops into Hang Time.
-      const v = Math.max(0, Math.round(((now - swStart) / 1000) * 100) / 100);
-      if (v > 0) setHangTime(v.toFixed(2));
-      setSwStart(null);
-      setSwNow(0);
-    }
-  };
-
   const updateCurrentPlan = (field: "athlete" | "type" | "hash", value: string) => {
     setPlannedKicks((prev) => {
       const next = [...prev];
@@ -800,8 +771,6 @@ export default function KickoffSessionPage() {
     setEndzone(false);
     setFairCatch(false);
     setShowAthleteDropdown(false);
-    setSwStart(null);
-    setSwNow(0);
   };
 
   const allKicksLogged = plannedKicks.length > 0 && sessionKicks.length >= plannedKicks.length;
@@ -1237,40 +1206,14 @@ export default function KickoffSessionPage() {
                       </div>
                     </div>
 
-                    {/* Live hang-time stopwatch — tap to start, tap again to stop;
-                        the elapsed time drops into Hang Time (still editable). */}
+                    {/* Live hang-time stopwatch — tap at the kick, tap again at
+                        the landing; the elapsed time drops into Hang Time. */}
                     {!viewOnly && koTracksHangTime(currentPlan?.type, koTypes) && (
-                      <div className="rounded-input border border-accent/40 bg-accent/5 p-2.5">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={handleStopwatchPress}
-                            className={clsx(
-                              "shrink-0 w-14 h-14 rounded-full flex items-center justify-center font-black transition-all active:scale-90 border-2",
-                              swStart != null
-                                ? "bg-accent text-white border-accent shadow-md"
-                                : "bg-surface-2 text-accent border-accent/60 hover:bg-accent/15"
-                            )}
-                            title={swStart != null ? "Tap to stop — time goes to Hang Time" : "Tap to start the hang timer"}
-                          >
-                            {swStart != null
-                              ? <span className="text-lg leading-none">■</span>
-                              : <span className="text-2xl leading-none">▶</span>}
-                          </button>
-                          <div className="min-w-0 flex-1">
-                            {swStart != null ? (
-                              <div className="text-3xl font-black tabular-nums text-accent leading-none">
-                                {swElapsed.toFixed(2)}<span className="text-lg">s</span>
-                              </div>
-                            ) : (
-                              <div className="text-sm font-bold text-muted">Hang timer</div>
-                            )}
-                            <div className="mt-1 text-[11px] text-muted">
-                              {swStart != null ? "Tap ■ at the catch to record hang time" : "Tap ▶ at the kick, ■ at the catch"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <IntervalStopwatch
+                        title="Hang"
+                        steps={["Kick", "Landing"]}
+                        onIntervals={([hang]) => { if (hang != null && hang > 0) setHangTime(hang.toFixed(2)); }}
+                      />
                     )}
 
                     {/* Distance + Hang Time */}
