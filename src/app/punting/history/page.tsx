@@ -53,12 +53,13 @@ function loadPuntTypes(): PuntTypeConfig[] {
   return DEFAULT_PUNT_TYPES;
 }
 
-// Keep digits and a single decimal point, so a time like "5.05" can be typed
-// literally (the field holds the raw text; the entry stores the parsed number).
-function sanitizeDecimal(v: string): string {
-  const s = v.replace(/[^0-9.]/g, "");
-  const parts = s.split(".");
-  return parts.length > 2 ? parts[0] + "." + parts.slice(1).join("") : s;
+// Auto-decimal: the raw digits typed become a time with the last two as the
+// hundredths (e.g. "505" -> "5.05", "5" -> "0.05"). A typed dot is ignored.
+function formatAutoDecimal(digits: string): string {
+  if (!digits) return "";
+  const padded = digits.padStart(3, "0");
+  const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
+  return `${whole}.${padded.slice(-2)}`;
 }
 
 function formatDateForInput(iso: string): string {
@@ -149,13 +150,15 @@ function PuntHistoryContent() {
       setRawTimes({});
     }
   };
-  const updateTime = (idx: number, field: "hangTime" | "opTime", raw: string) => {
-    const s = sanitizeDecimal(raw);
-    setRawTimes((prev) => ({ ...prev, [`${idx}-${field}`]: s }));
-    updateEntry(idx, field, s === "" || s === "." ? 0 : (parseFloat(s) || 0));
+  const updateTime = (idx: number, field: "hangTime" | "opTime", rawInput: string) => {
+    const digits = rawInput.replace(/\D/g, "").slice(0, 4);
+    setRawTimes((prev) => ({ ...prev, [`${idx}-${field}`]: digits }));
+    updateEntry(idx, field, digits ? parseFloat(formatAutoDecimal(digits)) : 0);
   };
-  const timeValue = (idx: number, field: "hangTime" | "opTime", num: number) =>
-    rawTimes[`${idx}-${field}`] ?? (num ? String(num) : "");
+  const timeValue = (idx: number, field: "hangTime" | "opTime", num: number) => {
+    const digits = rawTimes[`${idx}-${field}`] ?? (num > 0 ? String(Math.round(num * 100)) : "");
+    return digits ? formatAutoDecimal(digits) : "";
+  };
   const updateEntry = (idx: number, field: keyof PuntEntry, value: unknown) => {
     setEditEntries((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
   };
@@ -659,8 +662,8 @@ function PuntHistoryContent() {
                                   <input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
                                 )}
                               </td>
-                              <td className="table-cell p-1"><input type="text" inputMode="decimal" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
-                              <td className="table-cell p-1"><input type="text" inputMode="decimal" value={timeValue(i, "opTime", p.opTime || 0)} onChange={(e) => updateTime(i, "opTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                              <td className="table-cell p-1"><input type="text" inputMode="numeric" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                              <td className="table-cell p-1"><input type="text" inputMode="numeric" value={timeValue(i, "opTime", p.opTime || 0)} onChange={(e) => updateTime(i, "opTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                               <td className="table-cell p-1">
                                 <select value={String(p.directionalAccuracy ?? "")} onChange={(e) => updateEntry(i, "directionalAccuracy", parseFloat(e.target.value))} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
                                   <option value="1">1</option>

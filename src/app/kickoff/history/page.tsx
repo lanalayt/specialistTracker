@@ -10,6 +10,15 @@ import { KickoffFieldView } from "@/components/ui/KickoffFieldView";
 import type { KickoffEntry, Session } from "@/types";
 import clsx from "clsx";
 
+// Auto-decimal: raw digits become a time with the last two as hundredths
+// (e.g. "505" -> "5.05", "5" -> "0.05"). A typed dot is ignored.
+function formatAutoDecimal(digits: string): string {
+  if (!digits) return "";
+  const padded = digits.padStart(3, "0");
+  const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
+  return `${whole}.${padded.slice(-2)}`;
+}
+
 function formatDateForInput(iso: string): string {
   const d = new Date(iso);
   const y = d.getFullYear();
@@ -75,12 +84,15 @@ function KickoffHistoryContent() {
   const cancelEditing = () => { setEditing(false); setEditEntries([]); setRawTimes({}); };
   const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); setRawTimes({}); } };
   const updateEntry = (idx: number, field: keyof KickoffEntry, value: unknown) => { setEditEntries((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e)); };
-  const updateTime = (idx: number, field: "hangTime", raw: string) => {
-    const s = raw.replace(/[^0-9.]/g, "").split(".").slice(0, 2).join(".");
-    setRawTimes((prev) => ({ ...prev, [`${idx}-${field}`]: s }));
-    updateEntry(idx, field, s === "" || s === "." ? 0 : (parseFloat(s) || 0));
+  const updateTime = (idx: number, field: "hangTime", rawInput: string) => {
+    const digits = rawInput.replace(/\D/g, "").slice(0, 4);
+    setRawTimes((prev) => ({ ...prev, [`${idx}-${field}`]: digits }));
+    updateEntry(idx, field, digits ? parseFloat(formatAutoDecimal(digits)) : 0);
   };
-  const timeValue = (idx: number, field: "hangTime", num: number) => rawTimes[`${idx}-${field}`] ?? (num ? String(num) : "");
+  const timeValue = (idx: number, field: "hangTime", num: number) => {
+    const digits = rawTimes[`${idx}-${field}`] ?? (num > 0 ? String(Math.round(num * 100)) : "");
+    return digits ? formatAutoDecimal(digits) : "";
+  };
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
@@ -372,7 +384,7 @@ function KickoffHistoryContent() {
                       {editing ? (
                         <>
                           <td className="table-cell p-1"><input type="text" inputMode="numeric" value={e.distance || ""} onChange={(ev) => updateEntry(i, "distance", parseInt(ev.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
-                          <td className="table-cell p-1"><input type="text" inputMode="decimal" value={timeValue(i, "hangTime", e.hangTime)} onChange={(ev) => updateTime(i, "hangTime", ev.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={timeValue(i, "hangTime", e.hangTime)} onChange={(ev) => updateTime(i, "hangTime", ev.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                           <td className="table-cell p-1">
                             <select value={e.direction} onChange={(ev) => updateEntry(i, "direction", ev.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
                               <option value="1">1</option>
