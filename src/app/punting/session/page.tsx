@@ -863,12 +863,19 @@ export default function PuntingSessionPage() {
   const currentPlan = plannedPunts[currentPuntIdx];
 
   // ── Live stopwatch ───────────────────────────────────────────
-  // Tap sequence: catch → punt → landing. The two intervals map to op time
-  // (catch→punt) and hang time (punt→landing), gated by team settings.
+  // Tap sequence: catch → punt → landing. Each interval is routed by its VALUE,
+  // not its position: 2.50s and under → op time, 2.51s+ → hang time. Gated by
+  // team settings (op time on, and the punt type tracking hang time).
   const applyPuntStopwatch = (intervals: number[]) => {
-    const [op, hang] = intervals;
-    if (op != null && op > 0 && opTimeEnabled) setOpTime(op.toFixed(2));
-    if (hang != null && hang > 0 && tracksHangTime(currentPlan?.type, puntTypes)) setHangTime(hang.toFixed(2));
+    intervals.forEach((raw) => {
+      const v = Math.round(raw * 100) / 100;
+      if (v <= 0) return;
+      if (v <= 2.5) {
+        if (opTimeEnabled) setOpTime(v.toFixed(2));
+      } else if (tracksHangTime(currentPlan?.type, puntTypes)) {
+        setHangTime(v.toFixed(2));
+      }
+    });
   };
 
   const updateCurrentPlan = (field: "athlete" | "type" | "hash", value: string) => {
