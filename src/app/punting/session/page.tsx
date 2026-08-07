@@ -875,6 +875,8 @@ export default function PuntingSessionPage() {
       setHangTime(v.toFixed(2));
     }
   };
+  // Bumped on each Log Punt so the stopwatch remounts (stops + resets to 0).
+  const [swReset, setSwReset] = useState(0);
 
   const updateCurrentPlan = (field: "athlete" | "type" | "hash", value: string) => {
     setPlannedPunts((prev) => {
@@ -1011,6 +1013,7 @@ export default function PuntingSessionPage() {
       setReturnYardsInput("");
     }
     setShowAthleteDropdown(false);
+    setSwReset((k) => k + 1); // remount the stopwatch so it stops & resets to 0
   };
 
   const allPuntsLogged = plannedPunts.length > 0 && sessionPunts.length >= plannedPunts.length;
@@ -1703,6 +1706,7 @@ export default function PuntingSessionPage() {
                         landing; the two intervals fill Op Time and Hang Time. */}
                     {!viewOnly && (
                       <IntervalStopwatch
+                        key={swReset}
                         title="Opp & Hang Timer"
                         instruction="Press at catch, punt and landing"
                         taps={3}

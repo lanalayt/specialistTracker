@@ -703,6 +703,8 @@ export default function KickoffSessionPage() {
   const [showAthleteDropdown, setShowAthleteDropdown] = useState(false);
 
   const currentPlan = plannedKicks[currentKickIdx];
+  // Bumped on each Log kick so the stopwatch remounts (stops + resets to 0).
+  const [swReset, setSwReset] = useState(0);
 
   const updateCurrentPlan = (field: "athlete" | "type" | "hash", value: string) => {
     setPlannedKicks((prev) => {
@@ -771,6 +773,7 @@ export default function KickoffSessionPage() {
     setEndzone(false);
     setFairCatch(false);
     setShowAthleteDropdown(false);
+    setSwReset((k) => k + 1); // remount the stopwatch so it stops & resets to 0
   };
 
   const allKicksLogged = plannedKicks.length > 0 && sessionKicks.length >= plannedKicks.length;
@@ -1210,6 +1213,7 @@ export default function KickoffSessionPage() {
                         the landing; the elapsed time drops into Hang Time. */}
                     {!viewOnly && koTracksHangTime(currentPlan?.type, koTypes) && (
                       <IntervalStopwatch
+                        key={swReset}
                         title="Hang Timer"
                         instruction="Press at kick and landing"
                         taps={2}

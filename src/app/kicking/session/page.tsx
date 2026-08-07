@@ -803,12 +803,15 @@ export default function KickingSessionPage() {
       setHolder(defaultHolder(plannedKicks[advanceIdx]?.athlete));
     }
     setShowAthleteDropdown(false);
+    setSwReset((k) => k + 1); // remount the stopwatch so it stops & resets to 0
   };
 
   const allKicksLogged = plannedKicks.length > 0 && sessionKicks.length >= plannedKicks.length;
   const isEditing = editingKickIdx !== null;
   const showEntryCard = (!allKicksLogged || isEditing) && plannedKicks[currentKickIdx];
   const currentPlan = plannedKicks[currentKickIdx];
+  // Bumped on each Log kick so the stopwatch remounts (stops + resets to 0).
+  const [swReset, setSwReset] = useState(0);
 
   // Snap kick list. In a live session with a plan, always show ALL planned kicks
   // (not just the ones logged so far) so a snap can be logged for each as you go.
@@ -1611,6 +1614,7 @@ export default function KickingSessionPage() {
                         kick; the elapsed time drops into OT (still editable). */}
                     {!viewOnly && opTimeEnabled && (
                       <IntervalStopwatch
+                        key={swReset}
                         title="Opp Timer"
                         instruction="Press at snap and then at kick"
                         taps={2}
