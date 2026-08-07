@@ -53,6 +53,14 @@ function loadPuntTypes(): PuntTypeConfig[] {
   return DEFAULT_PUNT_TYPES;
 }
 
+// Keep digits and a single decimal point, so a time like "5.05" can be typed
+// literally (the field holds the raw text; the entry stores the parsed number).
+function sanitizeDecimal(v: string): string {
+  const s = v.replace(/[^0-9.]/g, "");
+  const parts = s.split(".");
+  return parts.length > 2 ? parts[0] + "." + parts.slice(1).join("") : s;
+}
+
 function formatDateForInput(iso: string): string {
   const d = new Date(iso);
   const y = d.getFullYear();
@@ -123,19 +131,31 @@ function PuntHistoryContent() {
   const punts = (selected?.entries ?? []) as PuntEntry[];
   const [editing, setEditing] = useState(false);
   const [editEntries, setEditEntries] = useState<PuntEntry[]>([]);
+  // Raw text for the decimal (hang/op) inputs while editing, keyed `${idx}-${field}`,
+  // so intermediate states like "5." or "5.0" aren't clobbered by the parsed number.
+  const [rawTimes, setRawTimes] = useState<Record<string, string>>({});
 
   const startEditing = () => {
     setEditEntries(punts.map((p) => ({ ...p })));
+    setRawTimes({});
     setEditing(true);
   };
-  const cancelEditing = () => { setEditing(false); setEditEntries([]); };
+  const cancelEditing = () => { setEditing(false); setEditEntries([]); setRawTimes({}); };
   const saveEditing = () => {
     if (selected) {
       updateSessionEntries(selected.id, editEntries);
       setEditing(false);
       setEditEntries([]);
+      setRawTimes({});
     }
   };
+  const updateTime = (idx: number, field: "hangTime" | "opTime", raw: string) => {
+    const s = sanitizeDecimal(raw);
+    setRawTimes((prev) => ({ ...prev, [`${idx}-${field}`]: s }));
+    updateEntry(idx, field, s === "" || s === "." ? 0 : (parseFloat(s) || 0));
+  };
+  const timeValue = (idx: number, field: "hangTime" | "opTime", num: number) =>
+    rawTimes[`${idx}-${field}`] ?? (num ? String(num) : "");
   const updateEntry = (idx: number, field: keyof PuntEntry, value: unknown) => {
     setEditEntries((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
   };
@@ -639,8 +659,8 @@ function PuntHistoryContent() {
                                   <input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
                                 )}
                               </td>
-                              <td className="table-cell p-1"><input type="text" inputMode="numeric" value={p.hangTime || ""} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); updateEntry(i, "hangTime", d ? parseFloat(`${d.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${d.padStart(3, "0").slice(-2)}`) : 0); }} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
-                              <td className="table-cell p-1"><input type="text" inputMode="numeric" value={p.opTime || ""} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); updateEntry(i, "opTime", d ? parseFloat(`${d.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${d.padStart(3, "0").slice(-2)}`) : 0); }} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                              <td className="table-cell p-1"><input type="text" inputMode="decimal" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                              <td className="table-cell p-1"><input type="text" inputMode="decimal" value={timeValue(i, "opTime", p.opTime || 0)} onChange={(e) => updateTime(i, "opTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                               <td className="table-cell p-1">
                                 <select value={String(p.directionalAccuracy ?? "")} onChange={(e) => updateEntry(i, "directionalAccuracy", parseFloat(e.target.value))} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
                                   <option value="1">1</option>

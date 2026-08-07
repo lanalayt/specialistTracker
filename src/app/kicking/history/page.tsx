@@ -125,10 +125,18 @@ function KickingHistoryContent() {
   const selected = filteredHistory.find((s) => s.id === selectedId);
   const [editing, setEditing] = useState(false);
   const [editEntries, setEditEntries] = useState<FGKick[]>([]);
-  const startEditing = () => { setEditEntries((selected?.entries ?? []) as FGKick[]); setEditing(true); };
-  const cancelEditing = () => { setEditing(false); setEditEntries([]); };
-  const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); } };
+  // Raw text for decimal inputs while editing, so "1." / "1.0" survive typing.
+  const [rawTimes, setRawTimes] = useState<Record<string, string>>({});
+  const startEditing = () => { setEditEntries((selected?.entries ?? []) as FGKick[]); setRawTimes({}); setEditing(true); };
+  const cancelEditing = () => { setEditing(false); setEditEntries([]); setRawTimes({}); };
+  const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); setRawTimes({}); } };
   const updateEntry = (idx: number, field: keyof FGKick, value: unknown) => { setEditEntries((prev) => prev.map((k, i) => i === idx ? { ...k, [field]: value } : k)); };
+  const updateTime = (idx: number, field: "opTime", raw: string) => {
+    const s = raw.replace(/[^0-9.]/g, "").split(".").slice(0, 2).join(".");
+    setRawTimes((prev) => ({ ...prev, [`${idx}-${field}`]: s }));
+    updateEntry(idx, field, s === "" || s === "." ? 0 : (parseFloat(s) || 0));
+  };
+  const timeValue = (idx: number, field: "opTime", num: number) => rawTimes[`${idx}-${field}`] ?? (num ? String(num) : "");
   // Reassign a kick's holder. During a bulk edit it goes into the draft; otherwise
   // it's a standalone quick fix that persists immediately.
   const changeHolder = (idx: number, value: string) => {
@@ -616,7 +624,7 @@ function KickingHistoryContent() {
                             </select>
                           </td>
                           {!hideScore && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}
-                          {sessionHasOT && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.opTime || ""} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); updateEntry(i, "opTime", d ? parseFloat(`${d.padStart(3, "0").slice(0, -2).replace(/^0+(?=\d)/, "") || "0"}.${d.padStart(3, "0").slice(-2)}`) : 0); }} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}
+                          {sessionHasOT && <td className="table-cell p-1"><input type="text" inputMode="decimal" value={timeValue(i, "opTime", k.opTime || 0)} onChange={(e) => updateTime(i, "opTime", e.target.value)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}
                         </>
                       ) : (
                         <>
