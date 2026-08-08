@@ -84,6 +84,10 @@ function KickoffHistoryContent() {
   const cancelEditing = () => { setEditing(false); setEditEntries([]); setRawTimes({}); };
   const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); setRawTimes({}); } };
   const updateEntry = (idx: number, field: keyof KickoffEntry, value: unknown) => { setEditEntries((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e)); };
+  const deleteEntry = (idx: number) => {
+    setEditEntries((prev) => prev.filter((_, i) => i !== idx).map((e, i) => ({ ...e, kickNum: i + 1 })));
+    setRawTimes({}); // indices shift after a delete — drop stale raw text
+  };
   const updateTime = (idx: number, field: "hangTime", rawInput: string) => {
     const digits = rawInput.replace(/\D/g, "").slice(0, 4);
     setRawTimes((prev) => ({ ...prev, [`${idx}-${field}`]: digits }));
@@ -374,6 +378,7 @@ function KickoffHistoryContent() {
                     <th className="table-header">Dist</th>
                     <th className="table-header">Hang</th>
                     <th className="table-header">Dir</th>
+                    {editing && <th className="table-header w-8"></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -401,6 +406,17 @@ function KickoffHistoryContent() {
                             e.direction === "1" ? "text-make" : e.direction === "OB" ? "text-miss" : e.direction === "0.5" ? "text-amber-400" : "text-muted"
                           )}>{e.direction || "—"}</td>
                         </>
+                      )}
+                      {editing && (
+                        <td className="table-cell text-center p-1">
+                          <button
+                            onClick={() => { if (window.confirm(`Delete kick #${e.kickNum ?? i + 1}?`)) deleteEntry(i); }}
+                            className="text-miss/60 hover:text-miss transition-colors text-sm leading-none px-1"
+                            title="Delete kick"
+                          >
+                            ×
+                          </button>
+                        </td>
                       )}
                     </tr>
                   ))}

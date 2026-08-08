@@ -902,6 +902,32 @@ export default function KickingSessionPage() {
     setScore(0);
   };
 
+  // Add another kick to the end of a live session (e.g. after all planned kicks
+  // are logged, before finishing). Defaults to the last kick's athlete/spot.
+  const handleAddKick = () => {
+    const last = plannedKicks[plannedKicks.length - 1];
+    const newKick = {
+      athlete: last?.athlete ?? athletes[0]?.name ?? "",
+      dist: last?.dist ?? 0,
+      pos: (last?.pos ?? "M") as FGPosition,
+      isPAT: last?.isPAT,
+    };
+    const newIdx = plannedKicks.length; // index of the appended kick
+    const newRowIdx = rows.length;      // index of the appended planning row
+    const newRow: LogRow = { ...emptyRow(), athlete: newKick.athlete, pos: String(newKick.pos), dist: newKick.isPAT ? "" : String(newKick.dist || "") };
+    setRows((prev) => [...prev, newRow]);
+    setPlannedKicks((prev) => [...prev, newKick]);
+    setPlannedRowIndices((prev) => [...prev, newRowIdx]);
+    setCurrentKickIdx(newIdx);
+    setEditingKickIdx(null);
+    setResult(null);
+    setScore(0);
+    setOpTime("");
+    setStarred(false);
+    setHolder(lastHolder || defaultHolder(newKick.athlete));
+    setSwReset((k) => k + 1); // fresh stopwatch for the new kick
+  };
+
   const handleCommitReady = () => {
     if (sessionKicks.length === 0) return;
     setPendingKicks(sessionKicks);
@@ -1728,8 +1754,16 @@ export default function KickingSessionPage() {
                       All {plannedKicks.length} kicks logged!
                     </p>
                     <p className="text-xs text-muted">
-                      Review below, then commit the session.
+                      Add another kick, or finish the session below.
                     </p>
+                    {!viewOnly && (
+                      <button
+                        onClick={handleAddKick}
+                        className="text-xs px-4 py-2 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                      >
+                        + Add Kick
+                      </button>
+                    )}
                   </div>
                 )}
                 </>
@@ -1781,7 +1815,7 @@ export default function KickingSessionPage() {
                     disabled={sessionKicks.length === 0}
                     className="btn-primary text-xs py-2 px-5"
                   >
-                    Commit Session
+                    Finish Session
                     {sessionKicks.length > 0 && ` (${sessionKicks.length})`}
                   </button>
                 </>
