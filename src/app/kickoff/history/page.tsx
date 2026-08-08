@@ -7,8 +7,36 @@ import { useAuth } from "@/lib/auth";
 import { exportKOSession, exportSessionPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { KickoffFieldView } from "@/components/ui/KickoffFieldView";
+import { getCachedSettings, loadSettingsFromCloud } from "@/lib/settingsSync";
 import type { KickoffEntry, Session } from "@/types";
 import clsx from "clsx";
+
+// Direction score options, mirroring the kickoff settings (numeric or field).
+const DEFAULT_KO_DIRS = [
+  { id: "1", label: "1.0" },
+  { id: "0.5", label: "0.5" },
+  { id: "0", label: "0" },
+  { id: "-1", label: "OB" },
+];
+const FIELD_KO_DIRS = [
+  { id: "SL-NUM", label: "Sideline-Numbers" },
+  { id: "NUM-HASH", label: "Numbers-Hash" },
+  { id: "TO_FIELD", label: "To The Field" },
+  { id: "OB", label: "OB" },
+];
+function loadKoDirs(): { id: string; label: string }[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = getCachedSettings<any>("kickoffSettings");
+    if (parsed) {
+      const defaults = parsed.directionMode === "field" ? FIELD_KO_DIRS : DEFAULT_KO_DIRS;
+      return parsed.directionMetrics?.length > 0
+        ? parsed.directionMetrics.map((d: { id: string; label: string }) => ({ id: d.id, label: d.label }))
+        : defaults;
+    }
+  } catch {}
+  return DEFAULT_KO_DIRS;
+}
 
 // Auto-decimal: raw digits become a time with the last two as hundredths
 // (e.g. "505" -> "5.05", "5" -> "0.05"). A typed dot is ignored.
@@ -78,6 +106,9 @@ function KickoffHistoryContent() {
   const entries = (selected?.entries ?? []) as KickoffEntry[];
   const [editing, setEditing] = useState(false);
   const [editEntries, setEditEntries] = useState<KickoffEntry[]>([]);
+  // Direction score options from team settings (so editing mirrors the settings).
+  const [koDirs, setKoDirs] = useState<{ id: string; label: string }[]>(() => loadKoDirs());
+  useEffect(() => { loadSettingsFromCloud("kickoffSettings").then(() => setKoDirs(loadKoDirs())); }, []);
   // Raw text for decimal inputs while editing, so "5." / "5.0" survive typing.
   const [rawTimes, setRawTimes] = useState<Record<string, string>>({});
   const startEditing = () => { setEditEntries(entries.map((e) => ({ ...e }))); setRawTimes({}); setEditing(true); };
@@ -392,9 +423,8 @@ function KickoffHistoryContent() {
                           <td className="table-cell p-1"><input type="text" inputMode="numeric" value={timeValue(i, "hangTime", e.hangTime)} onChange={(ev) => updateTime(i, "hangTime", ev.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                           <td className="table-cell p-1">
                             <select value={e.direction} onChange={(ev) => updateEntry(i, "direction", ev.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
-                              <option value="1">1</option>
-                              <option value="0.5">0.5</option>
-                              <option value="OB">OB</option>
+                              {e.direction && !koDirs.some((d) => d.id === e.direction) && <option value={e.direction}>{e.direction}</option>}
+                              {koDirs.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
                             </select>
                           </td>
                         </>
@@ -403,8 +433,8 @@ function KickoffHistoryContent() {
                           <td className="table-cell">{e.distance > 0 ? `${e.distance} yd` : "—"}</td>
                           <td className="table-cell text-muted">{e.hangTime > 0 ? `${e.hangTime.toFixed(2)}s` : "—"}</td>
                           <td className={clsx("table-cell font-bold",
-                            e.direction === "1" ? "text-make" : e.direction === "OB" ? "text-miss" : e.direction === "0.5" ? "text-amber-400" : "text-muted"
-                          )}>{e.direction || "—"}</td>
+                            e.direction === "1" ? "text-make" : (e.direction === "OB" || e.direction === "-1") ? "text-miss" : e.direction === "0.5" ? "text-amber-400" : "text-slate-200"
+                          )}>{koDirs.find((d) => d.id === e.direction)?.label ?? (e.direction || "—")}</td>
                         </>
                       )}
                       {editing && (
