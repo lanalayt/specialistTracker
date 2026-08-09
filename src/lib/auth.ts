@@ -14,7 +14,8 @@ interface AuthContextValue {
   /** True for coaches and athletes with edit access */
   canEdit: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, role?: UserRole, teamId?: string) => Promise<void>;
+  /** Resolves to true when email confirmation is required (no session yet). */
+  signUp: (email: string, password: string, name: string, role?: UserRole, teamId?: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   setDemoRole: (role: UserRole) => void;
 }
@@ -27,7 +28,7 @@ export const AuthContext = createContext<AuthContextValue>({
   isAthlete: false,
   canEdit: false,
   signIn: async () => {},
-  signUp: async () => {},
+  signUp: async () => false,
   signOut: async () => {},
   setDemoRole: () => {},
 });

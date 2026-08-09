@@ -182,6 +182,8 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
       password,
       options: {
         data: { name, role, teamId },
+        // Where the confirmation link sends the user after they verify.
+        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login?confirmed=1` : undefined,
       },
     });
     if (error) throw new Error(error.message);
@@ -213,6 +215,10 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
         // Non-fatal: the client-side auto-register on first login is the fallback.
       }
     }
+
+    // When email confirmation is enabled in Supabase, signUp returns no session
+    // until the user clicks the link — signal that so the UI can prompt them.
+    return !data.session;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = useCallback(async () => {

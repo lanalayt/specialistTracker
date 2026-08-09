@@ -66,6 +66,7 @@ function SignupInner() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
 
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -112,7 +113,7 @@ function SignupInner() {
       }
 
       const role: UserRole = resolvedRole === "athlete" ? "athlete" : "admin";
-      await signUp(form.email, form.password, form.name, role, needsTeamCode ? resolvedTeamId : undefined);
+      const needsConfirmation = await signUp(form.email, form.password, form.name, role, needsTeamCode ? resolvedTeamId : undefined);
       // Notify about new signup. Non-blocking — a failure here must never stop
       // the signup — but log it so a broken notification is visible instead of
       // silently swallowed.
@@ -128,6 +129,13 @@ function SignupInner() {
       } catch (notifyErr) {
         console.error("Signup notification request failed:", notifyErr);
       }
+      // Email confirmation enabled → no session yet; prompt them to confirm
+      // instead of pushing to a page that would just bounce back to login.
+      if (needsConfirmation) {
+        setAwaitingConfirmation(true);
+        setLoading(false);
+        return;
+      }
       // New team coaches → onboard, existing team coaches & athletes → dashboard
       router.push(roleChoice === "coach" && teamChoice === "new" ? "/onboard" : "/dashboard");
     } catch (err: unknown) {
@@ -142,6 +150,28 @@ function SignupInner() {
   }
 
   const accentColor = inviteColors?.primary || "#00d4a0";
+
+  if (awaitingConfirmation) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <img src="/logo-mark.svg" alt="Specialist Tracker" className="w-12 h-12 mx-auto mb-3" />
+          <div className="text-4xl mb-3">📧</div>
+          <h1 className="text-2xl font-extrabold text-slate-100">Confirm your email</h1>
+          <p className="text-sm text-muted mt-2">
+            We sent a confirmation link to <span className="text-slate-200 font-semibold">{form.email}</span>.
+            Click it to activate your account, then log in.
+          </p>
+          <p className="text-xs text-muted mt-3">
+            Wrong email or didn&apos;t get it? Check your spam folder, or{" "}
+            <button onClick={() => setAwaitingConfirmation(false)} className="text-accent hover:underline font-semibold">go back</button>{" "}
+            and try again.
+          </p>
+          <a href="/login" className="btn-primary inline-block mt-6 px-6 py-2 text-sm">Go to Login</a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
