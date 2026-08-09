@@ -113,12 +113,21 @@ function SignupInner() {
 
       const role: UserRole = resolvedRole === "athlete" ? "athlete" : "admin";
       await signUp(form.email, form.password, form.name, role, needsTeamCode ? resolvedTeamId : undefined);
-      // Notify about new signup
-      await fetch("/api/notify-signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, school: form.school, role: roleChoice }),
-      }).catch(() => {});
+      // Notify about new signup. Non-blocking — a failure here must never stop
+      // the signup — but log it so a broken notification is visible instead of
+      // silently swallowed.
+      try {
+        const notifyRes = await fetch("/api/notify-signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: form.name, email: form.email, school: form.school, role: roleChoice }),
+        });
+        if (!notifyRes.ok) {
+          console.error("Signup notification failed:", notifyRes.status, await notifyRes.text().catch(() => ""));
+        }
+      } catch (notifyErr) {
+        console.error("Signup notification request failed:", notifyErr);
+      }
       // New team coaches → onboard, existing team coaches & athletes → dashboard
       router.push(roleChoice === "coach" && teamChoice === "new" ? "/onboard" : "/dashboard");
     } catch (err: unknown) {

@@ -12,7 +12,10 @@ export async function POST(req: Request) {
 
     const { name, email, school, role } = await req.json();
 
-    await resend.emails.send({
+    // Resend returns { data, error } — it does NOT throw on a rejected send
+    // (e.g. a suppressed recipient), so check `error` explicitly or a failed
+    // send looks like a success.
+    const { data, error } = await resend.emails.send({
       from: "Specialist Tracker <noreply@specs-tracker.com>",
       to: "specialiststracker@gmail.com",
       subject: `New Signup: ${name} (${role})`,
@@ -27,9 +30,15 @@ export async function POST(req: Request) {
       `,
     });
 
-    return NextResponse.json({ ok: true });
+    if (error) {
+      console.error(`Signup notification: Resend rejected the send for ${email}:`, error);
+      return NextResponse.json({ ok: false, error: error.message ?? String(error) }, { status: 502 });
+    }
+
+    console.log(`Signup notification sent (id ${data?.id}) for ${email}`);
+    return NextResponse.json({ ok: true, id: data?.id });
   } catch (err) {
-    console.error("Signup notification error:", err);
-    return NextResponse.json({ ok: false }, { status: 500 });
+    console.error("Signup notification error (send threw):", err);
+    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }
