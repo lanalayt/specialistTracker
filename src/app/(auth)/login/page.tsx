@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
 import Link from "next/link";
@@ -31,6 +31,33 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+
+  // Arriving from the email-confirmation link: Supabase auto-establishes a
+  // session in this SPA instance where the team/membership context isn't wired
+  // up, so the app loads "empty" (not connected to the team). Once the session
+  // lands, force a clean full-page load into the app — the same path a normal
+  // login takes — so the team and membership initialize correctly the first time.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("confirmed") !== "1") return;
+    const supabase = createClient();
+    let cancelled = false;
+    let tries = 0;
+    const check = () => {
+      if (cancelled) return;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (cancelled) return;
+        if (session?.user) {
+          window.location.href = "/dashboard";
+        } else if (tries++ < 20) {
+          setTimeout(check, 150);
+        }
+      });
+    };
+    check();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
