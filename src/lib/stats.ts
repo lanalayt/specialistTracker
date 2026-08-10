@@ -211,10 +211,11 @@ export function processPunt(
     : (typeof type === "string" && type.toUpperCase().includes("POOCH"));
   const htEnabled = typeConfig ? typeConfig.hangTime : true;
   // Determine which metrics have data (0 = not entered for numeric fields).
-  // Pooch punts contribute their distance to the yard average only when they
-  // actually carry one (game stats compute gross yards from LOS→landing;
-  // practice pooch punts are yard-line-only and store yards = 0).
-  const hasYards = yards > 0;
+  // Yard-line (pooch) types are measured by landing yard line, never distance,
+  // so they must not feed the distance/gross average — even if an entry still
+  // carries a stray yards value (e.g. a punt switched from a distance type to
+  // a yard-line type). Their landing yard line is tracked separately below.
+  const hasYards = yards > 0 && !isYardLine;
   const hasHang = hangTime > 0 && htEnabled;
   const hasOT = opTime > 0;
   const daRaw = punt.directionalAccuracy;
