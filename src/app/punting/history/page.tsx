@@ -189,8 +189,24 @@ function PuntHistoryContent() {
     return digits ? formatAutoDecimal(digits) : "";
   };
   const updateEntry = (idx: number, field: keyof PuntEntry, value: unknown) => {
-    setEditEntries((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
+    setEditEntries((prev) => prev.map((p, i) => {
+      if (i !== idx) return p;
+      const next = { ...p, [field]: value };
+      // When the type changes to one measured differently, reconcile the
+      // distance / yard-line fields so the averages reflect the new metric.
+      // A yard-line (pooch) type must not keep a gross-distance value that
+      // would still count toward Avg Distance — and vice versa.
+      if (field === "type") {
+        if (isYardLineType(value as string, puntTypes)) next.yards = 0;
+        else next.poochLandingYardLine = undefined;
+      }
+      return next;
+    }));
   };
+
+  // While editing, drive the summary + averages off the in-progress edits so a
+  // type change updates the numbers immediately, not only after saving.
+  const displayPunts = editing ? editEntries : punts;
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
@@ -597,7 +613,7 @@ function PuntHistoryContent() {
             {/* Per-athlete recap stats */}
             {(() => {
               const byAthlete: Record<string, PuntEntry[]> = {};
-              punts.forEach((p) => {
+              displayPunts.forEach((p) => {
                 if (!byAthlete[p.athlete]) byAthlete[p.athlete] = [];
                 byAthlete[p.athlete].push(p);
               });
@@ -608,11 +624,15 @@ function PuntHistoryContent() {
                   {athleteNames.map((name) => {
                     const ap = byAthlete[name];
                     const att = ap.length;
-                    const yardsEntries = ap.filter((p) => p.yards > 0);
+                    // Only distance-metric punts count toward gross/net — a punt
+                    // switched to a yard-line (pooch) type drops out of these.
+                    const yardsEntries = ap.filter((p) => !isYardLineType(p.type, puntTypes) && p.yards > 0);
                     const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
                     const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
-                    const netPenalty = ap.reduce((s, p) => s + ((p.touchback || p.landingZones?.includes("TB")) ? 20 : (p.returnYards ?? 0)), 0);
+                    const netPenalty = yardsEntries.reduce((s, p) => s + ((p.touchback || p.landingZones?.includes("TB")) ? 20 : (p.returnYards ?? 0)), 0);
                     const avgNet = yardsEntries.length > 0 ? ((grossTotal - netPenalty) / yardsEntries.length).toFixed(1) : "—";
+                    const ylEntries = ap.filter((p) => isYardLineType(p.type, puntTypes) && p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+                    const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylEntries.length).toFixed(1) : null;
                     const hangEntries = ap.filter((p) => p.hangTime > 0);
                     const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                     const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
@@ -629,6 +649,7 @@ function PuntHistoryContent() {
                           <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
                           <div><span className="text-muted">Gross</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
                           <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{avgNet}</span></div>
+                          {avgYL && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYL}</span></div>}
                           <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
                           <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
                           <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>
@@ -642,7 +663,6 @@ function PuntHistoryContent() {
               );
             })()}
             {(() => {
-              const displayPunts = editing ? editEntries : punts;
               return (
                 <div className="card-2 overflow-x-auto">
                   <table className="w-full text-sm">
