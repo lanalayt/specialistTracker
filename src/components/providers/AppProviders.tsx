@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { AuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
 import { setTeamId, getTeamId } from "@/lib/teamData";
@@ -28,6 +29,7 @@ function mapSupabaseUser(supaUser: { id: string; email?: string; user_metadata?:
 export function AppProviders({ children, bootstrap = null }: { children: React.ReactNode; bootstrap?: Bootstrap | null }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const pathname = usePathname();
   const [athleteAccess, setAthleteAccess] = useState<"view" | "edit">("view");
   const supabase = createClient();
 
@@ -237,6 +239,26 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
     },
     [user]
   );
+
+  // Never render a "Guest" state: if auth has finished loading and there's no
+  // signed-in user on an app page, the middleware cookie may linger while the
+  // client has no session. Clear any stale token and send them to login.
+  useEffect(() => {
+    if (isLoading || user) return;
+    const PUBLIC = ["/login", "/signup", "/reset-password"];
+    if (!pathname || PUBLIC.some((r) => pathname.startsWith(r))) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      if (cancelled) return;
+      // Re-check for a session so we don't act on a transient state while one is
+      // still being established (e.g. right after email confirmation).
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled || session?.user) return;
+      await supabase.auth.signOut();
+      window.location.href = "/login";
+    }, 500);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [isLoading, user, pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <AuthContext.Provider
