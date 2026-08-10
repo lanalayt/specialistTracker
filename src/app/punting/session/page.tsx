@@ -1744,7 +1744,7 @@ export default function PuntingSessionPage() {
                           />
                         </div>
                       )}
-                      {tracksHangTime(currentPlan?.type, puntTypes) && (
+                      {(tracksHangTime(currentPlan?.type, puntTypes) || parseFloat(hangTime) > 0) && (
                       <div>
                         <p className="label">Hang Time (s)</p>
                         <input
@@ -2503,7 +2503,7 @@ export default function PuntingSessionPage() {
                               </>
                             )}
                             <td className="py-1 px-1">
-                              {tracksHangTime(row.type, puntTypes) ? (
+                              {tracksHangTime(row.type, puntTypes) || parseFloat(row.hangTime) > 0 ? (
                               <input
                                 type="text" inputMode="numeric" placeholder="sec"
                                 value={row.hangTime}
@@ -2612,7 +2612,7 @@ export default function PuntingSessionPage() {
                             )}
                           </td>
                           <td className="py-1 px-1">
-                            {tracksHangTime(row.type, puntTypes) ? (
+                            {tracksHangTime(row.type, puntTypes) || parseFloat(row.hangTime) > 0 ? (
                             <input
                               type="text" inputMode="numeric" placeholder="sec"
                               value={row.hangTime}

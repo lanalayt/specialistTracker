@@ -692,7 +692,7 @@ function PuntHistoryContent() {
                                 )}
                               </td>
                               <td className="table-cell p-1">
-                                {tracksHangTime(p.type, puntTypes) ? (
+                                {tracksHangTime(p.type, puntTypes) || p.hangTime > 0 ? (
                                   <input type="text" inputMode="numeric" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
                                 ) : (
                                   <span className="text-xs text-muted">—</span>
@@ -714,7 +714,7 @@ function PuntHistoryContent() {
                                   ? (p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? `${p.poochLandingYardLine} YL` : "—")
                                   : p.yards > 0 ? `${p.yards} yd` : "—"}
                               </td>
-                              <td className="table-cell text-muted">{tracksHangTime(p.type, puntTypes) ? (p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—") : "—"}</td>
+                              <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
                               <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
                               <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
                             </>
