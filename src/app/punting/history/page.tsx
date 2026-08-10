@@ -11,19 +11,42 @@ import { getCachedSettings, loadSettingsFromCloud } from "@/lib/settingsSync";
 import type { PuntEntry, Session } from "@/types";
 import clsx from "clsx";
 
-interface PuntTypeConfig { id: string; label: string; category: string }
+interface PuntTypeConfig { id: string; label: string; category: string; metric?: "distance" | "yardline"; hangTime?: boolean }
 
 const DEFAULT_PUNT_TYPES: PuntTypeConfig[] = [
-  { id: "DIR_LEFT", label: "Left", category: "DIRECTIONAL" },
-  { id: "DIR_STRAIGHT", label: "Straight", category: "DIRECTIONAL" },
-  { id: "DIR_RIGHT", label: "Right", category: "DIRECTIONAL" },
-  { id: "POOCH_LEFT", label: "Pooch Left", category: "POOCH" },
-  { id: "POOCH_MIDDLE", label: "Pooch Middle", category: "POOCH" },
-  { id: "POOCH_RIGHT", label: "Pooch Right", category: "POOCH" },
-  { id: "BANANA_LEFT", label: "Banana Left", category: "BANANA" },
-  { id: "BANANA_RIGHT", label: "Banana Right", category: "BANANA" },
-  { id: "RUGBY", label: "Rugby", category: "RUGBY" },
+  { id: "DIR_LEFT", label: "Left", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_STRAIGHT", label: "Straight", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "DIR_RIGHT", label: "Right", category: "DIRECTIONAL", metric: "distance", hangTime: true },
+  { id: "POOCH_LEFT", label: "Pooch Left", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_MIDDLE", label: "Pooch Middle", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "POOCH_RIGHT", label: "Pooch Right", category: "POOCH", metric: "yardline", hangTime: false },
+  { id: "BANANA_LEFT", label: "Banana Left", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "BANANA_RIGHT", label: "Banana Right", category: "BANANA", metric: "distance", hangTime: true },
+  { id: "RUGBY", label: "Rugby", category: "RUGBY", metric: "distance", hangTime: true },
 ];
+
+// Pooch-style types land on a yard line (no distance) and don't track hang time.
+function isPoochType(type: string): boolean {
+  return type.toUpperCase().includes("POOCH");
+}
+
+// A punt type is measured by yard line (vs distance) — pooch and any custom
+// type the coach configured with the "yardline" metric.
+function isYardLineType(type: string | undefined | null, typeConfigs: PuntTypeConfig[]): boolean {
+  if (!type) return false;
+  const config = typeConfigs.find((t) => t.id === type);
+  if (config?.metric) return config.metric === "yardline";
+  return isPoochType(type);
+}
+
+// Whether a punt type tracks hang time. Rugby/custom types the coach turned
+// hang time off for (e.g. "Brown") should never show a hang value.
+function tracksHangTime(type: string | undefined | null, typeConfigs: PuntTypeConfig[]): boolean {
+  if (!type) return true;
+  const config = typeConfigs.find((t) => t.id === type);
+  if (config && typeof config.hangTime === "boolean") return config.hangTime;
+  return !isPoochType(type);
+}
 
 // Read the team's configured punt types (falling back to the defaults). Only
 // enabled categories are offered, mirroring the live session picker.
@@ -45,7 +68,13 @@ function loadPuntTypes(): PuntTypeConfig[] {
           else if (upper.includes("BANANA")) category = "BANANA";
           else if (upper.includes("RUGBY")) category = "RUGBY";
         }
-        return { id, label: (t.label as string) ?? id, category };
+        return {
+          id,
+          label: (t.label as string) ?? id,
+          category,
+          metric: (t.metric as "distance" | "yardline") ?? (upper.includes("POOCH") ? "yardline" : "distance"),
+          hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
+        };
       });
       return enabled ? types.filter((t) => enabled.has(t.category)) : types;
     }
@@ -656,13 +685,19 @@ function PuntHistoryContent() {
                           {editing ? (
                             <>
                               <td className="table-cell p-1">
-                                {p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? (
-                                  <input type="text" inputMode="numeric" value={p.poochLandingYardLine || ""} onChange={(e) => updateEntry(i, "poochLandingYardLine", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-make" />
+                                {isYardLineType(p.type, puntTypes) ? (
+                                  <input type="text" inputMode="numeric" placeholder="YL" value={p.poochLandingYardLine || ""} onChange={(e) => updateEntry(i, "poochLandingYardLine", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-make" />
                                 ) : (
                                   <input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
                                 )}
                               </td>
-                              <td className="table-cell p-1"><input type="text" inputMode="numeric" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
+                              <td className="table-cell p-1">
+                                {tracksHangTime(p.type, puntTypes) ? (
+                                  <input type="text" inputMode="numeric" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
+                                ) : (
+                                  <span className="text-xs text-muted">—</span>
+                                )}
+                              </td>
                               <td className="table-cell p-1"><input type="text" inputMode="numeric" value={timeValue(i, "opTime", p.opTime || 0)} onChange={(e) => updateTime(i, "opTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                               <td className="table-cell p-1">
                                 <select value={String(p.directionalAccuracy ?? "")} onChange={(e) => updateEntry(i, "directionalAccuracy", parseFloat(e.target.value))} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
@@ -674,12 +709,12 @@ function PuntHistoryContent() {
                             </>
                           ) : (
                             <>
-                              <td className={clsx("table-cell", p.poochLandingYardLine != null && p.poochLandingYardLine > 0 && "!text-make font-semibold")}>
-                                {p.poochLandingYardLine != null && p.poochLandingYardLine > 0
-                                  ? `${p.poochLandingYardLine} YL`
+                              <td className={clsx("table-cell", isYardLineType(p.type, puntTypes) && "!text-make font-semibold")}>
+                                {isYardLineType(p.type, puntTypes)
+                                  ? (p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? `${p.poochLandingYardLine} YL` : "—")
                                   : p.yards > 0 ? `${p.yards} yd` : "—"}
                               </td>
-                              <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
+                              <td className="table-cell text-muted">{tracksHangTime(p.type, puntTypes) ? (p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—") : "—"}</td>
                               <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
                               <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
                             </>
