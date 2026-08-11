@@ -251,7 +251,10 @@ export default function KickingSessionPage() {
   const [pendingKicks, setPendingKicks] = useState<FGKick[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedKicks, setCommittedKicks] = useState<FGKick[]>(draft.committedKicks ?? []);
-  const [sessionMode, setSessionMode] = useState<"practice" | "game" | null>(isAthleteMode ? "practice" : initialMode);
+  // Coaches always start on the Practice/Game chooser — never auto-enter a mode
+  // from a saved draft (picking a mode resumes its draft via switchMode).
+  // Athletes only ever run practice, so they skip straight to it.
+  const [sessionMode, setSessionMode] = useState<"practice" | "game" | null>(isAthleteMode ? "practice" : null);
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
   const [draftSaved, setDraftSaved] = useState(false);
@@ -380,7 +383,9 @@ export default function KickingSessionPage() {
       else if (practiceDraft?.rows?.some((r) => r.athlete || r.dist || r.result)) mode = "practice";
       if (isAthleteMode) mode = "practice";
       const d = mode === "game" ? gameDraft : mode === "practice" ? practiceDraft : null;
-      if (mode) setSessionMode(mode);
+      // Only athletes auto-enter (practice). Coaches must always see the chooser
+      // first; picking a mode resumes that mode's draft via switchMode.
+      if (isAthleteMode && mode) setSessionMode(mode);
       if (d && d.rows) {
         setRows(d.rows);
         setManualEntry(d.manualEntry);

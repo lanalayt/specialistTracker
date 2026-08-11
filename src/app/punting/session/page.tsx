@@ -345,7 +345,9 @@ export default function PuntingSessionPage() {
   const [pendingPunts, setPendingPunts] = useState<PuntEntry[] | null>(null);
   const [committed, setCommitted] = useState(draft.committed ?? false);
   const [committedPunts, setCommittedPunts] = useState<PuntEntry[]>(draft.committedPunts ?? []);
-  const [sessionMode, setSessionMode] = useState<"practice" | "game" | null>(initialMode);
+  // Always start on the Practice/Game chooser — never auto-enter a mode from a
+  // saved draft. Picking a mode resumes that mode's draft (see switchMode).
+  const [sessionMode, setSessionMode] = useState<"practice" | "game" | null>(null);
   const [draftSaved, setDraftSaved] = useState(false);
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
@@ -445,7 +447,8 @@ export default function PuntingSessionPage() {
       else if ((practiceDraft?.sessionPunts?.length ?? 0) > 0 || practiceDraft?.sessionActive || practiceDraft?.committed) mode = "practice";
       else if (practiceDraft?.rows?.some((r) => r.athlete || r.yards || r.hangTime)) mode = "practice";
       const d = mode === "game" ? gameDraft : mode === "practice" ? practiceDraft : null;
-      if (mode) setSessionMode(mode);
+      // Populate the draft cache/state, but do NOT auto-enter the mode — the
+      // chooser must always show first. switchMode reloads on the user's pick.
       if (d && d.rows) {
         setRows(d.rows);
         setManualEntry(d.manualEntry);
