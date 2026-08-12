@@ -38,6 +38,37 @@ function loadKoDirs(): { id: string; label: string }[] {
   return DEFAULT_KO_DIRS;
 }
 
+// Kickoff type config (id → label, metric, hang-time) — mirrors the session
+// picker so the practice-history summary can split totals by kick type.
+interface KOTypeCfg { id: string; label: string; metric: "distance" | "yardline" | "none"; hangTime: boolean }
+const DEFAULT_KO_TYPES: KOTypeCfg[] = [
+  { id: "BLUE", label: "Blue", metric: "distance", hangTime: true },
+  { id: "RED", label: "Red", metric: "distance", hangTime: true },
+  { id: "SQUIB", label: "Squib", metric: "distance", hangTime: false },
+  { id: "SKY", label: "Sky", metric: "distance", hangTime: true },
+  { id: "ONSIDE", label: "Onside", metric: "none", hangTime: false },
+];
+function loadKoTypes(): KOTypeCfg[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsed = getCachedSettings<any>("kickoffSettings");
+    if (parsed?.kickoffTypes?.length > 0) {
+      return parsed.kickoffTypes.map((t: Record<string, unknown>) => ({
+        id: t.id as string,
+        label: (t.label as string) ?? (t.id as string),
+        metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
+        hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
+      }));
+    }
+  } catch {}
+  return DEFAULT_KO_TYPES;
+}
+function koTracksHang(type: string | undefined | null, cfgs: KOTypeCfg[]): boolean {
+  if (!type) return true;
+  const c = cfgs.find((t) => t.id === type);
+  return c ? c.hangTime : true;
+}
+
 // Auto-decimal: raw digits become a time with the last two as hundredths
 // (e.g. "505" -> "5.05", "5" -> "0.05"). A typed dot is ignored.
 function formatAutoDecimal(digits: string): string {
@@ -108,7 +139,10 @@ function KickoffHistoryContent() {
   const [editEntries, setEditEntries] = useState<KickoffEntry[]>([]);
   // Direction score options from team settings (so editing mirrors the settings).
   const [koDirs, setKoDirs] = useState<{ id: string; label: string }[]>(() => loadKoDirs());
-  useEffect(() => { loadSettingsFromCloud("kickoffSettings").then(() => setKoDirs(loadKoDirs())); }, []);
+  const [koTypes, setKoTypes] = useState<KOTypeCfg[]>(() => loadKoTypes());
+  useEffect(() => { loadSettingsFromCloud("kickoffSettings").then(() => { setKoDirs(loadKoDirs()); setKoTypes(loadKoTypes()); }); }, []);
+  const koTypeLabels: Record<string, string> = {};
+  koTypes.forEach((t) => { koTypeLabels[t.id] = t.label; });
   // Raw text for decimal inputs while editing, so "5." / "5.0" survive typing.
   const [rawTimes, setRawTimes] = useState<Record<string, string>>({});
   const startEditing = () => { setEditEntries(entries.map((e) => ({ ...e }))); setRawTimes({}); setEditing(true); };
@@ -367,6 +401,26 @@ function KickoffHistoryContent() {
                 if (d === "OB") return 0;
                 return null;
               };
+              // Compute a stat set for a group of kicks. Hang only counts kicks
+              // whose type tracks it; direction only counts numeric scores.
+              const statSet = (kicks: KickoffEntry[]) => {
+                const att = kicks.length;
+                const distE = kicks.filter((e) => e.distance > 0);
+                const avgDist = distE.length > 0 ? (distE.reduce((s, e) => s + e.distance, 0) / distE.length).toFixed(1) : "—";
+                const hangE = kicks.filter((e) => e.hangTime > 0 && koTracksHang(e.type, koTypes));
+                const avgHang = hangE.length > 0 ? (hangE.reduce((s, e) => s + e.hangTime, 0) / hangE.length).toFixed(2) : "—";
+                const dirVals = kicks.map((e) => dirToNum(e.direction)).filter((v): v is number => v != null);
+                const avgDir = dirVals.length > 0 ? (dirVals.reduce((s, v) => s + v, 0) / dirVals.length).toFixed(2) : "—";
+                return { att, avgDist, avgHang, avgDir };
+              };
+              const StatGrid = ({ s, metric }: { s: ReturnType<typeof statSet>; metric: "distance" | "yardline" | "none" }) => (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                  <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{s.att}</span></div>
+                  {metric !== "none" && <div><span className="text-muted">{metric === "yardline" ? "YL" : "Dist"}</span> <span className="text-slate-200 font-medium ml-1">{s.avgDist}</span></div>}
+                  <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{s.avgHang}{s.avgHang !== "—" ? "s" : ""}</span></div>
+                  <div><span className="text-muted">Dir</span> <span className="text-accent font-medium ml-1">{s.avgDir}</span></div>
+                </div>
+              );
               const byAthlete: Record<string, KickoffEntry[]> = {};
               entries.forEach((e) => {
                 if (!byAthlete[e.athlete]) byAthlete[e.athlete] = [];
@@ -374,26 +428,39 @@ function KickoffHistoryContent() {
               });
               const athleteNames = Object.keys(byAthlete);
               if (athleteNames.length === 0) return null;
+              const isGame = selected.mode === "game";
               return (
                 <div className="mb-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
                   {athleteNames.map((name) => {
                     const ak = byAthlete[name];
-                    const att = ak.length;
-                    const distEntries = ak.filter((e) => e.distance > 0);
-                    const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, e) => s + e.distance, 0) / distEntries.length).toFixed(1) : "—";
-                    const hangEntries = ak.filter((e) => e.hangTime > 0);
-                    const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, e) => s + e.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
-                    const dirVals = ak.map((e) => dirToNum(e.direction)).filter((v): v is number => v != null);
-                    const avgDir = dirVals.length > 0 ? (dirVals.reduce((s, v) => s + v, 0) / dirVals.length).toFixed(2) : "—";
+                    // Games blend all kick types together; practice splits the
+                    // totals out by type so e.g. Sky and Directional show separately.
+                    const typeIds = isGame ? [] : [...new Set(ak.map((e) => e.type || ""))]
+                      .sort((a, b) => {
+                        const ia = koTypes.findIndex((t) => t.id === a);
+                        const ib = koTypes.findIndex((t) => t.id === b);
+                        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+                      });
                     return (
                       <div key={name} className="card-2 p-3">
                         <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                          <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
-                          <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
-                          <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
-                          <div><span className="text-muted">Dir</span> <span className="text-accent font-medium ml-1">{avgDir}</span></div>
-                        </div>
+                        {isGame ? (
+                          <StatGrid s={statSet(ak)} metric="distance" />
+                        ) : (
+                          <div className="space-y-2.5">
+                            {typeIds.map((tid) => {
+                              const tk = ak.filter((e) => (e.type || "") === tid);
+                              const metric = koTypes.find((t) => t.id === tid)?.metric ?? "distance";
+                              const label = koTypeLabels[tid] ?? (tid || "—");
+                              return (
+                                <div key={tid || "none"}>
+                                  <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wide mb-1 pb-0.5 border-b border-border/50">{label}</p>
+                                  <StatGrid s={statSet(tk)} metric={metric} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

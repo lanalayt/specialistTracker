@@ -612,6 +612,44 @@ function PuntHistoryContent() {
             )}
             {/* Per-athlete recap stats */}
             {(() => {
+              // Compute a stat set for a group of punts. Distance-metric punts
+              // feed gross/net; yard-line (pooch) punts feed Avg YL. Hang counts
+              // only punts whose type tracks it.
+              const statSet = (ap: PuntEntry[]) => {
+                const att = ap.length;
+                const yardsEntries = ap.filter((p) => !isYardLineType(p.type, puntTypes) && p.yards > 0);
+                const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
+                const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
+                const netPenalty = yardsEntries.reduce((s, p) => s + ((p.touchback || p.landingZones?.includes("TB")) ? 20 : (p.returnYards ?? 0)), 0);
+                const avgNet = yardsEntries.length > 0 ? ((grossTotal - netPenalty) / yardsEntries.length).toFixed(1) : "—";
+                const ylEntries = ap.filter((p) => isYardLineType(p.type, puntTypes) && p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
+                const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylEntries.length).toFixed(1) : null;
+                const hangEntries = ap.filter((p) => p.hangTime > 0 && tracksHangTime(p.type, puntTypes));
+                const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
+                const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
+                const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
+                const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);
+                const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / daEntries.length) * 100)}%` : "—";
+                const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
+                const dirScore = daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);
+                const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
+                return { att, avgDist, avgNet, avgYL, avgHang, avgOT, dirPct, criticals, dirScoreDisplay };
+              };
+              // mode: "blend" shows gross/net and Avg YL together (games);
+              // "distance"/"yardline" show only the relevant metric (per type).
+              const StatGrid = ({ s, mode }: { s: ReturnType<typeof statSet>; mode: "blend" | "distance" | "yardline" }) => (
+                <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+                  <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{s.att}</span></div>
+                  {mode !== "yardline" && <div><span className="text-muted">Gross</span> <span className="text-slate-200 font-medium ml-1">{s.avgDist}</span></div>}
+                  {mode !== "yardline" && <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{s.avgNet}</span></div>}
+                  {(mode === "yardline" || (mode === "blend" && s.avgYL)) && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{s.avgYL ?? "—"}</span></div>}
+                  <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{s.avgHang}{s.avgHang !== "—" ? "s" : ""}</span></div>
+                  <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{s.avgOT}{s.avgOT !== "—" ? "s" : ""}</span></div>
+                  <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{s.dirPct}</span></div>
+                  <div><span className="text-muted">Dir Score</span> <span className="text-slate-200 font-medium ml-1">{s.dirScoreDisplay}</span></div>
+                  <div><span className="text-muted">Crit</span> <span className={`font-medium ml-1 ${s.criticals > 0 ? "text-miss" : "text-slate-200"}`}>{s.criticals}</span></div>
+                </div>
+              );
               const byAthlete: Record<string, PuntEntry[]> = {};
               displayPunts.forEach((p) => {
                 if (!byAthlete[p.athlete]) byAthlete[p.athlete] = [];
@@ -619,43 +657,38 @@ function PuntHistoryContent() {
               });
               const athleteNames = Object.keys(byAthlete);
               if (athleteNames.length === 0) return null;
+              const isGame = selected.mode === "game";
               return (
                 <div className="mb-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
                   {athleteNames.map((name) => {
                     const ap = byAthlete[name];
-                    const att = ap.length;
-                    // Only distance-metric punts count toward gross/net — a punt
-                    // switched to a yard-line (pooch) type drops out of these.
-                    const yardsEntries = ap.filter((p) => !isYardLineType(p.type, puntTypes) && p.yards > 0);
-                    const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
-                    const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
-                    const netPenalty = yardsEntries.reduce((s, p) => s + ((p.touchback || p.landingZones?.includes("TB")) ? 20 : (p.returnYards ?? 0)), 0);
-                    const avgNet = yardsEntries.length > 0 ? ((grossTotal - netPenalty) / yardsEntries.length).toFixed(1) : "—";
-                    const ylEntries = ap.filter((p) => isYardLineType(p.type, puntTypes) && p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
-                    const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylEntries.length).toFixed(1) : null;
-                    const hangEntries = ap.filter((p) => p.hangTime > 0);
-                    const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
-                    const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
-                    const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
-                    const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);
-                    const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / daEntries.length) * 100)}%` : "—";
-                    const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
-                    const dirScore = daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);
-                    const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
+                    // Games blend all punt types together; practice splits the
+                    // totals out by type (Directional, Pooch, Rugby, …).
+                    const typeIds = isGame ? [] : [...new Set(ap.map((p) => p.type || ""))]
+                      .sort((a, b) => {
+                        const ia = puntTypes.findIndex((t) => t.id === a);
+                        const ib = puntTypes.findIndex((t) => t.id === b);
+                        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+                      });
                     return (
                       <div key={name} className="card-2 p-3">
                         <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
-                        <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
-                          <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
-                          <div><span className="text-muted">Gross</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>
-                          <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{avgNet}</span></div>
-                          {avgYL && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{avgYL}</span></div>}
-                          <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
-                          <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{avgOT}{avgOT !== "—" ? "s" : ""}</span></div>
-                          <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{dirPct}</span></div>
-                          <div><span className="text-muted">Dir Score</span> <span className="text-slate-200 font-medium ml-1">{dirScoreDisplay}</span></div>
-                          <div><span className="text-muted">Crit</span> <span className={`font-medium ml-1 ${criticals > 0 ? "text-miss" : "text-slate-200"}`}>{criticals}</span></div>
-                        </div>
+                        {isGame ? (
+                          <StatGrid s={statSet(ap)} mode="blend" />
+                        ) : (
+                          <div className="space-y-2.5">
+                            {typeIds.map((tid) => {
+                              const tp = ap.filter((p) => (p.type || "") === tid);
+                              const label = typeLabels[tid] ?? (tid || "—");
+                              return (
+                                <div key={tid || "none"}>
+                                  <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wide mb-1 pb-0.5 border-b border-border/50">{label}</p>
+                                  <StatGrid s={statSet(tp)} mode={isYardLineType(tid, puntTypes) ? "yardline" : "distance"} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
