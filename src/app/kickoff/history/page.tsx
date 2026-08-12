@@ -421,7 +421,7 @@ function KickoffHistoryContent() {
               const StatGrid = ({ s, metric }: { s: ReturnType<typeof statSet>; metric: "distance" | "yardline" | "none" }) => (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                   <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{s.att}</span></div>
-                  {metric !== "none" && <div><span className="text-muted">{metric === "yardline" ? "YL" : "Dist"}</span> <span className="text-slate-200 font-medium ml-1">{s.avgDist}</span></div>}
+                  {metric !== "none" && <div><span className="text-muted">{metric === "yardline" ? "YL" : "Dist"}</span> <span className={clsx("font-medium ml-1", metric === "yardline" ? "text-make" : "text-slate-200")}>{s.avgDist}</span></div>}
                   <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{s.avgHang}{s.avgHang !== "—" ? "s" : ""}</span></div>
                   <div><span className="text-muted">Dir</span> <span className="text-accent font-medium ml-1">{s.avgDir}</span></div>
                 </div>
