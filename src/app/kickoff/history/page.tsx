@@ -68,6 +68,11 @@ function koTracksHang(type: string | undefined | null, cfgs: KOTypeCfg[]): boole
   const c = cfgs.find((t) => t.id === type);
   return c ? c.hangTime : true;
 }
+function koIsYardLine(type: string | undefined | null, cfgs: KOTypeCfg[]): boolean {
+  if (!type) return false;
+  const c = cfgs.find((t) => t.id === type);
+  return c ? c.metric === "yardline" : false;
+}
 
 // Auto-decimal: raw digits become a time with the last two as hundredths
 // (e.g. "505" -> "5.05", "5" -> "0.05"). A typed dot is ignored.
@@ -501,7 +506,7 @@ function KickoffHistoryContent() {
                         </>
                       ) : (
                         <>
-                          <td className="table-cell">{e.distance > 0 ? `${e.distance} yd` : "—"}</td>
+                          <td className={clsx("table-cell", koIsYardLine(e.type, koTypes) && "text-make font-semibold")}>{e.distance > 0 ? `${e.distance} ${koIsYardLine(e.type, koTypes) ? "YL" : "yd"}` : "—"}</td>
                           <td className="table-cell text-muted">{e.hangTime > 0 ? `${e.hangTime.toFixed(2)}s` : "—"}</td>
                           <td className={clsx("table-cell font-bold",
                             e.direction === "1" ? "text-make" : (e.direction === "OB" || e.direction === "-1") ? "text-miss" : e.direction === "0.5" ? "text-amber-400" : "text-slate-200"
