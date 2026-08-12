@@ -628,7 +628,9 @@ function PuntHistoryContent() {
                 const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                 const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
                 const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
-                const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);
+                // Include negative scores (e.g. -1 "really bad") so they pull
+                // the average down instead of being dropped from it.
+                const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number");
                 const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / daEntries.length) * 100)}%` : "—";
                 const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
                 const dirScore = daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);

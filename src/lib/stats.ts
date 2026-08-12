@@ -220,7 +220,9 @@ export function processPunt(
   const hasOT = opTime > 0;
   const daRaw = punt.directionalAccuracy;
   const isNumericDA = typeof daRaw === "number";
-  const hasDA = isNumericDA && daRaw >= 0;
+  // Include negative scores (e.g. -1 "really bad" / OB) so they pull the
+  // direction average down instead of being dropped from it.
+  const hasDA = isNumericDA;
 
   // Migration: old entries may have single landingZone instead of landingZones array
   const landingZones: PuntLandingZone[] = Array.isArray(punt.landingZones)

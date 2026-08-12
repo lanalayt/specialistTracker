@@ -12,30 +12,42 @@ import type { KickoffEntry, Session } from "@/types";
 import clsx from "clsx";
 
 // Direction score options, mirroring the kickoff settings (numeric or field).
-const DEFAULT_KO_DIRS = [
-  { id: "1", label: "1.0" },
-  { id: "0.5", label: "0.5" },
-  { id: "0", label: "0" },
-  { id: "-1", label: "OB" },
+interface KoDir { id: string; label: string; score?: number }
+const DEFAULT_KO_DIRS: KoDir[] = [
+  { id: "1", label: "1.0", score: 1 },
+  { id: "0.5", label: "0.5", score: 0.5 },
+  { id: "0", label: "0", score: 0 },
+  { id: "-1", label: "OB", score: -1 },
 ];
-const FIELD_KO_DIRS = [
-  { id: "SL-NUM", label: "Sideline-Numbers" },
-  { id: "NUM-HASH", label: "Numbers-Hash" },
-  { id: "TO_FIELD", label: "To The Field" },
-  { id: "OB", label: "OB" },
+const FIELD_KO_DIRS: KoDir[] = [
+  { id: "SL-NUM", label: "Sideline-Numbers", score: 1 },
+  { id: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
+  { id: "TO_FIELD", label: "To The Field", score: 0 },
+  { id: "OB", label: "OB", score: -1 },
 ];
-function loadKoDirs(): { id: string; label: string }[] {
+function loadKoDirs(): KoDir[] {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parsed = getCachedSettings<any>("kickoffSettings");
     if (parsed) {
       const defaults = parsed.directionMode === "field" ? FIELD_KO_DIRS : DEFAULT_KO_DIRS;
       return parsed.directionMetrics?.length > 0
-        ? parsed.directionMetrics.map((d: { id: string; label: string }) => ({ id: d.id, label: d.label }))
+        ? parsed.directionMetrics.map((d: { id: string; label: string; score?: number }) => ({ id: d.id, label: d.label, score: d.score }))
         : defaults;
     }
   } catch {}
   return DEFAULT_KO_DIRS;
+}
+// Numeric score for a stored direction value: prefer the configured score,
+// else the id itself as a number (numeric mode uses "1"/"0.5"/"0"/"-1"),
+// else the legacy "OB" label. Returns null when it can't be scored.
+function koDirScore(d: string | undefined | null, dirs: KoDir[]): number | null {
+  if (d == null || d === "") return null;
+  const cfg = dirs.find((x) => x.id === d);
+  if (cfg && typeof cfg.score === "number") return cfg.score;
+  if (d === "OB") return -1;
+  const n = parseFloat(d);
+  return isNaN(n) ? null : n;
 }
 
 // Kickoff type config (id → label, metric, hang-time) — mirrors the session
@@ -143,7 +155,7 @@ function KickoffHistoryContent() {
   const [editing, setEditing] = useState(false);
   const [editEntries, setEditEntries] = useState<KickoffEntry[]>([]);
   // Direction score options from team settings (so editing mirrors the settings).
-  const [koDirs, setKoDirs] = useState<{ id: string; label: string }[]>(() => loadKoDirs());
+  const [koDirs, setKoDirs] = useState<KoDir[]>(() => loadKoDirs());
   const [koTypes, setKoTypes] = useState<KOTypeCfg[]>(() => loadKoTypes());
   useEffect(() => { loadSettingsFromCloud("kickoffSettings").then(() => { setKoDirs(loadKoDirs()); setKoTypes(loadKoTypes()); }); }, []);
   const koTypeLabels: Record<string, string> = {};
@@ -400,22 +412,17 @@ function KickoffHistoryContent() {
             )}
             {/* Per-athlete recap stats */}
             {(() => {
-              const dirToNum = (d: string): number | null => {
-                if (d === "1") return 1;
-                if (d === "0.5") return 0.5;
-                if (d === "OB") return 0;
-                return null;
-              };
               // Compute a stat set for a group of kicks. Hang only counts kicks
-              // whose type tracks it; direction only counts numeric scores.
+              // whose type tracks it; direction is the average score shown as a
+              // percentage (so a -1 "really bad" pulls it down, not just excluded).
               const statSet = (kicks: KickoffEntry[]) => {
                 const att = kicks.length;
                 const distE = kicks.filter((e) => e.distance > 0);
                 const avgDist = distE.length > 0 ? (distE.reduce((s, e) => s + e.distance, 0) / distE.length).toFixed(1) : "—";
                 const hangE = kicks.filter((e) => e.hangTime > 0 && koTracksHang(e.type, koTypes));
                 const avgHang = hangE.length > 0 ? (hangE.reduce((s, e) => s + e.hangTime, 0) / hangE.length).toFixed(2) : "—";
-                const dirVals = kicks.map((e) => dirToNum(e.direction)).filter((v): v is number => v != null);
-                const avgDir = dirVals.length > 0 ? (dirVals.reduce((s, v) => s + v, 0) / dirVals.length).toFixed(2) : "—";
+                const dirVals = kicks.map((e) => koDirScore(e.direction, koDirs)).filter((v): v is number => v != null);
+                const avgDir = dirVals.length > 0 ? `${Math.round((dirVals.reduce((s, v) => s + v, 0) / dirVals.length) * 100)}%` : "—";
                 return { att, avgDist, avgHang, avgDir };
               };
               const StatGrid = ({ s, metric }: { s: ReturnType<typeof statSet>; metric: "distance" | "yardline" | "none" }) => (
