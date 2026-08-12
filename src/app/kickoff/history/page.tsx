@@ -473,6 +473,8 @@ function KickoffHistoryContent() {
                   <tr>
                     <th className="table-header text-left">#</th>
                     <th className="table-header text-left">Athlete</th>
+                    <th className="table-header text-left">Type</th>
+                    <th className="table-header">Loc</th>
                     <th className="table-header">Dist</th>
                     <th className="table-header">Hang</th>
                     <th className="table-header">Dir</th>
@@ -484,6 +486,8 @@ function KickoffHistoryContent() {
                     <tr key={i} className="hover:bg-surface/30">
                       <td className="table-cell text-left text-muted">{e.kickNum ?? i + 1}</td>
                       <td className="table-name">{e.athlete}</td>
+                      <td className="table-cell text-left text-muted">{koTypeLabels[e.type ?? ""] ?? (e.type || "—")}</td>
+                      <td className="table-cell text-muted">{e.hash || "—"}</td>
                       {editing ? (
                         <>
                           <td className="table-cell p-1"><input type="text" inputMode="numeric" value={e.distance || ""} onChange={(ev) => updateEntry(i, "distance", parseInt(ev.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
