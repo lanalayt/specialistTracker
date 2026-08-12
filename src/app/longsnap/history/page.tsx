@@ -472,7 +472,7 @@ export default function LongSnapHistoryPage() {
                                           </select>
                                         ) : (s.accuracy === "ON_TARGET" ? "Strike" : "Ball")}
                                       </td>
-                                      <td className={clsx("text-center py-1 px-1", s.laces === "Good" ? "text-make" : s.laces === "1/4 Turn" ? "text-warn" : "text-miss")}>
+                                      <td className={clsx("text-center py-1 px-1", s.laces === "Good" ? "text-make" : s.laces ? "text-miss" : "text-muted")}>
                                         {editing ? (
                                           <select value={s.laces || "Good"} onChange={(e) => { const laces = e.target.value; const updated = { ...s, laces }; updateSnap(snapIdx, { laces, score: calc30PtScore(updated) }); }} className={SEL}>
                                             {LACES_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -712,7 +712,7 @@ export default function LongSnapHistoryPage() {
                                           </span>
                                         )}
                                       </td>
-                                      <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces === "Back" ? "text-miss" : s.laces ? "text-amber-400" : "text-muted")}>
+                                      <td className={clsx("table-cell", s.laces === "Good" ? "text-make" : s.laces ? "text-miss" : "text-muted")}>
                                         {editing ? (
                                           <select value={s.laces || "Good"} onClick={(e) => e.stopPropagation()} onChange={(e) => { const laces = e.target.value; const updated = { ...s, laces }; updateSnap(i, { laces, score: calc30PtScore(updated) }); }} className={SEL}>
                                             {LACES_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

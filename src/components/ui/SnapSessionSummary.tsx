@@ -83,7 +83,7 @@ export function SnapSessionSummary({ snaps }: { snaps: LongSnapEntry[] }) {
                         {s.accuracy === "ON_TARGET" ? "Strike" : "Ball"}
                       </td>
                       {!isShort && <td className="table-cell text-muted">{s.time > 0 ? `${s.time.toFixed(2)}s` : "—"}</td>}
-                      {hasLaces && <td className="table-cell text-muted">{s.laces || "—"}</td>}
+                      {hasLaces && <td className={clsx("table-cell font-bold", s.laces === "Good" ? "text-make" : s.laces ? "text-miss" : "text-muted")}>{s.laces || "—"}</td>}
                       {hasSpiral && (
                         <td className={clsx("table-cell", s.spiral === "Good" ? "text-make" : s.spiral === "Bad" ? "text-miss" : "text-muted")}>
                           {s.spiral === "Good" ? "Tight" : s.spiral === "Bad" ? "Open" : "—"}
