@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { saveSettingsToCloud, loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Toggle } from "@/components/ui/Toggle";
@@ -43,8 +43,14 @@ function SnapSettingsContent() {
   const [dirty, setDirty] = useState(false);
   const [savedSettings, setSavedSettings] = useState<SnapSettings>(() => loadSettings());
 
+  // Once the user edits or saves, a late-arriving cloud read must not clobber
+  // their in-progress state (which would revert a deletion on the next save).
+  const interactedRef = useRef(false);
+  useEffect(() => { if (dirty) interactedRef.current = true; }, [dirty]);
+
   useEffect(() => {
     loadSettingsFromCloud<SnapSettings>(STORAGE_KEY).then((cloud) => {
+      if (interactedRef.current) return;
       if (cloud) {
         const cm = (cloud.chartMode === "detailed" ? "detailed" : "simple") as "simple" | "detailed";
         const mm = (cloud.missMode === "detailed" ? "detailed" : "simple") as "simple" | "detailed";
@@ -69,6 +75,7 @@ function SnapSettingsContent() {
   }, [chartMode, missMode, openSpiralIsBall, holderEnabled, savedSettings]);
 
   const handleSave = () => {
+    interactedRef.current = true;
     const settings: SnapSettings = { chartMode, missMode, openSpiralIsBall, holderEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);

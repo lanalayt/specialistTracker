@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -82,6 +82,11 @@ function FGSettingsContent() {
   // Track what was last saved so we can detect changes
   const [savedSettings, setSavedSettings] = useState<FGSettings>(DEFAULT_SETTINGS);
 
+  // Once the user edits or saves, a late-arriving cloud read must not clobber
+  // their in-progress state (which would revert a deletion on the next save).
+  const interactedRef = useRef(false);
+  useEffect(() => { if (dirty) interactedRef.current = true; }, [dirty]);
+
   useEffect(() => {
     // Apply the cached value immediately, then confirm from the DB
     const local = loadSettingsLocal();
@@ -97,6 +102,7 @@ function FGSettingsContent() {
 
     // Try loading from Supabase (overrides if found)
     loadSettingsFromCloud<FGSettings>(STORAGE_KEY).then((cloud) => {
+      if (interactedRef.current) return;
       if (cloud) {
         setSnapDistance(cloud.snapDistance ?? "7");
         setMakeMode(cloud.makeMode ?? "detailed");
@@ -146,6 +152,7 @@ function FGSettingsContent() {
   };
 
   const handleSave = () => {
+    interactedRef.current = true;
     const settings: FGSettings = { snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, holderEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setSavedSettings(settings);

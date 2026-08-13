@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -131,6 +131,11 @@ function KickoffSettingsContent() {
     directionMetrics: NUMERIC_DIRECTIONS,
   });
 
+  // Once the user edits or saves, a late-arriving cloud read must not clobber
+  // their in-progress state (which would revert a deletion on the next save).
+  const interactedRef = useRef(false);
+  useEffect(() => { if (dirty) interactedRef.current = true; }, [dirty]);
+
   useEffect(() => {
     const s = loadSettings();
     setTypes(s.kickoffTypes);
@@ -143,6 +148,7 @@ function KickoffSettingsContent() {
     setLoaded(true);
 
     loadSettingsFromCloud<KickoffSettings>(STORAGE_KEY).then((cloud) => {
+      if (interactedRef.current) return;
       if (cloud) {
         if (cloud.kickoffTypes?.length > 0) {
           const migrated = (cloud.kickoffTypes as unknown as Record<string, unknown>[]).map(migrateType);
@@ -209,6 +215,7 @@ function KickoffSettingsContent() {
   };
 
   const executeSave = (typesToSave: KOTypeConfig[]) => {
+    interactedRef.current = true;
     const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionEnabled: dirEnabled, directionMode: dirMode, directionMetrics: directions, returnYardsEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setTypes(typesToSave);
