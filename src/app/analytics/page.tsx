@@ -162,6 +162,12 @@ function PuntingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
       "Avg Dist": punts.length > 0 ? Math.round((totalYds / punts.length) * 10) / 10 : 0,
     };
   });
+  // Y-axis hugs the data: 10 yd below the lowest session to 10 yd above the
+  // highest (lower bound never negative). Recomputes as the filter changes.
+  const distVals = distTrend.map((d) => d["Avg Dist"] as number).filter((v) => v > 0);
+  const distDomain: [number, number] | undefined = distVals.length > 0
+    ? [Math.max(0, Math.floor(Math.min(...distVals)) - 10), Math.ceil(Math.max(...distVals)) + 10]
+    : undefined;
 
   // Avg hang time per session trend (only count punts with hangTime > 0)
   const htTrend = filteredHistory.map((s) => {
@@ -223,6 +229,7 @@ function PuntingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
           dataKey="Avg Dist"
           title="Avg Distance Over Sessions"
           unit=" yd"
+          domain={distDomain}
         />
         <LineTrendChart
           data={htTrend}
