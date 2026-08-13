@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -147,6 +147,14 @@ function PuntSettingsContent() {
     opTimeEnabled: true,
   });
 
+  // Once the user has edited or saved, a late-arriving cloud read must NOT
+  // overwrite their in-progress state — otherwise a deletion (e.g. removing the
+  // "OB" direction) gets reverted by the async load that started at mount and
+  // then written back on the next save. This ref latches the moment they touch
+  // the form (or save) so the cloud apply below can bail.
+  const interactedRef = useRef(false);
+  useEffect(() => { if (dirty) interactedRef.current = true; }, [dirty]);
+
   // Ensure field-based options have scores (migration for old data)
   const ensureScores = (opts: { id: string; label: string; score?: number }[], mode: DirectionMode) => {
     if (mode !== "field") return opts;
@@ -166,6 +174,10 @@ function PuntSettingsContent() {
     setLoaded(true);
 
     loadSettingsFromCloud<PuntSettings>(STORAGE_KEY).then((cloud) => {
+      // Bail if the user has already started editing/saved — applying the cloud
+      // value now would clobber their changes (this is what made deleting OB
+      // "come back": the mount-time read resolved after the delete and restored it).
+      if (interactedRef.current) return;
       if (cloud) {
         if (cloud.puntCategories?.length > 0) setCategories(cloud.puntCategories);
         if (cloud.puntTypes?.length > 0) setTypes((cloud.puntTypes as unknown as Record<string, unknown>[]).map(migrateType));
@@ -225,6 +237,7 @@ function PuntSettingsContent() {
   };
 
   const executeSave = (typesToSave: PuntTypeConfig[]) => {
+    interactedRef.current = true;
     const settings: PuntSettings = { puntCategories: categories, puntTypes: typesToSave, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, opTimeEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setTypes(typesToSave);
