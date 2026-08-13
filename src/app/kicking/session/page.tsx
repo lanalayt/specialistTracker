@@ -1419,6 +1419,18 @@ export default function KickingSessionPage() {
                         );
                       });
                     })()}
+                    {!viewOnly && (
+                      <button
+                        onClick={handleAddKick}
+                        title="Add a kick"
+                        className="flex flex-col items-center gap-0.5 cursor-pointer transition-all"
+                      >
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold border border-dashed border-accent/60 text-accent hover:bg-accent/10 transition-colors">
+                          +
+                        </div>
+                        <span className="text-[8px] font-semibold leading-none text-accent">Add</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

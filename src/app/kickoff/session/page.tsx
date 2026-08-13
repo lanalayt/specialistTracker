@@ -521,6 +521,30 @@ export default function KickoffSessionPage() {
     });
   }, []);
 
+  // Add a kick on the fly during a live session. Appends a new planned kick
+  // (copying the last kick's athlete/type/hash as defaults) and its planning
+  // row, then navigates to it with a clean entry card.
+  const handleAddKick = () => {
+    const last = plannedKicks[plannedKicks.length - 1];
+    const newKick = {
+      athlete: last?.athlete ?? athletes[0]?.name ?? "",
+      type: (last?.type ?? "") as KickoffType,
+      hash: (last?.hash ?? "") as KickoffHash,
+    };
+    const newIdx = plannedKicks.length;
+    const newRowIdx = rows.length;
+    const newRow: LogRow = { ...emptyRow(), athlete: newKick.athlete, type: String(newKick.type), hash: String(newKick.hash) };
+    setRows((prev) => [...prev, newRow]);
+    setPlannedKicks((prev) => [...prev, newKick]);
+    setPlannedRowIndices((prev) => [...prev, newRowIdx]);
+    setCurrentKickIdx(newIdx);
+    setEditingKickIdx(null);
+    setDistance("");
+    setHangTime("");
+    setDirection("1");
+    setSwReset((k) => k + 1); // fresh stopwatch for the new kick
+  };
+
   const addRow = useCallback(() => {
     setRows((prev) => [...prev, emptyRow()]);
   }, []);
@@ -1142,6 +1166,18 @@ export default function KickoffSessionPage() {
                         );
                       });
                     })()}
+                    {!viewOnly && (
+                      <button
+                        onClick={handleAddKick}
+                        title="Add a kick"
+                        className="flex flex-col items-center gap-0.5 cursor-pointer transition-all"
+                      >
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold border border-dashed border-accent/60 text-accent hover:bg-accent/10 transition-colors">
+                          +
+                        </div>
+                        <span className="text-[8px] font-semibold leading-none text-accent">Add</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

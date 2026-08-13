@@ -76,7 +76,7 @@ export function IntervalStopwatch({
         type="button"
         onClick={press}
         className={clsx(
-          "w-full min-h-16 py-2.5 rounded-input border-2 flex flex-col items-center justify-center transition-colors duration-100 active:scale-[0.98]",
+          "w-full min-h-24 py-4 rounded-input border-2 flex flex-col items-center justify-center transition-colors duration-100 active:scale-[0.98]",
           flash === "done"
             ? "bg-make text-slate-900 border-make"
             : flash === "step"
