@@ -52,14 +52,21 @@ function koDirScore(d: string | undefined | null, dirs: KoDir[]): number | null 
 
 // Kickoff type config (id → label, metric, hang-time) — mirrors the session
 // picker so the practice-history summary can split totals by kick type.
-interface KOTypeCfg { id: string; label: string; metric: "distance" | "yardline" | "none"; hangTime: boolean }
+interface KOTypeCfg { id: string; label: string; category?: string; metric: "distance" | "yardline" | "none"; hangTime: boolean }
 const DEFAULT_KO_TYPES: KOTypeCfg[] = [
-  { id: "BLUE", label: "Blue", metric: "distance", hangTime: true },
-  { id: "RED", label: "Red", metric: "distance", hangTime: true },
-  { id: "SQUIB", label: "Squib", metric: "distance", hangTime: false },
-  { id: "SKY", label: "Sky", metric: "distance", hangTime: true },
-  { id: "ONSIDE", label: "Onside", metric: "none", hangTime: false },
+  { id: "BLUE", label: "Blue", category: "DEEP", metric: "distance", hangTime: true },
+  { id: "RED", label: "Red", category: "DEEP", metric: "distance", hangTime: true },
+  { id: "SQUIB", label: "Squib", category: "SQUIB", metric: "distance", hangTime: false },
+  { id: "SKY", label: "Sky", category: "SKY", metric: "distance", hangTime: true },
+  { id: "ONSIDE", label: "Onside", category: "ONSIDE", metric: "none", hangTime: false },
 ];
+function koInferCategory(id: string): string {
+  const up = (id || "").toUpperCase();
+  if (up.includes("SKY")) return "SKY";
+  if (up.includes("SQUIB")) return "SQUIB";
+  if (up.includes("ONSIDE")) return "ONSIDE";
+  return "DEEP";
+}
 function loadKoTypes(): KOTypeCfg[] {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,6 +75,7 @@ function loadKoTypes(): KOTypeCfg[] {
       return parsed.kickoffTypes.map((t: Record<string, unknown>) => ({
         id: t.id as string,
         label: (t.label as string) ?? (t.id as string),
+        category: (t.category as string) ?? koInferCategory(t.id as string),
         metric: (t.metric as "distance" | "yardline" | "none") ?? "distance",
         hangTime: typeof t.hangTime === "boolean" ? t.hangTime : true,
       }));
@@ -75,6 +83,14 @@ function loadKoTypes(): KOTypeCfg[] {
   } catch {}
   return DEFAULT_KO_TYPES;
 }
+// Practice recaps group by main category (Directional/Sky/…), not sub-type.
+const KO_CAT_LABELS: Record<string, string> = { DEEP: "Directional", SKY: "Sky", SQUIB: "Squib", ONSIDE: "Onside" };
+const KO_CAT_ORDER = ["DEEP", "SKY", "SQUIB", "ONSIDE"];
+function koCategoryOf(type: string | undefined | null, cfgs: KOTypeCfg[]): string {
+  const cfg = cfgs.find((t) => t.id === type);
+  return cfg?.category ?? koInferCategory(type || "");
+}
+const koCatLabel = (c: string) => KO_CAT_LABELS[c] ?? (c ? c.charAt(0) + c.slice(1).toLowerCase() : "—");
 function koTracksHang(type: string | undefined | null, cfgs: KOTypeCfg[]): boolean {
   if (!type) return true;
   const c = cfgs.find((t) => t.id === type);
@@ -446,11 +462,11 @@ function KickoffHistoryContent() {
                   {athleteNames.map((name) => {
                     const ak = byAthlete[name];
                     // Games blend all kick types together; practice splits the
-                    // totals out by type so e.g. Sky and Directional show separately.
-                    const typeIds = isGame ? [] : [...new Set(ak.map((e) => e.type || ""))]
+                    // totals out by main category (Directional / Sky / …).
+                    const cats = isGame ? [] : [...new Set(ak.map((e) => koCategoryOf(e.type, koTypes)))]
                       .sort((a, b) => {
-                        const ia = koTypes.findIndex((t) => t.id === a);
-                        const ib = koTypes.findIndex((t) => t.id === b);
+                        const ia = KO_CAT_ORDER.indexOf(a);
+                        const ib = KO_CAT_ORDER.indexOf(b);
                         return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
                       });
                     return (
@@ -460,14 +476,13 @@ function KickoffHistoryContent() {
                           <StatGrid s={statSet(ak)} metric="distance" />
                         ) : (
                           <div className="space-y-2.5">
-                            {typeIds.map((tid) => {
-                              const tk = ak.filter((e) => (e.type || "") === tid);
-                              const metric = koTypes.find((t) => t.id === tid)?.metric ?? "distance";
-                              const label = koTypeLabels[tid] ?? (tid || "—");
+                            {cats.map((cat) => {
+                              const ck = ak.filter((e) => koCategoryOf(e.type, koTypes) === cat);
+                              const metric = ck.some((e) => koTypes.find((t) => t.id === e.type)?.metric === "yardline") ? "yardline" : "distance";
                               return (
-                                <div key={tid || "none"}>
-                                  <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wide mb-1 pb-0.5 border-b border-border/50">{label}</p>
-                                  <StatGrid s={statSet(tk)} metric={metric} />
+                                <div key={cat || "none"}>
+                                  <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wide mb-1 pb-0.5 border-b border-border/50">{koCatLabel(cat)}</p>
+                                  <StatGrid s={statSet(ck)} metric={metric} />
                                 </div>
                               );
                             })}

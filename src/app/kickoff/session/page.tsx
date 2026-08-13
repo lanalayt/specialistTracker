@@ -148,6 +148,21 @@ function koTracksHangTime(type: string | undefined | null, typeConfigs: KOTypeCo
   return config ? config.hangTime : true;
 }
 
+// Category grouping for practice recaps — Directional (deep) vs Sky vs … so
+// their stats (esp. hang) aren't blended together.
+const KO_CAT_LABELS: Record<string, string> = { DEEP: "Directional", SKY: "Sky", SQUIB: "Squib", ONSIDE: "Onside" };
+const KO_CAT_ORDER = ["DEEP", "SKY", "SQUIB", "ONSIDE"];
+function koCategoryOf(type: string | undefined | null, typeConfigs: KOTypeConfig[]): string {
+  const cfg = typeConfigs.find((t) => t.id === type);
+  if (cfg?.category) return cfg.category;
+  const up = (type || "").toUpperCase();
+  if (up.includes("SKY")) return "SKY";
+  if (up.includes("SQUIB")) return "SQUIB";
+  if (up.includes("ONSIDE")) return "ONSIDE";
+  return "DEEP";
+}
+const koCatLabel = (c: string) => KO_CAT_LABELS[c] ?? (c ? c.charAt(0) + c.slice(1).toLowerCase() : "—");
+
 // Parse a yard-line input ("-20", "+25", "50") into 0..100 field position
 function parseYardLine(input: string | undefined | null): number {
   if (input == null) return NaN;
@@ -468,6 +483,51 @@ export default function KickoffSessionPage() {
   const tbRate = totals.att > 0 ? `${Math.round((totals.touchbacks / totals.att) * 100)}%` : "—";
   const avgDist = totals.att > 0 ? (totals.totalDist / totals.att).toFixed(1) : "—";
   const avgHang = totals.att > 0 ? (totals.totalHang / totals.att).toFixed(2) : "—";
+
+  // Per-athlete recap body. In practice, splits the stats out by category
+  // (Directional/Sky/…) so hang time isn't blended across kick types; in a
+  // game everything stays combined.
+  const renderKoAthleteStats = (ak: KickoffEntry[]) => {
+    const statSet = (kicks: KickoffEntry[]) => {
+      const att = kicks.length;
+      const distE = kicks.filter((k) => k.distance > 0 && (koTypes.find((t) => t.id === k.type)?.metric ?? "distance") === "distance");
+      const ylE = kicks.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "yardline");
+      const hangE = kicks.filter((k) => k.hangTime > 0 && koTracksHangTime(k.type, koTypes));
+      const tb = kicks.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
+      return {
+        att,
+        avgDist: distE.length > 0 ? (distE.reduce((s, k) => s + k.distance, 0) / distE.length).toFixed(1) : null,
+        avgYL: ylE.length > 0 ? (ylE.reduce((s, k) => s + k.distance, 0) / ylE.length).toFixed(1) : null,
+        avgHang: hangE.length > 0 ? (hangE.reduce((s, k) => s + k.hangTime, 0) / hangE.length).toFixed(2) : "—",
+        tb,
+      };
+    };
+    const grid = (s: ReturnType<typeof statSet>) => (
+      <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
+        <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{s.att}</span></div>
+        {s.avgDist && <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{s.avgDist}</span></div>}
+        {s.avgYL && <div><span className="text-muted">YL</span> <span className="text-accent font-medium ml-1">{s.avgYL}</span></div>}
+        <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{s.avgHang}{s.avgHang !== "—" ? "s" : ""}</span></div>
+        <div><span className="text-muted">TB</span> <span className="text-make font-medium ml-1">{s.tb}</span></div>
+      </div>
+    );
+    if (sessionMode === "game") return grid(statSet(ak));
+    const cats = [...new Set(ak.map((k) => koCategoryOf(k.type, koTypes)))].sort((a, b) => {
+      const ia = KO_CAT_ORDER.indexOf(a);
+      const ib = KO_CAT_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    return (
+      <div className="space-y-2.5">
+        {cats.map((cat) => (
+          <div key={cat || "none"}>
+            <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wide mb-1 pb-0.5 border-b border-border/50">{koCatLabel(cat)}</p>
+            {grid(statSet(ak.filter((k) => koCategoryOf(k.type, koTypes) === cat)))}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const zoneData = KICKOFF_ZONES.map((z) => ({
     zone: z === "TB" ? "TB" : `Zone ${z}`,
@@ -1022,28 +1082,12 @@ export default function KickoffSessionPage() {
                         if (athleteNames.length === 0) return null;
                         return (
                           <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
-                            {athleteNames.map((name) => {
-                              const ak = byAthlete[name];
-                              const att = ak.length;
-                              const distEntries = ak.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "distance");
-                              const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : null;
-                              const ylEntries = ak.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "yardline");
-                              const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, k) => s + k.distance, 0) / ylEntries.length).toFixed(1) : null;
-                              const hangEntries = ak.filter((k) => k.hangTime > 0 && koTracksHangTime(k.type, koTypes));
-                              const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, k) => s + k.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
-                              const tbCount = ak.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
-                              return (
-                                <div key={name} className="card-2 p-3">
-                                  <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
-                                  <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
-                                    <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
-                                    {avgDist && <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist}</span></div>}
-                                    <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
-                                    <div><span className="text-muted">TB</span> <span className="text-make font-medium ml-1">{tbCount}</span></div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                            {athleteNames.map((name) => (
+                              <div key={name} className="card-2 p-3">
+                                <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                                {renderKoAthleteStats(byAthlete[name])}
+                              </div>
+                            ))}
                           </div>
                         );
                       })()}
@@ -1512,25 +1556,12 @@ export default function KickoffSessionPage() {
           {(() => {
             const byAthlete: Record<string, KickoffEntry[]> = {};
             committedKicks.forEach((k) => { if (!byAthlete[k.athlete]) byAthlete[k.athlete] = []; byAthlete[k.athlete].push(k); });
-            return Object.entries(byAthlete).map(([name, ak]) => {
-              const att = ak.length;
-              const distEntries2 = ak.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "distance");
-              const avgDist2 = distEntries2.length > 0 ? (distEntries2.reduce((s, k) => s + k.distance, 0) / distEntries2.length).toFixed(1) : null;
-              const ylEntries2 = ak.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "yardline");
-              const avgYL2 = ylEntries2.length > 0 ? (ylEntries2.reduce((s, k) => s + k.distance, 0) / ylEntries2.length).toFixed(1) : null;
-              const hangEntries = ak.filter((k) => k.hangTime > 0 && koTracksHangTime(k.type, koTypes));
-              const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, k) => s + k.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
-              return (
-                <div key={name} className="card-2 p-3">
-                  <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
-                  <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
-                    <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{att}</span></div>
-                    {avgDist2 && <div><span className="text-muted">Dist</span> <span className="text-slate-200 font-medium ml-1">{avgDist2}</span></div>}
-                    <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{avgHang}{avgHang !== "—" ? "s" : ""}</span></div>
-                  </div>
-                </div>
-              );
-            });
+            return Object.entries(byAthlete).map(([name, ak]) => (
+              <div key={name} className="card-2 p-3">
+                <p className="text-sm font-semibold text-slate-100 mb-2">{name}</p>
+                {renderKoAthleteStats(ak)}
+              </div>
+            ));
           })()}
           {/* Full kick table */}
           <div className="card-2 overflow-x-auto">
