@@ -1481,18 +1481,22 @@ export default function KickoffSessionPage() {
           {/* Right: Live stats */}
           <div className="lg:w-[40%] overflow-y-auto p-4 space-y-3">
             {(() => {
-              const sAtt = sessionKicks.length;
-              const sTB = sessionKicks.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
+              // Practice: the top-line session stats cover DIRECTIONAL (deep)
+              // kicks only; games are all-inclusive. The per-athlete cards above
+              // already break every category out separately.
+              const statKicks = sessionMode === "game" ? sessionKicks : sessionKicks.filter((k) => koCategoryOf(k.type, koTypes) === "DEEP");
+              const sAtt = statKicks.length;
+              const sTB = statKicks.filter((k) => k.result === "TB" || k.landingZone === "TB").length;
               const sTBRate = sAtt > 0 ? `${Math.round((sTB / sAtt) * 100)}%` : "—";
-              const distKicks = sessionKicks.filter((k) => k.distance > 0 && (koTypes.find((t) => t.id === k.type)?.metric ?? "distance") === "distance");
-              const ylKicks = sessionKicks.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "yardline");
-              const kicksWithHang = sessionKicks.filter((k) => k.hangTime > 0);
+              const distKicks = statKicks.filter((k) => k.distance > 0 && (koTypes.find((t) => t.id === k.type)?.metric ?? "distance") === "distance");
+              const ylKicks = statKicks.filter((k) => k.distance > 0 && koTypes.find((t) => t.id === k.type)?.metric === "yardline");
+              const kicksWithHang = statKicks.filter((k) => k.hangTime > 0);
               const sAvgDist = distKicks.length > 0 ? (distKicks.reduce((s, k) => s + k.distance, 0) / distKicks.length).toFixed(1) : null;
               const sAvgYL = ylKicks.length > 0 ? (ylKicks.reduce((s, k) => s + k.distance, 0) / ylKicks.length).toFixed(1) : null;
               const sAvgHang = kicksWithHang.length > 0 ? (kicksWithHang.reduce((s, k) => s + k.hangTime, 0) / kicksWithHang.length).toFixed(2) : "—";
               const sZoneData = KICKOFF_ZONES.map((z) => ({
                 zone: z === "TB" ? "TB" : `Zone ${z}`,
-                count: sessionKicks.filter((k) => k.landingZone === z).length,
+                count: statKicks.filter((k) => k.landingZone === z).length,
               }));
               return (
                 <>
@@ -2186,7 +2190,8 @@ export default function KickoffSessionPage() {
               <KickoffFieldView kicks={sessionKicks.filter((k) => k.los != null && k.landingYL != null)} />
             </>
           ) : (() => {
-            const kickRows = sessionKicks.length > 0 ? sessionKicks : filledRows.map(({ r }) => ({
+            // Practice: top-line session stats cover DIRECTIONAL (deep) kicks only.
+            const kickRows = sessionKicks.length > 0 ? sessionKicks.filter((k) => koCategoryOf(k.type, koTypes) === "DEEP") : filledRows.map(({ r }) => ({
               distance: parseFloat(r.distance) || 0,
               hangTime: parseFloat(r.hangTime) || 0,
               endzone: r.endzone,

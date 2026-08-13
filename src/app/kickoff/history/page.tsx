@@ -43,9 +43,14 @@ function loadKoDirs(): KoDir[] {
 // else the legacy "OB" label. Returns null when it can't be scored.
 function koDirScore(d: string | undefined | null, dirs: KoDir[]): number | null {
   if (d == null || d === "") return null;
+  // Standard numeric scores take priority over any per-option score stored in
+  // settings (which can be stale/misaligned) — mirrors the statistics page.
+  if (d === "1") return 1;
+  if (d === "0.5") return 0.5;
+  if (d === "0") return 0;
+  if (d === "-1" || d === "OB") return -1;
   const cfg = dirs.find((x) => x.id === d);
   if (cfg && typeof cfg.score === "number") return cfg.score;
-  if (d === "OB") return -1;
   const n = parseFloat(d);
   return isNaN(n) ? null : n;
 }
