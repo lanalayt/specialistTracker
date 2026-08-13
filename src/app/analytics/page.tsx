@@ -198,6 +198,12 @@ function PuntingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
       "Avg OT": punts.length > 0 ? Math.round((totalOT / punts.length) * 100) / 100 : 0,
     };
   });
+  // Y-axis hugs the data: 0.1s below the lowest session to 0.1s above the
+  // highest (lower bound never negative). Recomputes as the filter changes.
+  const otVals = otTrend.map((d) => d["Avg OT"] as number).filter((v) => v > 0);
+  const otDomain: [number, number] | undefined = otVals.length > 0
+    ? [Math.max(0, Math.round((Math.min(...otVals) - 0.1) * 100) / 100), Math.round((Math.max(...otVals) + 0.1) * 100) / 100]
+    : undefined;
 
 
   // Per-athlete comparison (computed from filtered history so mode filter works)
@@ -259,10 +265,7 @@ function PuntingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
           dataKey="Avg OT"
           title="Avg Operation Time Over Sessions"
           unit="s"
-          domain={[
-            Math.min(1.2, ...otTrend.map((d) => d["Avg OT"] as number).filter(Boolean)) - 0.05,
-            Math.max(1.5, ...otTrend.map((d) => d["Avg OT"] as number).filter(Boolean)) + 0.05,
-          ]}
+          domain={otDomain}
         />
       </div>
 
