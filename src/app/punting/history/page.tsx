@@ -660,16 +660,31 @@ function PuntHistoryContent() {
               const athleteNames = Object.keys(byAthlete);
               if (athleteNames.length === 0) return null;
               const isGame = selected.mode === "game";
+              // Group the practice breakdown by main category (Directional,
+              // Pooch, Rugby, Banana) — NOT by individual sub-type (e.g. a
+              // coach's custom "Red"/"Blue" directional types roll up together).
+              const CAT_LABELS: Record<string, string> = { DIRECTIONAL: "Directional", POOCH: "Pooch", BANANA: "Banana", RUGBY: "Rugby" };
+              const CAT_ORDER = ["DIRECTIONAL", "POOCH", "BANANA", "RUGBY"];
+              const categoryOf = (type: string | undefined | null): string => {
+                const cfg = puntTypes.find((t) => t.id === type);
+                if (cfg?.category) return cfg.category;
+                const up = (type || "").toUpperCase();
+                if (up.includes("POOCH")) return "POOCH";
+                if (up.includes("BANANA")) return "BANANA";
+                if (up.includes("RUGBY")) return "RUGBY";
+                return "DIRECTIONAL";
+              };
+              const catLabel = (c: string) => CAT_LABELS[c] ?? (c ? c.charAt(0) + c.slice(1).toLowerCase() : "—");
               return (
                 <div className="mb-4 grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(athleteNames.length, 3)}, minmax(0, 1fr))` }}>
                   {athleteNames.map((name) => {
                     const ap = byAthlete[name];
                     // Games blend all punt types together; practice splits the
-                    // totals out by type (Directional, Pooch, Rugby, …).
-                    const typeIds = isGame ? [] : [...new Set(ap.map((p) => p.type || ""))]
+                    // totals out by main category (Directional, Pooch, Rugby, Banana).
+                    const cats = isGame ? [] : [...new Set(ap.map((p) => categoryOf(p.type)))]
                       .sort((a, b) => {
-                        const ia = puntTypes.findIndex((t) => t.id === a);
-                        const ib = puntTypes.findIndex((t) => t.id === b);
+                        const ia = CAT_ORDER.indexOf(a);
+                        const ib = CAT_ORDER.indexOf(b);
                         return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
                       });
                     return (
@@ -679,13 +694,13 @@ function PuntHistoryContent() {
                           <StatGrid s={statSet(ap)} mode="blend" />
                         ) : (
                           <div className="space-y-2.5">
-                            {typeIds.map((tid) => {
-                              const tp = ap.filter((p) => (p.type || "") === tid);
-                              const label = typeLabels[tid] ?? (tid || "—");
+                            {cats.map((cat) => {
+                              const cp = ap.filter((p) => categoryOf(p.type) === cat);
+                              const isYL = cp.some((p) => isYardLineType(p.type, puntTypes));
                               return (
-                                <div key={tid || "none"}>
-                                  <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wide mb-1 pb-0.5 border-b border-border/50">{label}</p>
-                                  <StatGrid s={statSet(tp)} mode={isYardLineType(tid, puntTypes) ? "yardline" : "distance"} />
+                                <div key={cat || "none"}>
+                                  <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wide mb-1 pb-0.5 border-b border-border/50">{catLabel(cat)}</p>
+                                  <StatGrid s={statSet(cp)} mode={isYL ? "yardline" : "distance"} />
                                 </div>
                               );
                             })}
