@@ -11,6 +11,8 @@ import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
 import { useTeamSettings } from "@/lib/teamSettingsStore";
 import { makePct } from "@/lib/stats";
+import { MAKE_RESULTS } from "@/types";
+import type { FGKick, PuntEntry, KickoffEntry, Session } from "@/types";
 import Link from "next/link";
 import React from "react";
 
@@ -21,63 +23,78 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
   { href: "/longsnap", iconEl: <SnapperIcon size={44} />, label: "Snapping" },
 ];
 
-function SeasonHighlights() {
-  const { athletes: fgAthletes, stats: fgStats } = useFG();
-  const { athletes: puntAthletes, stats: puntStats } = usePunt();
-  const { athletes: koAthletes, stats: koStats } = useKickoff();
+// Pooch punts are measured by yard line, not distance, so they don't feed the
+// punt distance average. KO "directional" = deep kicks (not sky/squib/onside).
+const isPoochPunt = (type?: string) => (type || "").toUpperCase().includes("POOCH");
+const isDeepKO = (type?: string) => !/SKY|SQUIB|ONSIDE/i.test(type || "");
 
-  // FG
-  const fgTotals = fgAthletes.reduce(
-    (acc, a) => {
-      const s = fgStats[a.name];
-      if (!s) return acc;
-      return { att: acc.att + s.overall.att, made: acc.made + s.overall.made, longFG: Math.max(acc.longFG, s.overall.longFG) };
-    },
-    { att: 0, made: 0, longFG: 0 }
-  );
+function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepOnly: boolean) {
+  const fgKicks = fgH.flatMap((s) => (s.entries ?? []) as FGKick[]);
+  const makes = fgKicks.filter((k) => MAKE_RESULTS.includes(k.result));
+  const longFG = makes.reduce((m, k) => Math.max(m, k.dist), 0);
 
-  // Punt
-  const puntTotals = puntAthletes.reduce(
-    (acc, a) => {
-      const s = puntStats[a.name];
-      if (!s) return acc;
-      return {
-        totalYards: acc.totalYards + s.overall.totalYards,
-        yardsAtt: acc.yardsAtt + (s.overall.yardsAtt ?? s.overall.att),
-        totalHang: acc.totalHang + s.overall.totalHang,
-        hangAtt: acc.hangAtt + (s.overall.hangAtt ?? s.overall.att),
-      };
-    },
-    { totalYards: 0, yardsAtt: 0, totalHang: 0, hangAtt: 0 }
-  );
-  const puntAvg = puntTotals.yardsAtt > 0 ? (puntTotals.totalYards / puntTotals.yardsAtt).toFixed(1) : "—";
-  const puntHang = puntTotals.hangAtt > 0 ? `${(puntTotals.totalHang / puntTotals.hangAtt).toFixed(2)}s` : "—";
+  const punts = puntH.flatMap((s) => (s.entries ?? []) as PuntEntry[]);
+  const puntDistE = punts.filter((p) => p.yards > 0 && !isPoochPunt(p.type));
+  const puntHangE = punts.filter((p) => p.hangTime > 0);
 
-  // KO
-  const koTotals = koAthletes.reduce(
-    (acc, a) => {
-      const s = koStats[a.name];
-      if (!s) return acc;
-      return {
-        totalDist: acc.totalDist + s.overall.totalDist,
-        distAtt: acc.distAtt + (s.overall.distAtt ?? s.overall.att),
-        totalHang: acc.totalHang + s.overall.totalHang,
-        hangAtt: acc.hangAtt + (s.overall.hangAtt ?? s.overall.att),
-      };
-    },
-    { totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0 }
-  );
-  const koAvgDist = koTotals.distAtt > 0 ? (koTotals.totalDist / koTotals.distAtt).toFixed(1) : "—";
-  const koHang = koTotals.hangAtt > 0 ? `${(koTotals.totalHang / koTotals.hangAtt).toFixed(2)}s` : "—";
+  let kos = koH.flatMap((s) => (s.entries ?? []) as KickoffEntry[]);
+  if (koDeepOnly) kos = kos.filter((k) => isDeepKO(k.type));
+  const koDistE = kos.filter((k) => k.distance > 0);
+  const koHangE = kos.filter((k) => k.hangTime > 0);
 
+  return {
+    fgPct: makePct(fgKicks.length, makes.length),
+    longFG: longFG > 0 ? `${longFG} yd` : "—",
+    puntAvg: puntDistE.length > 0 ? `${(puntDistE.reduce((a, p) => a + p.yards, 0) / puntDistE.length).toFixed(1)} yd` : "—",
+    puntHang: puntHangE.length > 0 ? `${(puntHangE.reduce((a, p) => a + p.hangTime, 0) / puntHangE.length).toFixed(2)}s` : "—",
+    koAvgDist: koDistE.length > 0 ? `${(koDistE.reduce((a, k) => a + k.distance, 0) / koDistE.length).toFixed(1)} yd` : "—",
+    koHang: koHangE.length > 0 ? `${(koHangE.reduce((a, k) => a + k.hangTime, 0) / koHangE.length).toFixed(2)}s` : "—",
+  };
+}
+
+function HighlightCards({ h, accent }: { h: ReturnType<typeof highlightsFor>; accent?: boolean }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-      <StatCard label="FG %" value={makePct(fgTotals.att, fgTotals.made)} accent />
-      <StatCard label="Long FG" value={fgTotals.longFG > 0 ? `${fgTotals.longFG} yd` : "—"} />
-      <StatCard label="Punt Avg" value={puntAvg !== "—" ? `${puntAvg} yd` : "—"} />
-      <StatCard label="Punt Hang" value={puntHang} />
-      <StatCard label="KO Avg Dist" value={koAvgDist !== "—" ? `${koAvgDist} yd` : "—"} />
-      <StatCard label="KO Hang" value={koHang} />
+      <StatCard label="FG %" value={h.fgPct} accent={accent} glow={accent} />
+      <StatCard label="Long FG" value={h.longFG} accent={accent} glow={accent} />
+      <StatCard label="Punt Avg" value={h.puntAvg} accent={accent} glow={accent} />
+      <StatCard label="Punt Hang" value={h.puntHang} accent={accent} glow={accent} />
+      <StatCard label="KO Avg Dist" value={h.koAvgDist} accent={accent} glow={accent} />
+      <StatCard label="KO Hang" value={h.koHang} accent={accent} glow={accent} />
+    </div>
+  );
+}
+
+function Highlights() {
+  const { history: fgH } = useFG();
+  const { history: puntH } = usePunt();
+  const { history: koH } = useKickoff();
+
+  const isGame = (s: Session) => s.mode === "game";
+  const gameFG = fgH.filter(isGame);
+  const gamePunt = puntH.filter(isGame);
+  const gameKO = koH.filter(isGame);
+  const hasGame = gameFG.length + gamePunt.length + gameKO.length > 0;
+
+  // Practice highlights: KO stats are directional (deep) only.
+  const practice = highlightsFor(fgH.filter((s) => !isGame(s)), puntH.filter((s) => !isGame(s)), koH.filter((s) => !isGame(s)), true);
+  // Season highlights: games only, all-inclusive. Shown above once games exist.
+  const season = hasGame ? highlightsFor(gameFG, gamePunt, gameKO, false) : null;
+
+  return (
+    <div className="space-y-5">
+      {season && (
+        <div className="rounded-card border border-accent/40 bg-accent/[0.06] p-3 shadow-accent-lg">
+          <h2 className="text-sm font-bold text-accent uppercase tracking-wider mb-3">
+            Season Highlights <span className="text-[10px] font-semibold text-muted normal-case tracking-normal">· Games</span>
+          </h2>
+          <HighlightCards h={season} accent />
+        </div>
+      )}
+      <div>
+        <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Practice Highlights</h2>
+        <HighlightCards h={practice} />
+      </div>
     </div>
   );
 }
@@ -202,13 +219,8 @@ function DashboardContent() {
               </div>
             </div>
 
-            {/* Season Highlights */}
-            <div>
-              <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-                Season Highlights
-              </h2>
-              <SeasonHighlights />
-            </div>
+            {/* Highlights — practice always; season (games) above once games exist */}
+            <Highlights />
 
             {/* Recent sessions — all phases merged */}
             {allSessions.length > 0 && (
