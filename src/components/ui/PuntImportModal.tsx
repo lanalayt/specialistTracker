@@ -121,21 +121,31 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
     return null; // non-numeric direction code — left blank (rare; can extend later)
   };
 
-  // Distinct raw values needing resolution.
+  // Case-insensitive key so "Ru" and "RU" (or "Pooch red"/"Pooch Red") are the
+  // same value — mapped once, applied to every matching row.
+  const keyOf = (s: string) => s.trim().toLowerCase();
+
+  // Distinct raw values needing resolution (deduped case-insensitively).
   const distinct = (field: Field) => {
     const idx = colMap[field];
     if (idx < 0) return [] as string[];
-    const set = new Set<string>();
-    rawRows.forEach((r) => { const v = r[idx]; if (v != null && String(v).trim() !== "") set.add(String(v).trim()); });
-    return [...set];
+    const seen = new Map<string, string>();
+    rawRows.forEach((r) => {
+      const v = r[idx];
+      if (v != null && String(v).trim() !== "") {
+        const s = String(v).trim();
+        if (!seen.has(keyOf(s))) seen.set(keyOf(s), s);
+      }
+    });
+    return [...seen.values()];
   };
   const typeVals = useMemo(() => distinct("type"), [rawRows, colMap.type]); // eslint-disable-line react-hooks/exhaustive-deps
   const hashVals = useMemo(() => distinct("hash"), [rawRows, colMap.hash]); // eslint-disable-line react-hooks/exhaustive-deps
   const athleteVals = useMemo(() => distinct("athlete"), [rawRows, colMap.athlete]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const resolveType = (raw: string) => typeMap[raw] ?? autoType(raw);
-  const resolveHash = (raw: string) => hashMap[raw] ?? autoHash(raw);
-  const resolveAthlete = (raw: string) => athleteMap[raw] ?? autoAthlete(raw);
+  const resolveType = (raw: string) => typeMap[keyOf(raw)] ?? autoType(raw);
+  const resolveHash = (raw: string) => hashMap[keyOf(raw)] ?? autoHash(raw);
+  const resolveAthlete = (raw: string) => athleteMap[keyOf(raw)] ?? autoAthlete(raw);
 
   const unresolvedTypes = typeVals.filter((v) => !resolveType(v));
   const unresolvedAthletes = athleteVals.filter((v) => !resolveAthlete(v));
@@ -179,7 +189,7 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-surface border border-border rounded-card w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-accent-lg">
+      <div className="bg-surface border border-border rounded-card w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-accent-lg">
         <div className="p-5 border-b border-border flex items-center justify-between sticky top-0 bg-surface z-10">
           <div>
             <h2 className="text-lg font-bold text-slate-100">Import Punt Report</h2>
@@ -206,14 +216,14 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
               {/* Column mapping */}
               <div className="card-2 p-3 space-y-2">
                 <p className="text-xs font-semibold text-muted uppercase tracking-wider">Columns</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-1.5">
                   {(Object.keys(FIELD_LABELS) as Field[]).map((f) => (
                     <div key={f} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-300 w-32 shrink-0">{FIELD_LABELS[f]}</span>
+                      <span className="text-xs text-slate-300 w-36 shrink-0">{FIELD_LABELS[f]}</span>
                       <select
                         value={colMap[f]}
                         onChange={(e) => setColMap((m) => ({ ...m, [f]: parseInt(e.target.value) }))}
-                        className="flex-1 bg-surface-2 border border-border rounded-input px-2 py-1 text-xs text-slate-200"
+                        className="flex-1 min-w-0 bg-surface-2 border border-border rounded-input px-2 py-1.5 text-xs text-slate-200"
                       >
                         <option value={-1}>— none —</option>
                         {headers.map((h, i) => <option key={i} value={i}>{h || `Col ${i + 1}`}</option>)}
@@ -229,12 +239,12 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
                   <p className="text-xs font-semibold text-muted uppercase tracking-wider">Punt types <span className="normal-case text-[10px] text-muted">— match your report&apos;s calls to your types</span></p>
                   {typeVals.map((v) => (
                     <div key={v} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-200 w-28 shrink-0 font-semibold">{v}</span>
-                      <span className="text-muted text-xs">→</span>
+                      <span className="text-xs text-slate-200 w-28 shrink-0 font-semibold truncate">{v}</span>
+                      <span className="text-muted text-xs shrink-0">→</span>
                       <select
                         value={resolveType(v) ?? ""}
-                        onChange={(e) => { const t = { ...typeMap, [v]: e.target.value }; setTypeMap(t); persist(t, hashMap, athleteMap); }}
-                        className={clsx("flex-1 bg-surface-2 border rounded-input px-2 py-1 text-xs", resolveType(v) ? "border-border text-slate-200" : "border-miss/50 text-miss")}
+                        onChange={(e) => { const t = { ...typeMap, [keyOf(v)]: e.target.value }; setTypeMap(t); persist(t, hashMap, athleteMap); }}
+                        className={clsx("flex-1 min-w-0 bg-surface-2 border rounded-input px-2 py-1.5 text-xs", resolveType(v) ? "border-border text-slate-200" : "border-miss/50 text-miss")}
                       >
                         <option value="">— pick a type —</option>
                         {puntTypes.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -250,12 +260,12 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
                   <p className="text-xs font-semibold text-muted uppercase tracking-wider">Hash / position <span className="normal-case text-[10px] text-muted">— optional</span></p>
                   {hashVals.map((v) => (
                     <div key={v} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-200 w-28 shrink-0 font-semibold">{v}</span>
-                      <span className="text-muted text-xs">→</span>
+                      <span className="text-xs text-slate-200 w-28 shrink-0 font-semibold truncate">{v}</span>
+                      <span className="text-muted text-xs shrink-0">→</span>
                       <select
                         value={resolveHash(v) ?? ""}
-                        onChange={(e) => { const h = { ...hashMap, [v]: e.target.value }; setHashMap(h); persist(typeMap, h, athleteMap); }}
-                        className="flex-1 bg-surface-2 border border-border rounded-input px-2 py-1 text-xs text-slate-200"
+                        onChange={(e) => { const h = { ...hashMap, [keyOf(v)]: e.target.value }; setHashMap(h); persist(typeMap, h, athleteMap); }}
+                        className="flex-1 min-w-0 bg-surface-2 border border-border rounded-input px-2 py-1.5 text-xs text-slate-200"
                       >
                         <option value="">— skip —</option>
                         {hashOptions.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
@@ -271,12 +281,12 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
                   <p className="text-xs font-semibold text-muted uppercase tracking-wider">Athletes <span className="normal-case text-[10px] text-muted">— matched by jersey number</span></p>
                   {athleteVals.map((v) => (
                     <div key={v} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-200 w-28 shrink-0 font-semibold">#{v}</span>
-                      <span className="text-muted text-xs">→</span>
+                      <span className="text-xs text-slate-200 w-28 shrink-0 font-semibold truncate">#{v}</span>
+                      <span className="text-muted text-xs shrink-0">→</span>
                       <select
                         value={resolveAthlete(v) ?? ""}
-                        onChange={(e) => { const a = { ...athleteMap, [v]: e.target.value }; setAthleteMap(a); persist(typeMap, hashMap, a); }}
-                        className={clsx("flex-1 bg-surface-2 border rounded-input px-2 py-1 text-xs", resolveAthlete(v) ? "border-border text-slate-200" : "border-miss/50 text-miss")}
+                        onChange={(e) => { const a = { ...athleteMap, [keyOf(v)]: e.target.value }; setAthleteMap(a); persist(typeMap, hashMap, a); }}
+                        className={clsx("flex-1 min-w-0 bg-surface-2 border rounded-input px-2 py-1.5 text-xs", resolveAthlete(v) ? "border-border text-slate-200" : "border-miss/50 text-miss")}
                       >
                         <option value="">— pick athlete —</option>
                         {athletes.map((a) => <option key={a.id} value={a.name}>{a.name}{a.number ? ` (#${a.number})` : ""}</option>)}
