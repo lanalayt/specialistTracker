@@ -4,7 +4,7 @@ import { useState } from "react";
 import { usePunt } from "@/lib/puntContext";
 
 export default function PuntingAthletesPage() {
-  const { athletes, addAthletes, removeAthlete } = usePunt();
+  const { athletes, addAthletes, removeAthlete, setAthleteNumber } = usePunt();
   const [input, setInput] = useState("");
 
   const handleAdd = () => {
@@ -18,7 +18,7 @@ export default function PuntingAthletesPage() {
     <main className="p-4 lg:p-6 max-w-lg space-y-6">
       <div>
         <h2 className="text-base font-bold text-slate-100 mb-1">Athlete Roster</h2>
-        <p className="text-xs text-muted">Add or remove athletes from the Punting roster.</p>
+        <p className="text-xs text-muted">Add or remove athletes. The optional jersey number lets imported reports match players by number.</p>
       </div>
 
       <div className="space-y-2">
@@ -26,8 +26,16 @@ export default function PuntingAthletesPage() {
           <p className="text-xs text-muted">No athletes added yet.</p>
         )}
         {athletes.map((a) => (
-          <div key={a.id} className="card-2 flex items-center justify-between px-4 py-2.5">
-            <span className="text-sm font-medium text-slate-200">{a.name}</span>
+          <div key={a.id} className="card-2 flex items-center gap-3 px-4 py-2.5">
+            <input
+              className="input w-16 text-center text-sm py-1"
+              inputMode="numeric"
+              placeholder="#"
+              defaultValue={a.number ?? ""}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v !== (a.number ?? "")) setAthleteNumber(a.id, v); }}
+              title="Jersey number (optional)"
+            />
+            <span className="text-sm font-medium text-slate-200 flex-1">{a.name}</span>
             <button
               onClick={() => removeAthlete(a.id)}
               className="text-xs text-muted hover:text-miss transition-colors px-2 py-1"

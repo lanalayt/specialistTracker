@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 export interface StoredAthlete {
   id: string;
   name: string;
+  /** Optional jersey number — used to match imported (XOS/Thunder) rows to athletes. */
+  number?: string;
 }
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
@@ -46,17 +48,54 @@ export async function loadAthletes(
   if (!teamId || teamId === "local-dev") return [];
   try {
     const supabase = createClient();
-    const { data, error } = await supabase
+    // Prefer selecting the optional jersey `number`; if that column hasn't been
+    // added yet, transparently fall back so athlete loading never breaks.
+    const withNum = await supabase
       .from("athletes")
-      .select("id, name")
+      .select("id, name, number")
       .eq("team_id", teamId)
       .eq("sport", sport)
       .order("created_at", { ascending: true });
-    if (error) throw error;
-    return (data ?? []).map((r) => ({ id: r.id as string, name: r.name as string }));
+    let rows: Record<string, unknown>[] | null = withNum.data as Record<string, unknown>[] | null;
+    let err = withNum.error;
+    if (err) {
+      const basic = await supabase
+        .from("athletes")
+        .select("id, name")
+        .eq("team_id", teamId)
+        .eq("sport", sport)
+        .order("created_at", { ascending: true });
+      rows = basic.data as Record<string, unknown>[] | null;
+      err = basic.error;
+    }
+    if (err) throw err;
+    return (rows ?? []).map((r) => {
+      const num = r.number as string | number | null | undefined;
+      return { id: r.id as string, name: r.name as string, number: num != null && num !== "" ? String(num) : undefined };
+    });
   } catch (err) {
     console.warn("[AthleteStore] loadAthletes failed:", err);
     return [];
+  }
+}
+
+/**
+ * Set (or clear) an athlete's jersey number. Requires a `number` column on the
+ * athletes table; fails softly (logs) if it hasn't been added yet.
+ */
+export async function setAthleteNumber(teamId: string, athleteId: string, number: string): Promise<boolean> {
+  if (!teamId || teamId === "local-dev") return false;
+  try {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("athletes")
+      .update({ number: number.trim() || null })
+      .eq("id", athleteId);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn("[AthleteStore] setAthleteNumber failed (has the `number` column been added?):", err);
+    return false;
   }
 }
 
