@@ -61,6 +61,7 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
   const [rawRows, setRawRows] = useState<(string | number | null)[][]>([]);
   const [sheetName, setSheetName] = useState("");
   const [error, setError] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   // column → field index mapping (field → column index or -1)
   const [colMap, setColMap] = useState<Record<Field, number>>({ athlete: -1, type: -1, direction: -1, yards: -1, hang: -1, optime: -1, hash: -1 });
   // value translations, keyed by raw value → resolved id
@@ -200,10 +201,19 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
 
         <div className="p-5 space-y-4">
           {!headers && (
-            <label className="card-2 flex flex-col items-center justify-center gap-2 py-10 cursor-pointer border-2 border-dashed border-accent/40 hover:bg-accent/5 transition-colors">
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragEnter={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+              className={clsx(
+                "card-2 flex flex-col items-center justify-center gap-2 py-12 cursor-pointer border-2 border-dashed transition-colors",
+                dragOver ? "border-accent bg-accent/15" : "border-accent/40 hover:bg-accent/5"
+              )}
+            >
               <span className="text-3xl">⬆</span>
-              <span className="text-sm font-semibold text-accent">Choose an .xlsx file</span>
-              <span className="text-xs text-muted">We&apos;ll read the &quot;Punt&quot; sheet</span>
+              <span className="text-sm font-semibold text-accent">{dragOver ? "Drop to upload" : "Drag a file here, or click to browse"}</span>
+              <span className="text-xs text-muted">.xlsx — we&apos;ll read the &quot;Punt&quot; sheet</span>
               <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
             </label>
           )}
