@@ -40,7 +40,7 @@ type SimpleAthlete = { id: string; name: string };
 // ── FG Helpers ──────────────────────────────────────────────────────────────
 
 const POS_LABELS: Record<FGPosition, string> = { LH: "Left Hash", RH: "Right Hash", LM: "Left Middle", M: "Middle", RM: "Right Middle" };
-const DIST_LABELS: Record<DistRange, string> = { "20-29": "20–29 yds", "30-39": "30–39 yds", "40-49": "40–49 yds", "50-60": "50–60 yds", "60+": "60+ yds" };
+const DIST_LABELS: Record<DistRange, string> = { "20-29": "20–29 yds", "30-39": "30–39 yds", "40-49": "40–49 yds", "50-59": "50–59 yds", "60+": "60+ yds" };
 
 function FGStatTable({ athletes, statsMap, getValue, showScore = true, maxScore = 3 }: {
   athletes: SimpleAthlete[]; statsMap: Record<string, AthleteStats>;
@@ -203,7 +203,7 @@ function FGArchiveStats({ athletes, statsMap }: { athletes: SimpleAthlete[]; sta
       <CollapsibleSection title="By Distance">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {DIST_RANGES.map((range) => {
-            const maxScore = range === "50-60" || range === "60+" ? 4 : 3;
+            const maxScore = range === "50-59" || range === "60+" ? 4 : 3;
             return (
               <div key={range} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{DIST_LABELS[range]}</p>

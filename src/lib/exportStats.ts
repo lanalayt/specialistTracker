@@ -136,7 +136,7 @@ function aoaToSheet(rows: Row[]) {
 // ─── FG Kicking Export ──────────────────────────────────────────────────────
 
 const POS_LABELS: Record<FGPosition, string> = { LH: "Left Hash", RH: "Right Hash", LM: "Left Mid", M: "Middle", RM: "Right Mid" };
-const DIST_LABELS: Record<DistRange, string> = { "20-29": "20-29 yds", "30-39": "30-39 yds", "40-49": "40-49 yds", "50-60": "50-60 yds", "60+": "60+ yds" };
+const DIST_LABELS: Record<DistRange, string> = { "20-29": "20-29 yds", "30-39": "30-39 yds", "40-49": "40-49 yds", "50-59": "50-59 yds", "60+": "60+ yds" };
 
 function computeFGStats(athletes: string[], history: { entries?: FGKick[] }[], filter: (k: FGKick) => boolean): Record<string, AthleteStats> {
   let statsMap: Record<string, AthleteStats> = {};

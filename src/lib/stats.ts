@@ -58,8 +58,8 @@ export function getDistRange(yards: number): DistRange | null {
   if (yards >= 20 && yards <= 29) return "20-29";
   if (yards >= 30 && yards <= 39) return "30-39";
   if (yards >= 40 && yards <= 49) return "40-49";
-  if (yards >= 50 && yards <= 60) return "50-60";
-  if (yards > 60) return "60+";
+  if (yards >= 50 && yards <= 59) return "50-59";
+  if (yards >= 60) return "60+";
   return null;
 }
 

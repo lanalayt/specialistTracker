@@ -6,7 +6,7 @@ export type UserRole = "admin" | "coach" | "athlete";
 // FG Kicking
 export type FGPosition = "LH" | "RH" | "LM" | "RM" | "M";
 export type FGResult = "YL" | "YC" | "YR" | "XL" | "XR" | "XS" | "X";
-export type DistRange = "20-29" | "30-39" | "40-49" | "50-60" | "60+";
+export type DistRange = "20-29" | "30-39" | "40-49" | "50-59" | "60+";
 
 // Punting
 export type PuntType = string;
@@ -305,7 +305,7 @@ export const DIST_RANGES: DistRange[] = [
   "20-29",
   "30-39",
   "40-49",
-  "50-60",
+  "50-59",
   "60+",
 ];
 export const PUNT_TYPES: PuntType[] = [
