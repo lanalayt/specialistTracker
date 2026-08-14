@@ -32,27 +32,37 @@ interface Props {
 }
 
 // Logical fields we map spreadsheet columns onto.
-type Field = "athlete" | "type" | "direction" | "yards" | "hang" | "optime" | "hash";
+type Field = "athlete" | "type" | "direction" | "yards" | "yardline" | "hang" | "optime" | "hash";
 const FIELD_LABELS: Record<Field, string> = {
-  athlete: "Athlete (jersey #)",
+  athlete: "Athlete (name or #)",
   type: "Punt type",
   direction: "Direction score",
-  yards: "Distance / Pooch YL",
+  yards: "Distance (yards)",
+  yardline: "Pooch landing YL",
   hang: "Hang time",
   optime: "Op time",
   hash: "Hash / position",
 };
-// Header synonyms (normalized: lowercase, alphanumerics only).
+// Header synonyms (normalized: lowercase, alphanumerics only). Matching is exact
+// first, then substring for the longer synonyms — so "Direction (0, 0.5, 1)"
+// still maps to direction and "Opp Time" to op time.
 const SYNONYMS: Record<Field, string[]> = {
-  athlete: ["pffkicker", "kicker", "punter", "jersey", "number", "kickernum", "playernum", "player"],
+  athlete: ["pffkicker", "kicker", "punter", "athlete", "name", "player", "jersey", "number", "kickernum", "playernum"],
   type: ["call", "type", "punttype", "kicktype"],
   direction: ["landzn", "landzone", "landingzone", "direction", "dir"],
   yards: ["pffkickdepth", "kickdepth", "distance", "dist", "yards", "yds", "gross", "depth"],
+  yardline: ["yldown", "yardline", "poochyl", "landingyl", "yldown"],
   hang: ["pffhangtime", "hangtime", "hang", "ht"],
-  optime: ["oper", "optime", "operation", "operationtime", "op"],
+  optime: ["oper", "opptime", "optime", "operationtime", "operation", "opp"],
   hash: ["hash", "pos", "position"],
 };
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+// Read a cell as text, treating dashes / blanks as empty.
+const cellStr = (v: unknown): string => {
+  if (v == null) return "";
+  const s = String(v).trim();
+  return s === "-" || s === "—" || s === "–" || s === "" ? "" : s;
+};
 
 const MAP_PREF = "puntImportValueMaps_v1"; // per-user saved value translations
 
@@ -63,7 +73,7 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
   // column → field index mapping (field → column index or -1)
-  const [colMap, setColMap] = useState<Record<Field, number>>({ athlete: -1, type: -1, direction: -1, yards: -1, hang: -1, optime: -1, hash: -1 });
+  const [colMap, setColMap] = useState<Record<Field, number>>({ athlete: -1, type: -1, direction: -1, yards: -1, yardline: -1, hang: -1, optime: -1, hash: -1 });
   // value translations, keyed by raw value → resolved id
   const saved = (getAppPref<{ type?: Record<string, string>; hash?: Record<string, string>; athlete?: Record<string, string> }>(MAP_PREF)) ?? {};
   const [typeMap, setTypeMap] = useState<Record<string, string>>(saved.type ?? {});
@@ -82,15 +92,29 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
       setSheetName(name);
       const ws = wb.Sheets[name];
       const aoa = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
-      const hdr = (aoa[0] ?? []).map((h) => String(h ?? "").trim());
-      const rows = aoa.slice(1).filter((r) => Array.isArray(r) && r.some((c) => c != null && c !== ""));
+      // The header may not be the first row (some exports have a blank/title row
+      // on top) — use the first row with 2+ non-empty cells.
+      let headerIdx = aoa.findIndex((r) => Array.isArray(r) && r.filter((c) => c != null && String(c).trim() !== "").length >= 2);
+      if (headerIdx < 0) headerIdx = 0;
+      const hdr = (aoa[headerIdx] ?? []).map((h) => String(h ?? "").trim());
+      const rows = aoa.slice(headerIdx + 1).filter((r) => Array.isArray(r) && r.some((c) => cellStr(c) !== ""));
       if (hdr.length === 0 || rows.length === 0) { setError("Couldn't find a header row and data on that sheet."); return; }
-      // Auto-map columns by synonym.
-      const cm: Record<Field, number> = { athlete: -1, type: -1, direction: -1, yards: -1, hang: -1, optime: -1, hash: -1 };
-      (Object.keys(SYNONYMS) as Field[]).forEach((f) => {
-        const idx = hdr.findIndex((h) => SYNONYMS[f].includes(norm(h)));
-        cm[f] = idx;
-      });
+      // Auto-map columns: an exact-name pass first (claims columns), then a
+      // substring pass for the rest so a fuzzy match can't steal an exact one.
+      const cm: Record<Field, number> = { athlete: -1, type: -1, direction: -1, yards: -1, yardline: -1, hang: -1, optime: -1, hash: -1 };
+      const used = new Set<number>();
+      const claim = (f: Field, fuzzy: boolean) => {
+        if (cm[f] >= 0) return;
+        const idx = hdr.findIndex((h, i) => {
+          if (used.has(i)) return false;
+          const nh = norm(h);
+          if (!nh) return false;
+          return SYNONYMS[f].some((syn) => nh === syn || (fuzzy && syn.length >= 4 && nh.includes(syn)));
+        });
+        if (idx >= 0) { cm[f] = idx; used.add(idx); }
+      };
+      (Object.keys(SYNONYMS) as Field[]).forEach((f) => claim(f, false));
+      (Object.keys(SYNONYMS) as Field[]).forEach((f) => claim(f, true));
       setHeaders(hdr);
       setRawRows(rows);
       setColMap(cm);
@@ -108,9 +132,19 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
     const n = norm(raw);
     return hashOptions.find((h) => norm(h.label) === n || norm(h.id) === n)?.id;
   };
-  const autoAthlete = (rawNum: string): string | undefined => {
-    const n = String(rawNum).trim();
-    return athletes.find((a) => (a.number ?? "").trim() === n)?.name;
+  const autoAthlete = (raw: string): string | undefined => {
+    const s = String(raw).trim();
+    // Match by jersey number, then exact name, then a partial (last-name) match.
+    const byNum = athletes.find((a) => (a.number ?? "").trim() === s);
+    if (byNum) return byNum.name;
+    const k = s.toLowerCase();
+    const exact = athletes.find((a) => a.name.trim().toLowerCase() === k);
+    if (exact) return exact.name;
+    if (k.length >= 2) {
+      const partial = athletes.find((a) => a.name.toLowerCase().includes(k));
+      if (partial) return partial.name;
+    }
+    return undefined;
   };
   const dirScoreOf = (raw: string): string | null => {
     const s = String(raw).trim();
@@ -132,11 +166,8 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
     if (idx < 0) return [] as string[];
     const seen = new Map<string, string>();
     rawRows.forEach((r) => {
-      const v = r[idx];
-      if (v != null && String(v).trim() !== "") {
-        const s = String(v).trim();
-        if (!seen.has(keyOf(s))) seen.set(keyOf(s), s);
-      }
+      const s = cellStr(r[idx]);
+      if (s && !seen.has(keyOf(s))) seen.set(keyOf(s), s);
     });
     return [...seen.values()];
   };
@@ -154,30 +185,28 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
   // Build the final rows.
   const builtRows: ImportedPuntRow[] = useMemo(() => {
     if (!headers) return [];
-    const get = (r: (string | number | null)[], f: Field) => (colMap[f] >= 0 ? r[colMap[f]] : null);
+    const get = (r: (string | number | null)[], f: Field) => (colMap[f] >= 0 ? cellStr(r[colMap[f]]) : "");
     return rawRows.map((r) => {
-      const rawType = String(get(r, "type") ?? "").trim();
+      const rawType = get(r, "type");
       const typeId = rawType ? resolveType(rawType) ?? "" : "";
       const cfg = puntTypes.find((t) => t.id === typeId);
       const isYL = cfg?.metric === "yardline";
-      const depthRaw = get(r, "yards");
-      const depth = depthRaw != null && String(depthRaw).trim() !== "" ? String(depthRaw).trim() : "";
-      const rawNum = String(get(r, "athlete") ?? "").trim();
-      const hangRaw = get(r, "hang");
-      const opRaw = get(r, "optime");
-      const dirRaw = String(get(r, "direction") ?? "").trim();
-      const rawHash = String(get(r, "hash") ?? "").trim();
+      const depth = get(r, "yards");        // gross distance column
+      const ylCol = get(r, "yardline");     // separate pooch-YL column, if any
+      const rawNum = get(r, "athlete");
+      const rawHash = get(r, "hash");
       return {
         athlete: rawNum ? resolveAthlete(rawNum) ?? "" : "",
         type: typeId,
         hash: rawHash ? resolveHash(rawHash) ?? "" : "",
         yards: isYL ? "" : depth,
-        poochYL: isYL ? depth : "",
-        hangTime: hangRaw != null && String(hangRaw).trim() !== "" ? String(hangRaw).trim() : "",
-        opTime: opRaw != null && String(opRaw).trim() !== "" ? String(opRaw).trim() : "",
-        directionalAccuracy: dirScoreOf(dirRaw) ?? "",
+        poochYL: isYL ? (ylCol || depth) : "",
+        hangTime: get(r, "hang"),
+        opTime: get(r, "optime"),
+        directionalAccuracy: dirScoreOf(get(r, "direction")) ?? "",
       };
-    });
+    // Drop rows that carry no real result (e.g. "-" placeholder kicks).
+    }).filter((row) => row.athlete && (row.type || row.yards || row.poochYL || row.hangTime || row.opTime || row.directionalAccuracy));
   }, [headers, rawRows, colMap, typeMap, hashMap, athleteMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canImport = headers && builtRows.length > 0 && unresolvedTypes.length === 0 && unresolvedAthletes.length === 0 && colMap.athlete >= 0 && colMap.type >= 0;
@@ -288,10 +317,10 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
               {/* Resolve unmatched athlete numbers */}
               {athleteVals.length > 0 && (
                 <div className="card-2 p-3 space-y-2">
-                  <p className="text-xs font-semibold text-muted uppercase tracking-wider">Athletes <span className="normal-case text-[10px] text-muted">— matched by jersey number</span></p>
+                  <p className="text-xs font-semibold text-muted uppercase tracking-wider">Athletes <span className="normal-case text-[10px] text-muted">— matched by name or jersey number</span></p>
                   {athleteVals.map((v) => (
                     <div key={v} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-200 w-28 shrink-0 font-semibold truncate">#{v}</span>
+                      <span className="text-xs text-slate-200 w-28 shrink-0 font-semibold truncate">{/^\d+$/.test(v) ? `#${v}` : v}</span>
                       <span className="text-muted text-xs shrink-0">→</span>
                       <select
                         value={resolveAthlete(v) ?? ""}
