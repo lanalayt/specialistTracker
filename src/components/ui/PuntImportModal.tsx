@@ -47,7 +47,9 @@ const FIELD_LABELS: Record<Field, string> = {
 // first, then substring for the longer synonyms — so "Direction (0, 0.5, 1)"
 // still maps to direction and "Opp Time" to op time.
 const SYNONYMS: Record<Field, string[]> = {
-  athlete: ["pffkicker", "kicker", "punter", "athlete", "name", "player", "jersey", "number", "kickernum", "playernum"],
+  // Order matters — earlier synonyms win. A bare "name" is last (many exports
+  // use "Name" for a play descriptor, not the athlete).
+  athlete: ["pffkicker", "kicker", "punter", "athlete", "player", "jersey", "kickernum", "playernum", "number", "name"],
   type: ["call", "type", "punttype", "kicktype"],
   direction: ["landzn", "landzone", "landingzone", "direction", "dir"],
   yards: ["pffkickdepth", "kickdepth", "distance", "dist", "yards", "yds", "gross", "depth"],
@@ -105,13 +107,17 @@ export function PuntImportModal({ onClose, onImport, athletes, puntTypes, direct
       const used = new Set<number>();
       const claim = (f: Field, fuzzy: boolean) => {
         if (cm[f] >= 0) return;
-        const idx = hdr.findIndex((h, i) => {
-          if (used.has(i)) return false;
-          const nh = norm(h);
-          if (!nh) return false;
-          return SYNONYMS[f].some((syn) => nh === syn || (fuzzy && syn.length >= 4 && nh.includes(syn)));
-        });
-        if (idx >= 0) { cm[f] = idx; used.add(idx); }
+        // Try synonyms in priority order so a preferred header (e.g. pff_KICKER)
+        // wins over a lower-priority one (e.g. a bare "Name" column).
+        for (const syn of SYNONYMS[f]) {
+          const idx = hdr.findIndex((h, i) => {
+            if (used.has(i)) return false;
+            const nh = norm(h);
+            if (!nh) return false;
+            return nh === syn || (fuzzy && syn.length >= 4 && nh.includes(syn));
+          });
+          if (idx >= 0) { cm[f] = idx; used.add(idx); return; }
+        }
       };
       (Object.keys(SYNONYMS) as Field[]).forEach((f) => claim(f, false));
       (Object.keys(SYNONYMS) as Field[]).forEach((f) => claim(f, true));
