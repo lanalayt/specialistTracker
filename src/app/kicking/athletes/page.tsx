@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useFG } from "@/lib/fgContext";
 
 export default function KickingAthletesPage() {
-  const { athletes, addAthletes, removeAthlete } = useFG();
+  const { athletes, addAthletes, removeAthlete, setAthleteNumber } = useFG();
   const [input, setInput] = useState("");
 
   const handleAdd = () => {
@@ -26,8 +26,16 @@ export default function KickingAthletesPage() {
           <p className="text-xs text-muted">No athletes added yet.</p>
         )}
         {athletes.map((a) => (
-          <div key={a.id} className="card-2 flex items-center justify-between px-4 py-2.5">
-            <span className="text-sm font-medium text-slate-200">{a.name}</span>
+          <div key={a.id} className="card-2 flex items-center gap-3 px-4 py-2.5">
+            <input
+              className="input w-16 text-center text-sm py-1"
+              inputMode="numeric"
+              placeholder="#"
+              defaultValue={a.number ?? ""}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v !== (a.number ?? "")) setAthleteNumber(a.id, v); }}
+              title="Jersey number (optional)"
+            />
+            <span className="text-sm font-medium text-slate-200 flex-1">{a.name}</span>
             <button
               onClick={() => removeAthlete(a.id)}
               className="text-xs text-muted hover:text-miss transition-colors px-2 py-1"

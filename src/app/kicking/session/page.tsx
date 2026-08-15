@@ -10,6 +10,8 @@ import { SessionSummary } from "@/components/ui/SessionSummary";
 import { FGFieldView } from "@/components/ui/FGFieldView";
 import { StatCard } from "@/components/ui/StatCard";
 import { IntervalStopwatch } from "@/components/ui/IntervalStopwatch";
+import { ImportModal } from "@/components/ui/ImportModal";
+import { buildFGImportConfig } from "@/lib/importConfigs";
 import { makePct } from "@/lib/stats";
 import type { FGKick, FGPosition, FGResult } from "@/types";
 import { POSITIONS, RESULTS } from "@/types";
@@ -538,6 +540,24 @@ export default function KickingSessionPage() {
       return stack.slice(0, -1);
     });
   }, []);
+
+  const [showImport, setShowImport] = useState(false);
+  const handleImportRows = useCallback((imported: Record<string, string>[]) => {
+    const newRows: LogRow[] = imported.map((r) => ({
+      ...emptyRow(),
+      athlete: r.athlete ?? "",
+      dist: r.dist ?? "",
+      pos: r.pos ?? "",
+      result: r.result ?? "",
+      score: r.score ?? "",
+      opTime: r.opTime ?? "",
+    }));
+    setRows((prev) => {
+      const filled = prev.filter((r) => r.athlete || r.dist || r.pos || r.result || r.opTime);
+      return [...filled, ...newRows];
+    });
+    if (!manualEntry) setManualEntry(true);
+  }, [manualEntry]);
 
   const addRow = useCallback(() => {
     setRows((prev) => [...prev, emptyRow()]);
@@ -2130,6 +2150,13 @@ export default function KickingSessionPage() {
                 </button>
                 )}
                 <button
+                  onClick={() => setShowImport(true)}
+                  className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                  title="Import from an XOS / Thunder export"
+                >
+                  ⬆ Import
+                </button>
+                <button
                   onClick={addRow}
                   className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
                 >
@@ -2633,6 +2660,15 @@ export default function KickingSessionPage() {
           })()}
         </div>
       </main>
+
+      {showImport && (
+        <ImportModal
+          config={buildFGImportConfig({ posOptions: POSITIONS.map((p) => ({ id: p, label: p })) })}
+          athletes={athletes}
+          onClose={() => setShowImport(false)}
+          onImport={handleImportRows}
+        />
+      )}
 
       {pendingKicks && (
         <SessionSummary

@@ -6,7 +6,8 @@ import { StatCard } from "@/components/ui/StatCard";
 import { IntervalStopwatch } from "@/components/ui/IntervalStopwatch";
 import { PuntSessionLog } from "@/components/ui/PuntSessionLog";
 import { PuntSessionSummary } from "@/components/ui/PuntSessionSummary";
-import { PuntImportModal, type ImportedPuntRow } from "@/components/ui/PuntImportModal";
+import { ImportModal } from "@/components/ui/ImportModal";
+import { buildPuntImportConfig } from "@/lib/importConfigs";
 import { PuntFieldStrip } from "@/components/ui/PuntFieldStrip";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, PuntType, PuntHash, PuntLandingZone } from "@/types";
@@ -662,17 +663,17 @@ export default function PuntingSessionPage() {
   const [showImport, setShowImport] = useState(false);
   // Drop imported reps into the log as editable rows (replacing empty rows first,
   // then appending). The coach reviews/edits, then commits like any session.
-  const handleImportRows = useCallback((imported: ImportedPuntRow[]) => {
+  const handleImportRows = useCallback((imported: Record<string, string>[]) => {
     const newRows: LogRow[] = imported.map((r) => ({
       ...emptyRow(),
-      athlete: r.athlete,
-      type: r.type,
-      hash: r.hash,
-      yards: r.yards,
-      poochYL: r.poochYL,
-      hangTime: r.hangTime,
-      opTime: r.opTime,
-      directionalAccuracy: r.directionalAccuracy,
+      athlete: r.athlete ?? "",
+      type: r.type ?? "",
+      hash: r.hash ?? "",
+      yards: r.yards ?? "",
+      poochYL: r.poochYL ?? "",
+      hangTime: r.hangTime ?? "",
+      opTime: r.opTime ?? "",
+      directionalAccuracy: r.directionalAccuracy ?? "",
     }));
     setRows((prev) => {
       const filled = prev.filter((r) => r.athlete || r.type || r.hash || r.yards || r.hangTime || r.opTime || r.poochYL);
@@ -2969,13 +2970,14 @@ export default function PuntingSessionPage() {
       </main>
 
       {showImport && (
-        <PuntImportModal
+        <ImportModal
+          config={buildPuntImportConfig({
+            puntTypes: puntTypes.map((t) => ({ id: t.id, label: t.label, metric: t.metric })),
+            hashOptions: PUNT_HASHES.map((h) => ({ id: h, label: POS_LABELS[h] })),
+          })}
+          athletes={athletes}
           onClose={() => setShowImport(false)}
           onImport={handleImportRows}
-          athletes={athletes}
-          puntTypes={puntTypes.map((t) => ({ id: t.id, label: t.label, category: t.category, metric: t.metric }))}
-          directionOptions={DA_OPTIONS.map((o) => ({ id: String(o.value), label: o.label, score: o.score }))}
-          hashOptions={PUNT_HASHES.map((h) => ({ id: h, label: POS_LABELS[h] }))}
         />
       )}
 

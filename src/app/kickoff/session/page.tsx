@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { IntervalStopwatch } from "@/components/ui/IntervalStopwatch";
+import { ImportModal } from "@/components/ui/ImportModal";
+import { buildKickoffImportConfig } from "@/lib/importConfigs";
 import { ZoneBarChart } from "@/components/ui/Chart";
 import { KickoffSessionLog } from "@/components/ui/KickoffSessionLog";
 import { KickoffSessionSummary } from "@/components/ui/KickoffSessionSummary";
@@ -604,6 +606,24 @@ export default function KickoffSessionPage() {
     setDirection("1");
     setSwReset((k) => k + 1); // fresh stopwatch for the new kick
   };
+
+  const [showImport, setShowImport] = useState(false);
+  const handleImportRows = useCallback((imported: Record<string, string>[]) => {
+    const newRows: LogRow[] = imported.map((r) => ({
+      ...emptyRow(),
+      athlete: r.athlete ?? "",
+      type: r.type ?? "",
+      hash: r.hash ?? "",
+      distance: r.distance ?? "",
+      hangTime: r.hangTime ?? "",
+      direction: r.direction ?? "",
+    }));
+    setRows((prev) => {
+      const filled = prev.filter((r) => r.athlete || r.type || r.hash || r.distance || r.hangTime || r.direction);
+      return [...filled, ...newRows];
+    });
+    if (!manualEntry) setManualEntry(true);
+  }, [manualEntry]);
 
   const addRow = useCallback(() => {
     setRows((prev) => [...prev, emptyRow()]);
@@ -1675,12 +1695,21 @@ export default function KickoffSessionPage() {
               )}
             </h2>
             {!viewOnly && (
-              <button
-                onClick={addRow}
-                className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
-              >
-                + Row
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowImport(true)}
+                  className="text-xs px-2.5 py-1 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all"
+                  title="Import from an XOS / Thunder export"
+                >
+                  ⬆ Import
+                </button>
+                <button
+                  onClick={addRow}
+                  className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
+                >
+                  + Row
+                </button>
+              </div>
             )}
           </div>
 
@@ -2221,6 +2250,18 @@ export default function KickoffSessionPage() {
           })()}
         </div>
       </main>
+
+      {showImport && (
+        <ImportModal
+          config={buildKickoffImportConfig({
+            koTypes: koTypes.map((t) => ({ id: t.id, label: t.label })),
+            hashOptions: KICKOFF_HASHES.map((h) => ({ id: h, label: POS_LABELS[h] })),
+          })}
+          athletes={athletes}
+          onClose={() => setShowImport(false)}
+          onImport={handleImportRows}
+        />
+      )}
 
       {pendingKicks && (
         <KickoffSessionSummary

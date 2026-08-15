@@ -7,7 +7,7 @@ import type { KickoffEntry, KickoffAthleteStats, Session, SessionMode } from "@/
 import { emptyKickoffStats, recomputeKickoffStats, genId, sessionLabel } from "@/lib/stats";
 import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
-import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
+import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, setAthleteNumber as setAthleteNumberRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settingsSync";
 
@@ -17,6 +17,7 @@ interface KickoffContextValue {
   history: Session[];
   addAthletes: (names: string[]) => void;
   removeAthlete: (athleteId: string) => void;
+  setAthleteNumber: (athleteId: string, number: string) => void;
   commitPractice: (entries: KickoffEntry[], label?: string, weather?: string, mode?: SessionMode, opponent?: string, gameTime?: string) => Session;
   resetStatsKeepAthletes: () => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
@@ -114,6 +115,12 @@ export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: 
     if (tid && tid !== "local-dev") { stampAthleteWrite(tid); removeAthleteRow(tid, athleteId); }
   }, []);
 
+  const setAthleteNumberAction = useCallback((athleteId: string, number: string) => {
+    const tid = getTeamId();
+    setAthletes((prev) => prev.map((a) => (a.id === athleteId ? { ...a, number: number.trim() || undefined } : a)));
+    if (tid && tid !== "local-dev") { stampAthleteWrite(tid); setAthleteNumberRow(tid, athleteId, number); }
+  }, []);
+
   const commitPractice = useCallback((entries: KickoffEntry[], label?: string, weather?: string, mode: SessionMode = "practice", opponent?: string, gameTime?: string): Session => {
     const tid = getTeamId();
     const session: Session = {
@@ -174,7 +181,7 @@ export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: 
 
   return (
     <KickoffContext.Provider value={{
-      athletes, stats, history, addAthletes, removeAthlete: removeAthleteAction,
+      athletes, stats, history, addAthletes, removeAthlete: removeAthleteAction, setAthleteNumber: setAthleteNumberAction,
       commitPractice, resetStatsKeepAthletes, updateSessionDate, updateSessionWeather, updateSessionOpponent,
       updateSessionEntries, deleteSession, restoreSession: restoreSessionAction,
     }}>
