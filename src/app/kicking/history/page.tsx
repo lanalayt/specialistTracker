@@ -157,6 +157,16 @@ function KickingHistoryContent() {
     const next = kicks.map((k, i) => (i === idx ? { ...k, holder: value || undefined } : k));
     updateSessionEntries(selected.id, next);
   };
+  // Add/remove a kick's live-rep star. During a bulk edit it goes into the
+  // draft; otherwise it's a standalone quick fix that persists immediately —
+  // no need to unlock the session first.
+  const toggleStar = (idx: number, current: boolean | undefined) => {
+    const nextVal = current ? undefined : true;
+    if (editing) { updateEntry(idx, "starred", nextVal); return; }
+    if (!selected) return;
+    const next = kicks.map((k, i) => (i === idx ? { ...k, starred: nextVal } : k));
+    updateSessionEntries(selected.id, next);
+  };
   const kicks = (selected?.entries ?? []) as FGKick[];
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
 
@@ -594,17 +604,17 @@ function KickingHistoryContent() {
                     <tr key={i} className="hover:bg-surface/30 transition-colors">
                       <td className="table-cell text-left text-muted">
                         {k.kickNum ?? i + 1}
-                        {editing ? (
+                        {viewOnly ? (
+                          k.starred ? <span className="text-amber-400"> ★</span> : ""
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => updateEntry(i, "starred", !k.starred)}
+                            onClick={() => toggleStar(i, k.starred)}
                             className={clsx("ml-1 transition-colors", k.starred ? "text-amber-400" : "text-muted/40 hover:text-amber-400")}
                             title={k.starred ? "Live rep (starred) — click to unstar" : "Mark as live rep"}
                           >
                             {k.starred ? "★" : "☆"}
                           </button>
-                        ) : (
-                          k.starred ? <span className="text-amber-400"> ★</span> : ""
                         )}
                       </td>
                       <td className="table-name">{k.athlete}</td>
