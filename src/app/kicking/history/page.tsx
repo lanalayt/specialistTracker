@@ -592,7 +592,21 @@ function KickingHistoryContent() {
                 <tbody>
                   {(editing ? editEntries : kicks).map((k, i) => (
                     <tr key={i} className="hover:bg-surface/30 transition-colors">
-                      <td className="table-cell text-left text-muted">{k.kickNum ?? i + 1}{k.starred ? <span className="text-amber-400"> ★</span> : ""}</td>
+                      <td className="table-cell text-left text-muted">
+                        {k.kickNum ?? i + 1}
+                        {editing ? (
+                          <button
+                            type="button"
+                            onClick={() => updateEntry(i, "starred", !k.starred)}
+                            className={clsx("ml-1 transition-colors", k.starred ? "text-amber-400" : "text-muted/40 hover:text-amber-400")}
+                            title={k.starred ? "Live rep (starred) — click to unstar" : "Mark as live rep"}
+                          >
+                            {k.starred ? "★" : "☆"}
+                          </button>
+                        ) : (
+                          k.starred ? <span className="text-amber-400"> ★</span> : ""
+                        )}
+                      </td>
                       <td className="table-name">{k.athlete}</td>
                       <td className="table-cell p-1">
                         {viewOnly ? (
