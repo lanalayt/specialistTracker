@@ -92,6 +92,23 @@ export default function LongSnapStatisticsPage() {
 
   const totalLaces = Object.values(lacesStats).reduce((acc, v) => ({ total: acc.total + v.total, att: acc.att + v.att }), { total: 0, att: 0 });
 
+  // Per-athlete spiral stats for short snaps. Spiral is logged as "Good"/"Bad";
+  // a snap counts toward the % only if a spiral value was recorded.
+  const spiralStats = useMemo(() => {
+    const result: Record<string, { good: number; att: number }> = {};
+    modeHistory.forEach((session) => {
+      const snaps = (session.entries ?? []) as LongSnapEntry[];
+      snaps.forEach((s) => {
+        if (s.snapType !== "FG" && s.snapType !== "PAT") return;
+        if (!s.spiral) return;
+        if (!result[s.athlete]) result[s.athlete] = { good: 0, att: 0 };
+        if (s.spiral === "Good") result[s.athlete].good += 1;
+        result[s.athlete].att += 1;
+      });
+    });
+    return result;
+  }, [modeHistory]);
+
   // Score stats for short snaps (30-point scoring: max 3 per snap)
   const scoreStats = useMemo(() => {
     const result: Record<string, { totalScore: number; att: number }> = {};
@@ -194,8 +211,9 @@ export default function LongSnapStatisticsPage() {
                 <th className="table-header">Strike %</th>
                 {snapTab === "long" && <th className="table-header">Avg Time</th>}
                 {snapTab === "short" && !isAthleteMode && <th className="table-header">Laces %</th>}
+                {snapTab === "short" && !isAthleteMode && <th className="table-header">Spiral %</th>}
                 {snapTab === "short" && isAthleteMode && <th className="table-header">Score %</th>}
-                {!(snapTab === "short" && isAthleteMode) && <th className="table-header">Crit</th>}
+                {snapTab === "long" && <th className="table-header">Crit</th>}
               </tr>
             </thead>
             <tbody>
@@ -229,11 +247,15 @@ export default function LongSnapStatisticsPage() {
                       const ls = lacesStats[a.name];
                       return <td className="table-cell">{ls && ls.att > 0 ? `${Math.round((ls.total / ls.att) * 100)}%` : "—"}</td>;
                     })()}
+                    {snapTab === "short" && !isAthleteMode && (() => {
+                      const sp = spiralStats[a.name];
+                      return <td className="table-cell">{sp && sp.att > 0 ? `${Math.round((sp.good / sp.att) * 100)}%` : "—"}</td>;
+                    })()}
                     {snapTab === "short" && isAthleteMode && (() => {
                       const sc = scoreStats.byAthlete[a.name];
                       return <td className="table-cell font-bold text-sky-400">{sc && sc.att > 0 ? `${Math.round((sc.totalScore / (sc.att * 3)) * 100)}%` : "—"}</td>;
                     })()}
-                    {!(snapTab === "short" && isAthleteMode) && <td className={`table-cell ${(bucket.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{bucket.criticals || "—"}</td>}
+                    {snapTab === "long" && <td className={`table-cell ${(bucket.criticals || 0) > 0 ? "text-miss font-semibold" : ""}`}>{bucket.criticals || "—"}</td>}
                   </tr>
                 );
               })}
