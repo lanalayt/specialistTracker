@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { StatCard } from "@/components/ui/StatCard";
+import { Stopwatch } from "@/components/ui/Stopwatch";
 import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
@@ -161,6 +162,8 @@ function DashboardContent() {
   return (
     <div className="lg:pl-56 min-h-screen min-w-0 pb-20 lg:pb-0">
       <Header title={schoolName} />
+      {/* Floating stopwatch — sits top-right, just under the profile/menu icons */}
+      <Stopwatch />
 
       <main className="p-4 lg:p-6 space-y-6 max-w-6xl">
         {/* Welcome — double-click to edit */}
