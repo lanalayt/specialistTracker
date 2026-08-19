@@ -1,16 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useAuth } from "@/lib/auth";
 import { getTeamId } from "@/lib/teamData";
-import {
-  saveStopwatchRun,
-  loadStopwatchRuns,
-  deleteStopwatchRun,
-  type StopwatchLap,
-  type StopwatchRun,
-} from "@/lib/stopwatchStore";
+import { saveStopwatchRun, type StopwatchLap } from "@/lib/stopwatchStore";
 
 // The in-progress run is mirrored to localStorage so the clock survives a
 // reload or a trip to another page — it keeps counting off wall-clock time.
@@ -61,7 +55,6 @@ export function Stopwatch() {
   const [open, setOpen] = useState(false);
   const [run, setRun] = useState<ActiveRun | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [recent, setRecent] = useState<StopwatchRun[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const running = run !== null && run.stoppedAt === null;
@@ -90,16 +83,6 @@ export function Stopwatch() {
     return () => clearInterval(id);
   }, [running]);
 
-  const refreshRecent = useCallback(async () => {
-    const tid = getTeamId();
-    if (!tid) return;
-    setRecent(await loadStopwatchRuns(tid, 5));
-  }, []);
-
-  useEffect(() => {
-    if (open) refreshRecent();
-  }, [open, refreshRecent]);
-
   // Click-away / Escape close, so the panel doesn't linger over the dashboard.
   useEffect(() => {
     if (!open) return;
@@ -127,7 +110,7 @@ export function Stopwatch() {
     setRun(stopped);
     const tid = getTeamId();
     if (!tid) return;
-    const ok = await saveStopwatchRun(tid, {
+    await saveStopwatchRun(tid, {
       id: stopped.id,
       userId: user?.id ?? null,
       startedAt: new Date(stopped.startedAt).toISOString(),
@@ -135,17 +118,9 @@ export function Stopwatch() {
       totalMs: stopped.stoppedAt! - stopped.startedAt,
       laps: toLaps(stopped),
     });
-    if (ok) refreshRecent();
   };
 
   const reset = () => setRun(null);
-
-  const removeRun = async (id: string) => {
-    const tid = getTeamId();
-    if (!tid) return;
-    setRecent((rs) => rs.filter((r) => r.id !== id));
-    await deleteStopwatchRun(tid, id);
-  };
 
   const laps = run ? toLaps(run) : [];
 
@@ -219,24 +194,6 @@ export function Stopwatch() {
             </div>
           )}
 
-          {recent.length > 0 && (
-            <div className="mt-3 pt-2 border-t border-border">
-              <p className="text-[10px] font-semibold text-muted uppercase tracking-widest mb-1">Saved Runs</p>
-              {recent.map((r) => (
-                <div key={r.id} className="flex items-center justify-between gap-2 text-[11px] py-1">
-                  <span className="text-muted truncate">
-                    {new Date(r.startedAt).toLocaleDateString(undefined, { month: "numeric", day: "numeric" })}
-                    {" · "}
-                    {r.laps.length} lap{r.laps.length !== 1 ? "s" : ""}
-                  </span>
-                  <span className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono tabular-nums text-slate-300">{fmt(r.totalMs)}</span>
-                    <button onClick={() => removeRun(r.id)} aria-label="Delete run" className="text-muted hover:text-miss">✕</button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>
