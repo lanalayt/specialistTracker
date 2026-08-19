@@ -196,7 +196,7 @@ function KickoffHistoryContent() {
     const sole = athleteOptions.length === 1 ? athleteOptions[0] : "";
     setEditEntries((prev) => [...prev, {
       athleteId: sole ? (athleteIdByName[sole] ?? "") : "",
-      athlete: sole, type: "", distance: 0, hangTime: 0, direction: "", score: 0, kickNum: prev.length + 1,
+      athlete: sole, type: "REG", distance: 0, hangTime: 0, direction: "", score: 0, kickNum: prev.length + 1,
     } as KickoffEntry]);
   };
   const setEntryAthlete = (idx: number, name: string) => {

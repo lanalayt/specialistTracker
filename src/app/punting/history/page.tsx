@@ -189,7 +189,7 @@ function PuntHistoryContent() {
     const sole = athleteOptions.length === 1 ? athleteOptions[0] : "";
     setEditEntries((prev) => [...prev, {
       athleteId: sole ? (athleteIdByName[sole] ?? "") : "",
-      athlete: sole, type: "", hash: "", yards: 0, hangTime: 0, opTime: 0,
+      athlete: sole, type: "", hash: "M", yards: 0, hangTime: 0, opTime: 0,
       landingZones: [], directionalAccuracy: 1, kickNum: prev.length + 1,
     } as PuntEntry]);
   };
