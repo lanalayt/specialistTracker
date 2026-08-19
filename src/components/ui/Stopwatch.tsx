@@ -106,7 +106,10 @@ export function Stopwatch() {
 
   const stop = async () => {
     if (!run || run.stoppedAt !== null) return;
-    const stopped: ActiveRun = { ...run, stoppedAt: Date.now() };
+    // Stop closes out the segment in progress, so the time since the last Lap
+    // (or since the start) lands as a final split rather than being dropped.
+    const at = Date.now();
+    const stopped: ActiveRun = { ...run, laps: [...run.laps, at], stoppedAt: at };
     setRun(stopped);
     const tid = getTeamId();
     if (!tid) return;
@@ -114,8 +117,8 @@ export function Stopwatch() {
       id: stopped.id,
       userId: user?.id ?? null,
       startedAt: new Date(stopped.startedAt).toISOString(),
-      stoppedAt: new Date(stopped.stoppedAt!).toISOString(),
-      totalMs: stopped.stoppedAt! - stopped.startedAt,
+      stoppedAt: new Date(at).toISOString(),
+      totalMs: at - stopped.startedAt,
       laps: toLaps(stopped),
     });
   };
