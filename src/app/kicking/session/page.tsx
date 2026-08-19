@@ -1596,8 +1596,8 @@ export default function KickingSessionPage() {
                       if (nextIdx < 0 || !plannedKicks[nextIdx]) return null;
                       const next = plannedKicks[nextIdx];
                       return (
-                        <p className="text-[10px] text-muted text-left">
-                          Next: <span className="text-slate-400 font-semibold">{next.athlete}</span> — {next.isPAT ? "PAT" : `${next.dist}yd (LOS ${calcLOS(next.dist)}) · ${next.pos}`}
+                        <p className="text-sm font-semibold text-slate-300 text-left">
+                          Next: <span className="text-white font-bold">{next.athlete}</span> — {next.isPAT ? "PAT" : `${next.dist}yd (LOS ${calcLOS(next.dist)}) · ${next.pos}`}
                         </p>
                       );
                     })()}
