@@ -173,6 +173,10 @@ function KickoffHistoryContent() {
 
   const selected = filteredHistory.find((s) => s.id === selectedId);
   const entries = (selected?.entries ?? []) as KickoffEntry[];
+  // Athletes already in this session, for the Athlete dropdown when editing/adding.
+  const athleteIdByName: Record<string, string> = {};
+  entries.forEach((e) => { if (e.athlete && !(e.athlete in athleteIdByName)) athleteIdByName[e.athlete] = e.athleteId; });
+  const athleteOptions = Object.keys(athleteIdByName).sort((a, b) => a.localeCompare(b));
   const [editing, setEditing] = useState(false);
   const [editEntries, setEditEntries] = useState<KickoffEntry[]>([]);
   // Direction score options from team settings (so editing mirrors the settings).
@@ -185,7 +189,19 @@ function KickoffHistoryContent() {
   const [rawTimes, setRawTimes] = useState<Record<string, string>>({});
   const startEditing = () => { setEditEntries(entries.map((e) => ({ ...e }))); setRawTimes({}); setEditing(true); };
   const cancelEditing = () => { setEditing(false); setEditEntries([]); setRawTimes({}); };
-  const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); setRawTimes({}); } };
+  // Drop any blank rows added but never filled in (no athlete) before saving.
+  const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries.filter((e) => e.athlete)); setEditing(false); setEditEntries([]); setRawTimes({}); } };
+  // Append a blank kickoff in edit mode so the coach can log one after the fact.
+  const addEntry = () => {
+    const sole = athleteOptions.length === 1 ? athleteOptions[0] : "";
+    setEditEntries((prev) => [...prev, {
+      athleteId: sole ? (athleteIdByName[sole] ?? "") : "",
+      athlete: sole, type: "", distance: 0, hangTime: 0, direction: "", score: 0, kickNum: prev.length + 1,
+    } as KickoffEntry]);
+  };
+  const setEntryAthlete = (idx: number, name: string) => {
+    setEditEntries((prev) => prev.map((e, i) => i === idx ? { ...e, athlete: name, athleteId: athleteIdByName[name] ?? "" } : e));
+  };
   const updateEntry = (idx: number, field: keyof KickoffEntry, value: unknown) => { setEditEntries((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e)); };
   const deleteEntry = (idx: number) => {
     setEditEntries((prev) => prev.filter((_, i) => i !== idx).map((e, i) => ({ ...e, kickNum: i + 1 })));
@@ -517,8 +533,27 @@ function KickoffHistoryContent() {
                   {(editing ? editEntries : entries).map((e, i) => (
                     <tr key={i} className="hover:bg-surface/30">
                       <td className="table-cell text-left text-muted">{e.kickNum ?? i + 1}</td>
-                      <td className="table-name">{e.athlete}</td>
-                      <td className="table-cell text-left text-muted">{koTypeLabels[e.type ?? ""] ?? (e.type || "—")}</td>
+                      {editing ? (
+                        <td className="table-name p-1">
+                          <select value={e.athlete} onChange={(ev) => setEntryAthlete(i, ev.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200 max-w-[110px]">
+                            <option value="">—</option>
+                            {[...new Set([...athleteOptions, ...(e.athlete ? [e.athlete] : [])])].sort((a, b) => a.localeCompare(b)).map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </td>
+                      ) : (
+                        <td className="table-name">{e.athlete}</td>
+                      )}
+                      {editing ? (
+                        <td className="table-cell p-1">
+                          <select value={e.type ?? ""} onChange={(ev) => updateEntry(i, "type", ev.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200 max-w-[120px]">
+                            <option value="">—</option>
+                            {e.type && !koTypes.some((t) => t.id === e.type) && <option value={e.type}>{koTypeLabels[e.type] ?? e.type}</option>}
+                            {koTypes.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                          </select>
+                        </td>
+                      ) : (
+                        <td className="table-cell text-left text-muted">{koTypeLabels[e.type ?? ""] ?? (e.type || "—")}</td>
+                      )}
                       <td className="table-cell text-muted">{e.hash || "—"}</td>
                       {editing ? (
                         <>
@@ -555,6 +590,9 @@ function KickoffHistoryContent() {
                   ))}
                 </tbody>
               </table>
+              {editing && (
+                <button onClick={addEntry} className="mt-2 text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">+ Add Kickoff</button>
+              )}
             </div>
           </>
         )}

@@ -138,7 +138,16 @@ function KickingHistoryContent() {
   const [rawTimes, setRawTimes] = useState<Record<string, string>>({});
   const startEditing = () => { setEditEntries((selected?.entries ?? []) as FGKick[]); setRawTimes({}); setEditing(true); };
   const cancelEditing = () => { setEditing(false); setEditEntries([]); setRawTimes({}); };
-  const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries); setEditing(false); setEditEntries([]); setRawTimes({}); } };
+  // Drop any blank rows added but never filled in (no athlete) before saving.
+  const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries.filter((k) => k.athlete)); setEditing(false); setEditEntries([]); setRawTimes({}); } };
+  // Append a blank kick in edit mode so the coach can log one after the fact.
+  const addEntry = () => {
+    const sole = athleteOptions.length === 1 ? athleteOptions[0] : "";
+    setEditEntries((prev) => [...prev, { athleteId: sole ? (athleteIdByName[sole] ?? "") : "", athlete: sole, dist: 0, pos: "M", result: "YC", score: 0, kickNum: prev.length + 1 }]);
+  };
+  const setEntryAthlete = (idx: number, name: string) => {
+    setEditEntries((prev) => prev.map((k, i) => i === idx ? { ...k, athlete: name, athleteId: athleteIdByName[name] ?? "" } : k));
+  };
   const updateEntry = (idx: number, field: keyof FGKick, value: unknown) => { setEditEntries((prev) => prev.map((k, i) => i === idx ? { ...k, [field]: value } : k)); };
   const updateTime = (idx: number, field: "opTime", rawInput: string) => {
     const digits = rawInput.replace(/\D/g, "").slice(0, 4);
@@ -169,6 +178,10 @@ function KickingHistoryContent() {
   };
   const kicks = (selected?.entries ?? []) as FGKick[];
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
+  // Athletes already in this session, for the Athlete dropdown when editing/adding.
+  const athleteIdByName: Record<string, string> = {};
+  kicks.forEach((k) => { if (k.athlete && !(k.athlete in athleteIdByName)) athleteIdByName[k.athlete] = k.athleteId; });
+  const athleteOptions = Object.keys(athleteIdByName).sort((a, b) => a.localeCompare(b));
 
   return (
     <main className="flex flex-col lg:flex-row h-[calc(100vh-100px)] overflow-hidden">
@@ -617,7 +630,14 @@ function KickingHistoryContent() {
                           </button>
                         )}
                       </td>
-                      <td className="table-name">{k.athlete}</td>
+                      <td className="table-name p-1">
+                        {editing ? (
+                          <select value={k.athlete} onChange={(e) => setEntryAthlete(i, e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200 max-w-[110px]">
+                            <option value="">—</option>
+                            {[...new Set([...athleteOptions, ...(k.athlete ? [k.athlete] : [])])].sort((a, b) => a.localeCompare(b)).map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        ) : k.athlete}
+                      </td>
                       <td className="table-cell p-1">
                         {viewOnly ? (
                           <span className="text-xs text-muted" title={k.holder || "No holder"}>{toInitials(k.holder)}</span>
@@ -679,6 +699,9 @@ function KickingHistoryContent() {
                   ))}
                 </tbody>
               </table>
+              {editing && (
+                <button onClick={addEntry} className="mt-2 text-xs px-2.5 py-1.5 rounded-input border border-accent/50 text-accent hover:bg-accent/10 transition-all font-semibold">+ Add Kick</button>
+              )}
             </div>
             ); })()}
           </>)}
