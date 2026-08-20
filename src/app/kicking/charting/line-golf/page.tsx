@@ -29,6 +29,7 @@ export default function LineGolfPage() {
   const [targetYL] = useState("50");
   const [kicksPerPlayer, setKicksPerPlayer] = useState(10);
   const [gameStarted, setGameStarted] = useState(false);
+  const [activePlayer, setActivePlayer] = useState<string | null>(null);
   const [gameOver, setGameOver] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -38,12 +39,20 @@ export default function LineGolfPage() {
 
   const players = mode === "single" ? (selectedPlayers.length === 1 ? selectedPlayers : []) : selectedPlayers;
   const totalKicks = players.length * kicksPerPlayer;
-  const currentKickIdx = results.length;
-  const currentPlayerIdx = players.length > 0 ? currentKickIdx % players.length : 0;
-  const currentPlayer = players[currentPlayerIdx] ?? "";
+  // Whose turn it is. Advances in order after each kick, but a coach can tap any
+  // name on the scoreboard to hand the next kick to someone else.
+  const currentPlayer = activePlayer && players.includes(activePlayer) ? activePlayer : (players[0] ?? "");
   const target = parseInt(targetYL) || 50;
 
+  // Hand the next kick to the player after whoever just kicked.
+  const advanceFrom = (justKicked: string) => {
+    if (players.length === 0) return;
+    const idx = players.indexOf(justKicked);
+    setActivePlayer(players[(idx + 1) % players.length]);
+  };
+
   const getPlayerResults = (name: string) => results.filter((r) => r.athlete === name);
+  const scoredPlayers = players.filter((p) => results.some((r) => r.athlete === p));
   const getPlayerScore = (name: string) => getPlayerResults(name).reduce((s, r) => s + r.score, 0);
 
   const togglePlayer = (name: string) => {
@@ -56,6 +65,7 @@ export default function LineGolfPage() {
     const score = Math.min(off, MAX_SCORE_PER_KICK);
     setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target - score, direction: "left", score }]);
     setLeftInput("");
+    advanceFrom(currentPlayer);
     if (results.length + 1 >= totalKicks) setGameOver(true);
   };
 
@@ -65,19 +75,25 @@ export default function LineGolfPage() {
     const score = Math.min(off, MAX_SCORE_PER_KICK);
     setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target + score, direction: "right", score }]);
     setRightInput("");
+    advanceFrom(currentPlayer);
     if (results.length + 1 >= totalKicks) setGameOver(true);
   };
 
   const handleSubmitCenter = () => {
     setResults((prev) => [...prev, { athlete: currentPlayer, target, landed: target, direction: "center", score: 0 }]);
+    advanceFrom(currentPlayer);
     if (results.length + 1 >= totalKicks) setGameOver(true);
   };
 
   const handleUndo = () => {
     if (results.length === 0) return;
+    setActivePlayer(results[results.length - 1].athlete);
     setResults((prev) => prev.slice(0, -1));
     setGameOver(false);
   };
+
+  // End the chart early — e.g. 5 kicks selected but only time for 3.
+  const handleFinish = () => setGameOver(true);
 
   const handleSave = () => {
     if (results.length === 0) return;
@@ -87,7 +103,7 @@ export default function LineGolfPage() {
       score: r.score, kickNum: i + 1,
     }));
     const label = mode === "multi"
-      ? `Line Golf @ ${target}yd — ${players.map((p) => `${p}: ${getPlayerScore(p)}`).join(" vs ")}`
+      ? `Line Golf @ ${target}yd — ${scoredPlayers.map((p) => `${p}: ${getPlayerScore(p)}`).join(" vs ")}`
       : `Line Golf @ ${target}yd — Score: ${getPlayerScore(players[0])}`;
     commitPractice(kicks, label);
     setSaved(true);
@@ -95,7 +111,7 @@ export default function LineGolfPage() {
 
   const handleNewGame = () => {
     setResults([]); setGameStarted(false); setGameOver(false);
-    setMode(null); setSelectedPlayers([]); setSaved(false);
+    setMode(null); setSelectedPlayers([]); setSaved(false); setActivePlayer(null);
     setLeftInput(""); setRightInput("");
   };
 
@@ -142,7 +158,7 @@ export default function LineGolfPage() {
               ))}
             </div>
           </div>
-          <button onClick={() => setGameStarted(true)} disabled={!canStart} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
+          <button onClick={() => { setActivePlayer(selectedPlayers[0] ?? null); setGameStarted(true); }} disabled={!canStart} className="btn-primary py-3 px-8 text-sm w-full disabled:opacity-40">Start Game</button>
           <button onClick={() => { setMode(null); setSelectedPlayers([]); }} className="text-xs text-muted hover:text-white transition-colors">← Back</button>
         </div>
       </div>
@@ -155,9 +171,12 @@ export default function LineGolfPage() {
       <div className="flex-1 overflow-y-auto p-4">
         <div className="max-w-2xl mx-auto space-y-6 text-center">
           <h2 className="text-2xl font-extrabold text-slate-100">Game Over</h2>
-          <p className="text-sm text-muted">Target: {target} yard line</p>
-          <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${players.length}, minmax(0, 1fr))` }}>
-            {players.map((p) => {
+          <p className="text-sm text-muted">
+            Target: {target} yard line
+            {results.length < totalKicks && ` · finished early (${results.length} of ${totalKicks} kicks)`}
+          </p>
+          <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${Math.max(1, scoredPlayers.length)}, minmax(0, 1fr))` }}>
+            {scoredPlayers.map((p) => {
               const pr = getPlayerResults(p);
               const sc = getPlayerScore(p);
               return (
@@ -223,19 +242,24 @@ export default function LineGolfPage() {
             {players.map((p, i) => (
               <div key={p} className="flex items-center gap-3">
                 {i > 0 && <span className="text-xs text-muted font-bold">vs</span>}
-                <div className={clsx("card-2 px-4 py-2 text-center", p === currentPlayer && "ring-2 ring-accent")}>
+                <button
+                  type="button"
+                  onClick={() => setActivePlayer(p)}
+                  className={clsx("card-2 px-4 py-2 text-center transition-all", p === currentPlayer ? "ring-2 ring-accent" : "opacity-70 hover:opacity-100 hover:border-accent/40")}
+                >
                   <p className="text-xs font-bold text-slate-200">{p}</p>
                   <p className="text-lg font-black text-accent">{getPlayerScore(p)}</p>
                   <p className="text-[10px] text-muted">Kick {getPlayerResults(p).length + (p === currentPlayer ? 1 : 0)}/{kicksPerPlayer}</p>
-                </div>
+                </button>
               </div>
             ))}
           </div>
         )}
+        {mode === "multi" && <p className="text-[10px] text-muted text-center -mt-2">Tap a name to give them the next kick</p>}
 
         {/* Progress */}
         <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-          <div className="h-full bg-accent transition-all" style={{ width: `${(results.length / totalKicks) * 100}%` }} />
+          <div className="h-full bg-accent transition-all" style={{ width: `${Math.min(100, (results.length / totalKicks) * 100)}%` }} />
         </div>
 
         {/* Field view — 0 in center, counts up to 10 each side */}
@@ -264,7 +288,7 @@ export default function LineGolfPage() {
               }).length;
               return (
                 <div key={i} className="absolute -translate-x-1/2" style={{ left: `${Math.max(2, Math.min(98, pct))}%`, top: `${15 + samePosBefore * 24}%` }}>
-                  <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", r.score === 0 ? "bg-green-500" : r.score <= 2 ? "bg-accent" : "bg-red-500")}>
+                  <div className={clsx("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black text-white", r.score <= 2 ? "bg-green-500" : "bg-red-500")}>
                     {i + 1}
                   </div>
                 </div>
@@ -294,6 +318,7 @@ export default function LineGolfPage() {
         <div className="flex gap-2">
           {results.length > 0 && <button onClick={handleUndo} className="text-xs px-3 py-2 rounded-input border border-border text-muted hover:text-white font-semibold transition-all">Undo</button>}
           <button onClick={() => { if (leftInput) handleSubmitLeft(); else if (rightInput) handleSubmitRight(); }} disabled={!leftInput && !rightInput} className="btn-primary flex-1 py-2 text-sm font-bold disabled:opacity-40">Go</button>
+          {results.length > 0 && <button onClick={handleFinish} className="text-xs px-3 py-2 rounded-input border border-accent/50 text-accent hover:bg-accent/10 font-semibold transition-all">Finish</button>}
         </div>
 
         {/* Mini log */}
