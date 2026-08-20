@@ -32,6 +32,24 @@ function toInitials(name?: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/** A PAT row: flagged as one, or carrying the "PAT" spot the session logger writes.
+ *  PATs are all snapped from the same spot, so they have no kick distance. */
+function isPatKick(k: { isPAT?: boolean; pos?: string }): boolean {
+  return k.isPAT === true || k.pos === "PAT";
+}
+
+// Spelled-out result names for the edit dropdown — the stored codes (YC, XS, …)
+// mean nothing to a coach mid-edit.
+const RESULT_EDIT_LABELS: Record<string, string> = {
+  YL: "\u2713 Good \u2014 Left",
+  YC: "\u2713 Good \u2014 Middle",
+  YR: "\u2713 Good \u2014 Right",
+  XL: "\u2717 Miss Left",
+  XS: "\u2717 Miss Short",
+  XR: "\u2717 Miss Right",
+  X: "\u2717 Miss",
+};
+
 function formatResult(result: string, makeMode: "simple" | "detailed"): string {
   if (result.startsWith("Y")) {
     if (makeMode === "simple") return "✓";
@@ -149,6 +167,16 @@ function KickingHistoryContent() {
     setEditEntries((prev) => prev.map((k, i) => i === idx ? { ...k, athlete: name, athleteId: athleteIdByName[name] ?? "" } : k));
   };
   const updateEntry = (idx: number, field: keyof FGKick, value: unknown) => { setEditEntries((prev) => prev.map((k, i) => i === idx ? { ...k, [field]: value } : k)); };
+  // Spot changes go through here so PAT stays consistent: picking PAT flags the
+  // kick and drops its distance, and moving off PAT clears the flag. Without
+  // this a PAT edited in here counts as a 0-yard field goal in the stats.
+  const updatePos = (idx: number, value: string) => {
+    setEditEntries((prev) => prev.map((k, i) => {
+      if (i !== idx) return k;
+      if (value === "PAT") return { ...k, pos: "PAT" as FGKick["pos"], isPAT: true, dist: 0 };
+      return { ...k, pos: value as FGKick["pos"], isPAT: undefined };
+    }));
+  };
   const updateTime = (idx: number, field: "opTime", rawInput: string) => {
     const digits = rawInput.replace(/\D/g, "").slice(0, 4);
     setRawTimes((prev) => ({ ...prev, [`${idx}-${field}`]: digits }));
@@ -668,15 +696,21 @@ function KickingHistoryContent() {
                       </td>
                       {editing ? (
                         <>
-                          <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.dist || ""} onChange={(e) => updateEntry(i, "dist", parseInt(e.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                           <td className="table-cell p-1">
-                            <select value={k.pos} onChange={(e) => updateEntry(i, "pos", e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
+                            {isPatKick(k) ? (
+                              <span className="inline-block w-12 text-center text-xs text-muted" title="PATs are kicked from a fixed spot — no distance">—</span>
+                            ) : (
+                              <input type="text" inputMode="numeric" value={k.dist || ""} onChange={(e) => updateEntry(i, "dist", parseInt(e.target.value) || 0)} className="w-12 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
+                            )}
+                          </td>
+                          <td className="table-cell p-1">
+                            <select value={isPatKick(k) ? "PAT" : k.pos} onChange={(e) => updatePos(i, e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
                               {["LH","LM","M","RM","RH","PAT"].map((p) => <option key={p} value={p}>{p}</option>)}
                             </select>
                           </td>
                           <td className="table-cell p-1">
                             <select value={k.result} onChange={(e) => updateEntry(i, "result", e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
-                              {["YL","YC","YR","XL","XS","XR","X"].map((r) => <option key={r} value={r}>{r}</option>)}
+                              {["YL","YC","YR","XL","XS","XR","X"].map((r) => <option key={r} value={r}>{RESULT_EDIT_LABELS[r] ?? r}</option>)}
                             </select>
                           </td>
                           {!hideScore && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}
@@ -684,7 +718,7 @@ function KickingHistoryContent() {
                         </>
                       ) : (
                         <>
-                          <td className="table-cell">{k.dist} yd</td>
+                          <td className="table-cell">{isPatKick(k) ? <span className="text-muted">—</span> : `${k.dist} yd`}</td>
                           <td className="table-cell text-muted">{k.pos}</td>
                           <td className="table-cell">
                             <span className={clsx("text-xs font-semibold", k.result.startsWith("Y") ? "text-make" : "text-miss")}>
