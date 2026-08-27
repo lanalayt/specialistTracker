@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { usePunt } from "@/lib/puntContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { IntervalStopwatch } from "@/components/ui/IntervalStopwatch";
@@ -122,6 +122,9 @@ interface PartialPuntInput {
   directionalAccuracy: number | string;
   starred: boolean;
   poochYL?: string;
+  // Practice yard-line entry (see practiceDistMode)
+  startYL?: string;
+  landYL?: string;
 }
 
 interface SessionDraft {
@@ -139,6 +142,9 @@ interface SessionDraft {
   sessionMode?: "practice" | "game";
   opponent?: string;
   gameTime?: string;
+  // Practice only: "total" = type the distance, "yardline" = derive it from
+  // the start / landing yard lines (same convention as game punts).
+  practiceDistMode?: PracticeDistMode;
 }
 
 const emptyRow = (): LogRow => ({
@@ -182,6 +188,17 @@ function loadPracticeEntryPref(): boolean {
 }
 function savePracticeEntryPref(manual: boolean) {
   setAppPref(ENTRY_MODE_PREF, manual);
+}
+
+// Practice live entry: type a total distance, or enter the start + landing yard
+// lines and let the distance fall out of them (same convention as game punts).
+type PracticeDistMode = "total" | "yardline";
+const DIST_MODE_PREF = "puntPracticeDistMode"; // per-user app pref
+function loadPracticeDistMode(): PracticeDistMode {
+  return getAppPref<string>(DIST_MODE_PREF) === "yardline" ? "yardline" : "total";
+}
+function savePracticeDistMode(mode: PracticeDistMode) {
+  setAppPref(DIST_MODE_PREF, mode);
 }
 
 interface PuntTypeConfig {
@@ -505,6 +522,12 @@ export default function PuntingSessionPage() {
   const [returnYardsInput, setReturnYardsInput] = useState<string>("");
   // Pooch punt only: yard line where ball landed (practice log mode)
   const [poochYL, setPoochYL] = useState<string>(initPartial?.poochYL ?? "");
+  // Practice only: total-distance entry vs start/landing yard-line entry
+  const [practiceDistMode, setPracticeDistMode] = useState<PracticeDistMode>(
+    draft.practiceDistMode ?? loadPracticeDistMode()
+  );
+  const [startYL, setStartYL] = useState<string>(initPartial?.startYL ?? "");
+  const [landYL, setLandYL] = useState<string>(initPartial?.landYL ?? "");
 
   // Persist draft on every relevant state change (after the DB restore has run,
   // so the empty initial state can't clobber a saved draft).
@@ -512,7 +535,7 @@ export default function PuntingSessionPage() {
     if (!mainDraftHydrated.current || !sessionMode) return;
     // Merge current input fields into partialInputs for the active punt
     const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, startYL, landYL } }
       : partialInputs;
     saveDraftForMode({
       rows,
@@ -529,15 +552,16 @@ export default function PuntingSessionPage() {
       sessionMode: sessionMode ?? undefined,
       opponent,
       gameTime,
+      practiceDistMode,
     }, sessionMode);
-  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, committedPunts, weather, sessionMode, opponent, gameTime]);
+  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, committedPunts, weather, sessionMode, opponent, gameTime, practiceDistMode, startYL, landYL]);
 
   // ── Switch between practice / game mode with independent drafts ──
   const switchMode = (newMode: "practice" | "game") => {
     if (newMode === sessionMode) return;
     // Save current state to current mode's draft
     const mergedPartials = sessionActive
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, startYL, landYL } }
       : partialInputs;
     const currentDraft: SessionDraft = {
       rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices,
@@ -545,6 +569,7 @@ export default function PuntingSessionPage() {
       committed, committedWeather: committed ? weather : undefined,
       committedPunts: committed ? committedPunts : undefined,
       sessionMode: sessionMode ?? undefined, opponent, gameTime,
+      practiceDistMode,
     };
     if (sessionMode) saveDraftForMode(currentDraft, sessionMode);
     // Load new mode's draft
@@ -564,6 +589,9 @@ export default function PuntingSessionPage() {
     setDirectionalAccuracy(newPartial?.directionalAccuracy ?? defaultDA);
     setStarred(newPartial?.starred ?? false);
     setPoochYL(newPartial?.poochYL ?? "");
+    setPracticeDistMode(nd?.practiceDistMode ?? loadPracticeDistMode());
+    setStartYL(newPartial?.startYL ?? "");
+    setLandYL(newPartial?.landYL ?? "");
     setLos("");
     setLandingYL("");
     setReturnYardsInput("");
@@ -905,6 +933,20 @@ export default function PuntingSessionPage() {
   // Bumped on each Log Punt so the stopwatch remounts (stops + resets to 0).
   const [swReset, setSwReset] = useState(0);
 
+  // Practice yard-line entry uses the same sign convention as game punts:
+  //   start "-30" = own 30 → 30, landing "40" = opponent 40 → 60 ⇒ a 30 yd punt.
+  // Pooch/yard-line punt types keep their own Landing YL field instead.
+  const practiceYLActive =
+    sessionMode !== "game" &&
+    practiceDistMode === "yardline" &&
+    !isYardLineType(currentPlan?.type, puntTypes);
+  const practiceYL = useMemo(() => {
+    const start = parseYardLine(startYL, "-");   // start defaults to own side
+    const land = parseYardLine(landYL, "+");     // landing defaults to opponent side
+    if (isNaN(start) || isNaN(land)) return null;
+    return { start, land, distance: Math.max(0, land - start) };
+  }, [startYL, landYL]);
+
   const updateCurrentPlan = (field: "athlete" | "type" | "hash", value: string) => {
     setPlannedPunts((prev) => {
       const next = [...prev];
@@ -927,14 +969,25 @@ export default function PuntingSessionPage() {
     const plan = plannedPunts[currentPuntIdx];
     const htVal = parseFloat(hangTime) || 0;
     const otVal = parseFloat(opTime) || 0;
-    const losVal = los !== "" ? parseInt(los) || 0 : undefined;
-    const landingYLVal = landingYL !== "" ? parseInt(landingYL) || 0 : undefined;
+    let losVal = los !== "" ? parseInt(los) || 0 : undefined;
+    let landingYLVal = landingYL !== "" ? parseInt(landingYL) || 0 : undefined;
     // In game mode, compute gross yards automatically from LOS and landing YL
     let ydsVal = parseInt(yards) || 0;
     let retVal: number | undefined = undefined;
     if (sessionMode === "game" && losVal != null && landingYLVal != null) {
       ydsVal = Math.max(0, landingYLVal - losVal);
       retVal = returnYardsInput !== "" ? parseInt(returnYardsInput) || 0 : undefined;
+    }
+    // Practice + yard-line entry: distance falls out of the two yard lines, and
+    // the yard lines ride along on the entry so the punt can be charted later.
+    if (practiceYLActive && (startYL !== "" || landYL !== "")) {
+      if (!practiceYL) {
+        alert("Yard lines must be 0–50, and both are needed to get a distance.\nStart: use - for own side (default), + for opponent.\nLanding: no sign or + for opponent side (default), - for own side.\nExample: Start=-30, Landing=40 → 30 yd punt.");
+        return;
+      }
+      ydsVal = practiceYL.distance;
+      losVal = practiceYL.start;
+      landingYLVal = practiceYL.land;
     }
     // Pooch punts (practice mode): don't track distance — track landing YL only
     const isPooch = isYardLineType(plan.type, puntTypes);
@@ -947,7 +1000,7 @@ export default function PuntingSessionPage() {
       poochYLVal = Math.max(0, 100 - landingYLVal);
     }
     // Auto-detect touchback: landing at opponent's end zone (field pos >= 100)
-    const isTouchback = landingYLVal != null && landingYLVal >= 100;
+    const isTouchback = sessionMode === "game" && landingYLVal != null && landingYLVal >= 100;
     const liveZones: PuntLandingZone[] = [];
     if (isTouchback) liveZones.push("TB");
     const punt: PuntEntry = {
@@ -1026,6 +1079,12 @@ export default function PuntingSessionPage() {
       setDirectionalAccuracy(defaultDA);
       setStarred(!!plannedPunts[advanceIdx]?.starred);
       setPoochYL("");
+    }
+    // Practice yard-line entry: reps usually repeat from the same spot, so keep
+    // the start yard line and only clear where the ball landed.
+    if (sessionMode !== "game") {
+      setStartYL(nextPartial?.startYL ?? startYL);
+      setLandYL(nextPartial?.landYL ?? "");
     }
     // Game mode: after logging, seed next LOS with (landingYL - returnYards),
     // and clear landing YL + return for the next punt.
@@ -1320,7 +1379,7 @@ export default function PuntingSessionPage() {
   // ── Save Draft to cloud ──────────────────────────────────────
   const handleSaveDraft = () => {
     const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, startYL, landYL } }
       : partialInputs;
     const draft: SessionDraft = {
       rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices,
@@ -1328,6 +1387,7 @@ export default function PuntingSessionPage() {
       committed, committedWeather: committed ? weather : undefined,
       committedPunts: committed ? committedPunts : undefined,
       sessionMode: sessionMode ?? undefined, opponent, gameTime,
+      practiceDistMode,
     };
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
@@ -1741,9 +1801,77 @@ export default function PuntingSessionPage() {
                       />
                     )}
 
+                    {/* Practice: choose how distance is entered — typed total,
+                        or start/landing yard lines that calculate it (same
+                        convention as game punts). */}
+                    {sessionMode !== "game" && !isYardLineType(currentPlan?.type, puntTypes) && (
+                      <div className="space-y-2">
+                        <div className="flex gap-1 p-1 rounded-input bg-surface-2 border border-border">
+                          {([
+                            ["total", "Total Distance"],
+                            ["yardline", "Yard Lines"],
+                          ] as [PracticeDistMode, string][]).map(([m, label]) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => { setPracticeDistMode(m); savePracticeDistMode(m); }}
+                              disabled={viewOnly}
+                              className={clsx(
+                                "flex-1 py-1.5 rounded-input text-[11px] font-bold uppercase tracking-wider transition-all",
+                                practiceDistMode === m
+                                  ? "bg-accent text-white"
+                                  : "text-muted hover:text-white"
+                              )}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {practiceDistMode === "yardline" && (
+                          <>
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <p className="label">Start YL</p>
+                                <input
+                                  className="input text-center text-lg font-bold"
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="-30"
+                                  value={startYL}
+                                  onChange={(e) => setStartYL(e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <p className="label">Landing YL</p>
+                                <input
+                                  className="input text-center text-lg font-bold"
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="40"
+                                  value={landYL}
+                                  onChange={(e) => setLandYL(e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <p className="label">Distance</p>
+                                <div className="input text-center text-lg font-bold text-accent">
+                                  {practiceYL && practiceYL.distance > 0 ? `${practiceYL.distance}` : "—"}
+                                </div>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-muted text-center">
+                              Own side is <span className="text-slate-300">-</span>, opponent side is{" "}
+                              <span className="text-slate-300">+</span> — e.g. -30 to 40 is a 30 yd punt.
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                     {/* Yards + Hang Time + Opp Time */}
                     <div className="grid grid-cols-3 gap-3">
-                      {sessionMode !== "game" && !isYardLineType(currentPlan?.type, puntTypes) && (
+                      {sessionMode !== "game" && practiceDistMode === "total" && !isYardLineType(currentPlan?.type, puntTypes) && (
                         <div>
                           <p className="label">Yards</p>
                           <input

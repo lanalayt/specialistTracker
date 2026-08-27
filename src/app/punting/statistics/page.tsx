@@ -418,7 +418,7 @@ function PuntStatsView({
   typeLabels: Record<string, string>;
   typeMetrics: Record<string, "distance" | "yardline">;
   label: string;
-  history: { entries?: PuntEntry[] }[];
+  history: { entries?: PuntEntry[]; mode?: string }[];
   puntFilter?: (p: PuntEntry) => boolean;
 }) {
   // Map any punt type to a category — handles legacy types not in current config
@@ -490,10 +490,13 @@ function PuntStatsView({
 
   const hasPoochData = Object.values(poochYLStats).some((s) => s.att > 0);
 
-  // All game punts with LOS + landing YL for the field view
+  // All game punts with LOS + landing YL for the field view. Practice punts can
+  // also carry yard lines now (yard-line distance entry), so gate on the
+  // session mode — otherwise practice reps would land in the game stats.
   const gamePunts = useMemo(() => {
     const all: PuntEntry[] = [];
     history.forEach((session) => {
+      if (session.mode !== "game") return;
       (session.entries ?? []).forEach((p) => {
         if (puntFilter && !puntFilter(p)) return;
         if (p.los != null && p.landingYL != null) all.push(p);
