@@ -719,7 +719,9 @@ export default function KickoffSessionPage() {
 
     const retVal = r.touchback ? 0 : (r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined);
     const losVal = 35; // kickoff spot — own 35
-    const landingYLVal = Math.min(100, losVal + distance);
+    // Not capped at the goal line — a kick that carries into or out of the end zone
+    // keeps its true landing spot (105 = mid end zone, 110 = back line, 115 = 5 out).
+    const landingYLVal = losVal + distance;
     const filledIdx = filledIndices.indexOf(rowIdx);
     const kickNum = filledIdx >= 0 ? filledIdx + 1 : sessionKicks.length + 1;
     const kick: KickoffEntry = {

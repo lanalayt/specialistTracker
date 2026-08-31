@@ -14,8 +14,16 @@ const H = 380;
 const PAD_X = 20;
 const TOP_Y = 100;
 const BOTTOM_Y = 340;
-const FIELD_MIN = -10;
-const FIELD_MAX = 110;
+// Playing surface runs -10 (back of left end zone) to 110 (back of right end zone).
+// The drawn area extends past both back lines so kickoffs that carry out of the end
+// zone keep going instead of piling up on the goal line: from the own 35, 70 yds
+// lands mid end zone (105), 75 at the back line (110), 80 five yds out the back (115).
+const GOAL_MIN = 0;
+const GOAL_MAX = 100;
+const BACK_MIN = -10;
+const BACK_MAX = 110;
+const FIELD_MIN = -20;
+const FIELD_MAX = 120;
 const FIELD_RANGE = FIELD_MAX - FIELD_MIN;
 
 function proj(fieldX: number, fieldY: number): { x: number; y: number } {
@@ -27,9 +35,21 @@ function proj(fieldX: number, fieldY: number): { x: number; y: number } {
   return { x: W / 2 + xT * halfWidth, y };
 }
 
+// Keep an absurd distance inside the drawn area; real kickoffs stay well short of this.
+function clampToField(fieldX: number): number { return Math.max(FIELD_MIN, Math.min(FIELD_MAX, fieldX)); }
+
+// Landing spot is fully determined by the tee and the distance kicked, so prefer
+// that over a stored landingYL (older sessions saved it capped at the goal line).
+function landingSpot(k: { los?: number; landingYL?: number; distance?: number }): number {
+  const los = k.los ?? 35;
+  if ((k.distance ?? 0) > 0) return los + (k.distance as number);
+  return k.landingYL ?? los;
+}
+
 function hangLift(ht: number | undefined): number { const h = Math.max(0.5, Math.min(ht ?? 3, 6)); return 20 + (h / 6) * 100; }
 
-function renderArc(key: string | number, los: number, landing: number, ht: number | undefined, retYds: number | undefined, opacity: number, color = "#f59e0b", sw = 2.5) {
+function renderArc(key: string | number, los: number, landingRaw: number, ht: number | undefined, retYds: number | undefined, opacity: number, color = "#f59e0b", sw = 2.5) {
+  const landing = clampToField(landingRaw);
   if (landing <= los) return null;
   const fy = 26.5;
   const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
@@ -70,13 +90,22 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
   }
 
   const leftEZ = (() => {
-    const tl = proj(-10, 0); const tr = proj(0, 0); const br = proj(0, 53); const bl = proj(-10, 53);
+    const tl = proj(BACK_MIN, 0); const tr = proj(GOAL_MIN, 0); const br = proj(GOAL_MIN, 53); const bl = proj(BACK_MIN, 53);
     return <polygon points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill={ezColor} opacity={0.3} />;
   })();
   const rightEZ = (() => {
-    const tl = proj(100, 0); const tr = proj(110, 0); const br = proj(110, 53); const bl = proj(100, 53);
+    const tl = proj(GOAL_MAX, 0); const tr = proj(BACK_MAX, 0); const br = proj(BACK_MAX, 53); const bl = proj(GOAL_MAX, 53);
     return <polygon points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill={ezColor} opacity={0.3} />;
   })();
+
+  // Faint 5-yard ticks on the apron past each back line, so a kick that carries
+  // out of the end zone still reads at a glance (115 = 5 yds out the back).
+  const overrunLines: React.ReactNode[] = [];
+  for (const fx of [BACK_MIN - 5, BACK_MIN - 10, BACK_MAX + 5, BACK_MAX + 10]) {
+    const far = proj(fx, 0); const near = proj(fx, 53);
+    overrunLines.push(<line key={`ov-${fx}`} x1={far.x} y1={far.y} x2={near.x} y2={near.y}
+      stroke="rgba(255,255,255,0.09)" strokeWidth={1} strokeDasharray="4,5" />);
+  }
 
   const yardLines: React.ReactNode[] = [];
   for (let fx = 0; fx <= 100; fx += 10) {
@@ -134,11 +163,15 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
         <rect x={0} y={0} width={W} height={TOP_Y} fill="url(#ko-sky)" />
         <circle cx={W * 0.2} cy={10} r={60} fill="rgba(255,255,255,0.02)" />
         <circle cx={W * 0.8} cy={10} r={60} fill="rgba(255,255,255,0.02)" />
-        {(() => { const tl = proj(-10, 0); const tr = proj(110, 0); const br = proj(110, 53); const bl = proj(-10, 53);
+        {/* Apron beyond the back of each end zone — where a long kick keeps carrying */}
+        {(() => { const tl = proj(FIELD_MIN, 0); const tr = proj(FIELD_MAX, 0); const br = proj(FIELD_MAX, 53); const bl = proj(FIELD_MIN, 53);
+          return <polygon points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill="#0b1220" />; })()}
+        {(() => { const tl = proj(BACK_MIN, 0); const tr = proj(BACK_MAX, 0); const br = proj(BACK_MAX, 53); const bl = proj(BACK_MIN, 53);
           return <polygon points={`${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`} fill="#14532d" />; })()}
+        {overrunLines}
         {leftEZ}{rightEZ}
         {stripes}
-        {(() => { const tl = proj(-10, 0); const tr = proj(110, 0); const bl = proj(-10, 53); const br = proj(110, 53);
+        {(() => { const tl = proj(BACK_MIN, 0); const tr = proj(BACK_MAX, 0); const bl = proj(BACK_MIN, 53); const br = proj(BACK_MAX, 53);
           return (<>
             <line x1={tl.x} y1={tl.y} x2={tr.x} y2={tr.y} stroke="white" strokeWidth={3} />
             <line x1={bl.x} y1={bl.y} x2={br.x} y2={br.y} stroke="white" strokeWidth={3} />
@@ -167,7 +200,7 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           );
         })}
         {kicks.map((k, i) => {
-          const los = k.los ?? 35; const landing = k.landingYL ?? (los + (k.distance || 0));
+          const los = k.los ?? 35; const landing = clampToField(landingSpot(k));
           if (landing <= los) return null;
           const isSelected = selectedIdx === i;
           const arc = renderArc(i, los, landing, k.hangTime, k.returnYards, isSelected ? 1 : 0.7, isSelected ? "#fbbf24" : "#f59e0b", isSelected ? 3.5 : 2.5);
@@ -184,20 +217,20 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           );
         })}
         {currentKick && (() => {
-          const los = currentKick.los ?? 35; const landing = currentKick.landingYL ?? (los + (currentKick.distance ?? 0));
+          const los = currentKick.los ?? 35; const landing = clampToField(landingSpot(currentKick));
           if (landing <= los) return null;
           return renderArc("preview", los, landing, currentKick.hangTime, 0, 1, "#fbbf24", 3.5);
         })()}
         {/* Tooltip for selected kickoff */}
         {selectedIdx != null && kicks[selectedIdx] && (() => {
           const k = kicks[selectedIdx];
-          const los = k.los ?? 35; const landing = k.landingYL ?? (los + (k.distance || 0));
+          const los = k.los ?? 35; const landing = clampToField(landingSpot(k));
           if (landing <= los) return null;
           const fy = 26.5;
           const sP = proj(los, fy); const eP = proj(landing, fy);
           const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
           const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
-          const dist = k.distance || (landing - los);
+          const dist = k.distance || (landingSpot(k) - los);
           return (
             <g>
               <rect x={tx - 75} y={ty - 28} width={150} height={36} rx={6} fill="rgba(0,0,0,0.9)" stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
