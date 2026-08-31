@@ -13,7 +13,7 @@ import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, PuntType, PuntHash, PuntLandingZone } from "@/types";
 import { PUNT_HASHES } from "@/types";
 import { insertSession as insertSnapSession, updateSession as updateSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
-import { genId as genSnapId } from "@/lib/stats";
+import { genId as genSnapId, isPuntTouchback, puntNetPenalty, puntFinalSpot } from "@/lib/stats";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
@@ -59,19 +59,6 @@ function tracksHangTime(type: string | undefined | null, typeConfigs: PuntTypeCo
   return !isPoochType(type); // fallback
 }
 
-// Touchback penalty: ball comes out to the 20, so net loses 20 yards vs gross
-// Also touchbacks do NOT count as inside-20 or inside-10
-function isTB(p: { touchback?: boolean; landingZones?: string[] }): boolean {
-  return !!(p.touchback || p.landingZones?.includes("TB"));
-}
-function puntNetPenalty(p: { touchback?: boolean; landingZones?: string[]; returnYards?: number }): number {
-  return isTB(p) ? 20 : (p.returnYards ?? 0);
-}
-function puntFinalSpot(p: { landingYL?: number; touchback?: boolean; landingZones?: string[]; returnYards?: number }): number {
-  if (isTB(p)) return 0; // touchback = not inside 20
-  return (p.landingYL ?? 0) - (p.returnYards ?? 0);
-}
-
 // Parse a yard-line input into an absolute field position 0..100
 // where 0 = own goal line and 100 = opponent goal line.
 //
@@ -84,6 +71,14 @@ function puntFinalSpot(p: { landingYL?: number; touchback?: boolean; landingZone
 //
 // Returns NaN for invalid input (caller should handle).
 // defaultSide: "-" = own side (use for LOS), "+" = opponent side (use for landing YL)
+// A game row is a touchback when its landing yard line reaches the opponent's
+// goal line — "0" (or "+0") parses to field position 100.
+function isTouchbackRow(r: { landingYL?: string; touchback?: boolean }): boolean {
+  if (r.touchback) return true;
+  const parsed = parseYardLine(r.landingYL, "+");
+  return !isNaN(parsed) && parsed >= 100;
+}
+
 function parseYardLine(input: string | undefined | null, defaultSide: "-" | "+" = "-"): number {
   if (input == null) return NaN;
   const trimmed = String(input).trim();
@@ -2137,6 +2132,7 @@ export default function PuntingSessionPage() {
                   const daCount = numDAPunts.length;
                   const daSum = numDAPunts.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);
                   const dirPct = daCount > 0 ? `${Math.round((daSum / daCount) * 100)}%` : "—";
+                  const tbCount = punts.filter((p) => isPuntTouchback(p)).length;
                   return (
                     <>
                       <div className="text-[10px] font-black text-red-400 uppercase tracking-widest">Game Stats · {sAtt} punt{sAtt !== 1 ? "s" : ""}</div>
@@ -2147,6 +2143,7 @@ export default function PuntingSessionPage() {
                         <StatCard label="Dir %" value={dirPct} />
                         <StatCard label="Inside 20" value={inside20} />
                         <StatCard label="Inside 10" value={inside10} />
+                        <StatCard label="Touchbacks" value={tbCount} />
                       </div>
                     </>
                   );
@@ -2628,6 +2625,11 @@ export default function PuntingSessionPage() {
                                   })()}</span>
                                   <span className="text-[9px] text-make/30 absolute right-1">{row.landingYL ?? ""}</span>
                                 </div>
+                                {isTouchbackRow(row) && (
+                                  <div className="text-center leading-none">
+                                    <span className="text-[9px] font-bold text-warn uppercase tracking-wider">Touchback</span>
+                                  </div>
+                                )}
                               </td>
                             ) : (
                               <>
@@ -2658,9 +2660,12 @@ export default function PuntingSessionPage() {
                                       }
                                     }}
                                     readOnly={viewOnly}
-                                    title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
+                                    title="Use -X for own side, +X for opponent side (e.g. -20 or +25). Landing on 0 is the goal line — a touchback."
                                     className="w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60"
                                   />
+                                  {isTouchbackRow(row) && (
+                                    <p className="text-[9px] font-bold text-warn uppercase tracking-wider text-center mt-0.5 leading-none">Touchback</p>
+                                  )}
                                 </td>
                               </>
                             )}
@@ -3008,14 +3013,15 @@ export default function PuntingSessionPage() {
                 const sAtt = punts.length;
                 const ydsCount = punts.filter((p) => p.yards > 0).length;
                 const totalGross = punts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
-                const totalRet = punts.reduce((s, p) => s + (p.returnYards || 0), 0);
+                // Net loses the return yards, or a flat 20 on a touchback.
+                const totalNetPenalty = punts.reduce((s, p) => s + puntNetPenalty(p), 0);
                 const avgGross = ydsCount > 0 ? (totalGross / ydsCount).toFixed(1) : "—";
-                const avgNet = ydsCount > 0 ? ((totalGross - totalRet) / ydsCount).toFixed(1) : "—";
+                const avgNet = ydsCount > 0 ? ((totalGross - totalNetPenalty) / ydsCount).toFixed(1) : "—";
                 const htCount = punts.filter((p) => p.hangTime > 0).length;
                 const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
-                const finalSpot2 = (p: { landingYL?: number; returnYards?: number }) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
-                const inside20 = punts.filter((p) => finalSpot2(p) >= 80).length;
-                const inside10 = punts.filter((p) => finalSpot2(p) >= 90).length;
+                const inside20 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
+                const inside10 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
+                const tbCount = punts.filter((p) => isPuntTouchback(p)).length;
                 const numDAPunts2 = punts.filter((p) => typeof p.directionalAccuracy === "number");
                 const daCount = numDAPunts2.length;
                 const daSum = numDAPunts2.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);
@@ -3031,6 +3037,7 @@ export default function PuntingSessionPage() {
                     <StatCard label="Dir %" value={dirPct} />
                     <StatCard label="Inside 20" value={inside20} />
                     <StatCard label="Inside 10" value={inside10} />
+                    <StatCard label="Touchbacks" value={tbCount} />
                   </div>
                 );
               })()}

@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { PuntEntry, PuntLandingZone } from "@/types";
+import { puntNetPenalty } from "@/lib/stats";
 
 interface ZoneCount {
   zone: PuntLandingZone;
@@ -36,11 +37,12 @@ export function PuntFieldStrip({ punts }: PuntFieldStripProps) {
   const in20 = counts.inside10 + counts.inside20;
   const inside20Pct = att > 0 ? Math.round((in20 / att) * 100) : 0;
   const tbPct = att > 0 ? Math.round((counts.TB / att) * 100) : 0;
-  const totalReturn = punts.reduce((acc, p) => acc + (p.returnYards || 0), 0);
+  // Net loses the return yards, or a flat 20 on a touchback.
+  const totalNetPenalty = punts.reduce((acc, p) => acc + puntNetPenalty(p), 0);
   const puntsWithYards = punts.filter((p) => p.yards > 0);
   const totalYards = puntsWithYards.reduce((acc, p) => acc + p.yards, 0);
   const avgYards = puntsWithYards.length > 0 ? (totalYards / puntsWithYards.length).toFixed(1) : "—";
-  const avgNet = puntsWithYards.length > 0 ? ((totalYards - totalReturn) / puntsWithYards.length).toFixed(1) : "—";
+  const avgNet = puntsWithYards.length > 0 ? ((totalYards - totalNetPenalty) / puntsWithYards.length).toFixed(1) : "—";
 
   // Directional accuracy stats
   const puntsWithDA = punts.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);

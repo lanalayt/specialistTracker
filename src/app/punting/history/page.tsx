@@ -8,6 +8,7 @@ import { exportPuntSession, exportSessionPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import { getCachedSettings, loadSettingsFromCloud } from "@/lib/settingsSync";
+import { isPuntTouchback, puntNetPenalty } from "@/lib/stats";
 import type { PuntEntry, Session } from "@/types";
 import clsx from "clsx";
 
@@ -637,7 +638,7 @@ function PuntHistoryContent() {
                 const yardsEntries = ap.filter((p) => !isYardLineType(p.type, puntTypes) && p.yards > 0);
                 const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
                 const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
-                const netPenalty = yardsEntries.reduce((s, p) => s + ((p.touchback || p.landingZones?.includes("TB")) ? 20 : (p.returnYards ?? 0)), 0);
+                const netPenalty = yardsEntries.reduce((s, p) => s + puntNetPenalty(p), 0);
                 const avgNet = yardsEntries.length > 0 ? ((grossTotal - netPenalty) / yardsEntries.length).toFixed(1) : "—";
                 const ylEntries = ap.filter((p) => isYardLineType(p.type, puntTypes) && p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
                 const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylEntries.length).toFixed(1) : null;
@@ -650,9 +651,10 @@ function PuntHistoryContent() {
                 const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number");
                 const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / daEntries.length) * 100)}%` : "—";
                 const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
+                const touchbacks = ap.filter((p) => isPuntTouchback(p)).length;
                 const dirScore = daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);
                 const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
-                return { att, avgDist, avgNet, avgYL, avgHang, avgOT, dirPct, criticals, dirScoreDisplay };
+                return { att, avgDist, avgNet, avgYL, avgHang, avgOT, dirPct, criticals, dirScoreDisplay, touchbacks };
               };
               // mode: "blend" shows gross/net and Avg YL together (games);
               // "distance"/"yardline" show only the relevant metric (per type).
@@ -667,6 +669,7 @@ function PuntHistoryContent() {
                   <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{s.dirPct}</span></div>
                   <div><span className="text-muted">Dir Score</span> <span className="text-slate-200 font-medium ml-1">{s.dirScoreDisplay}</span></div>
                   <div><span className="text-muted">Crit</span> <span className={`font-medium ml-1 ${s.criticals > 0 ? "text-miss" : "text-slate-200"}`}>{s.criticals}</span></div>
+                  {mode !== "yardline" && <div><span className="text-muted">TB</span> <span className={`font-medium ml-1 ${s.touchbacks > 0 ? "text-warn" : "text-slate-200"}`}>{s.touchbacks}</span></div>}
                 </div>
               );
               const byAthlete: Record<string, PuntEntry[]> = {};

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
-import { processPunt, emptyPuntStats } from "@/lib/stats";
+import { processPunt, emptyPuntStats, isPuntTouchback, TOUCHBACK_NET_PENALTY } from "@/lib/stats";
 import { PUNT_HASHES } from "@/types";
 import type { PuntHash, PuntStatBucket, PuntAthleteStats, PuntEntry } from "@/types";
 import clsx from "clsx";
@@ -526,7 +526,7 @@ function PuntStatsView({
       }
       if (p.fairCatch) fairCatches += 1;
       const yl = p.landingYL ?? 0;
-      const isTouchback = p.touchback || yl >= 100;
+      const isTouchback = isPuntTouchback(p);
       if (isTouchback) {
         touchbacks += 1;
       } else {
@@ -535,7 +535,7 @@ function PuntStatsView({
       }
     });
     // NCAA net punt average: (gross − return yards − 20 per touchback) / punts
-    const net = (grossTotal - returnTotal - 20 * touchbacks) / n;
+    const net = (grossTotal - returnTotal - TOUCHBACK_NET_PENALTY * touchbacks) / n;
     return {
       total: n,
       avgDistance: (grossTotal / n).toFixed(1),

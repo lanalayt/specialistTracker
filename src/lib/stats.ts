@@ -331,6 +331,52 @@ export function recomputePuntStats(
   return statsMap;
 }
 
+// ─── Touchback rules (game punts) ───────────────────────────────────────────
+// A punt that reaches the opponent's goal line is a touchback: field position
+// 100 is the goal line, so a landing yard line of 0 ("+0") parses to 100.
+// The ball comes out to the 20, so the punting team's net loses a flat 20 yards
+// off the gross no matter how far the punt travelled — a 40 yd touchback nets 20.
+
+/** Field position the ball is spotted at after a touchback (opponent's 20). */
+export const TOUCHBACK_SPOT = 80;
+/** Yards a touchback costs the net average. */
+export const TOUCHBACK_NET_PENALTY = 20;
+
+export interface PuntTouchbackShape {
+  touchback?: boolean;
+  landingZones?: string[];
+  landingYL?: number;
+  returnYards?: number;
+}
+
+/**
+ * A punt is a touchback if it was flagged as one, tagged with the TB landing
+ * zone, or simply landed on/behind the goal line. The last case also covers
+ * punts logged before the flag existed.
+ */
+export function isPuntTouchback(p: PuntTouchbackShape): boolean {
+  return !!(
+    p.touchback ||
+    p.landingZones?.includes("TB") ||
+    (p.landingYL != null && p.landingYL >= 100)
+  );
+}
+
+/** Yards subtracted from a punt's gross to get its net. */
+export function puntNetPenalty(p: PuntTouchbackShape): number {
+  return isPuntTouchback(p) ? TOUCHBACK_NET_PENALTY : (p.returnYards ?? 0);
+}
+
+/**
+ * Where the ball ended up, as a field position, for inside-20/inside-10 counts.
+ * A touchback returns 0 because it is never credited inside the 20 — the ball
+ * comes out to the 20, it does not stop there.
+ */
+export function puntFinalSpot(p: PuntTouchbackShape): number {
+  if (isPuntTouchback(p)) return 0;
+  return (p.landingYL ?? 0) - (p.returnYards ?? 0);
+}
+
 // Punt stat helpers
 export function inside20Pct(byLanding: Record<PuntLandingZone, number>, total: number): string {
   if (total === 0) return "—";
