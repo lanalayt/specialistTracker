@@ -8,7 +8,9 @@ import { useAuth } from "@/lib/auth";
 import { FGProvider, useFG } from "@/lib/fgContext";
 import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
-import { createArchive } from "@/lib/archiveManager";
+import { createArchive, SCOPE_LABELS } from "@/lib/archiveManager";
+import { sessionInScope } from "@/lib/stats";
+import type { StatScope } from "@/types";
 import { getTeamId } from "@/lib/teamData";
 import { updateTeamSettings, stampTeamSettingsWrite, patchTeamSettingsCache, useTeamSettings } from "@/lib/teamSettingsStore";
 import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, loadCustomThemes, saveCustomThemes, loadCustomThemesFromCloud, type ThemeColors, type SavedTheme } from "@/lib/themeColors";
@@ -107,9 +109,21 @@ function SettingsContent() {
 
   // Archive UI state
   const [archiveName, setArchiveName] = useState("");
+  const [archiveScope, setArchiveScope] = useState<StatScope>("practice");
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [archiveDone, setArchiveDone] = useState(false);
+
+  // How many sessions each scope would take, so a coach can see what an
+  // archive will contain (and what it will clear) before confirming.
+  const scopeCounts = React.useMemo(() => {
+    const all = [...fg.history, ...punt.history, ...kickoff.history];
+    return {
+      all: all.length,
+      practice: all.filter((s) => sessionInScope(s, "practice")).length,
+      game: all.filter((s) => sessionInScope(s, "game")).length,
+    } as Record<StatScope, number>;
+  }, [fg.history, punt.history, kickoff.history]);
 
   const handleArchiveClick = () => {
     if (!archiveName.trim()) {
@@ -122,15 +136,20 @@ function SettingsContent() {
   const handleConfirmArchive = async () => {
     setArchiving(true);
     try {
+      const scope = archiveScope;
+      // Only the sessions in scope are snapshotted, and only those are cleared —
+      // the other kind of session carries on untouched.
+      const inScope = (sessions: typeof fg.history) => sessions.filter((s) => sessionInScope(s, scope));
       await createArchive(
         archiveName.trim(),
-        { athletes: fg.athletes.map(a => a.name), stats: fg.stats, history: fg.history },
-        { athletes: punt.athletes.map(a => a.name), stats: punt.stats, history: punt.history },
-        { athletes: kickoff.athletes.map(a => a.name), stats: kickoff.stats, history: kickoff.history }
+        scope,
+        { athletes: fg.athletes.map(a => a.name), stats: fg.statsFor(scope), history: inScope(fg.history) },
+        { athletes: punt.athletes.map(a => a.name), stats: punt.statsFor(scope), history: inScope(punt.history) },
+        { athletes: kickoff.athletes.map(a => a.name), stats: kickoff.statsFor(scope), history: inScope(kickoff.history) }
       );
-      fg.resetStatsKeepAthletes();
-      punt.resetStatsKeepAthletes();
-      kickoff.resetStatsKeepAthletes();
+      fg.resetStatsKeepAthletes(scope);
+      punt.resetStatsKeepAthletes(scope);
+      kickoff.resetStatsKeepAthletes(scope);
       setShowArchiveConfirm(false);
       setArchiveName("");
       setArchiveDone(true);
@@ -398,8 +417,27 @@ function SettingsContent() {
               Archive Stats
             </p>
             <p className="text-xs text-muted">
-              Save a snapshot of all current stats (FG, Punt, Kickoff) under a name, then reset all stats back to 0. Archived snapshots stay available under Archived Stats in the sidebar.
+              Save a snapshot of your stats (FG, Punt, Kickoff) under a name, then reset those stats back to 0. Practice and game stats archive separately, so you can roll one over and leave the other running. Archived snapshots stay available under Archived Stats in the sidebar.
             </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(["practice", "game", "all"] as StatScope[]).map((sc) => (
+                <button
+                  key={sc}
+                  onClick={() => setArchiveScope(sc)}
+                  className={clsx(
+                    "px-2 py-2 rounded-input text-xs font-semibold border transition-all",
+                    archiveScope === sc
+                      ? "border-amber-500/60 bg-amber-500/15 text-amber-300"
+                      : "border-border text-muted hover:text-white hover:bg-surface-2"
+                  )}
+                >
+                  <span className="block">{SCOPE_LABELS[sc]}</span>
+                  <span className="block text-[10px] font-normal opacity-70 mt-0.5">
+                    {scopeCounts[sc]} session{scopeCounts[sc] === 1 ? "" : "s"}
+                  </span>
+                </button>
+              ))}
+            </div>
             <div className="flex gap-2">
               <input
                 className="input flex-1"
@@ -440,11 +478,21 @@ function SettingsContent() {
           <div className="card max-w-sm w-full space-y-4">
             <div>
               <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Confirm Archive</p>
-              <h3 className="text-base font-bold text-slate-100 mt-1">Archive all current stats?</h3>
+              <h3 className="text-base font-bold text-slate-100 mt-1">
+                Archive {archiveScope === "all" ? "all current stats" : `${archiveScope} stats`}?
+              </h3>
             </div>
             <p className="text-xs text-muted">
-              This will save a snapshot named <span className="text-accent font-semibold">&quot;{archiveName}&quot;</span> containing all current FG, Punt, and Kickoff stats and session history, then reset all current stats and history back to zero. Athletes will be kept.
+              This will save a snapshot named <span className="text-accent font-semibold">&quot;{archiveName}&quot;</span> containing the{" "}
+              <span className="text-slate-300 font-semibold">{scopeCounts[archiveScope]}</span>{" "}
+              {archiveScope === "all" ? "" : `${archiveScope} `}session{scopeCounts[archiveScope] === 1 ? "" : "s"} across FG, Punt, and Kickoff, then clear{" "}
+              {archiveScope === "all" ? "all stats and history" : `your ${archiveScope} stats and history`} back to zero. Athletes will be kept.
             </p>
+            {archiveScope !== "all" && (
+              <p className="text-xs text-muted">
+                Your {archiveScope === "practice" ? "game" : "practice"} stats are left untouched.
+              </p>
+            )}
             <p className="text-xs text-muted">
               You can view archived snapshots under <span className="text-slate-300">Archived Stats</span> in the sidebar.
             </p>

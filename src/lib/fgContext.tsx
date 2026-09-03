@@ -8,12 +8,13 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
-import type { FGKick, AthleteStats, Session, SessionMode } from "@/types";
+import type { FGKick, AthleteStats, Session, SessionMode, StatScope } from "@/types";
 import {
   emptyAthleteStats,
   recomputeFGStats,
   genId,
   sessionLabel,
+  sessionInScope,
 } from "@/lib/stats";
 import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
@@ -28,7 +29,12 @@ interface FGContextValue {
   removeAthlete: (athleteId: string) => void;
   setAthleteNumber: (athleteId: string, number: string) => void;
   commitPractice: (kicks: FGKick[], label?: string, weather?: string, mode?: SessionMode, opponent?: string, gameTime?: string) => Session;
-  resetStatsKeepAthletes: () => void;
+  /**
+   * Archive rollover: drop the sessions in `scope` and keep the rest, so
+   * practice and game stats can be rolled over independently. Athletes stay.
+   */
+  statsFor: (scope: StatScope) => Record<string, AthleteStats>;
+  resetStatsKeepAthletes: (scope?: StatScope) => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   updateSessionOpponent: (sessionId: string, opponent: string) => void;
@@ -45,15 +51,19 @@ export function FGProvider({ children, sportKey = "KICKING" }: { children: React
   const { user } = useAuth();
 
   // Stats computed on the fly from practice sessions
-  const stats = useMemo(() => {
+  // Stats for one scope's sessions. `stats` is the practice aggregate the app
+  // shows; archiving asks for the scope it is about to snapshot.
+  const statsFor = useCallback((scope: StatScope) => {
     const names = athletes.map((a) => a.name);
     return recomputeFGStats(
       names,
       sessions
-        .filter((s) => s.mode !== "game")
+        .filter((s) => sessionInScope(s, scope))
         .map((s) => ({ kicks: (s.entries as FGKick[]) ?? [] }))
     );
   }, [athletes, sessions]);
+
+  const stats = useMemo(() => statsFor("practice"), [statsFor]);
 
   // History = sessions sorted by date
   const history = useMemo(
@@ -255,14 +265,15 @@ export function FGProvider({ children, sportKey = "KICKING" }: { children: React
     }
   }, []);
 
-  const resetStatsKeepAthletes = useCallback(() => {
-    // Soft-delete all sessions for this sport
+  const resetStatsKeepAthletes = useCallback((scope: StatScope = "all") => {
+    // Soft-delete the sessions in scope for this sport, keeping the others
+    const dropped = sessions.filter((s) => sessionInScope(s, scope));
     const tid = getTeamId();
     if (tid && tid !== "local-dev") {
       stampSessionWrite(tid);
-      sessions.forEach((s) => softDeleteSession(tid, s.id));
+      dropped.forEach((s) => softDeleteSession(tid, s.id));
     }
-    setSessions([]);
+    setSessions((prev) => prev.filter((s) => !sessionInScope(s, scope)));
   }, [sessions]);
 
   return (
@@ -275,6 +286,7 @@ export function FGProvider({ children, sportKey = "KICKING" }: { children: React
         removeAthlete: removeAthleteAction,
         setAthleteNumber: setAthleteNumberAction,
         commitPractice,
+        statsFor,
         resetStatsKeepAthletes,
         updateSessionDate,
         updateSessionWeather,

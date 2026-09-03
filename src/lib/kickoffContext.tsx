@@ -3,8 +3,8 @@
 import React, {
   createContext, useContext, useState, useCallback, useEffect, useMemo,
 } from "react";
-import type { KickoffEntry, KickoffAthleteStats, Session, SessionMode } from "@/types";
-import { emptyKickoffStats, recomputeKickoffStats, genId, sessionLabel } from "@/lib/stats";
+import type { KickoffEntry, KickoffAthleteStats, Session, SessionMode, StatScope } from "@/types";
+import { emptyKickoffStats, recomputeKickoffStats, genId, sessionLabel, sessionInScope } from "@/lib/stats";
 import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
 import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, setAthleteNumber as setAthleteNumberRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
@@ -19,7 +19,12 @@ interface KickoffContextValue {
   removeAthlete: (athleteId: string) => void;
   setAthleteNumber: (athleteId: string, number: string) => void;
   commitPractice: (entries: KickoffEntry[], label?: string, weather?: string, mode?: SessionMode, opponent?: string, gameTime?: string) => Session;
-  resetStatsKeepAthletes: () => void;
+  /**
+   * Archive rollover: drop the sessions in `scope` and keep the rest, so
+   * practice and game stats can be rolled over independently. Athletes stay.
+   */
+  statsFor: (scope: StatScope) => Record<string, KickoffAthleteStats>;
+  resetStatsKeepAthletes: (scope?: StatScope) => void;
   updateSessionDate: (sessionId: string, date: string, label: string) => void;
   updateSessionWeather: (sessionId: string, weather: string) => void;
   updateSessionOpponent: (sessionId: string, opponent: string) => void;
@@ -48,16 +53,20 @@ export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: 
     return undefined;
   }, [koSettings]);
 
-  const stats = useMemo(() => {
+  // Stats for one scope's sessions. `stats` is the practice aggregate the app
+  // shows; archiving asks for the scope it is about to snapshot.
+  const statsFor = useCallback((scope: StatScope) => {
     const names = athletes.map((a) => a.name);
     return recomputeKickoffStats(
       names,
       sessions
-        .filter((s) => s.mode !== "game")
+        .filter((s) => sessionInScope(s, scope))
         .map((s) => ({ entries: (s.entries as KickoffEntry[]) ?? [] })),
       koTypeConfigs
     );
   }, [athletes, sessions, koTypeConfigs]);
+
+  const stats = useMemo(() => statsFor("practice"), [statsFor]);
 
   const history = useMemo(
     () => [...sessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
@@ -173,16 +182,17 @@ export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: 
     if (tid && tid !== "local-dev") { stampSessionWrite(tid); insertSession(tid, { ...session, sport: sportKey as Session["sport"], teamId: tid }); }
   }, []);
 
-  const resetStatsKeepAthletes = useCallback(() => {
+  const resetStatsKeepAthletes = useCallback((scope: StatScope = "all") => {
+    const dropped = sessions.filter((s) => sessionInScope(s, scope));
     const tid = getTeamId();
-    if (tid && tid !== "local-dev") { stampSessionWrite(tid); sessions.forEach((s) => softDeleteSession(tid, s.id)); }
-    setSessions([]);
+    if (tid && tid !== "local-dev") { stampSessionWrite(tid); dropped.forEach((s) => softDeleteSession(tid, s.id)); }
+    setSessions((prev) => prev.filter((s) => !sessionInScope(s, scope)));
   }, [sessions]);
 
   return (
     <KickoffContext.Provider value={{
       athletes, stats, history, addAthletes, removeAthlete: removeAthleteAction, setAthleteNumber: setAthleteNumberAction,
-      commitPractice, resetStatsKeepAthletes, updateSessionDate, updateSessionWeather, updateSessionOpponent,
+      commitPractice, statsFor, resetStatsKeepAthletes, updateSessionDate, updateSessionWeather, updateSessionOpponent,
       updateSessionEntries, deleteSession, restoreSession: restoreSessionAction,
     }}>
       {children}

@@ -219,6 +219,12 @@ export interface LongSnapAthleteStats {
 
 export type SessionMode = "practice" | "game";
 
+/**
+ * Which sessions an action applies to. Practice and game sessions are tracked
+ * separately, so stats can be archived and rolled over one at a time.
+ */
+export type StatScope = "all" | "practice" | "game";
+
 export interface Session {
   id: string;
   teamId: string;

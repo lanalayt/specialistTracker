@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
-import { loadArchives, deleteArchive, type StatArchive } from "@/lib/archiveManager";
+import { loadArchives, deleteArchive, SCOPE_LABELS, type StatArchive } from "@/lib/archiveManager";
 import { makePct, avgScore, processKick, emptyAthleteStats, processPunt, emptyPuntStats } from "@/lib/stats";
 import type { FGKick, PuntEntry, KickoffEntry, AthleteStats, FGPosition, DistRange, PuntAthleteStats, PuntHash, PuntStatBucket } from "@/types";
 import { POSITIONS, DIST_RANGES, PUNT_HASHES, KICKOFF_HASHES } from "@/types";
@@ -36,6 +36,25 @@ function CollapsibleSection({ title, defaultOpen = false, children }: { title: s
 }
 
 type SimpleAthlete = { id: string; name: string };
+
+// Practice and game stats archive separately, so every snapshot says which it holds.
+function ScopeChip({ scope, className }: { scope: StatArchive["scope"]; className?: string }) {
+  return (
+    <span
+      className={clsx(
+        "inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border",
+        scope === "game"
+          ? "border-red-500/40 text-red-400 bg-red-500/10"
+          : scope === "practice"
+            ? "border-accent/40 text-accent bg-accent/10"
+            : "border-border text-muted bg-surface-2",
+        className
+      )}
+    >
+      {SCOPE_LABELS[scope]}
+    </span>
+  );
+}
 
 // ── FG Helpers ──────────────────────────────────────────────────────────────
 
@@ -514,7 +533,7 @@ export default function ArchivesPage() {
             <p className="text-sm text-muted">Loading...</p>
           ) : archives.length === 0 ? (
             <div className="card text-sm text-muted">
-              No archives yet. To create one, go to Settings &rarr; Archive Stats, enter a name and confirm.
+              No archives yet. To create one, go to Settings &rarr; Archive Stats, pick practice, game or all stats, enter a name and confirm.
             </div>
           ) : (
             <div className="flex flex-col lg:flex-row gap-6">
@@ -533,6 +552,7 @@ export default function ArchivesPage() {
                     >
                       <p className="text-sm font-semibold text-slate-100 truncate">{a.name}</p>
                       <p className="text-[10px] text-muted mt-0.5">{formatDate(a.createdAt)}</p>
+                      <ScopeChip scope={a.scope} className="mt-1" />
                     </button>
                   ))}
                 </div>
@@ -601,7 +621,10 @@ function ArchiveDetail({ archive, onDelete, confirmDelete }: {
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-xs font-semibold text-accent uppercase tracking-wider">Archived</p>
-            <h2 className="text-xl font-bold text-slate-100 mt-1">{archive.name}</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <h2 className="text-xl font-bold text-slate-100">{archive.name}</h2>
+              <ScopeChip scope={archive.scope} />
+            </div>
             <p className="text-xs text-muted mt-0.5">Created {new Date(archive.createdAt).toLocaleString()}</p>
           </div>
           <RoleGuard coachOnly>

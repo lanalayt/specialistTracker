@@ -27,6 +27,8 @@ import {
   SNAP_TYPES,
   SnapType,
   SnapBenchmark,
+  SessionMode,
+  StatScope,
 } from "@/types";
 
 // ─── FG Kicking ──────────────────────────────────────────────────────────────
@@ -329,6 +331,17 @@ export function recomputePuntStats(
     });
   });
   return statsMap;
+}
+
+// ─── Session scope ──────────────────────────────────────────────────────────
+
+/**
+ * Whether a session belongs to the given scope. A session with no mode is a
+ * legacy practice session, matching how practice stats are computed.
+ */
+export function sessionInScope(s: { mode?: SessionMode }, scope: StatScope): boolean {
+  if (scope === "all") return true;
+  return scope === "game" ? s.mode === "game" : s.mode !== "game";
 }
 
 // ─── Touchback rules (game punts) ───────────────────────────────────────────
