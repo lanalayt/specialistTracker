@@ -20,10 +20,10 @@ export interface ArchivedPhaseData<S> {
   stats: Record<string, S>;
   history: Session[];
   /**
-   * The archive's scope, repeated on each phase. The archives table has no
-   * scope column, so it rides along inside the phase JSON instead — all three
-   * carry the same value, and an archive saved before scopes existed has none
-   * and reads back as "all".
+   * The archive's scope, repeated on each phase. The scope lives in its own
+   * `archives.scope` column (see supabase-archive-scope.sql); this copy is the
+   * fallback for rows written before that column existed, or by a client
+   * running against a database where the migration has not been applied yet.
    */
   scope?: StatScope;
 }
@@ -61,8 +61,9 @@ export async function loadArchives(): Promise<StatArchive[]> {
         id: s.id,
         name: s.name,
         createdAt: s.createdAt,
-        // Archives saved before scopes existed cover everything.
-        scope: fg.scope ?? punt.scope ?? kickoff.scope ?? "all",
+        // The store resolves the column, falling back to the phase JSON;
+        // archives saved before scopes existed cover everything.
+        scope: s.scope,
         fg,
         punt,
         kickoff,
@@ -94,6 +95,7 @@ export async function createArchive(
       id: archive.id,
       name: archive.name,
       createdAt: archive.createdAt,
+      scope: archive.scope,
       fg: archive.fg as unknown as Record<string, unknown>,
       punt: archive.punt as unknown as Record<string, unknown>,
       kickoff: archive.kickoff as unknown as Record<string, unknown>,
