@@ -331,7 +331,6 @@ function FGStatsView({
 
 export default function KickingStatisticsPage() {
   const pathname = usePathname();
-  const hideScore = pathname.startsWith("/athlete");
   const { athletes, stats, history } = useFG();
   const [tab, setTab] = useState<"all" | "starred">("all");
   const [gameMode, setGameMode] = useState<"practice" | "game">("practice");
@@ -340,12 +339,24 @@ export default function KickingStatisticsPage() {
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() =>
     getCachedSettings<{ makeMode?: string }>("fgSettings")?.makeMode === "simple" ? "simple" : "detailed"
   );
+  const [scoreEnabled, setScoreEnabled] = useState<"on" | "practice" | "off">(() => {
+    const cached = getCachedSettings<{ scoreEnabled?: unknown }>("fgSettings")?.scoreEnabled;
+    return cached === "on" || cached === "practice" || cached === "off" ? cached : "practice";
+  });
 
   useEffect(() => {
-    loadSettingsFromCloud<{ makeMode?: string }>("fgSettings").then((cloud) => {
+    loadSettingsFromCloud<{ makeMode?: string; scoreEnabled?: unknown }>("fgSettings").then((cloud) => {
       if (cloud?.makeMode === "simple" || cloud?.makeMode === "detailed") setMakeMode(cloud.makeMode);
+      if (cloud?.scoreEnabled === "on" || cloud?.scoreEnabled === "practice" || cloud?.scoreEnabled === "off") {
+        setScoreEnabled(cloud.scoreEnabled);
+      }
     });
   }, []);
+
+  const isAthleteRoute = pathname.startsWith("/athlete");
+  // Score column: hidden on the athlete self-view, when scoring is off
+  // entirely, or when it's practice-only and we're looking at game stats.
+  const hideScore = isAthleteRoute || scoreEnabled === "off" || (scoreEnabled === "practice" && gameMode === "game");
 
   const [excludeLiveReps, setExcludeLiveReps] = useState(() => getAppPref<boolean>("fgExcludeLiveReps") === true);
 
@@ -389,7 +400,7 @@ export default function KickingStatisticsPage() {
   return (
     <main className="p-4 lg:p-6 space-y-4 max-w-5xl overflow-y-auto">
       {/* Practice / Game mode toggle */}
-      {!hideScore && (
+      {!isAthleteRoute && (
       <div className="flex rounded-input border border-border overflow-hidden w-fit">
         <button
           onClick={() => setGameMode("practice")}
