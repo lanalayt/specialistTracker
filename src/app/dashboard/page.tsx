@@ -24,9 +24,7 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
   { href: "/longsnap", iconEl: <SnapperIcon size={44} />, label: "Snapping" },
 ];
 
-// Pooch punts are measured by yard line, not distance, so they don't feed the
-// punt distance average. KO "directional" = deep kicks (not sky/squib/onside).
-const isPoochPunt = (type?: string) => (type || "").toUpperCase().includes("POOCH");
+// KO "directional" = deep kicks (not sky/squib/onside).
 const isDeepKO = (type?: string) => !/SKY|SQUIB|ONSIDE/i.test(type || "");
 
 function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepOnly: boolean) {
@@ -35,7 +33,10 @@ function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepO
   const longFG = makes.reduce((m, k) => Math.max(m, k.dist), 0);
 
   const punts = puntH.flatMap((s) => (s.entries ?? []) as PuntEntry[]);
-  const puntDistE = punts.filter((p) => p.yards > 0 && !isPoochPunt(p.type));
+  // Practice-mode pooch entries carry yards=0 (tracked by landing yard line
+  // instead), so they're excluded here naturally. Game-mode pooch entries do
+  // get a real gross-yards value, so they count like any other punt type.
+  const puntDistE = punts.filter((p) => p.yards > 0);
   const puntHangE = punts.filter((p) => p.hangTime > 0);
 
   let kos = koH.flatMap((s) => (s.entries ?? []) as KickoffEntry[]);
