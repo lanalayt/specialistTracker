@@ -169,35 +169,37 @@ function StatTable({ athletes, statsMap, showEZ = true, metric, showHang }: {
   const hasHang = showHang ?? visible.some((a) => statsMap[a.name]?.hangAtt > 0);
   const hasFC = visible.some((a) => statsMap[a.name]?.fairCatches > 0);
   return (
-    <table className="w-full text-xs sm:text-sm">
-      <thead>
-        <tr>
-          <th className="table-header text-left">Athlete</th>
-          <th className="table-header">KOs</th>
-          <th className={clsx("table-header", isYL && "text-accent")}>{isYL ? "YL" : "Dist"}</th>
-          {hasHang && <th className="table-header">Hang</th>}
-          {showEZ && <th className="table-header">EZ %</th>}
-          {hasFC && <th className="table-header">FC</th>}
-          <th className="table-header">Dir %</th>
-        </tr>
-      </thead>
-      <tbody>
-        {visible.map((a) => {
-          const s = statsMap[a.name];
-          return (
-            <tr key={a.id} className="hover:bg-surface/30">
-              <td className="table-name">{a.name}</td>
-              <td className="table-cell">{s.att}</td>
-              <td className={clsx("table-cell", isYL ? "text-accent font-semibold" : "")}>{avgDist(s)}</td>
-              {hasHang && <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>}
-              {showEZ && <td className="table-cell text-make font-semibold">{ezPct(s)}</td>}
-              {hasFC && <td className="table-cell">{s.fairCatches || "—"}</td>}
-              <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs sm:text-sm">
+        <thead>
+          <tr>
+            <th className="table-header text-left whitespace-nowrap">Athlete</th>
+            <th className="table-header whitespace-nowrap">KOs</th>
+            <th className={clsx("table-header whitespace-nowrap", isYL && "text-accent")}>{isYL ? "YL" : "Dist"}</th>
+            {hasHang && <th className="table-header whitespace-nowrap">Hang</th>}
+            {showEZ && <th className="table-header whitespace-nowrap">EZ %</th>}
+            {hasFC && <th className="table-header whitespace-nowrap">FC</th>}
+            <th className="table-header whitespace-nowrap">Dir %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((a) => {
+            const s = statsMap[a.name];
+            return (
+              <tr key={a.id} className="hover:bg-surface/30">
+                <td className="table-name">{a.name}</td>
+                <td className="table-cell">{s.att}</td>
+                <td className={clsx("table-cell", isYL ? "text-accent font-semibold" : "")}>{avgDist(s)}</td>
+                {hasHang && <td className="table-cell text-muted">{avgHang(s)}{avgHang(s) !== "—" ? "s" : ""}</td>}
+                {showEZ && <td className="table-cell text-make font-semibold">{ezPct(s)}</td>}
+                {hasFC && <td className="table-cell">{s.fairCatches || "—"}</td>}
+                <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
