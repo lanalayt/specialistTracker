@@ -84,8 +84,10 @@ function loadPuntTypes(): PuntTypeConfig[] {
 
 // Auto-decimal: the raw digits typed become a time with the last two as the
 // hundredths (e.g. "505" -> "5.05", "5" -> "0.05"). A typed dot is ignored.
+// All-zero digits format to empty rather than "0.00" — otherwise backspacing
+// a formatted "0.00" re-extracts "00" every time and can never reach blank.
 function formatAutoDecimal(digits: string): string {
-  if (!digits) return "";
+  if (!digits || /^0+$/.test(digits)) return "";
   const padded = digits.padStart(3, "0");
   const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
   return `${whole}.${padded.slice(-2)}`;

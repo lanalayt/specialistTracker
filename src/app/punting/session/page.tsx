@@ -35,6 +35,12 @@ function checkPuntOutliers(yards: number, hangTime: number, opTime: number): str
   return warnings;
 }
 
+// Op time under this is physically impossible — reject rather than just warn.
+const MIN_OP_TIME = 0.5;
+function isOpTimeTooLow(opTime: number): boolean {
+  return opTime > 0 && opTime < MIN_OP_TIME;
+}
+
 // Pooch punt types are tracked separately — distance is not counted in
 // overall averages. Instead we track the yard line where the ball landed.
 // Legacy fallback — only used if type config not available
@@ -486,9 +492,12 @@ export default function PuntingSessionPage() {
 
   // Auto-decimal: user types digits, we insert decimal 2 places from right
   // e.g. "456" → "4.56", "12" → "0.12", "1" → "0.01"
+  // All-zero digits ("0", "00", "000"...) format to empty rather than "0.00" —
+  // otherwise backspacing a formatted "0.00" re-extracts "00" from what's left
+  // every time, so it can never be deleted down to blank.
   function formatAutoDecimal(raw: string): string {
     const digits = raw.replace(/\D/g, "");
-    if (!digits) return "";
+    if (!digits || /^0+$/.test(digits)) return "";
     const padded = digits.padStart(3, "0");
     const whole = padded.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
     return `${whole}.${padded.slice(-2)}`;
@@ -803,6 +812,11 @@ export default function PuntingSessionPage() {
     const gross = Math.max(0, landingYLVal - losVal);
     const htVal = parseFloat(r.hangTime) || 0;
     const otVal = parseFloat(r.opTime) || 0;
+    if (isOpTimeTooLow(otVal)) {
+      alert(`Op time of ${otVal}s isn't possible — must be at least ${MIN_OP_TIME}s, or left blank.`);
+      setErrorRows((prev) => new Set([...prev, rowIdx]));
+      return;
+    }
     const retVal = r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined;
       const daVal: number | string = r.directionalAccuracy !== "" && r.directionalAccuracy != null
       ? (dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? 0) : (parseFloat(r.directionalAccuracy) || 0))
@@ -900,6 +914,13 @@ export default function PuntingSessionPage() {
       };
     });
 
+    const tooLowIdx = punts.findIndex((p) => isOpTimeTooLow(p.opTime));
+    if (tooLowIdx >= 0) {
+      alert(`Row ${tooLowIdx + 1}: Op time of ${punts[tooLowIdx].opTime}s isn't possible — must be at least ${MIN_OP_TIME}s, or left blank.`);
+      setErrorRows(new Set([filled[tooLowIdx].i]));
+      return;
+    }
+
     // Outlier check across all punts
     const allWarnings: string[] = [];
     punts.forEach((p, i) => {
@@ -969,6 +990,10 @@ export default function PuntingSessionPage() {
     const plan = plannedPunts[currentPuntIdx];
     const htVal = parseFloat(hangTime) || 0;
     const otVal = parseFloat(opTime) || 0;
+    if (isOpTimeTooLow(otVal)) {
+      alert(`Op time of ${otVal}s isn't possible — must be at least ${MIN_OP_TIME}s, or left blank.`);
+      return;
+    }
     let losVal = los !== "" ? parseInt(los) || 0 : undefined;
     let landingYLVal = landingYL !== "" ? parseInt(landingYL) || 0 : undefined;
     // In game mode, compute gross yards automatically from LOS and landing YL
