@@ -26,9 +26,11 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
 
 // KO "directional" = deep kicks (not sky/squib/onside).
 const isDeepKO = (type?: string) => !/SKY|SQUIB|ONSIDE/i.test(type || "");
+// Some legacy/imported kicks carry pos "PAT" without the isPAT flag set.
+const isPatKick = (k: { isPAT?: boolean; pos?: string }) => k.isPAT === true || k.pos === "PAT";
 
 function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepOnly: boolean) {
-  const fgKicks = fgH.flatMap((s) => (s.entries ?? []) as FGKick[]).filter((k) => !k.isPAT);
+  const fgKicks = fgH.flatMap((s) => (s.entries ?? []) as FGKick[]).filter((k) => !isPatKick(k));
   const makes = fgKicks.filter((k) => MAKE_RESULTS.includes(k.result));
   const longFG = makes.reduce((m, k) => Math.max(m, k.dist), 0);
 
