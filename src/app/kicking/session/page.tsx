@@ -2306,6 +2306,8 @@ export default function KickingSessionPage() {
                       </td>
                       {manualEntry && sessionMode === "game" && (() => {
                         const isSaved = sessionKicks.some((k) => k.kickNum === filledIdx + 1);
+                        const isMake = row.result.startsWith("Y");
+                        const savedClass = isMake ? "border-make/30 text-make" : "border-miss/30 text-miss";
                         return (
                           <>
                             <td className="py-1 px-1">
@@ -2316,7 +2318,7 @@ export default function KickingSessionPage() {
                                   if (e.target.value.startsWith("X")) updateRow(idx, "score", "0");
                                 }}
                                 disabled={viewOnly || isSaved}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? savedClass : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               >
                                 <option value="">—</option>
                                 {(() => {
@@ -2334,7 +2336,7 @@ export default function KickingSessionPage() {
                                   value={row.score}
                                   onChange={(e) => updateRow(idx, "score", e.target.value)}
                                   disabled={viewOnly || isSaved}
-                                  className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                  className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs focus:outline-none", isSaved ? savedClass : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                                 >
                                   <option value="">—</option>
                                   {scoreOptions.map((s) => (
@@ -2352,7 +2354,7 @@ export default function KickingSessionPage() {
                                 value={row.opTime}
                                 onChange={(e) => updateRow(idx, "opTime", formatOpTime(e.target.value))}
                                 readOnly={viewOnly || isSaved}
-                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? "border-make/30 text-make" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
+                                className={clsx("w-full bg-transparent border rounded px-1 py-1 text-xs text-center focus:outline-none", isSaved ? savedClass : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
                             )}
