@@ -30,7 +30,7 @@ const isPoochPunt = (type?: string) => (type || "").toUpperCase().includes("POOC
 const isDeepKO = (type?: string) => !/SKY|SQUIB|ONSIDE/i.test(type || "");
 
 function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepOnly: boolean) {
-  const fgKicks = fgH.flatMap((s) => (s.entries ?? []) as FGKick[]);
+  const fgKicks = fgH.flatMap((s) => (s.entries ?? []) as FGKick[]).filter((k) => !k.isPAT);
   const makes = fgKicks.filter((k) => MAKE_RESULTS.includes(k.result));
   const longFG = makes.reduce((m, k) => Math.max(m, k.dist), 0);
 
