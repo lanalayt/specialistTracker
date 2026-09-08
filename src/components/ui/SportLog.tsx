@@ -13,6 +13,7 @@ const RESULT_LABELS: Record<FGResult, string> = {
   XL: "← Miss Left",
   XR: "Miss Right →",
   XS: "↓ Miss Short",
+  XB: "⊘ Blocked",
   X: "✗ Miss",
 };
 

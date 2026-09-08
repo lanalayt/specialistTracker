@@ -172,6 +172,7 @@ const RESULT_LABELS: Record<string, string> = {
   YR: "Make →",
   XL: "Miss ←",
   XS: "Miss ↓",
+  XB: "Blocked",
   X: "Miss ✗",
   XR: "Miss →",
 };
@@ -188,6 +189,7 @@ const MISS_BTNS: { r: FGResult; label: string }[] = [
   { r: "XL", label: "← MISS" },
   { r: "XS", label: "↓ SHORT" },
   { r: "XR", label: "MISS →" },
+  { r: "XB", label: "⊘ BLOCKED" },
 ];
 
 export default function KickingSessionPage() {
@@ -1644,7 +1646,7 @@ export default function KickingSessionPage() {
                               onClick={() => { setResult("X"); setScore(0); }}
                               className={clsx(
                                 "w-full py-3 rounded-input text-xs font-bold transition-all",
-                                result === "XL" || result === "XS" || result === "XR" || result === "X"
+                                result === "XL" || result === "XS" || result === "XR" || result === "XB" || result === "X"
                                   ? "bg-miss text-white shadow-lg"
                                   : "bg-miss/10 text-miss border border-miss/30 hover:bg-miss/20"
                               )}
@@ -1653,7 +1655,7 @@ export default function KickingSessionPage() {
                             </button>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             {MISS_BTNS.map(({ r, label }) => (
                               <button
                                 key={r}
@@ -2319,7 +2321,7 @@ export default function KickingSessionPage() {
                                 <option value="">—</option>
                                 {(() => {
                                   const makes = makeMode === "simple" ? ["YC"] : ["YL", "YC", "YR"];
-                                  const misses = missMode === "simple" ? ["X"] : ["XL", "XS", "XR"];
+                                  const misses = missMode === "simple" ? ["X"] : ["XL", "XS", "XR", "XB"];
                                   return [...makes, ...misses].map((r) => (
                                     <option key={r} value={r}>{RESULT_LABELS[r]}</option>
                                   ));
@@ -2393,7 +2395,7 @@ export default function KickingSessionPage() {
                               <option value="">—</option>
                               {(() => {
                                 const makes = makeMode === "simple" ? ["YC"] : ["YL", "YC", "YR"];
-                                const misses = missMode === "simple" ? ["X"] : ["XL", "XS", "XR"];
+                                const misses = missMode === "simple" ? ["X"] : ["XL", "XS", "XR", "XB"];
                                 return [...makes, ...misses].map((r) => (
                                   <option key={r} value={r}>{RESULT_LABELS[r]}</option>
                                 ));

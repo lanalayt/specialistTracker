@@ -172,11 +172,11 @@ function fgStatsToAOA(athletes: string[], statsMap: Record<string, AthleteStats>
   // ── Miss Chart ──
   rows.push([]);
   rows.push(["MISS CHART"]);
-  rows.push(["Athlete", "Miss Left", "Miss Right", "Miss Short", "Total"]);
+  rows.push(["Athlete", "Miss Left", "Miss Right", "Miss Short", "Blocked", "Total"]);
   athletes.forEach((a) => {
     const s = statsMap[a];
     if (!s) return;
-    rows.push([a, s.miss.XL, s.miss.XR, s.miss.XS, s.miss.XL + s.miss.XR + s.miss.XS + (s.miss.X || 0)]);
+    rows.push([a, s.miss.XL, s.miss.XR, s.miss.XS, s.miss.XB || 0, s.miss.XL + s.miss.XR + s.miss.XS + (s.miss.XB || 0) + (s.miss.X || 0)]);
   });
 
   // ── By Hash / Position ──

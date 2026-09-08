@@ -6,13 +6,14 @@ interface GoalPostVizProps {
   missL: number;
   missR: number;
   missS: number;
+  missB?: number;
   missX?: number;
   makes: number;
 }
 
-export function GoalPostViz({ missL, missR, missS, missX = 0, makes }: GoalPostVizProps) {
-  const total = makes + missL + missR + missS + missX;
-  const totalMiss = missL + missR + missS + missX;
+export function GoalPostViz({ missL, missR, missS, missB = 0, missX = 0, makes }: GoalPostVizProps) {
+  const total = makes + missL + missR + missS + missB + missX;
+  const totalMiss = missL + missR + missS + missB + missX;
 
   return (
     <div className="card">
@@ -74,6 +75,12 @@ export function GoalPostViz({ missL, missR, missS, missX = 0, makes }: GoalPostV
             </text>
           </svg>
         </div>
+      )}
+      {/* Blocked */}
+      {missB > 0 && (
+        <p className="text-center text-xs text-muted mt-1">
+          Blocked: <span className="text-miss font-bold">{missB}</span>
+        </p>
       )}
       {/* Total misses */}
       {totalMiss > 0 && (

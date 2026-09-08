@@ -165,17 +165,18 @@ export function MultiAthleteTable({
 // ─── Miss chart ───────────────────────────────────────────────────────────────
 
 interface MissChartProps {
-  miss: { XL: number; XR: number; XS: number; X: number };
+  miss: { XL: number; XR: number; XS: number; XB?: number; X: number };
   className?: string;
 }
 
 export function MissChart({ miss, className }: MissChartProps) {
-  const total = miss.XL + miss.XR + miss.XS + miss.X;
+  const total = miss.XL + miss.XR + miss.XS + (miss.XB || 0) + miss.X;
 
   const bars = [
     { label: "Miss Left (XL)", count: miss.XL, color: "#f59e0b" },
     { label: "Miss Right (XR)", count: miss.XR, color: "#ef4444" },
     { label: "Miss Short (XS)", count: miss.XS, color: "#8b5cf6" },
+    { label: "Blocked (XB)", count: miss.XB || 0, color: "#64748b" },
   ];
 
   return (

@@ -47,6 +47,7 @@ const RESULT_EDIT_LABELS: Record<string, string> = {
   XL: "\u2717 Miss Left",
   XS: "\u2717 Miss Short",
   XR: "\u2717 Miss Right",
+  XB: "\u2717 Blocked",
   X: "\u2717 Miss",
 };
 
@@ -61,6 +62,7 @@ function formatResult(result: string, makeMode: "simple" | "detailed"): string {
   if (result === "XL") return "✗L";
   if (result === "XR") return "✗R";
   if (result === "XS") return "✗ Short";
+  if (result === "XB") return "✗ Blocked";
   if (result === "X") return "✗ Miss";
   return result;
 }
@@ -504,7 +506,7 @@ function KickingHistoryContent() {
                           `FG Session — ${selected.label}`,
                           hdrs,
                           kicks.map((k, i) => {
-                            const row = [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result.startsWith("Y") ? "GOOD" : k.result === "XL" ? "MISS LEFT" : k.result === "XR" ? "MISS RIGHT" : k.result === "XS" ? "MISS SHORT" : "MISS"];
+                            const row = [String(k.kickNum ?? i + 1), k.athlete, k.isPAT ? "PAT" : `${k.dist}`, k.pos, k.result.startsWith("Y") ? "GOOD" : k.result === "XL" ? "MISS LEFT" : k.result === "XR" ? "MISS RIGHT" : k.result === "XS" ? "MISS SHORT" : k.result === "XB" ? "BLOCKED" : "MISS"];
                             if (hasScore) row.push(String(k.score));
                             if (hasOT) row.push(k.opTime && k.opTime > 0 ? k.opTime.toFixed(2) : "—");
                             return row;
@@ -710,7 +712,7 @@ function KickingHistoryContent() {
                           </td>
                           <td className="table-cell p-1">
                             <select value={k.result} onChange={(e) => updateEntry(i, "result", e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
-                              {["YL","YC","YR","XL","XS","XR","X"].map((r) => <option key={r} value={r}>{RESULT_EDIT_LABELS[r] ?? r}</option>)}
+                              {["YL","YC","YR","XL","XS","XR","XB","X"].map((r) => <option key={r} value={r}>{RESULT_EDIT_LABELS[r] ?? r}</option>)}
                             </select>
                           </td>
                           {!hideScore && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}

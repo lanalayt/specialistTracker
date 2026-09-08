@@ -31,6 +31,7 @@ export function KickEntryCard({ athletes, kickCount, onAdd }: KickEntryCardProps
     { r: "XL", label: "← MISS" },
     { r: "XS", label: "↓ SHORT" },
     { r: "XR", label: "MISS →" },
+    { r: "XB", label: "⊘ BLOCKED" },
   ];
 
   const handleLog = () => {
@@ -155,7 +156,7 @@ export function KickEntryCard({ athletes, kickCount, onAdd }: KickEntryCardProps
             ))}
           </div>
           {/* Misses */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {MISS_BTNS.map(({ r, label }) => (
               <button
                 key={r}

@@ -33,6 +33,7 @@ export function LiveFGStats({ kicks }: LiveFGStatsProps) {
   const missL = kicks.filter((k) => k.result === "XL").length;
   const missR = kicks.filter((k) => k.result === "XR").length;
   const missS = kicks.filter((k) => k.result === "XS").length;
+  const missB = kicks.filter((k) => k.result === "XB").length;
   const missX = kicks.filter((k) => k.result === "X").length;
 
   // PAT summary
@@ -72,7 +73,7 @@ export function LiveFGStats({ kicks }: LiveFGStatsProps) {
         )}
       </div>
       <FGHeatGrid grid={grid} />
-      <GoalPostViz missL={missL} missR={missR} missS={missS} missX={missX} makes={makes} />
+      <GoalPostViz missL={missL} missR={missR} missS={missS} missB={missB} missX={missX} makes={makes} />
     </div>
   );
 }

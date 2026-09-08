@@ -122,7 +122,8 @@ const FG_RESULT_OPTIONS = [
   { id: "XL", label: "Miss — Left" },
   { id: "XR", label: "Miss — Right" },
   { id: "XS", label: "Miss — Short" },
-  { id: "X", label: "Miss / Block" },
+  { id: "XB", label: "Miss — Blocked" },
+  { id: "X", label: "Miss" },
 ];
 export function buildFGImportConfig(opts: { posOptions: { id: string; label: string }[] }): ImportConfig {
   const { posOptions } = opts;
@@ -132,7 +133,7 @@ export function buildFGImportConfig(opts: { posOptions: { id: string; label: str
     if (n.includes("wr") || n === "wideright" || n === "right") return "XR";
     if (n.includes("wl") || n === "wideleft" || n === "left") return "XL";
     if (n.includes("short") || n === "sh") return "XS";
-    if (n.includes("block") || n === "bk" || n === "blk") return "X";
+    if (n.includes("block") || n === "bk" || n === "blk") return "XB";
     return FG_RESULT_OPTIONS.find((o) => norm(o.id) === n)?.id;
   };
   const autoPos = (raw: string) => { const n = norm(raw); return posOptions.find((p) => norm(p.label) === n || norm(p.id) === n)?.id; };

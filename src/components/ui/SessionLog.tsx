@@ -11,6 +11,7 @@ const RESULT_LABELS: Record<string, string> = {
   XL: "← MISS",
   XR: "MISS →",
   XS: "↓ SHORT",
+  XB: "⊘ BLOCKED",
   X: "✗ MISS",
 };
 

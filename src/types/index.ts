@@ -5,7 +5,7 @@ export type UserRole = "admin" | "coach" | "athlete";
 
 // FG Kicking
 export type FGPosition = "LH" | "RH" | "LM" | "RM" | "M";
-export type FGResult = "YL" | "YC" | "YR" | "XL" | "XR" | "XS" | "X";
+export type FGResult = "YL" | "YC" | "YR" | "XL" | "XR" | "XS" | "XB" | "X";
 export type DistRange = "20-29" | "30-39" | "40-49" | "50-59" | "60+";
 
 // Punting
@@ -62,7 +62,7 @@ export interface AthleteStats {
   overall: StatBucket & { longFG: number; totalOpTime: number; opTimeAtt: number };
   position: Record<FGPosition, StatBucket>;
   distance: Record<DistRange, StatBucket>;
-  miss: { XL: number; XR: number; XS: number; X: number };
+  miss: { XL: number; XR: number; XS: number; XB: number; X: number };
   make: { YL: number; YC: number; YR: number };
   pat: StatBucket;
 }
@@ -298,9 +298,9 @@ export interface SportCard {
 
 // Left → right field order for the heat grid
 export const POSITIONS: FGPosition[] = ["LH", "LM", "M", "RM", "RH"];
-export const RESULTS: FGResult[] = ["YL", "YC", "YR", "XL", "XR", "XS"];
+export const RESULTS: FGResult[] = ["YL", "YC", "YR", "XL", "XR", "XS", "XB"];
 export const MAKE_RESULTS: FGResult[] = ["YL", "YC", "YR"];
-export const MISS_RESULTS: FGResult[] = ["XL", "XR", "XS"];
+export const MISS_RESULTS: FGResult[] = ["XL", "XR", "XS", "XB"];
 export const DIST_RANGES: DistRange[] = [
   "20-29",
   "30-39",

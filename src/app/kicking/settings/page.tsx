@@ -222,7 +222,7 @@ function FGSettingsContent() {
       </div>
 
       <div className="card space-y-3">
-        <p className="label">Miss Tracking<Tooltip text="How detailed you want your misses to be. Simple = just 'Miss'. Detailed = miss left, miss right, or short." /></p>
+        <p className="label">Miss Tracking<Tooltip text="How detailed you want your misses to be. Simple = just 'Miss'. Detailed = miss left, miss right, short, or blocked." /></p>
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setMissMode("simple")}
@@ -249,7 +249,7 @@ function FGSettingsContent() {
           >
             <span className="block text-base mb-1">Detailed</span>
             <span className="block text-[10px] font-normal text-muted">
-              ← MISS &nbsp; ↓ SHORT &nbsp; MISS →
+              ← MISS &nbsp; ↓ SHORT &nbsp; MISS → &nbsp; ⊘ BLOCKED
             </span>
           </button>
         </div>
