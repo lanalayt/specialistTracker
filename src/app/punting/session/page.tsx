@@ -1842,10 +1842,10 @@ export default function PuntingSessionPage() {
                               onClick={() => { setPracticeDistMode(m); savePracticeDistMode(m); }}
                               disabled={viewOnly}
                               className={clsx(
-                                "flex-1 py-1.5 rounded-input text-[11px] font-bold uppercase tracking-wider transition-all",
+                                "flex-1 py-1.5 rounded-input text-[11px] font-bold uppercase tracking-wider transition-all border",
                                 practiceDistMode === m
-                                  ? "bg-accent text-white"
-                                  : "text-muted hover:text-white"
+                                  ? "bg-accent/20 text-accent border-accent/60"
+                                  : "bg-transparent text-muted border-transparent hover:text-white"
                               )}
                             >
                               {label}
@@ -1861,7 +1861,7 @@ export default function PuntingSessionPage() {
                                 <input
                                   className="input text-center text-lg font-bold"
                                   type="text"
-                                  inputMode="numeric"
+                                  inputMode="text"
                                   placeholder="-30"
                                   value={startYL}
                                   onChange={(e) => setStartYL(e.target.value)}
@@ -1872,7 +1872,7 @@ export default function PuntingSessionPage() {
                                 <input
                                   className="input text-center text-lg font-bold"
                                   type="text"
-                                  inputMode="numeric"
+                                  inputMode="text"
                                   placeholder="40"
                                   value={landYL}
                                   onChange={(e) => setLandYL(e.target.value)}
