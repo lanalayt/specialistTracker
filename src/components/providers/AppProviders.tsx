@@ -188,7 +188,22 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
         emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login?confirmed=1` : undefined,
       },
     });
-    if (error) throw new Error(error.message);
+    // With email confirmations disabled, Supabase errors outright on a
+    // duplicate email ("User already registered"). With them enabled, it
+    // instead returns a fake success (no error, no session) to avoid leaking
+    // which emails are registered — the only tell is an empty identities
+    // array on the returned user. Normalize both into one clear error so the
+    // signup form can point the user at the login page instead of either
+    // surfacing a confusing message or silently pretending it worked.
+    if (error) {
+      if (/already registered|already exists|already in use/i.test(error.message)) {
+        throw new Error("EMAIL_ALREADY_IN_USE");
+      }
+      throw new Error(error.message);
+    }
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      throw new Error("EMAIL_ALREADY_IN_USE");
+    }
 
     // When joining an existing team (athlete or co-coach), create the members
     // row immediately via the service-role endpoint. This is what links the user

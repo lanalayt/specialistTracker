@@ -67,9 +67,12 @@ function SignupInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [emailInUse, setEmailInUse] = useState(false);
 
-  const update = (field: string, value: string) =>
+  const update = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    if (field === "email" && emailInUse) setEmailInUse(false);
+  };
 
   const [teamCode, setTeamCode] = useState(legacyTeam ?? "");
 
@@ -93,6 +96,7 @@ function SignupInner() {
     }
     setLoading(true);
     setError("");
+    setEmailInUse(false);
     try {
       const needsTeamCode = roleChoice === "athlete" || (roleChoice === "coach" && teamChoice === "existing");
       let resolvedTeamId = teamCode.trim().replace(/[^a-zA-Z0-9-]/g, "");
@@ -139,7 +143,11 @@ function SignupInner() {
       // New team coaches → onboard, existing team coaches & athletes → dashboard
       router.push(roleChoice === "coach" && teamChoice === "new" ? "/onboard" : "/dashboard");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Sign up failed");
+      if (err instanceof Error && err.message === "EMAIL_ALREADY_IN_USE") {
+        setEmailInUse(true);
+      } else {
+        setError(err instanceof Error ? err.message : "Sign up failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -194,6 +202,18 @@ function SignupInner() {
         </div>
 
         <div className="card" style={inviteColors ? { borderColor: `${accentColor}40`, boxShadow: `0 0 30px ${accentColor}15` } : undefined}>
+          {emailInUse && (
+            <div className="bg-miss/10 border border-miss/30 rounded-input px-3 py-2.5 mb-4">
+              <p className="text-miss text-sm font-semibold">Email address already in use</p>
+              <p className="text-xs text-muted mt-1">
+                An account with this email already exists.{" "}
+                <Link href="/login" className="text-accent hover:underline font-semibold">
+                  Go to the login page
+                </Link>{" "}
+                to sign in instead.
+              </p>
+            </div>
+          )}
           {error && (
             <div className="bg-miss/10 border border-miss/30 text-miss text-sm rounded-input px-3 py-2 mb-4">
               {error}
