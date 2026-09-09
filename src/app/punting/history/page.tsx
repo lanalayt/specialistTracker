@@ -654,7 +654,8 @@ function PuntHistoryContent() {
                 const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
                 const dirScore = daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);
                 const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
-                return { att, avgDist, avgNet, avgYL, avgHang, avgOT, dirPct, criticals, dirScoreDisplay };
+                const blocked = ap.filter((p) => p.blocked).length;
+                return { att, avgDist, avgNet, avgYL, avgHang, avgOT, dirPct, criticals, dirScoreDisplay, blocked };
               };
               // mode: "blend" shows gross/net and Avg YL together (games);
               // "distance"/"yardline" show only the relevant metric (per type).
@@ -669,6 +670,7 @@ function PuntHistoryContent() {
                   <div><span className="text-muted">Dir%</span> <span className="text-accent font-medium ml-1">{s.dirPct}</span></div>
                   <div><span className="text-muted">Dir Score</span> <span className="text-slate-200 font-medium ml-1">{s.dirScoreDisplay}</span></div>
                   <div><span className="text-muted">Crit</span> <span className={`font-medium ml-1 ${s.criticals > 0 ? "text-miss" : "text-slate-200"}`}>{s.criticals}</span></div>
+                  {s.blocked > 0 && <div><span className="text-muted">Blocked</span> <span className="font-medium ml-1 text-miss">{s.blocked}</span></div>}
                 </div>
               );
               const byAthlete: Record<string, PuntEntry[]> = {};
@@ -744,6 +746,7 @@ function PuntHistoryContent() {
                         <th className="table-header">Hang</th>
                         <th className="table-header">OT</th>
                         <th className="table-header">Dir</th>
+                        {displayPunts.some((p) => p.blocked) || editing ? <th className="table-header" title="Blocked — no distance or hang time">Blk</th> : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -781,14 +784,18 @@ function PuntHistoryContent() {
                           {editing ? (
                             <>
                               <td className="table-cell p-1">
-                                {isYardLineType(p.type, puntTypes) ? (
+                                {p.blocked ? (
+                                  <span className="text-xs text-muted">—</span>
+                                ) : isYardLineType(p.type, puntTypes) ? (
                                   <input type="text" inputMode="numeric" placeholder="YL" value={p.poochLandingYardLine || ""} onChange={(e) => updateEntry(i, "poochLandingYardLine", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-make" />
                                 ) : (
                                   <input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
                                 )}
                               </td>
                               <td className="table-cell p-1">
-                                {tracksHangTime(p.type, puntTypes) || p.hangTime > 0 ? (
+                                {p.blocked ? (
+                                  <span className="text-xs text-muted">—</span>
+                                ) : tracksHangTime(p.type, puntTypes) || p.hangTime > 0 ? (
                                   <input type="text" inputMode="numeric" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
                                 ) : (
                                   <span className="text-xs text-muted">—</span>
@@ -802,6 +809,23 @@ function PuntHistoryContent() {
                                   <option value="0">0</option>
                                 </select>
                               </td>
+                              <td className="table-cell p-1 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={!!p.blocked}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    updateEntry(i, "blocked", checked || undefined);
+                                    if (checked) {
+                                      updateEntry(i, "yards", 0);
+                                      updateEntry(i, "hangTime", 0);
+                                      updateEntry(i, "poochLandingYardLine", undefined);
+                                    }
+                                  }}
+                                  title="Blocked — no distance or hang time"
+                                  className="w-4 h-4 accent-miss cursor-pointer"
+                                />
+                              </td>
                             </>
                           ) : (
                             <>
@@ -813,6 +837,11 @@ function PuntHistoryContent() {
                               <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
                               <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
                               <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
+                              {displayPunts.some((dp) => dp.blocked) && (
+                                <td className="table-cell text-center">
+                                  {p.blocked ? <span className="text-miss font-semibold">⊘</span> : ""}
+                                </td>
+                              )}
                             </>
                           )}
                         </tr>

@@ -184,18 +184,18 @@ export function avgScore(att: number, score: number): string {
 export function emptyPuntStats(): PuntAthleteStats {
   const byType = {} as PuntAthleteStats["byType"];
   PUNT_TYPES.forEach((t) => {
-    byType[t] = { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0 };
+    byType[t] = { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0, blocked: 0 };
   });
   const byHash = {} as PuntAthleteStats["byHash"];
   PUNT_HASHES.forEach((h) => {
-    byHash[h] = { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0 };
+    byHash[h] = { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0, blocked: 0 };
   });
   const byLanding = {} as PuntAthleteStats["byLanding"];
   PUNT_LANDING_ZONES.forEach((z) => {
     byLanding[z] = 0;
   });
   return {
-    overall: { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0, long: 0, totalReturnYards: 0, poochYardLineTotal: 0, poochYardLineAtt: 0 },
+    overall: { att: 0, totalYards: 0, totalHang: 0, totalOpTime: 0, totalDirectionalAccuracy: 0, criticalDirections: 0, blocked: 0, long: 0, totalReturnYards: 0, poochYardLineTotal: 0, poochYardLineAtt: 0 },
     byType,
     byHash,
     byLanding,
@@ -219,8 +219,9 @@ export function processPunt(
   // so they must not feed the distance/gross average — even if an entry still
   // carries a stray yards value (e.g. a punt switched from a distance type to
   // a yard-line type). Their landing yard line is tracked separately below.
-  const hasYards = yards > 0 && !isYardLine;
-  const hasHang = hangTime > 0 && htEnabled;
+  // Blocked punts likewise never have real distance/hang time.
+  const hasYards = yards > 0 && !isYardLine && !punt.blocked;
+  const hasHang = hangTime > 0 && htEnabled && !punt.blocked;
   const hasOT = opTime > 0;
   const daRaw = punt.directionalAccuracy;
   const isNumericDA = typeof daRaw === "number";
@@ -241,6 +242,7 @@ export function processPunt(
   const isCritical = hasDA && directionalAccuracy === 0 ? 1 : 0;
   const returnYards = punt.returnYards;
   const { poochLandingYardLine } = punt;
+  const isBlocked = !!punt.blocked;
 
   if (!statsMap[athlete]) {
     statsMap = { ...statsMap, [athlete]: emptyPuntStats() };
@@ -262,6 +264,9 @@ export function processPunt(
   if (s.overall.poochYardLineTotal === undefined) {
     s.overall = { ...s.overall, poochYardLineTotal: 0, poochYardLineAtt: 0 };
   }
+  if (s.overall.blocked === undefined) {
+    s.overall = { ...s.overall, blocked: 0 };
+  }
 
   const hasPoochYL = isYardLine && poochLandingYardLine != null;
 
@@ -276,6 +281,7 @@ export function processPunt(
     totalDirectionalAccuracy: s.overall.totalDirectionalAccuracy + (hasDA ? directionalAccuracy : 0),
     daAtt: (s.overall.daAtt || 0) + (hasDA ? 1 : 0),
     criticalDirections: s.overall.criticalDirections + isCritical,
+    blocked: (s.overall.blocked || 0) + (isBlocked ? 1 : 0),
     long: hasYards ? Math.max(s.overall.long, yards) : s.overall.long,
     totalReturnYards: s.overall.totalReturnYards + (returnYards || 0),
     poochYardLineTotal: s.overall.poochYardLineTotal + (hasPoochYL ? poochLandingYardLine! : 0),
@@ -293,6 +299,7 @@ export function processPunt(
     totalDirectionalAccuracy: (b?.totalDirectionalAccuracy || 0) + (hasDA ? directionalAccuracy : 0),
     daAtt: (b?.daAtt || 0) + (hasDA ? 1 : 0),
     criticalDirections: (b?.criticalDirections || 0) + isCritical,
+    blocked: (b?.blocked || 0) + (isBlocked ? 1 : 0),
     poochYardLineTotal: (b?.poochYardLineTotal || 0) + (hasPoochYL ? poochLandingYardLine! : 0),
     poochYardLineAtt: (b?.poochYardLineAtt || 0) + (hasPoochYL ? 1 : 0),
   });

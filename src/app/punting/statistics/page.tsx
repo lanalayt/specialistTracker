@@ -151,6 +151,7 @@ function PuntStatTable({
   metric?: "distance" | "yardline";
 }) {
   const isYL = metric === "yardline";
+  const hasBlocked = athletes.some((a) => (getBucket(statsMap[a.name] ?? emptyPuntStats())?.blocked ?? 0) > 0);
   return (
     <table className="w-full text-xs">
       <thead>
@@ -163,6 +164,7 @@ function PuntStatTable({
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
           <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit<Tooltip text="Critical Direction — Any punt with a direction score of 0" /></th>
+          {hasBlocked && <th className="text-[10px] font-semibold text-miss uppercase tracking-wider text-right py-1.5 px-1.5">Blocked</th>}
         </tr>
       </thead>
       <tbody>
@@ -183,6 +185,11 @@ function PuntStatTable({
               <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", b.criticalDirections > 0 ? "text-miss" : "text-slate-200")}>
                 {b.criticalDirections || "—"}
               </td>
+              {hasBlocked && (
+                <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", (b.blocked ?? 0) > 0 ? "text-miss font-semibold" : "text-slate-200")}>
+                  {b.blocked || "—"}
+                </td>
+              )}
             </tr>
           );
         })}
@@ -274,6 +281,7 @@ function CategorySection({
             const o = catStats[a.name]?.overall;
             return o && (o.yardsAtt ?? o.att) > 0 && o.totalYards > 0;
           });
+          const hasBlocked = athletes.some((a) => (catStats[a.name]?.overall.blocked ?? 0) > 0);
           return (
             <table className="w-full text-xs">
               <thead>
@@ -286,6 +294,7 @@ function CategorySection({
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Crit<Tooltip text="Critical Direction — Any punt with a direction score of 0" /></th>
+                  {hasBlocked && <th className="text-[10px] font-semibold text-miss uppercase tracking-wider text-right py-1.5 px-1.5">Blocked</th>}
                 </tr>
               </thead>
               <tbody>
@@ -314,6 +323,11 @@ function CategorySection({
                       <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", o.criticalDirections > 0 ? "text-miss" : "text-slate-200")}>
                         {o.criticalDirections || "—"}
                       </td>
+                      {hasBlocked && (
+                        <td className={clsx("text-xs text-right py-1.5 px-1.5 border-t border-border/50", (o.blocked ?? 0) > 0 ? "text-miss font-semibold" : "text-slate-200")}>
+                          {o.blocked || "—"}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

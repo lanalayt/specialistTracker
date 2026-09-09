@@ -54,8 +54,14 @@ export function PuntSessionLog({ punts, onDelete }: PuntSessionLogProps) {
               {typeLabels[p.type] ?? p.type}
             </span>
             <span className="text-xs text-muted w-8 shrink-0">{p.hash}</span>
-            <span className="text-xs text-slate-200 w-12 shrink-0">{p.yards} yd</span>
-            <span className="text-xs text-muted w-12 shrink-0">{p.hangTime}s</span>
+            {p.blocked ? (
+              <span className="text-xs font-bold text-miss w-24 shrink-0">⊘ Blocked</span>
+            ) : (
+              <>
+                <span className="text-xs text-slate-200 w-12 shrink-0">{p.yards} yd</span>
+                <span className="text-xs text-muted w-12 shrink-0">{p.hangTime}s</span>
+              </>
+            )}
             <span className="text-xs text-muted w-12 shrink-0">{p.opTime}s OT</span>
             <span className={`text-xs font-bold flex-1 ${p.directionalAccuracy === 0 ? "text-miss" : p.directionalAccuracy === 1 ? "text-make" : "text-warn"}`}>
               {p.directionalAccuracy === 1 ? "1.0" : p.directionalAccuracy === 0.5 ? "0.5" : "0"}

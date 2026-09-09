@@ -108,6 +108,9 @@ export interface PuntEntry {
   landingYL?: number;
   fairCatch?: boolean;
   touchback?: boolean;
+  // Punt was blocked — no distance/hang time apply, so those are excluded
+  // from averages even though the punt still counts as an attempt.
+  blocked?: boolean;
 }
 
 // ─── Punt stats ─────────────────────────────────────────────────────────────
@@ -123,6 +126,7 @@ export interface PuntStatBucket {
   totalDirectionalAccuracy: number;
   daAtt?: number;
   criticalDirections: number;
+  blocked?: number;
   // Pooch only: landing yard-line average (game stats).
   poochYardLineTotal?: number;
   poochYardLineAtt?: number;

@@ -119,6 +119,8 @@ interface LogRow {
   returnYards?: string;
   fairCatch?: boolean;
   touchback?: boolean;
+  // Punt was blocked — no distance/hang time apply.
+  blocked?: boolean;
 }
 
 interface PartialPuntInput {
@@ -128,6 +130,7 @@ interface PartialPuntInput {
   directionalAccuracy: number | string;
   starred: boolean;
   poochYL?: string;
+  blocked?: boolean;
   // Practice yard-line entry (see practiceDistMode)
   startYL?: string;
   landYL?: string;
@@ -167,6 +170,7 @@ const emptyRow = (): LogRow => ({
   landingYL: "",
   returnYards: "",
   fairCatch: false,
+  blocked: false,
 });
 
 // Session drafts live in session_drafts (via draftStore), not localStorage.
@@ -525,6 +529,7 @@ export default function PuntingSessionPage() {
     initPartial?.directionalAccuracy ?? (dirMode === "field" ? DA_OPTIONS[0]?.value ?? "SL-NUM" : 1)
   );
   const [starred, setStarred] = useState(initPartial?.starred ?? false);
+  const [blocked, setBlocked] = useState(initPartial?.blocked ?? false);
   // Game-mode only: LOS and Landing yard line (absolute 0..100 field positions)
   const [los, setLos] = useState<string>("");
   const [landingYL, setLandingYL] = useState<string>("");
@@ -544,7 +549,7 @@ export default function PuntingSessionPage() {
     if (!mainDraftHydrated.current || !sessionMode) return;
     // Merge current input fields into partialInputs for the active punt
     const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, startYL, landYL } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, startYL, landYL } }
       : partialInputs;
     saveDraftForMode({
       rows,
@@ -563,14 +568,14 @@ export default function PuntingSessionPage() {
       gameTime,
       practiceDistMode,
     }, sessionMode);
-  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, committed, committedPunts, weather, sessionMode, opponent, gameTime, practiceDistMode, startYL, landYL]);
+  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, blocked, committed, committedPunts, weather, sessionMode, opponent, gameTime, practiceDistMode, startYL, landYL]);
 
   // ── Switch between practice / game mode with independent drafts ──
   const switchMode = (newMode: "practice" | "game") => {
     if (newMode === sessionMode) return;
     // Save current state to current mode's draft
     const mergedPartials = sessionActive
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, startYL, landYL } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, startYL, landYL } }
       : partialInputs;
     const currentDraft: SessionDraft = {
       rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices,
@@ -597,6 +602,7 @@ export default function PuntingSessionPage() {
     setOpTime(newPartial?.opTime ?? "");
     setDirectionalAccuracy(newPartial?.directionalAccuracy ?? defaultDA);
     setStarred(newPartial?.starred ?? false);
+    setBlocked(newPartial?.blocked ?? false);
     setPoochYL(newPartial?.poochYL ?? "");
     setPracticeDistMode(nd?.practiceDistMode ?? loadPracticeDistMode());
     setStartYL(newPartial?.startYL ?? "");
@@ -786,6 +792,7 @@ export default function PuntingSessionPage() {
     setOpTime("");
     setDirectionalAccuracy(defaultDA);
     setStarred(!!planned[startIdx >= 0 ? startIdx : 0]?.starred);
+    setBlocked(false);
     setSessionActive(true);
   };
 
@@ -802,15 +809,18 @@ export default function PuntingSessionPage() {
       setErrorRows((prev) => new Set([...prev, rowIdx]));
       return;
     }
-    const losVal = parseYardLine(r.los, "-");      // LOS defaults to own side
-    const landingYLVal = parseYardLine(r.landingYL, "+"); // Landing defaults to opponent side
-    if (isNaN(losVal) || isNaN(landingYLVal)) {
+    const isBlocked = !!r.blocked;
+    // Blocked punts never had a snap-to-landing sequence, so LOS/landing YL
+    // aren't required and don't feed a distance.
+    const losVal = isBlocked ? NaN : parseYardLine(r.los, "-");      // LOS defaults to own side
+    const landingYLVal = isBlocked ? NaN : parseYardLine(r.landingYL, "+"); // Landing defaults to opponent side
+    if (!isBlocked && (isNaN(losVal) || isNaN(landingYLVal))) {
       alert("Yard lines must be 0–50.\nLOS: use - for own side (default), + for opponent.\nLanding: no sign or + for opponent side (default), - for own side.\nExamples: LOS=-20, Landing=25 or +25");
       setErrorRows((prev) => new Set([...prev, rowIdx]));
       return;
     }
-    const gross = Math.max(0, landingYLVal - losVal);
-    const htVal = parseFloat(r.hangTime) || 0;
+    const gross = isBlocked ? 0 : Math.max(0, landingYLVal - losVal);
+    const htVal = isBlocked ? 0 : (parseFloat(r.hangTime) || 0);
     const otVal = parseFloat(r.opTime) || 0;
     if (isOpTimeTooLow(otVal)) {
       alert(`Op time of ${otVal}s isn't possible — must be at least ${MIN_OP_TIME}s, or left blank.`);
@@ -822,7 +832,7 @@ export default function PuntingSessionPage() {
       ? (dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? 0) : (parseFloat(r.directionalAccuracy) || 0))
       : (dirMode === "field" ? (DA_OPTIONS[0]?.score ?? 1) : 1);
     // Auto-detect touchback: landing YL of 0 = into the end zone = touchback
-    const isTouchback = landingYLVal >= 100;
+    const isTouchback = !isBlocked && landingYLVal >= 100;
     // Filled index (position among filled rows)
     const filledIdx = filledIndices.indexOf(rowIdx);
     const kickNum = filledIdx >= 0 ? filledIdx + 1 : sessionPunts.length + 1;
@@ -831,7 +841,7 @@ export default function PuntingSessionPage() {
     if (isTouchback) zones.push("TB");
     else if (r.fairCatch) zones.push("fairCatch");
     // Outlier check
-    const warnings = checkPuntOutliers(gross, htVal, otVal);
+    const warnings = isBlocked ? [] : checkPuntOutliers(gross, htVal, otVal);
     if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
 
     const punt: PuntEntry = {
@@ -845,13 +855,14 @@ export default function PuntingSessionPage() {
       landingZones: zones,
       directionalAccuracy: daVal,
       kickNum,
-      los: losVal,
-      landingYL: landingYLVal,
+      los: isBlocked ? undefined : losVal,
+      landingYL: isBlocked ? undefined : landingYLVal,
       returnYards: isTouchback ? 0 : (r.fairCatch ? 0 : retVal),
       fairCatch: r.fairCatch || undefined,
       touchback: isTouchback || undefined,
+      blocked: isBlocked || undefined,
       // Pooch punts (game): record the opponent yard line the ball landed on for Avg YL.
-      poochLandingYardLine: isYardLineType(r.type, puntTypes) ? Math.max(0, 100 - landingYLVal) : undefined,
+      poochLandingYardLine: !isBlocked && isYardLineType(r.type, puntTypes) ? Math.max(0, 100 - landingYLVal) : undefined,
     };
     setSessionPunts((prev) => {
       // Replace if already saved for this kickNum, else append
@@ -898,18 +909,20 @@ export default function PuntingSessionPage() {
 
     const punts: PuntEntry[] = filled.map(({ r }) => {
       const isPooch = isYardLineType(r.type, puntTypes);
+      const isBlocked = !!r.blocked;
       return {
         athleteId: r.athlete,
         athlete: r.athlete,
         type: r.type as PuntType,
         hash: r.hash as PuntHash,
-        // Pooch punts: no distance contribution
-        yards: isPooch ? 0 : (parseInt(r.yards) || 0),
-        hangTime: parseFloat(r.hangTime) || 0,
+        // Pooch punts: no distance contribution. Blocked punts: no distance or hang time.
+        yards: isPooch || isBlocked ? 0 : (parseInt(r.yards) || 0),
+        hangTime: isBlocked ? 0 : (parseFloat(r.hangTime) || 0),
         opTime: parseFloat(r.opTime) || 0,
         landingZones: [],
         directionalAccuracy: dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? DA_OPTIONS[0]?.score ?? 1) : (parseFloat(r.directionalAccuracy) || 0),
         starred: r.starred || undefined,
+        blocked: isBlocked || undefined,
         poochLandingYardLine: isPooch && r.poochYL ? (parseInt(r.poochYL) || 0) : undefined,
       };
     });
@@ -999,48 +1012,58 @@ export default function PuntingSessionPage() {
     // In game mode, compute gross yards automatically from LOS and landing YL
     let ydsVal = parseInt(yards) || 0;
     let retVal: number | undefined = undefined;
-    if (sessionMode === "game" && losVal != null && landingYLVal != null) {
-      ydsVal = Math.max(0, landingYLVal - losVal);
-      retVal = returnYardsInput !== "" ? parseInt(returnYardsInput) || 0 : undefined;
-    }
-    // Practice + yard-line entry: distance falls out of the two yard lines, and
-    // the yard lines ride along on the entry so the punt can be charted later.
-    if (practiceYLActive && (startYL !== "" || landYL !== "")) {
-      if (!practiceYL) {
-        alert("Yard lines must be 0–50, and both are needed to get a distance.\nStart: use - for own side (default), + for opponent.\nLanding: no sign or + for opponent side (default), - for own side.\nExample: Start=-30, Landing=40 → 30 yd punt.");
-        return;
-      }
-      ydsVal = practiceYL.distance;
-      losVal = practiceYL.start;
-      landingYLVal = practiceYL.land;
-    }
-    // Pooch punts (practice mode): don't track distance — track landing YL only
-    const isPooch = isYardLineType(plan.type, puntTypes);
     let poochYLVal: number | undefined = undefined;
-    if (isPooch && sessionMode !== "game") {
-      poochYLVal = poochYL !== "" ? parseInt(poochYL) || 0 : undefined;
-      ydsVal = 0; // pooch punts do not contribute to distance averages (practice)
-    } else if (isPooch && sessionMode === "game" && landingYLVal != null) {
-      // Game pooch: keep gross yards AND record the opponent landing yard line for Avg YL.
-      poochYLVal = Math.max(0, 100 - landingYLVal);
+    const isPooch = isYardLineType(plan.type, puntTypes);
+    // Blocked punts have no real distance, hang time, or LOS/landing — the
+    // snap never resulted in a normal kick, whatever the type/entry mode.
+    if (blocked) {
+      losVal = undefined;
+      landingYLVal = undefined;
+      ydsVal = 0;
+    } else {
+      if (sessionMode === "game" && losVal != null && landingYLVal != null) {
+        ydsVal = Math.max(0, landingYLVal - losVal);
+        retVal = returnYardsInput !== "" ? parseInt(returnYardsInput) || 0 : undefined;
+      }
+      // Practice + yard-line entry: distance falls out of the two yard lines, and
+      // the yard lines ride along on the entry so the punt can be charted later.
+      if (practiceYLActive && (startYL !== "" || landYL !== "")) {
+        if (!practiceYL) {
+          alert("Yard lines must be 0–50, and both are needed to get a distance.\nStart: use - for own side (default), + for opponent.\nLanding: no sign or + for opponent side (default), - for own side.\nExample: Start=-30, Landing=40 → 30 yd punt.");
+          return;
+        }
+        ydsVal = practiceYL.distance;
+        losVal = practiceYL.start;
+        landingYLVal = practiceYL.land;
+      }
+      // Pooch punts (practice mode): don't track distance — track landing YL only
+      if (isPooch && sessionMode !== "game") {
+        poochYLVal = poochYL !== "" ? parseInt(poochYL) || 0 : undefined;
+        ydsVal = 0; // pooch punts do not contribute to distance averages (practice)
+      } else if (isPooch && sessionMode === "game" && landingYLVal != null) {
+        // Game pooch: keep gross yards AND record the opponent landing yard line for Avg YL.
+        poochYLVal = Math.max(0, 100 - landingYLVal);
+      }
     }
     // Auto-detect touchback: landing at opponent's end zone (field pos >= 100)
     const isTouchback = sessionMode === "game" && landingYLVal != null && landingYLVal >= 100;
     const liveZones: PuntLandingZone[] = [];
     if (isTouchback) liveZones.push("TB");
+    const finalHtVal = blocked ? 0 : htVal;
     const punt: PuntEntry = {
       athleteId: plan.athlete,
       athlete: plan.athlete,
       type: plan.type,
       hash: plan.hash,
       yards: ydsVal,
-      hangTime: htVal,
+      hangTime: finalHtVal,
       opTime: otVal,
       landingZones: liveZones,
       directionalAccuracy: dirMode === "field"
         ? (DA_OPTIONS.find((o) => o.value === directionalAccuracy)?.score ?? 0)
         : directionalAccuracy,
       starred: starred || undefined,
+      blocked: blocked || undefined,
       kickNum: currentPuntIdx + 1,
       los: losVal,
       landingYL: landingYLVal,
@@ -1050,7 +1073,7 @@ export default function PuntingSessionPage() {
     };
 
     // Outlier check
-    const warnings = checkPuntOutliers(ydsVal, htVal, otVal);
+    const warnings = checkPuntOutliers(ydsVal, finalHtVal, otVal);
     if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
 
     if (editingPuntIdx !== null) {
@@ -1097,12 +1120,14 @@ export default function PuntingSessionPage() {
       setOpTime(nextPartial.opTime);
       setDirectionalAccuracy(nextPartial.directionalAccuracy);
       setStarred(nextPartial.starred);
+      setBlocked(nextPartial.blocked ?? false);
     } else {
       setYards("");
       setHangTime("");
       setOpTime("");
       setDirectionalAccuracy(defaultDA);
       setStarred(!!plannedPunts[advanceIdx]?.starred);
+      setBlocked(false);
       setPoochYL("");
     }
     // Practice yard-line entry: reps usually repeat from the same spot, so keep
@@ -1188,7 +1213,7 @@ export default function PuntingSessionPage() {
     if (!isPlannedLogged(currentPuntIdx)) {
       setPartialInputs((prev) => ({
         ...prev,
-        [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, poochYL },
+        [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, poochYL },
       }));
     }
 
@@ -1241,6 +1266,7 @@ export default function PuntingSessionPage() {
     setOpTime("");
     setDirectionalAccuracy(defaultDA);
     setStarred(false);
+    setBlocked(false);
     setPoochYL("");
     setLos("");
     setLandingYL("");
@@ -1404,7 +1430,7 @@ export default function PuntingSessionPage() {
   // ── Save Draft to cloud ──────────────────────────────────────
   const handleSaveDraft = () => {
     const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, startYL, landYL } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, startYL, landYL } }
       : partialInputs;
     const draft: SessionDraft = {
       rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices,
@@ -1639,7 +1665,7 @@ export default function PuntingSessionPage() {
                             onClick={() => {
                               // Save current partial input before switching
                               if (!isPlannedLogged(currentPuntIdx)) {
-                                setPartialInputs((prev) => ({ ...prev, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred } }));
+                                setPartialInputs((prev) => ({ ...prev, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked } }));
                               }
                               setCurrentPuntIdx(i);
                               setShowAthleteDropdown(false);
@@ -1650,6 +1676,7 @@ export default function PuntingSessionPage() {
                                 setOpTime(String(logged.opTime));
                                 setDirectionalAccuracy(logged.directionalAccuracy);
                                 setStarred(!!logged.starred);
+                                setBlocked(!!logged.blocked);
                                 setEditingPuntIdx(getLoggedPuntArrayIdx(i));
                               } else {
                                 const partial = partialInputs[i];
@@ -1659,12 +1686,14 @@ export default function PuntingSessionPage() {
                                   setOpTime(partial.opTime);
                                   setDirectionalAccuracy(partial.directionalAccuracy);
                                   setStarred(partial.starred);
+                                  setBlocked(partial.blocked ?? false);
                                 } else {
                                   setYards("");
                                   setHangTime("");
                                   setOpTime("");
                                   setDirectionalAccuracy(defaultDA);
                                   setStarred(!!plannedPunts[i]?.starred);
+                                  setBlocked(false);
                                 }
                                 setEditingPuntIdx(null);
                               }
@@ -1779,31 +1808,33 @@ export default function PuntingSessionPage() {
                         <div>
                           <p className="label">LOS</p>
                           <input
-                            className="input text-center text-lg font-bold"
+                            className={clsx("input text-center text-lg font-bold", blocked && "opacity-40")}
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            placeholder="yd"
-                            value={los}
+                            placeholder={blocked ? "—" : "yd"}
+                            value={blocked ? "" : los}
                             onChange={(e) => setLos(e.target.value)}
+                            disabled={blocked}
                           />
                         </div>
                         <div>
                           <p className="label">Landing YL</p>
                           <input
-                            className="input text-center text-lg font-bold"
+                            className={clsx("input text-center text-lg font-bold", blocked && "opacity-40")}
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            placeholder="yd"
-                            value={landingYL}
+                            placeholder={blocked ? "—" : "yd"}
+                            value={blocked ? "" : landingYL}
                             onChange={(e) => setLandingYL(e.target.value)}
+                            disabled={blocked}
                           />
                         </div>
                         <div>
                           <p className="label">Distance</p>
                           <div className="input text-center text-lg font-bold text-accent">
-                            {(() => {
+                            {blocked ? "—" : (() => {
                               const l = parseInt(los) || 0;
                               const ly = parseInt(landingYL) || 0;
                               const d = Math.max(0, ly - l);
@@ -1894,19 +1925,45 @@ export default function PuntingSessionPage() {
                       </div>
                     )}
 
+                    {/* Blocked — no distance or hang time on a blocked punt */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBlocked((v) => {
+                          const next = !v;
+                          if (next) {
+                            setYards("");
+                            setHangTime("");
+                            setPoochYL("");
+                          }
+                          return next;
+                        });
+                      }}
+                      disabled={viewOnly}
+                      className={clsx(
+                        "w-full py-2 rounded-input text-xs font-bold uppercase tracking-wider border transition-all",
+                        blocked
+                          ? "bg-miss/20 text-miss border-miss/50"
+                          : "bg-surface-2 text-muted border-border hover:text-white"
+                      )}
+                    >
+                      {blocked ? "⊘ Blocked" : "Mark as Blocked"}
+                    </button>
+
                     {/* Yards + Hang Time + Opp Time */}
                     <div className="grid grid-cols-3 gap-3">
                       {sessionMode !== "game" && practiceDistMode === "total" && !isYardLineType(currentPlan?.type, puntTypes) && (
                         <div>
                           <p className="label">Yards</p>
                           <input
-                            className="input text-center text-lg font-bold"
+                            className={clsx("input text-center text-lg font-bold", blocked && "opacity-40")}
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            placeholder="yds"
-                            value={yards}
+                            placeholder={blocked ? "—" : "yds"}
+                            value={blocked ? "" : yards}
                             onChange={(e) => setYards(e.target.value)}
+                            disabled={blocked}
                           />
                         </div>
                       )}
@@ -1914,13 +1971,14 @@ export default function PuntingSessionPage() {
                         <div>
                           <p className="label">Landing YL</p>
                           <input
-                            className="input text-center text-lg font-bold text-accent"
+                            className={clsx("input text-center text-lg font-bold text-accent", blocked && "opacity-40")}
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            placeholder="yd"
-                            value={poochYL}
+                            placeholder={blocked ? "—" : "yd"}
+                            value={blocked ? "" : poochYL}
                             onChange={(e) => setPoochYL(e.target.value)}
+                            disabled={blocked}
                           />
                         </div>
                       )}
@@ -1928,12 +1986,13 @@ export default function PuntingSessionPage() {
                       <div>
                         <p className="label">Hang Time (s)</p>
                         <input
-                          className="input text-center text-lg font-bold"
+                          className={clsx("input text-center text-lg font-bold", blocked && "opacity-40")}
                           type="text"
                           inputMode="numeric"
-                          placeholder="sec"
-                          value={hangTime}
+                          placeholder={blocked ? "—" : "sec"}
+                          value={blocked ? "" : hangTime}
                           onChange={handleAutoDecimalChange(setHangTime)}
+                          disabled={blocked}
                         />
                       </div>
                       )}
@@ -2528,6 +2587,7 @@ export default function PuntingSessionPage() {
                       {opTimeEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-red-500/40 text-[11px]">OT</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-14 border-b border-red-500/40 text-[11px]">Ret</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-10 border-b border-red-500/40 text-[11px]" title="Fair Catch">FC</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-10 border-b border-red-500/40 text-[11px]" title="Blocked — no distance or hang time">Blk</th>
                       {dirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>}
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-14 border-b border-red-500/40 text-[10px]">Save</th>
                     </>
@@ -2550,6 +2610,9 @@ export default function PuntingSessionPage() {
                           Dir
                         </th>
                       )}
+                      <th className="bg-surface-2 text-muted font-bold py-2 px-1.5 text-center w-10 border-b border-border text-[11px]" title="Blocked — no distance or hang time">
+                        Blk
+                      </th>
                     </>
                   )}
                   {sessionMode !== "game" && (
@@ -2645,31 +2708,38 @@ export default function PuntingSessionPage() {
                             {isSaved ? (
                               <td colSpan={2} className="py-1 px-1 relative">
                                 <div className="flex items-center justify-center relative">
-                                  <span className="text-[9px] text-make/30 absolute left-1">{row.los ?? ""}</span>
-                                  <span className="text-sm font-bold text-make">{(() => {
-                                    const l = parseYardLine(row.los, "-");
-                                    const ly = parseYardLine(row.landingYL, "+");
-                                    return !isNaN(l) && !isNaN(ly) ? `${Math.max(0, ly - l)} yd` : "—";
-                                  })()}</span>
-                                  <span className="text-[9px] text-make/30 absolute right-1">{row.landingYL ?? ""}</span>
+                                  {row.blocked ? (
+                                    <span className="text-xs font-bold text-miss">⊘ Blocked</span>
+                                  ) : (
+                                    <>
+                                      <span className="text-[9px] text-make/30 absolute left-1">{row.los ?? ""}</span>
+                                      <span className="text-sm font-bold text-make">{(() => {
+                                        const l = parseYardLine(row.los, "-");
+                                        const ly = parseYardLine(row.landingYL, "+");
+                                        return !isNaN(l) && !isNaN(ly) ? `${Math.max(0, ly - l)} yd` : "—";
+                                      })()}</span>
+                                      <span className="text-[9px] text-make/30 absolute right-1">{row.landingYL ?? ""}</span>
+                                    </>
+                                  )}
                                 </div>
                               </td>
                             ) : (
                               <>
                                 <td className="py-1 px-1">
                                   <input
-                                    type="text" inputMode="text" placeholder="-20"
-                                    value={row.los ?? ""}
+                                    type="text" inputMode="text" placeholder={row.blocked ? "—" : "-20"}
+                                    value={row.blocked ? "" : (row.los ?? "")}
                                     onChange={(e) => updateRow(idx, "los", e.target.value)}
                                     readOnly={viewOnly}
+                                    disabled={!!row.blocked}
                                     title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
-                                    className="w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60"
+                                    className={clsx("w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60", row.blocked && "opacity-40")}
                                   />
                                 </td>
                                 <td className="py-1 px-1">
                                   <input
-                                    type="text" inputMode="text" placeholder="25"
-                                    value={row.landingYL ?? ""}
+                                    type="text" inputMode="text" placeholder={row.blocked ? "—" : "25"}
+                                    value={row.blocked ? "" : (row.landingYL ?? "")}
                                     onChange={(e) => {
                                       updateRow(idx, "landingYL", e.target.value);
                                       const val = e.target.value.trim();
@@ -2683,14 +2753,17 @@ export default function PuntingSessionPage() {
                                       }
                                     }}
                                     readOnly={viewOnly}
+                                    disabled={!!row.blocked}
                                     title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
-                                    className="w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60"
+                                    className={clsx("w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60", row.blocked && "opacity-40")}
                                   />
                                 </td>
                               </>
                             )}
                             <td className="py-1 px-1">
-                              {tracksHangTime(row.type, puntTypes) || parseFloat(row.hangTime) > 0 ? (
+                              {row.blocked ? (
+                                <span className="text-xs text-muted text-center block py-2">—</span>
+                              ) : tracksHangTime(row.type, puntTypes) || parseFloat(row.hangTime) > 0 ? (
                               <input
                                 type="text" inputMode="numeric" placeholder="sec"
                                 value={row.hangTime}
@@ -2732,10 +2805,29 @@ export default function PuntingSessionPage() {
                               <input
                                 type="checkbox"
                                 checked={!!row.fairCatch}
-                                disabled={viewOnly || isSaved || !!row.touchback}
+                                disabled={viewOnly || isSaved || !!row.touchback || !!row.blocked}
                                 onChange={(e) => updateRow(idx, "fairCatch", e.target.checked)}
                                 title="Fair Catch"
                                 className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </td>
+                            <td className="py-1 px-1 text-center">
+                              <input
+                                type="checkbox"
+                                checked={!!row.blocked}
+                                disabled={viewOnly || isSaved}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  updateRow(idx, "blocked", checked);
+                                  if (checked) {
+                                    updateRow(idx, "hangTime", "");
+                                    updateRow(idx, "los", "");
+                                    updateRow(idx, "landingYL", "");
+                                    updateRow(idx, "fairCatch", false);
+                                  }
+                                }}
+                                title="Blocked — no distance or hang time"
+                                className="w-4 h-4 accent-miss cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
                             {dirEnabled && (
@@ -2779,7 +2871,9 @@ export default function PuntingSessionPage() {
                       {manualEntry && sessionMode !== "game" && (
                         <>
                           <td className="py-1 px-1">
-                            {isYardLineType(row.type, puntTypes) ? (
+                            {row.blocked ? (
+                              <span className="text-xs text-muted text-center block">—</span>
+                            ) : isYardLineType(row.type, puntTypes) ? (
                               <input
                                 type="text" inputMode="numeric" pattern="[0-9]*" placeholder="YL"
                                 value={row.poochYL ?? ""}
@@ -2799,7 +2893,9 @@ export default function PuntingSessionPage() {
                             )}
                           </td>
                           <td className="py-1 px-1">
-                            {tracksHangTime(row.type, puntTypes) || parseFloat(row.hangTime) > 0 ? (
+                            {row.blocked ? (
+                              <span className="text-xs text-muted text-center block">—</span>
+                            ) : tracksHangTime(row.type, puntTypes) || parseFloat(row.hangTime) > 0 ? (
                             <input
                               type="text" inputMode="numeric" placeholder="sec"
                               value={row.hangTime}
@@ -2843,6 +2939,24 @@ export default function PuntingSessionPage() {
                               </select>
                             </td>
                           )}
+                          <td className="py-1 px-1 text-center">
+                            <input
+                              type="checkbox"
+                              checked={!!row.blocked}
+                              disabled={viewOnly}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                updateRow(idx, "blocked", checked);
+                                if (checked) {
+                                  updateRow(idx, "yards", "");
+                                  updateRow(idx, "hangTime", "");
+                                  updateRow(idx, "poochYL", "");
+                                }
+                              }}
+                              title="Blocked — no distance or hang time"
+                              className="w-4 h-4 accent-miss cursor-pointer disabled:cursor-not-allowed"
+                            />
+                          </td>
                         </>
                       )}
                       {sessionMode !== "game" && (
@@ -2900,12 +3014,14 @@ export default function PuntingSessionPage() {
                                         setOpTime(String(logged.opTime));
                                         setDirectionalAccuracy(logged.directionalAccuracy);
                                         setStarred(!!logged.starred);
+                                        setBlocked(!!logged.blocked);
                                       } else {
                                         setYards("");
                                         setHangTime("");
                                         setOpTime("");
                                         setDirectionalAccuracy(defaultDA);
                                         setStarred(false);
+                                        setBlocked(false);
                                       }
                                       setSessionActive(true);
                                     }}

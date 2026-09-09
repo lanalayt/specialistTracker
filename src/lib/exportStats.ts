@@ -292,7 +292,7 @@ function computePuntStats(athletes: string[], history: { entries?: PuntEntry[] }
 
 function puntBucketRows(athletes: string[], statsMap: Record<string, PuntAthleteStats>, getBucket: (s: PuntAthleteStats) => PuntStatBucket): Row[] {
   const rows: Row[] = [];
-  rows.push(["Athlete", "Att", "Avg Yds", "Avg HT", "Avg OT", "DA%", "Crit"]);
+  rows.push(["Athlete", "Att", "Avg Yds", "Avg HT", "Avg OT", "DA%", "Crit", "Blocked"]);
   athletes.forEach((a) => {
     const s = statsMap[a];
     if (!s) return;
@@ -310,6 +310,7 @@ function puntBucketRows(athletes: string[], statsMap: Record<string, PuntAthlete
       oAtt > 0 ? +(b.totalOpTime / oAtt).toFixed(2) : "—",
       dAtt > 0 ? `${Math.round((b.totalDirectionalAccuracy / dAtt) * 100)}%` : "—",
       b.criticalDirections,
+      b.blocked || 0,
     ]);
   });
   return rows;
