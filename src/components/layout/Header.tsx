@@ -383,12 +383,13 @@ export function MobileNav() {
   const activeColor = isScout ? "text-amber-400" : isAthlete ? "text-sky-400" : "text-accent";
   // Custom theme colors (accent, etc.) are plain CSS vars, not Tailwind's
   // RGB-channel format, so bg-accent/NN produces no rule — use the app's
-  // pre-mixed --accent-dim var via an arbitrary-value class instead.
+  // pre-mixed --accent-dim var via an arbitrary-value class instead. A solid
+  // (non-opacity) border color always works, so that carries the outline.
   const activeGlow = isScout
-    ? "bg-amber-400/15 shadow-[0_0_12px_rgba(251,191,36,0.5)]"
+    ? "bg-amber-400/15 border-2 border-amber-400 shadow-[0_0_14px_rgba(251,191,36,0.65)]"
     : isAthlete
-    ? "bg-sky-400/15 shadow-[0_0_12px_rgba(56,189,248,0.5)]"
-    : "bg-[var(--accent-dim)] shadow-accent";
+    ? "bg-sky-400/15 border-2 border-sky-400 shadow-[0_0_14px_rgba(56,189,248,0.65)]"
+    : "bg-[var(--accent-dim)] border-2 border-accent shadow-[0_0_14px_var(--accent)]";
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border lg:hidden z-40">
