@@ -381,6 +381,14 @@ export function MobileNav() {
 
   const items = isScout ? SCOUT_MOBILE_NAV : isAthlete ? ATHLETE_MOBILE_NAV : NAV_ITEMS.slice(0, 5);
   const activeColor = isScout ? "text-amber-400" : isAthlete ? "text-sky-400" : "text-accent";
+  // Custom theme colors (accent, etc.) are plain CSS vars, not Tailwind's
+  // RGB-channel format, so bg-accent/NN produces no rule — use the app's
+  // pre-mixed --accent-dim var via an arbitrary-value class instead.
+  const activeGlow = isScout
+    ? "bg-amber-400/15 shadow-[0_0_12px_rgba(251,191,36,0.5)]"
+    : isAthlete
+    ? "bg-sky-400/15 shadow-[0_0_12px_rgba(56,189,248,0.5)]"
+    : "bg-[var(--accent-dim)] shadow-accent";
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border lg:hidden z-40">
@@ -389,9 +397,11 @@ export function MobileNav() {
           "disabled" in item && item.disabled ? (
             <div
               key={item.label}
-              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 opacity-30 cursor-not-allowed"
+              className="flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 opacity-30 cursor-not-allowed"
             >
-              {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+              <div className="w-9 h-9 rounded-full flex items-center justify-center">
+                {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+              </div>
               <span className="text-[7px] font-bold leading-none text-warn">SOON</span>
             </div>
           ) : (
@@ -399,11 +409,18 @@ export function MobileNav() {
               key={item.href}
               href={item.href}
               className={clsx(
-                "flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors",
+                "flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 transition-colors",
                 isActive(item.href) ? activeColor : "text-muted"
               )}
             >
-              {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+              <div
+                className={clsx(
+                  "w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                  isActive(item.href) && activeGlow
+                )}
+              >
+                {item.iconEl ?? <span className="text-lg leading-none">{item.icon}</span>}
+              </div>
               <span className="text-[9px] font-medium leading-none">
                 {item.label.split(" ")[0]}
               </span>
