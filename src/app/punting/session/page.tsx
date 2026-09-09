@@ -2186,7 +2186,7 @@ export default function PuntingSessionPage() {
 
                 {/* Session log */}
                 <div className="flex-1 overflow-y-auto min-h-0">
-                  <PuntSessionLog punts={sessionPunts} onDelete={handleDeletePunt} />
+                  <PuntSessionLog punts={sessionPunts} onDelete={handleDeletePunt} puntTypes={puntTypes} />
                 </div>
               </>
             )}

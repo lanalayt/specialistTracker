@@ -1,28 +1,23 @@
 "use client";
 
 import React from "react";
-import { useSettings } from "@/lib/settingsSync";
 import type { PuntEntry } from "@/types";
 
-const DEFAULT_PUNT_TYPES = [
-  { id: "DIR_LEFT", label: "Left", metric: "distance" as const },
-  { id: "DIR_STRAIGHT", label: "Straight", metric: "distance" as const },
-  { id: "DIR_RIGHT", label: "Right", metric: "distance" as const },
-  { id: "POOCH_LEFT", label: "Pooch Left", metric: "yardline" as const },
-  { id: "POOCH_MIDDLE", label: "Pooch Middle", metric: "yardline" as const },
-  { id: "POOCH_RIGHT", label: "Pooch Right", metric: "yardline" as const },
-  { id: "RUGBY", label: "Rugby", metric: "distance" as const },
-];
+type PuntTypeInfo = { id: string; label: string; metric?: string };
 
-type PuntTypeInfo = { id: string; label: string; metric?: "distance" | "yardline" };
-
-function resolvePuntTypes(parsed: { puntTypes?: PuntTypeInfo[] } | null): PuntTypeInfo[] {
-  if (parsed?.puntTypes && parsed.puntTypes.length > 0) return parsed.puntTypes;
-  return DEFAULT_PUNT_TYPES;
-}
+const DEFAULT_TYPE_LABELS: Record<string, string> = {
+  DIR_LEFT: "Left",
+  DIR_STRAIGHT: "Straight",
+  DIR_RIGHT: "Right",
+  POOCH_LEFT: "Pooch Left",
+  POOCH_MIDDLE: "Pooch Middle",
+  POOCH_RIGHT: "Pooch Right",
+  RUGBY: "Rugby",
+};
 
 // A punt type is measured by yard line (vs. gross distance) — pooch and any
-// custom type the coach configured with the "yardline" metric.
+// custom type the coach configured with the "yardline" metric. Falls back to
+// an id-name check so legacy/undeclared types (e.g. "POOCH_BROWN") still work.
 function isYardLineType(type: string | undefined, types: PuntTypeInfo[]): boolean {
   if (!type) return false;
   const cfg = types.find((t) => t.id === type);
@@ -33,12 +28,13 @@ function isYardLineType(type: string | undefined, types: PuntTypeInfo[]): boolea
 interface PuntSessionLogProps {
   punts: PuntEntry[];
   onDelete: (idx: number) => void;
+  // Passed down from the session page's own resolved type config so this
+  // list always agrees with how the entry itself decided make/yardage.
+  puntTypes?: PuntTypeInfo[];
 }
 
-export function PuntSessionLog({ punts, onDelete }: PuntSessionLogProps) {
-  const puntSettings = useSettings<{ puntTypes?: PuntTypeInfo[] }>("puntSettings");
-  const puntTypes = resolvePuntTypes(puntSettings);
-  const typeLabels: Record<string, string> = {};
+export function PuntSessionLog({ punts, onDelete, puntTypes = [] }: PuntSessionLogProps) {
+  const typeLabels: Record<string, string> = { ...DEFAULT_TYPE_LABELS };
   puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
 
   if (punts.length === 0) {
