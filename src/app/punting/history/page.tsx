@@ -527,7 +527,7 @@ function PuntHistoryContent() {
                           const aYds = ap.filter((p) => p.yards > 0);
                           const aHt = ap.filter((p) => p.hangTime > 0);
                           const aOt = ap.filter((p) => (p.opTime || 0) > 0);
-                          const aDa = ap.filter((p) => typeof p.directionalAccuracy === "number");
+                          const aDa = ap.filter((p) => typeof p.directionalAccuracy === "number" && !p.blocked);
                           const stats: Record<string, string> = {
                             Punts: String(ap.length),
                             "Avg Dist": aYds.length > 0 ? (aYds.reduce((s, p) => s + p.yards, 0) / aYds.length).toFixed(1) : "—",
@@ -555,7 +555,7 @@ function PuntHistoryContent() {
                             row.push(
                               p.hangTime > 0 ? p.hangTime.toFixed(2) : "—",
                               (p.opTime || 0) > 0 ? p.opTime.toFixed(2) : "—",
-                              String(p.directionalAccuracy ?? "—"),
+                              p.blocked ? "—" : String(p.directionalAccuracy ?? "—"),
                             );
                             return row;
                           }),
@@ -648,10 +648,11 @@ function PuntHistoryContent() {
                 const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
                 const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
                 // Include negative scores (e.g. -1 "really bad") so they pull
-                // the average down instead of being dropped from it.
-                const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number");
+                // the average down instead of being dropped from it. A blocked
+                // punt never had a real direction, so it's excluded here too.
+                const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && !p.blocked);
                 const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0) / daEntries.length) * 100)}%` : "—";
-                const criticals = ap.filter((p) => p.directionalAccuracy === 0).length;
+                const criticals = ap.filter((p) => p.directionalAccuracy === 0 && !p.blocked).length;
                 const dirScore = daEntries.reduce((s, p) => s + (typeof p.directionalAccuracy === "number" ? p.directionalAccuracy : 0), 0);
                 const dirScoreDisplay = daEntries.length > 0 ? `${dirScore % 1 === 0 ? dirScore : dirScore.toFixed(1)}/${daEntries.length}` : "—";
                 const blocked = ap.filter((p) => p.blocked).length;
@@ -803,11 +804,15 @@ function PuntHistoryContent() {
                               </td>
                               <td className="table-cell p-1"><input type="text" inputMode="numeric" value={timeValue(i, "opTime", p.opTime || 0)} onChange={(e) => updateTime(i, "opTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                               <td className="table-cell p-1">
-                                <select value={String(p.directionalAccuracy ?? "")} onChange={(e) => updateEntry(i, "directionalAccuracy", parseFloat(e.target.value))} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
-                                  <option value="1">1</option>
-                                  <option value="0.5">0.5</option>
-                                  <option value="0">0</option>
-                                </select>
+                                {p.blocked ? (
+                                  <span className="text-xs text-muted">—</span>
+                                ) : (
+                                  <select value={String(p.directionalAccuracy ?? "")} onChange={(e) => updateEntry(i, "directionalAccuracy", parseFloat(e.target.value))} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
+                                    <option value="1">1</option>
+                                    <option value="0.5">0.5</option>
+                                    <option value="0">0</option>
+                                  </select>
+                                )}
                               </td>
                               <td className="table-cell p-1 text-center">
                                 <input
@@ -822,7 +827,7 @@ function PuntHistoryContent() {
                                       updateEntry(i, "poochLandingYardLine", undefined);
                                     }
                                   }}
-                                  title="Blocked — no distance or hang time"
+                                  title="Blocked — no distance, hang time, or direction score"
                                   className="w-4 h-4 accent-miss cursor-pointer"
                                 />
                               </td>
@@ -836,7 +841,7 @@ function PuntHistoryContent() {
                               </td>
                               <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
                               <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
-                              <td className={`table-cell font-bold ${p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
+                              <td className={`table-cell font-bold ${p.blocked ? "text-muted font-normal" : p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.blocked ? "—" : p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
                               {displayPunts.some((dp) => dp.blocked) && (
                                 <td className="table-cell text-center">
                                   {p.blocked ? <span className="text-miss font-semibold">⊘</span> : ""}

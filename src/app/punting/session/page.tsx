@@ -1925,31 +1925,6 @@ export default function PuntingSessionPage() {
                       </div>
                     )}
 
-                    {/* Blocked — no distance or hang time on a blocked punt */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBlocked((v) => {
-                          const next = !v;
-                          if (next) {
-                            setYards("");
-                            setHangTime("");
-                            setPoochYL("");
-                          }
-                          return next;
-                        });
-                      }}
-                      disabled={viewOnly}
-                      className={clsx(
-                        "w-full py-2 rounded-input text-xs font-bold uppercase tracking-wider border transition-all",
-                        blocked
-                          ? "bg-miss/20 text-miss border-miss/50"
-                          : "bg-surface-2 text-muted border-border hover:text-white"
-                      )}
-                    >
-                      {blocked ? "⊘ Blocked" : "Mark as Blocked"}
-                    </button>
-
                     {/* Yards + Hang Time + Opp Time */}
                     <div className="grid grid-cols-3 gap-3">
                       {sessionMode !== "game" && practiceDistMode === "total" && !isYardLineType(currentPlan?.type, puntTypes) && (
@@ -2045,15 +2020,16 @@ export default function PuntingSessionPage() {
                     {dirEnabled && (
                     <div>
                       <p className="label">Direction{dirMode === "numeric" ? " Score" : ""}</p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className={clsx("flex flex-wrap gap-2", blocked && "opacity-40 pointer-events-none")}>
                         {DA_OPTIONS.map((opt) => {
                           const isNumeric = dirMode === "numeric";
                           const val = isNumeric ? parseFloat(opt.value) : opt.value;
-                          const isActive = directionalAccuracy === val || String(directionalAccuracy) === opt.value;
+                          const isActive = !blocked && (directionalAccuracy === val || String(directionalAccuracy) === opt.value);
                           return (
                             <button
                               key={opt.value}
                               onClick={() => setDirectionalAccuracy(val)}
+                              disabled={blocked}
                               className={clsx(
                                 "px-3 py-3 rounded-input text-xs font-bold border transition-all",
                                 isActive
@@ -2072,6 +2048,31 @@ export default function PuntingSessionPage() {
                       </div>
                     </div>
                     )}
+
+                    {/* Blocked — no distance, hang time, or direction score on a blocked punt */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBlocked((v) => {
+                          const next = !v;
+                          if (next) {
+                            setYards("");
+                            setHangTime("");
+                            setPoochYL("");
+                          }
+                          return next;
+                        });
+                      }}
+                      disabled={viewOnly}
+                      className={clsx(
+                        "px-3 py-1.5 rounded-input text-[10px] font-bold uppercase tracking-wider border transition-all",
+                        blocked
+                          ? "bg-miss/20 text-miss border-miss/50"
+                          : "bg-surface-2 text-muted border-border hover:text-white"
+                      )}
+                    >
+                      {blocked ? "⊘ Blocked" : "Mark as Blocked"}
+                    </button>
 
                     {/* Log Snap — mirrors the FG live card so a snap can be
                         logged for the punt currently on screen. */}
@@ -2824,14 +2825,18 @@ export default function PuntingSessionPage() {
                                     updateRow(idx, "los", "");
                                     updateRow(idx, "landingYL", "");
                                     updateRow(idx, "fairCatch", false);
+                                    updateRow(idx, "directionalAccuracy", "");
                                   }
                                 }}
-                                title="Blocked — no distance or hang time"
+                                title="Blocked — no distance, hang time, or direction score"
                                 className="w-4 h-4 accent-miss cursor-pointer disabled:cursor-not-allowed"
                               />
                             </td>
                             {dirEnabled && (
                               <td className="py-1 px-1">
+                                {row.blocked ? (
+                                  <span className="text-xs text-muted text-center block py-1">—</span>
+                                ) : (
                                 <select
                                   value={row.directionalAccuracy}
                                   onChange={(e) => updateRow(idx, "directionalAccuracy", e.target.value)}
@@ -2843,6 +2848,7 @@ export default function PuntingSessionPage() {
                                     <option key={o.value} value={o.value}>{o.label}</option>
                                   ))}
                                 </select>
+                                )}
                               </td>
                             )}
                             <td className="py-1 px-1 text-center">
@@ -2926,17 +2932,21 @@ export default function PuntingSessionPage() {
                           )}
                           {dirEnabled && (
                             <td className="py-1 px-1">
-                              <select
-                                value={row.directionalAccuracy}
-                                onChange={(e) => updateRow(idx, "directionalAccuracy", e.target.value)}
-                                disabled={viewOnly}
-                                className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
-                              >
-                                <option value="">—</option>
-                                {DA_OPTIONS.map((o) => (
-                                  <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                              </select>
+                              {row.blocked ? (
+                                <span className="text-xs text-muted text-center block">—</span>
+                              ) : (
+                                <select
+                                  value={row.directionalAccuracy}
+                                  onChange={(e) => updateRow(idx, "directionalAccuracy", e.target.value)}
+                                  disabled={viewOnly}
+                                  className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
+                                >
+                                  <option value="">—</option>
+                                  {DA_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                  ))}
+                                </select>
+                              )}
                             </td>
                           )}
                           <td className="py-1 px-1 text-center">
@@ -2951,9 +2961,10 @@ export default function PuntingSessionPage() {
                                   updateRow(idx, "yards", "");
                                   updateRow(idx, "hangTime", "");
                                   updateRow(idx, "poochYL", "");
+                                  updateRow(idx, "directionalAccuracy", "");
                                 }
                               }}
-                              title="Blocked — no distance or hang time"
+                              title="Blocked — no distance, hang time, or direction score"
                               className="w-4 h-4 accent-miss cursor-pointer disabled:cursor-not-allowed"
                             />
                           </td>

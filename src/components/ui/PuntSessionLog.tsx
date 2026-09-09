@@ -63,9 +63,13 @@ export function PuntSessionLog({ punts, onDelete }: PuntSessionLogProps) {
               </>
             )}
             <span className="text-xs text-muted w-12 shrink-0">{p.opTime}s OT</span>
-            <span className={`text-xs font-bold flex-1 ${p.directionalAccuracy === 0 ? "text-miss" : p.directionalAccuracy === 1 ? "text-make" : "text-warn"}`}>
-              {p.directionalAccuracy === 1 ? "1.0" : p.directionalAccuracy === 0.5 ? "0.5" : "0"}
-            </span>
+            {p.blocked ? (
+              <span className="text-xs text-muted flex-1">—</span>
+            ) : (
+              <span className={`text-xs font-bold flex-1 ${p.directionalAccuracy === 0 ? "text-miss" : p.directionalAccuracy === 1 ? "text-make" : "text-warn"}`}>
+                {p.directionalAccuracy === 1 ? "1.0" : p.directionalAccuracy === 0.5 ? "0.5" : "0"}
+              </span>
+            )}
             <button
               onClick={() => onDelete(idx)}
               className="w-6 h-6 rounded flex items-center justify-center text-muted hover:text-miss transition-colors text-sm ml-2"

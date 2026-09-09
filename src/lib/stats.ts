@@ -226,8 +226,9 @@ export function processPunt(
   const daRaw = punt.directionalAccuracy;
   const isNumericDA = typeof daRaw === "number";
   // Include negative scores (e.g. -1 "really bad" / OB) so they pull the
-  // direction average down instead of being dropped from it.
-  const hasDA = isNumericDA;
+  // direction average down instead of being dropped from it. Blocked punts
+  // never had a real direction, so they don't feed the DA average either.
+  const hasDA = isNumericDA && !punt.blocked;
 
   // Migration: old entries may have single landingZone instead of landingZones array
   const landingZones: PuntLandingZone[] = Array.isArray(punt.landingZones)
