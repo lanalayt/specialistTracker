@@ -102,6 +102,17 @@ function parseYardLine(input: string | undefined | null, defaultSide: "-" | "+" 
   return sign === "-" ? n : 100 - n;
 }
 
+// Inverse of parseYardLine — format an absolute field position (0..100) back
+// into the signed input string, omitting the sign when it matches the
+// field's default side so it redisplays the way the coach would have typed it.
+function formatYardLine(abs: number, defaultSide: "-" | "+" = "-"): string {
+  if (abs <= 50) {
+    return defaultSide === "-" ? String(abs) : `-${abs}`;
+  }
+  const oppVal = 100 - abs;
+  return defaultSide === "+" ? String(oppVal) : `+${oppVal}`;
+}
+
 // ── Table row (planning phase) ────────────────────────────────
 interface LogRow {
   athlete: string;
@@ -1665,7 +1676,7 @@ export default function PuntingSessionPage() {
                             onClick={() => {
                               // Save current partial input before switching
                               if (!isPlannedLogged(currentPuntIdx)) {
-                                setPartialInputs((prev) => ({ ...prev, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked } }));
+                                setPartialInputs((prev) => ({ ...prev, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, poochYL, startYL, landYL } }));
                               }
                               setCurrentPuntIdx(i);
                               setShowAthleteDropdown(false);
@@ -1677,6 +1688,11 @@ export default function PuntingSessionPage() {
                                 setDirectionalAccuracy(logged.directionalAccuracy);
                                 setStarred(!!logged.starred);
                                 setBlocked(!!logged.blocked);
+                                setPoochYL(logged.poochLandingYardLine != null ? String(logged.poochLandingYardLine) : "");
+                                setLos(logged.los != null ? String(logged.los) : "");
+                                setLandingYL(logged.landingYL != null ? String(logged.landingYL) : "");
+                                setStartYL(logged.los != null ? formatYardLine(logged.los, "-") : "");
+                                setLandYL(logged.landingYL != null ? formatYardLine(logged.landingYL, "+") : "");
                                 setEditingPuntIdx(getLoggedPuntArrayIdx(i));
                               } else {
                                 const partial = partialInputs[i];
@@ -1687,6 +1703,9 @@ export default function PuntingSessionPage() {
                                   setDirectionalAccuracy(partial.directionalAccuracy);
                                   setStarred(partial.starred);
                                   setBlocked(partial.blocked ?? false);
+                                  setPoochYL(partial.poochYL ?? "");
+                                  setStartYL(partial.startYL ?? "");
+                                  setLandYL(partial.landYL ?? "");
                                 } else {
                                   setYards("");
                                   setHangTime("");
@@ -1694,7 +1713,12 @@ export default function PuntingSessionPage() {
                                   setDirectionalAccuracy(defaultDA);
                                   setStarred(!!plannedPunts[i]?.starred);
                                   setBlocked(false);
+                                  setPoochYL("");
+                                  setStartYL("");
+                                  setLandYL("");
                                 }
+                                setLos("");
+                                setLandingYL("");
                                 setEditingPuntIdx(null);
                               }
                             }}
@@ -3026,6 +3050,11 @@ export default function PuntingSessionPage() {
                                         setDirectionalAccuracy(logged.directionalAccuracy);
                                         setStarred(!!logged.starred);
                                         setBlocked(!!logged.blocked);
+                                        setPoochYL(logged.poochLandingYardLine != null ? String(logged.poochLandingYardLine) : "");
+                                        setLos(logged.los != null ? String(logged.los) : "");
+                                        setLandingYL(logged.landingYL != null ? String(logged.landingYL) : "");
+                                        setStartYL(logged.los != null ? formatYardLine(logged.los, "-") : "");
+                                        setLandYL(logged.landingYL != null ? formatYardLine(logged.landingYL, "+") : "");
                                       } else {
                                         setYards("");
                                         setHangTime("");
@@ -3033,6 +3062,11 @@ export default function PuntingSessionPage() {
                                         setDirectionalAccuracy(defaultDA);
                                         setStarred(false);
                                         setBlocked(false);
+                                        setPoochYL("");
+                                        setLos("");
+                                        setLandingYL("");
+                                        setStartYL("");
+                                        setLandYL("");
                                       }
                                       setSessionActive(true);
                                     }}
