@@ -185,14 +185,28 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
     return { pos, pct: kicks.length > 0 ? Math.round((made / kicks.length) * 100) : null, att: kicks.length };
   });
 
+  // Kick Score may be off entirely, or practice-only — a game kick logged
+  // while scoring is practice-only never got a real score, so it must not
+  // silently drag the average down as a 0. Tag each kick with its session's
+  // mode so the score average can be limited to score-eligible kicks
+  // independently of whatever mode the page's filter is showing.
+  const scoreEnabled = getCachedSettings<{ scoreEnabled?: string }>("fgSettings")?.scoreEnabled ?? "practice";
+  const kicksWithMode = filteredHistory.flatMap((s) =>
+    ((s.entries ?? []) as FGKick[]).map((k) => ({ ...k, sessionMode: s.mode }))
+  );
+
   // Per-athlete comparison (from filtered history so mode filter works)
   const athleteRows = filteredAthletes.map((a) => {
     const ak = allFilteredKicks.filter((k) => k.athlete === a && !k.isPAT);
+    const scoreKicks = kicksWithMode.filter((k) =>
+      k.athlete === a && !k.isPAT && scoreEnabled !== "off" && (scoreEnabled === "on" || k.sessionMode !== "game")
+    );
     return {
       athlete: a,
       att: ak.length,
       made: ak.filter((k) => k.result.startsWith("Y")).length,
-      score: ak.reduce((s, k) => s + (k.score || 0), 0),
+      scoreAtt: scoreKicks.length,
+      score: scoreKicks.reduce((s, k) => s + (k.score || 0), 0),
       longFG: ak.length > 0 ? Math.max(...ak.filter((k) => k.result.startsWith("Y")).map((k) => k.dist), 0) : 0,
     };
   });
@@ -222,7 +236,7 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
                 <th className="table-header">Made</th>
                 <th className="table-header">Att</th>
                 <th className="table-header">Make%</th>
-                <th className="table-header">Avg Score</th>
+                {scoreEnabled !== "off" && <th className="table-header">Avg Score</th>}
                 <th className="table-header">Long FG</th>
               </tr>
             </thead>
@@ -233,9 +247,11 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
                   <td className="table-cell">{r.made || "—"}</td>
                   <td className="table-cell">{r.att || "—"}</td>
                   <td className="table-cell make-pct">{makePct(r.att, r.made)}</td>
-                  <td className="table-cell text-muted">
-                    {r.att > 0 ? (r.score / r.att).toFixed(1) : "—"}
-                  </td>
+                  {scoreEnabled !== "off" && (
+                    <td className="table-cell text-muted">
+                      {r.scoreAtt > 0 ? (r.score / r.scoreAtt).toFixed(1) : "—"}
+                    </td>
+                  )}
                   <td className="table-cell text-muted">
                     {r.longFG > 0 ? `${r.longFG} yd` : "—"}
                   </td>
