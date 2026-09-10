@@ -63,6 +63,15 @@ function fmtScore(n: number): string {
   return n % 1 === 0 ? String(n) : n.toFixed(1);
 }
 
+// Session.date here is a full ISO timestamp (new Date().toISOString()), not
+// a plain YYYY-MM-DD, so it can be parsed directly without the "noon" trick
+// history pages use for date-only strings.
+function formatSessionDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
+}
+
 const SEL = "bg-surface-2 border border-border text-slate-200 text-xs px-1 py-0.5 rounded-input focus:outline-none focus:border-accent/60 appearance-none cursor-pointer";
 
 const ACC_OPTIONS: { value: string; label: string }[] = [
@@ -259,16 +268,25 @@ export default function LongSnapHistoryPage() {
                     selectedId === s.id && "bg-accent/10 border-l-2 border-accent"
                   )}
                 >
-                  <p className="text-sm font-semibold text-slate-200">{s.label}</p>
-                  <p className="text-xs text-muted mt-0.5">
-                    {(() => {
-                      const hasLong = ss.some((e) => e.snapType === "PUNT");
-                      const hasShort = ss.some((e) => e.snapType === "FG" || e.snapType === "PAT");
-                      const typeLabel = hasLong && hasShort ? "Mixed" : hasShort ? "Short Snap" : "Long Snap";
-                      return <><span className="text-accent font-semibold">{typeLabel}</span> · </>;
-                    })()}
-                    {ss.length} snap{ss.length !== 1 ? "s" : ""}
-                  </p>
+                  {tab === "charting" ? (
+                    <>
+                      <p className="text-sm font-semibold text-slate-200">{formatSessionDate(s.date)}</p>
+                      <p className="text-xs text-muted mt-0.5">{s.label}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold text-slate-200">{s.label}</p>
+                      <p className="text-xs text-muted mt-0.5">
+                        {(() => {
+                          const hasLong = ss.some((e) => e.snapType === "PUNT");
+                          const hasShort = ss.some((e) => e.snapType === "FG" || e.snapType === "PAT");
+                          const typeLabel = hasLong && hasShort ? "Mixed" : hasShort ? "Short Snap" : "Long Snap";
+                          return <><span className="text-accent font-semibold">{typeLabel}</span> · </>;
+                        })()}
+                        {ss.length} snap{ss.length !== 1 ? "s" : ""}
+                      </p>
+                    </>
+                  )}
                 </button>
               );
             })}
