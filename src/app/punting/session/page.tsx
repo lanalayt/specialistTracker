@@ -405,7 +405,9 @@ export default function PuntingSessionPage() {
   const dirEnabled = dirSettings.enabled;
   const dirMode = dirSettings.mode;
   const DA_OPTIONS = dirSettings.options;
-  const defaultDA: number | string = dirMode === "field" ? (DA_OPTIONS[0]?.value ?? "SL-NUM") : 1;
+  // No direction pre-selected — the coach has to actually score one for it
+  // to count, otherwise every un-scored punt would look like a perfect 1.0.
+  const defaultDA: number | string = "";
   const typeLabels: Record<string, string> = {};
   puntTypes.forEach((t) => { typeLabels[t.id] = t.label; });
   const drag = useDragReorder(rows, setRows);
@@ -540,7 +542,7 @@ export default function PuntingSessionPage() {
   const [hangTime, setHangTime] = useState(initPartial?.hangTime ?? "");
   const [opTime, setOpTime] = useState(initPartial?.opTime ?? "");
   const [directionalAccuracy, setDirectionalAccuracy] = useState<number | string>(
-    initPartial?.directionalAccuracy ?? (dirMode === "field" ? DA_OPTIONS[0]?.value ?? "SL-NUM" : 1)
+    initPartial?.directionalAccuracy ?? ""
   );
   const [starred, setStarred] = useState(initPartial?.starred ?? false);
   const [blocked, setBlocked] = useState(initPartial?.blocked ?? false);
@@ -841,9 +843,11 @@ export default function PuntingSessionPage() {
       setErrorRows((prev) => new Set([...prev, rowIdx]));
       return;
     }
+      // No direction typed — leave it unset rather than defaulting to a score,
+      // so it doesn't get counted as a perfect (or any) Dir % result.
       const daVal: number | string = r.directionalAccuracy !== "" && r.directionalAccuracy != null
       ? (dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? 0) : (parseFloat(r.directionalAccuracy) || 0))
-      : (dirMode === "field" ? (DA_OPTIONS[0]?.score ?? 1) : 1);
+      : "";
     // Auto-detect touchback: landing YL of 0 = into the end zone = touchback
     const isTouchback = !isBlocked && landingYLVal >= 100;
     // Filled index (position among filled rows)
@@ -938,7 +942,9 @@ export default function PuntingSessionPage() {
         hangTime: isBlocked ? 0 : (parseFloat(r.hangTime) || 0),
         opTime: parseFloat(r.opTime) || 0,
         landingZones: [],
-        directionalAccuracy: dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? DA_OPTIONS[0]?.score ?? 1) : (parseFloat(r.directionalAccuracy) || 0),
+        directionalAccuracy: r.directionalAccuracy !== "" && r.directionalAccuracy != null
+          ? (dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? 0) : (parseFloat(r.directionalAccuracy) || 0))
+          : "",
         starred: r.starred || undefined,
         blocked: isBlocked || undefined,
         poochLandingYardLine: isPooch && r.poochYL ? (parseInt(r.poochYL) || 0) : undefined,
@@ -1078,9 +1084,9 @@ export default function PuntingSessionPage() {
       hangTime: finalHtVal,
       opTime: otVal,
       landingZones: liveZones,
-      directionalAccuracy: dirMode === "field"
+      directionalAccuracy: directionalAccuracy === "" ? "" : (dirMode === "field"
         ? (DA_OPTIONS.find((o) => o.value === directionalAccuracy)?.score ?? 0)
-        : directionalAccuracy,
+        : directionalAccuracy),
       starred: starred || undefined,
       blocked: blocked || undefined,
       kickNum: currentPuntIdx + 1,

@@ -380,7 +380,7 @@ export default function KickoffSessionPage() {
   // Session card state
   const [distance, setDistance] = useState("");
   const [hangTime, setHangTime] = useState("");
-  const [direction, setDirection] = useState<KickoffDirection>("1");
+  const [direction, setDirection] = useState<KickoffDirection>("");
   const [endzone, setEndzone] = useState(false);
   const [fairCatch, setFairCatch] = useState(false);
   // score removed — not used for kickoff
@@ -451,7 +451,7 @@ export default function KickoffSessionPage() {
     setWeather(nd?.committedWeather ?? "");
     setDistance("");
     setHangTime("");
-    setDirection("1");
+    setDirection("");
     setSessionMode(newMode);
   };
 
@@ -603,7 +603,7 @@ export default function KickoffSessionPage() {
     setEditingKickIdx(null);
     setDistance("");
     setHangTime("");
-    setDirection("1");
+    setDirection("");
     setSwReset((k) => k + 1); // fresh stopwatch for the new kick
   };
 
@@ -689,7 +689,7 @@ export default function KickoffSessionPage() {
 
     setDistance("");
     setHangTime("");
-    setDirection("1" as KickoffDirection);
+    setDirection("");
     setSessionActive(true);
   };
 
@@ -733,7 +733,7 @@ export default function KickoffSessionPage() {
       hash: (r.hash || undefined) as KickoffHash | undefined,
       distance,
       hangTime: htVal,
-      direction: (r.direction || "1") as KickoffDirection,
+      direction: r.direction,
       score: 0,
       kickNum,
       los: losVal,
@@ -793,7 +793,7 @@ export default function KickoffSessionPage() {
       hash: (r.hash || undefined) as KickoffHash | undefined,
       distance: parseInt(r.distance) || 0,
       hangTime: parseFloat(r.hangTime) || 0,
-      direction: (r.direction || "1") as KickoffDirection,
+      direction: r.direction,
       score: 0,
       endzone: r.endzone || undefined,
     }));
@@ -880,7 +880,7 @@ export default function KickoffSessionPage() {
 
     setDistance("");
     setHangTime("");
-    setDirection("1" as KickoffDirection);
+    setDirection("");
     setEndzone(false);
     setFairCatch(false);
     setShowAthleteDropdown(false);
@@ -924,7 +924,7 @@ export default function KickoffSessionPage() {
     setEditingKickIdx(null);
     setDistance("");
     setHangTime("");
-    setDirection("1" as KickoffDirection);
+    setDirection("");
   };
 
   const handleCommitReady = () => {
@@ -1208,7 +1208,7 @@ export default function KickoffSessionPage() {
                               } else {
                                 setDistance("");
                                 setHangTime("");
-                                setDirection("1" as KickoffDirection);
+                                setDirection("");
                                 setEditingKickIdx(null);
                               }
                             }}
@@ -2078,7 +2078,7 @@ export default function KickoffSessionPage() {
                                       } else {
                                         setDistance("");
                                         setHangTime("");
-                                        setDirection("1" as KickoffDirection);
+                                        setDirection("");
                                       }
                                       setSessionActive(true);
                                     }}
