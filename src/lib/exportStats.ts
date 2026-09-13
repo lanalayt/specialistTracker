@@ -24,6 +24,7 @@ import {
   emptyPuntStats,
   processKickoff,
   emptyKickoffStats,
+  avgKONet,
   processLongSnap,
   emptyLongSnapStats,
 } from "@/lib/stats";
@@ -400,7 +401,7 @@ function koStatsToAOA(athletes: string[], statsMap: Record<string, KickoffAthlet
   const rows: Row[] = [];
 
   rows.push(["KICKOFF STATS"]);
-  rows.push(["Athlete", "Kickoffs", "Touchbacks", "TB%", "OOB", "Avg Dist", "Avg Hang"]);
+  rows.push(["Athlete", "Kickoffs", "Touchbacks", "TB%", "OOB", "Avg Dist", "Avg Hang", "Net Yds"]);
   athletes.forEach((a) => {
     const s = statsMap[a];
     if (!s) return;
@@ -415,6 +416,7 @@ function koStatsToAOA(athletes: string[], statsMap: Record<string, KickoffAthlet
       o.oob,
       dAtt > 0 ? +(o.totalDist / dAtt).toFixed(1) : "—",
       hAtt > 0 ? +(o.totalHang / hAtt).toFixed(2) : "—",
+      avgKONet(o.totalNet, o.netAtt),
     ]);
   });
 

@@ -111,11 +111,13 @@ interface AthleteKOStats {
   dirAtt: number;
   endzones: number;
   fairCatches: number;
+  totalNet: number;
+  netAtt: number;
   dirCounts: Record<string, number>;
 }
 
 function emptyStats(): AthleteKOStats {
-  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, fairCatches: 0, dirCounts: {} };
+  return { att: 0, totalDist: 0, distAtt: 0, totalHang: 0, hangAtt: 0, dirSum: 0, dirAtt: 0, endzones: 0, fairCatches: 0, totalNet: 0, netAtt: 0, dirCounts: {} };
 }
 
 function addEntry(s: AthleteKOStats, e: KickoffEntry, directions?: { id: string; score?: number }[]): AthleteKOStats {
@@ -124,6 +126,8 @@ function addEntry(s: AthleteKOStats, e: KickoffEntry, directions?: { id: string;
   if (e.direction) {
     dirCounts[e.direction] = (dirCounts[e.direction] || 0) + 1;
   }
+  const hasNet = e.returnToYL != null;
+  const net = hasNet ? 100 - (e.returnToYL as number) - (e.los ?? 35) : 0;
   return {
     att: s.att + 1,
     totalDist: s.totalDist + (e.distance > 0 ? e.distance : 0),
@@ -134,6 +138,8 @@ function addEntry(s: AthleteKOStats, e: KickoffEntry, directions?: { id: string;
     dirAtt: s.dirAtt + (dir != null ? 1 : 0),
     endzones: s.endzones + (e.endzone ? 1 : 0),
     fairCatches: s.fairCatches + (e.fairCatch ? 1 : 0),
+    totalNet: s.totalNet + (hasNet ? net : 0),
+    netAtt: s.netAtt + (hasNet ? 1 : 0),
     dirCounts,
   };
 }
@@ -144,6 +150,10 @@ function avgDist(s: AthleteKOStats): string {
 
 function avgHang(s: AthleteKOStats): string {
   return s.hangAtt > 0 ? (s.totalHang / s.hangAtt).toFixed(2) : "—";
+}
+
+function avgNet(s: AthleteKOStats): string {
+  return s.netAtt > 0 ? (s.totalNet / s.netAtt).toFixed(1) : "—";
 }
 
 function dirPct(s: AthleteKOStats): string {
@@ -168,6 +178,7 @@ function StatTable({ athletes, statsMap, showEZ = true, metric, showHang }: {
   }
   const hasHang = showHang ?? visible.some((a) => statsMap[a.name]?.hangAtt > 0);
   const hasFC = visible.some((a) => statsMap[a.name]?.fairCatches > 0);
+  const hasNet = visible.some((a) => statsMap[a.name]?.netAtt > 0);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs sm:text-sm">
@@ -180,6 +191,7 @@ function StatTable({ athletes, statsMap, showEZ = true, metric, showHang }: {
             {showEZ && <th className="table-header whitespace-nowrap">EZ %</th>}
             {hasFC && <th className="table-header whitespace-nowrap">FC</th>}
             <th className="table-header whitespace-nowrap">Dir %</th>
+            {hasNet && <th className="table-header whitespace-nowrap">Net Yds</th>}
           </tr>
         </thead>
         <tbody>
@@ -194,6 +206,7 @@ function StatTable({ athletes, statsMap, showEZ = true, metric, showHang }: {
                 {showEZ && <td className="table-cell text-make font-semibold">{ezPct(s)}</td>}
                 {hasFC && <td className="table-cell">{s.fairCatches || "—"}</td>}
                 <td className="table-cell text-accent font-semibold">{dirPct(s)}</td>
+                {hasNet && <td className="table-cell font-semibold">{avgNet(s)}</td>}
               </tr>
             );
           })}

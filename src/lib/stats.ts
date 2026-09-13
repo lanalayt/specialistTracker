@@ -360,6 +360,12 @@ export function avgNet(totalYards: number, totalReturnYards: number, att: number
   return ((totalYards - totalReturnYards) / att).toFixed(1);
 }
 
+// Kickoff net yards: 100 - returnToYL - los (field-position convention where
+// 0 is the kicking team's own goal line and 100 is the receiving team's).
+export function avgKONet(totalNet: number, netAtt: number): string {
+  return netAtt > 0 ? (totalNet / netAtt).toFixed(1) : "—";
+}
+
 // ─── Long Snap benchmark ──────────────────────────────────────────────────────
 
 export function getSnapBenchmark(snapType: SnapType, time: number): SnapBenchmark {
@@ -389,6 +395,8 @@ export function emptyKickoffStats(): KickoffAthleteStats {
       totalDist: 0,
       totalHang: 0,
       totalReturn: 0,
+      totalNet: 0,
+      netAtt: 0,
       endzones: 0,
     },
     byZone,
@@ -400,13 +408,15 @@ export function processKickoff(
   statsMap: Record<string, KickoffAthleteStats>,
   typeConfig?: { metric: "distance" | "yardline" | "none"; hangTime: boolean }
 ): Record<string, KickoffAthleteStats> {
-  const { athlete, distance, hangTime, landingZone, result, returnYards, endzone } =
+  const { athlete, distance, hangTime, landingZone, result, returnYards, returnToYL, los, endzone } =
     entry;
 
   const metricEnabled = typeConfig ? typeConfig.metric !== "none" : true;
   const htEnabled = typeConfig ? typeConfig.hangTime : true;
   const hasDist = distance > 0 && metricEnabled;
   const hasHang = hangTime > 0 && htEnabled;
+  const hasNet = returnToYL != null;
+  const net = hasNet ? 100 - (returnToYL as number) - (los ?? 35) : 0;
 
   if (!statsMap[athlete]) {
     statsMap = { ...statsMap, [athlete]: emptyKickoffStats() };
@@ -422,6 +432,8 @@ export function processKickoff(
     totalHang: s.overall.totalHang + (hasHang ? hangTime : 0),
     hangAtt: (s.overall.hangAtt || 0) + (hasHang ? 1 : 0),
     totalReturn: s.overall.totalReturn + (returnYards ?? 0),
+    totalNet: s.overall.totalNet + (hasNet ? net : 0),
+    netAtt: s.overall.netAtt + (hasNet ? 1 : 0),
     endzones: (s.overall.endzones || 0) + (endzone ? 1 : 0),
   };
 

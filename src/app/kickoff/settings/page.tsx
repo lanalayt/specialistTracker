@@ -465,14 +465,14 @@ function KickoffSettingsContent() {
       </div>
       </div>
 
-      {/* Return Yards toggle */}
+      {/* Return To Yard Line toggle */}
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Return Yards</p>
-            <p className="text-[10px] text-muted mt-0.5">Show return yards input in game mode</p>
+            <p className="text-xs font-semibold text-muted uppercase tracking-wider">Return To Yard Line</p>
+            <p className="text-[10px] text-muted mt-0.5">Show the return-to yard line input in game mode, for Net Yards</p>
           </div>
-          <Toggle checked={returnYardsEnabled} onChange={setReturnYardsEnabled} label="Toggle return yards" />
+          <Toggle checked={returnYardsEnabled} onChange={setReturnYardsEnabled} label="Toggle return to yard line" />
         </div>
       </div>
 

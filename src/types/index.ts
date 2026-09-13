@@ -153,7 +153,14 @@ export interface KickoffEntry {
   score: number;
   landingZone?: KickoffLandingZone;
   result?: "TB" | "RETURN" | "OOB";
+  // Legacy: raw yards gained on the return. Superseded by returnToYL, which
+  // records where the return ended (as a yard line) so net yards can be
+  // computed relative to the goal line — kept only so old entries still read.
   returnYards?: number;
+  // The receiving team's own yard line where the return ended (e.g. 15, 25 on
+  // a touchback), as the coach would call it out. Used with `los` to derive
+  // net yards: 100 - returnToYL - los.
+  returnToYL?: number;
   kickNum?: number;
   endzone?: boolean;
   fairCatch?: boolean;
@@ -175,6 +182,8 @@ export interface KickoffAthleteStats {
     totalHang: number;
     hangAtt?: number;
     totalReturn: number;
+    totalNet: number;
+    netAtt: number;
     endzones: number;
   };
   byZone: Record<KickoffLandingZone, number>;

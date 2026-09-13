@@ -48,6 +48,16 @@ function landingSpot(k: { los?: number; landingYL?: number; distance?: number })
 
 function hangLift(ht: number | undefined): number { const h = Math.max(0.5, Math.min(ht ?? 3, 6)); return 20 + (h / 6) * 100; }
 
+// Yards the return traveled back from the landing spot, derived from where the
+// return ended (returnToYL, the receiving team's own yard line) rather than a
+// raw yards-gained number.
+function returnRunYds(k: { los?: number; landingYL?: number; distance?: number; returnToYL?: number }): number {
+  if (k.returnToYL == null) return 0;
+  const landing = landingSpot(k);
+  const endSpot = 100 - k.returnToYL;
+  return Math.max(0, landing - endSpot);
+}
+
 function renderArc(key: string | number, los: number, landingRaw: number, ht: number | undefined, retYds: number | undefined, opacity: number, color = "#f59e0b", sw = 2.5) {
   const landing = clampToField(landingRaw);
   if (landing <= los) return null;
@@ -203,7 +213,7 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           const los = k.los ?? 35; const landing = clampToField(landingSpot(k));
           if (landing <= los) return null;
           const isSelected = selectedIdx === i;
-          const arc = renderArc(i, los, landing, k.hangTime, k.returnYards, isSelected ? 1 : 0.7, isSelected ? "#fbbf24" : "#f59e0b", isSelected ? 3.5 : 2.5);
+          const arc = renderArc(i, los, landing, k.hangTime, returnRunYds(k), isSelected ? 1 : 0.7, isSelected ? "#fbbf24" : "#f59e0b", isSelected ? 3.5 : 2.5);
           if (!arc) return null;
           const fy = 26.5;
           const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
@@ -231,12 +241,13 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
           const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
           const dist = k.distance || (landingSpot(k) - los);
+          const net = k.returnToYL != null ? 100 - k.returnToYL - los : null;
           return (
             <g>
               <rect x={tx - 75} y={ty - 28} width={150} height={36} rx={6} fill="rgba(0,0,0,0.9)" stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
               <text x={tx} y={ty - 12} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#e2e8f0">{k.athlete} · #{k.kickNum ?? selectedIdx + 1}</text>
               <text x={tx} y={ty + 1} textAnchor="middle" fontSize={9} fill="#94a3b8">
-                {dist > 0 ? `${dist}yd` : "—"} · {k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s HT` : "—"}{k.returnYards ? ` · ${k.returnYards}yd ret` : ""}
+                {dist > 0 ? `${dist}yd` : "—"} · {k.hangTime > 0 ? `${k.hangTime.toFixed(2)}s HT` : "—"}{net != null ? ` · ${net}yd net` : ""}
               </text>
             </g>
           );
