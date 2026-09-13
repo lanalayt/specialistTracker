@@ -639,7 +639,11 @@ function PuntHistoryContent() {
                 const yardsEntries = ap.filter((p) => !isYardLineType(p.type, puntTypes) && p.yards > 0);
                 const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
                 const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
-                const netPenalty = yardsEntries.reduce((s, p) => s + ((p.touchback || p.landingZones?.includes("TB")) ? 20 : (p.returnYards ?? 0)), 0);
+                const netPenalty = yardsEntries.reduce((s, p) => {
+                  if (p.touchback || p.landingZones?.includes("TB")) return s + 20;
+                  if (p.returnToYL != null) return s + Math.max(0, (p.landingYL ?? 0) - p.returnToYL);
+                  return s + (p.returnYards ?? 0);
+                }, 0);
                 const avgNet = yardsEntries.length > 0 ? ((grossTotal - netPenalty) / yardsEntries.length).toFixed(1) : "—";
                 const ylEntries = ap.filter((p) => isYardLineType(p.type, puntTypes) && p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
                 const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylEntries.length).toFixed(1) : null;

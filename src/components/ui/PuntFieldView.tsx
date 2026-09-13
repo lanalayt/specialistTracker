@@ -33,6 +33,14 @@ function hashToFieldY(hash: string | undefined): number {
 }
 function hangLift(ht: number | undefined): number { const h = Math.max(0.5, Math.min(ht ?? 3, 6)); return 20 + (h / 6) * 100; }
 
+// Yards the return traveled back from the landing spot, derived from where
+// the return ended (returnToYL, an absolute field position) when present —
+// falling back to the legacy raw-yards field for older entries.
+function returnRunYds(p: { landingYL?: number; returnYards?: number; returnToYL?: number }): number {
+  if (p.returnToYL != null && p.landingYL != null) return Math.max(0, p.landingYL - p.returnToYL);
+  return p.returnYards ?? 0;
+}
+
 function renderArc(key: string | number, los: number, landing: number, ht: number | undefined, retYds: number | undefined, fc: boolean, hash: string | undefined, opacity: number, color = "#06b6d4", sw = 2.5) {
   if (landing <= los) return null;
   const fy = hashToFieldY(hash);
@@ -183,7 +191,7 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
         {punts.map((p, i) => {
           if (p.los == null || p.landingYL == null) return null;
           const isSelected = selectedIdx === i;
-          const arc = renderArc(i, p.los, p.landingYL, p.hangTime, p.returnYards, !!p.fairCatch, p.hash, isSelected ? 1 : 0.7, isSelected ? "#22d3ee" : "#06b6d4", isSelected ? 3.5 : 2.5);
+          const arc = renderArc(i, p.los, p.landingYL, p.hangTime, returnRunYds(p), !!p.fairCatch, p.hash, isSelected ? 1 : 0.7, isSelected ? "#22d3ee" : "#06b6d4", isSelected ? 3.5 : 2.5);
           if (!arc) return null;
           // Invisible wider hit area for tap
           const fy = hashToFieldY(p.hash);
@@ -214,7 +222,7 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
                 {p.yards > 0 ? `${p.yards}yd` : "—"} · {p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s HT` : "—"}{p.opTime > 0 ? ` · ${p.opTime.toFixed(2)}s OT` : ""}
               </text>
               <text x={tx} y={ty + 14} textAnchor="middle" fontSize={9} fill="#94a3b8">
-                {p.touchback ? "Touchback" : p.fairCatch ? "Fair Catch" : p.returnYards ? `${p.returnYards}yd return` : ""}{p.directionalAccuracy != null ? ` · Dir: ${p.directionalAccuracy}` : ""}
+                {p.touchback ? "Touchback" : p.fairCatch ? "Fair Catch" : (returnRunYds(p) > 0 ? `${returnRunYds(p)}yd return` : "")}{p.directionalAccuracy != null ? ` · Dir: ${p.directionalAccuracy}` : ""}
               </text>
             </g>
           );

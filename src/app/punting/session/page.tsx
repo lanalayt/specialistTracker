@@ -70,11 +70,14 @@ function tracksHangTime(type: string | undefined | null, typeConfigs: PuntTypeCo
 function isTB(p: { touchback?: boolean; landingZones?: string[] }): boolean {
   return !!(p.touchback || p.landingZones?.includes("TB"));
 }
-function puntNetPenalty(p: { touchback?: boolean; landingZones?: string[]; returnYards?: number }): number {
-  return isTB(p) ? 20 : (p.returnYards ?? 0);
+function puntNetPenalty(p: { touchback?: boolean; landingZones?: string[]; returnYards?: number; returnToYL?: number; landingYL?: number }): number {
+  if (isTB(p)) return 20;
+  if (p.returnToYL != null) return Math.max(0, (p.landingYL ?? 0) - p.returnToYL);
+  return p.returnYards ?? 0;
 }
-function puntFinalSpot(p: { landingYL?: number; touchback?: boolean; landingZones?: string[]; returnYards?: number }): number {
+function puntFinalSpot(p: { landingYL?: number; touchback?: boolean; landingZones?: string[]; returnYards?: number; returnToYL?: number }): number {
   if (isTB(p)) return 0; // touchback = not inside 20
+  if (p.returnToYL != null) return p.returnToYL;
   return (p.landingYL ?? 0) - (p.returnYards ?? 0);
 }
 
@@ -127,7 +130,7 @@ interface LogRow {
   // Game-mode only
   los?: string;
   landingYL?: string;
-  returnYards?: string;
+  returnToYL?: string;
   fairCatch?: boolean;
   touchback?: boolean;
   // Punt was blocked — no distance/hang time apply.
@@ -179,7 +182,7 @@ const emptyRow = (): LogRow => ({
   starred: false,
   los: "",
   landingYL: "",
-  returnYards: "",
+  returnToYL: "",
   fairCatch: false,
   blocked: false,
 });
@@ -544,7 +547,7 @@ export default function PuntingSessionPage() {
   // Game-mode only: LOS and Landing yard line (absolute 0..100 field positions)
   const [los, setLos] = useState<string>("");
   const [landingYL, setLandingYL] = useState<string>("");
-  const [returnYardsInput, setReturnYardsInput] = useState<string>("");
+  const [returnToYLInput, setReturnToYLInput] = useState<string>("");
   // Pooch punt only: yard line where ball landed (practice log mode)
   const [poochYL, setPoochYL] = useState<string>(initPartial?.poochYL ?? "");
   // Practice only: total-distance entry vs start/landing yard-line entry
@@ -620,7 +623,7 @@ export default function PuntingSessionPage() {
     setLandYL(newPartial?.landYL ?? "");
     setLos("");
     setLandingYL("");
-    setReturnYardsInput("");
+    setReturnToYLInput("");
     setPendingPunts(null);
     setCommitted(nd?.committed ?? false);
     setCommittedPunts(nd?.committedPunts ?? []);
@@ -838,7 +841,6 @@ export default function PuntingSessionPage() {
       setErrorRows((prev) => new Set([...prev, rowIdx]));
       return;
     }
-    const retVal = r.returnYards !== "" && r.returnYards != null ? parseInt(r.returnYards) || 0 : undefined;
       const daVal: number | string = r.directionalAccuracy !== "" && r.directionalAccuracy != null
       ? (dirMode === "field" ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? 0) : (parseFloat(r.directionalAccuracy) || 0))
       : (dirMode === "field" ? (DA_OPTIONS[0]?.score ?? 1) : 1);
@@ -851,6 +853,11 @@ export default function PuntingSessionPage() {
     const zones: PuntLandingZone[] = [];
     if (isTouchback) zones.push("TB");
     else if (r.fairCatch) zones.push("fairCatch");
+    // Return YL uses the same signed yard-line convention as LOS/Landing —
+    // irrelevant (and left undefined) on a touchback or fair catch, since
+    // those are handled as fixed penalties / no-run respectively.
+    const parsedReturnToYL = r.returnToYL !== "" && r.returnToYL != null ? parseYardLine(r.returnToYL, "+") : NaN;
+    const returnToYLVal = (isTouchback || r.fairCatch || isNaN(parsedReturnToYL)) ? undefined : parsedReturnToYL;
     // Outlier check
     const warnings = isBlocked ? [] : checkPuntOutliers(gross, htVal, otVal);
     if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
@@ -868,7 +875,7 @@ export default function PuntingSessionPage() {
       kickNum,
       los: isBlocked ? undefined : losVal,
       landingYL: isBlocked ? undefined : landingYLVal,
-      returnYards: isTouchback ? 0 : (r.fairCatch ? 0 : retVal),
+      returnToYL: returnToYLVal,
       fairCatch: r.fairCatch || undefined,
       touchback: isTouchback || undefined,
       blocked: isBlocked || undefined,
@@ -1022,7 +1029,7 @@ export default function PuntingSessionPage() {
     let landingYLVal = landingYL !== "" ? parseInt(landingYL) || 0 : undefined;
     // In game mode, compute gross yards automatically from LOS and landing YL
     let ydsVal = parseInt(yards) || 0;
-    let retVal: number | undefined = undefined;
+    let retToYLVal: number | undefined = undefined;
     let poochYLVal: number | undefined = undefined;
     const isPooch = isYardLineType(plan.type, puntTypes);
     // Blocked punts have no real distance, hang time, or LOS/landing — the
@@ -1034,7 +1041,8 @@ export default function PuntingSessionPage() {
     } else {
       if (sessionMode === "game" && losVal != null && landingYLVal != null) {
         ydsVal = Math.max(0, landingYLVal - losVal);
-        retVal = returnYardsInput !== "" ? parseInt(returnYardsInput) || 0 : undefined;
+        retToYLVal = returnToYLInput !== "" ? parseInt(returnToYLInput) : undefined;
+        if (retToYLVal != null && isNaN(retToYLVal)) retToYLVal = undefined;
       }
       // Practice + yard-line entry: distance falls out of the two yard lines, and
       // the yard lines ride along on the entry so the punt can be charted later.
@@ -1078,7 +1086,7 @@ export default function PuntingSessionPage() {
       kickNum: currentPuntIdx + 1,
       los: losVal,
       landingYL: landingYLVal,
-      returnYards: isTouchback ? 0 : retVal,
+      returnToYL: isTouchback ? undefined : retToYLVal,
       poochLandingYardLine: poochYLVal,
       touchback: isTouchback || undefined,
     };
@@ -1147,17 +1155,18 @@ export default function PuntingSessionPage() {
       setStartYL(nextPartial?.startYL ?? startYL);
       setLandYL(nextPartial?.landYL ?? "");
     }
-    // Game mode: after logging, seed next LOS with (landingYL - returnYards),
-    // and clear landing YL + return for the next punt.
+    // Game mode: after logging, seed next LOS with where the return ended
+    // (or the landing spot if no return was recorded), and clear landing YL
+    // + return for the next punt.
     if (sessionMode === "game") {
       const landed = landingYL !== "" ? parseInt(landingYL) || 0 : undefined;
-      const ret = returnYardsInput !== "" ? parseInt(returnYardsInput) || 0 : 0;
-      if (landed != null) {
-        // Next punting team LOS = where the return ended = landing - return
-        setLos(String(Math.max(0, landed - ret)));
+      const retAbs = returnToYLInput !== "" ? parseInt(returnToYLInput) : NaN;
+      const nextSpot = !isNaN(retAbs) ? retAbs : landed;
+      if (nextSpot != null) {
+        setLos(String(Math.max(0, Math.min(100, nextSpot))));
       }
       setLandingYL("");
-      setReturnYardsInput("");
+      setReturnToYLInput("");
     }
     setShowAthleteDropdown(false);
     setSwReset((k) => k + 1); // remount the stopwatch so it stops & resets to 0
@@ -1281,7 +1290,7 @@ export default function PuntingSessionPage() {
     setPoochYL("");
     setLos("");
     setLandingYL("");
-    setReturnYardsInput("");
+    setReturnToYLInput("");
     setShowAthleteDropdown(false);
   };
 
@@ -1691,6 +1700,7 @@ export default function PuntingSessionPage() {
                                 setPoochYL(logged.poochLandingYardLine != null ? String(logged.poochLandingYardLine) : "");
                                 setLos(logged.los != null ? String(logged.los) : "");
                                 setLandingYL(logged.landingYL != null ? String(logged.landingYL) : "");
+                                setReturnToYLInput(logged.returnToYL != null ? String(logged.returnToYL) : "");
                                 setStartYL(logged.los != null ? formatYardLine(logged.los, "-") : "");
                                 setLandYL(logged.landingYL != null ? formatYardLine(logged.landingYL, "+") : "");
                                 setEditingPuntIdx(getLoggedPuntArrayIdx(i));
@@ -1719,6 +1729,7 @@ export default function PuntingSessionPage() {
                                 }
                                 setLos("");
                                 setLandingYL("");
+                                setReturnToYLInput("");
                                 setEditingPuntIdx(null);
                               }
                             }}
@@ -2010,15 +2021,15 @@ export default function PuntingSessionPage() {
                       )}
                       {sessionMode === "game" && (
                         <div>
-                          <p className="label">Return Yds</p>
+                          <p className="label">Return YL</p>
                           <input
                             className="input text-center text-lg font-bold"
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            placeholder="ret"
-                            value={returnYardsInput}
-                            onChange={(e) => setReturnYardsInput(e.target.value)}
+                            placeholder="yl"
+                            value={returnToYLInput}
+                            onChange={(e) => setReturnToYLInput(e.target.value)}
                           />
                         </div>
                       )}
@@ -2033,8 +2044,10 @@ export default function PuntingSessionPage() {
                             const ly = parseInt(landingYL) || 0;
                             const gross = Math.max(0, ly - l);
                             if (gross <= 0) return "—";
-                            const tbPenalty = ly >= 100 ? 20 : (parseInt(returnYardsInput) || 0);
-                            return `${gross - tbPenalty} yd`;
+                            const isTBLive = ly >= 100;
+                            const retAbs = parseInt(returnToYLInput);
+                            const penalty = isTBLive ? 20 : (!isNaN(retAbs) ? Math.max(0, ly - retAbs) : 0);
+                            return `${gross - penalty} yd`;
                           })()}
                         </span>
                       </div>
@@ -2610,7 +2623,7 @@ export default function PuntingSessionPage() {
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-16 border-b border-red-500/40 text-[11px]" title="Landing yard line">Land</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-red-500/40 text-[11px]">HT</th>
                       {opTimeEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-[4.5rem] border-b border-red-500/40 text-[11px]">OT</th>}
-                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-14 border-b border-red-500/40 text-[11px]">Ret</th>
+                      <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-14 border-b border-red-500/40 text-[11px]" title="Yard line where the return ended">Ret YL</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-10 border-b border-red-500/40 text-[11px]" title="Fair Catch">FC</th>
                       <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1.5 text-center w-10 border-b border-red-500/40 text-[11px]" title="Blocked — no distance or hang time">Blk</th>
                       {dirEnabled && <th className="bg-red-500/10 text-red-400 font-bold py-2 px-1 text-center w-[4.5rem] border-b border-red-500/40 text-[10px]">Dir. Score</th>}
@@ -2771,7 +2784,7 @@ export default function PuntingSessionPage() {
                                       const parsed = parseYardLine(val, "+");
                                       if (!isNaN(parsed) && parsed >= 100) {
                                         updateRow(idx, "touchback", true);
-                                        updateRow(idx, "returnYards", "");
+                                        updateRow(idx, "returnToYL", "");
                                         updateRow(idx, "fairCatch", false);
                                       } else if (row.touchback) {
                                         updateRow(idx, "touchback", false);
@@ -2819,10 +2832,11 @@ export default function PuntingSessionPage() {
                             )}
                             <td className="py-1 px-1">
                               <input
-                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="ret"
-                                value={row.returnYards ?? ""}
-                                onChange={(e) => updateRow(idx, "returnYards", e.target.value)}
+                                type="text" inputMode="text" placeholder={(row.fairCatch || row.touchback) ? "—" : "+35"}
+                                value={(row.fairCatch || row.touchback) ? "" : (row.returnToYL ?? "")}
+                                onChange={(e) => updateRow(idx, "returnToYL", e.target.value)}
                                 readOnly={viewOnly || isSaved || !!row.fairCatch || !!row.touchback}
+                                title="Use -X for own side, +X for opponent side (e.g. -20 or +35)"
                                 className={clsx("w-full bg-transparent border rounded px-1.5 py-2 text-sm text-center focus:outline-none", isSaved ? "border-make/30 text-make" : (row.fairCatch || row.touchback) ? "border-border/30 text-muted" : "border-red-500/40 text-slate-200 focus:border-red-500/60")}
                               />
                             </td>
@@ -3053,6 +3067,7 @@ export default function PuntingSessionPage() {
                                         setPoochYL(logged.poochLandingYardLine != null ? String(logged.poochLandingYardLine) : "");
                                         setLos(logged.los != null ? String(logged.los) : "");
                                         setLandingYL(logged.landingYL != null ? String(logged.landingYL) : "");
+                                        setReturnToYLInput(logged.returnToYL != null ? String(logged.returnToYL) : "");
                                         setStartYL(logged.los != null ? formatYardLine(logged.los, "-") : "");
                                         setLandYL(logged.landingYL != null ? formatYardLine(logged.landingYL, "+") : "");
                                       } else {
@@ -3065,6 +3080,7 @@ export default function PuntingSessionPage() {
                                         setPoochYL("");
                                         setLos("");
                                         setLandingYL("");
+                                        setReturnToYLInput("");
                                         setStartYL("");
                                         setLandYL("");
                                       }
@@ -3194,14 +3210,13 @@ export default function PuntingSessionPage() {
                 const sAtt = punts.length;
                 const ydsCount = punts.filter((p) => p.yards > 0).length;
                 const totalGross = punts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
-                const totalRet = punts.reduce((s, p) => s + (p.returnYards || 0), 0);
+                const totalNetPenalty = punts.reduce((s, p) => s + puntNetPenalty(p), 0);
                 const avgGross = ydsCount > 0 ? (totalGross / ydsCount).toFixed(1) : "—";
-                const avgNet = ydsCount > 0 ? ((totalGross - totalRet) / ydsCount).toFixed(1) : "—";
+                const avgNet = ydsCount > 0 ? ((totalGross - totalNetPenalty) / ydsCount).toFixed(1) : "—";
                 const htCount = punts.filter((p) => p.hangTime > 0).length;
                 const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
-                const finalSpot2 = (p: { landingYL?: number; returnYards?: number }) => (p.landingYL ?? 0) - (p.returnYards ?? 0);
-                const inside20 = punts.filter((p) => finalSpot2(p) >= 80).length;
-                const inside10 = punts.filter((p) => finalSpot2(p) >= 90).length;
+                const inside20 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
+                const inside10 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
                 const numDAPunts2 = punts.filter((p) => typeof p.directionalAccuracy === "number");
                 const daCount = numDAPunts2.length;
                 const daSum = numDAPunts2.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);

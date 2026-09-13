@@ -533,7 +533,6 @@ function PuntStatsView({
     let fairCatches = 0;
     gamePunts.forEach((p) => {
       grossTotal += p.yards ?? 0;
-      returnTotal += p.returnYards ?? 0;
       if (p.hangTime && p.hangTime > 0) {
         hangTotal += p.hangTime;
         hangCount += 1;
@@ -546,6 +545,10 @@ function PuntStatsView({
       } else {
         if (yl >= 80 && yl < 100) inside20 += 1;
         if (yl >= 90 && yl < 100) inside10 += 1;
+        // Return penalty: derived from where the return ended (returnToYL,
+        // an absolute field position) when present, else the legacy raw-
+        // yards field for older entries. Touchbacks use the fixed 20 below.
+        returnTotal += p.returnToYL != null ? Math.max(0, yl - p.returnToYL) : (p.returnYards ?? 0);
       }
     });
     // NCAA net punt average: (gross − return yards − 20 per touchback) / punts

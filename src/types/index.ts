@@ -98,7 +98,13 @@ export interface PuntEntry {
   hangTime: number;
   opTime: number; // punter operation time in seconds
   landingZones: PuntLandingZone[];
+  // Legacy: raw yards gained on the return. Superseded by returnToYL.
   returnYards?: number;
+  // Game mode: absolute field position (0..100, same convention as los/
+  // landingYL) where the return ended. Lets net yards be computed as the
+  // true final spot minus los, instead of crediting the punter for extra
+  // gross distance that a return then wipes out.
+  returnToYL?: number;
   directionalAccuracy: number | string;
   poochLandingYardLine?: number;
   starred?: boolean;
