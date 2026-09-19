@@ -526,6 +526,8 @@ function KickoffHistoryContent() {
                     <th className="table-header">Dist</th>
                     <th className="table-header">Hang</th>
                     <th className="table-header">Dir</th>
+                    {selected.mode === "game" && <th className="table-header">TB</th>}
+                    {selected.mode === "game" && <th className="table-header">Ret YL</th>}
                     {editing && <th className="table-header w-8"></th>}
                   </tr>
                 </thead>
@@ -574,6 +576,16 @@ function KickoffHistoryContent() {
                             e.direction === "1" ? "text-make" : (e.direction === "OB" || e.direction === "-1") ? "text-miss" : e.direction === "0.5" ? "text-amber-400" : "text-slate-200"
                           )}>{koDirs.find((d) => d.id === e.direction)?.label ?? (e.direction || "—")}</td>
                         </>
+                      )}
+                      {selected.mode === "game" && (
+                        <td className={clsx("table-cell font-bold", e.result === "TB" ? "text-miss" : "text-muted")}>
+                          {e.result === "TB" ? "TB" : "—"}
+                        </td>
+                      )}
+                      {selected.mode === "game" && (
+                        <td className="table-cell text-accent font-semibold">
+                          {e.returnToYL != null ? e.returnToYL : "—"}
+                        </td>
                       )}
                       {editing && (
                         <td className="table-cell text-center p-1">
