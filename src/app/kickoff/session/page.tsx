@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useKickoff } from "@/lib/kickoffContext";
+import { koNetYards } from "@/lib/stats";
 import { StatCard } from "@/components/ui/StatCard";
 import { IntervalStopwatch } from "@/components/ui/IntervalStopwatch";
 import { ImportModal } from "@/components/ui/ImportModal";
@@ -717,9 +718,11 @@ export default function KickoffSessionPage() {
     const warnings = checkKickoffOutliers(distance, htVal);
     if (warnings.length > 0 && !window.confirm(`Are you sure?\n\n${warnings.join("\n")}`)) return;
 
-    // Touchbacks are spotted at the receiving team's own 25 by rule.
+    // Touchbacks are spotted at the receiving team's own 25 by rule — no
+    // actual return happened, so leave returnToYL unset (net is handled as a
+    // fixed case wherever it's computed) instead of implying a real runback.
     const parsedReturnToYL = r.returnToYL !== "" && r.returnToYL != null ? parseInt(r.returnToYL) : NaN;
-    const returnToYLVal = r.touchback ? 25 : (Number.isNaN(parsedReturnToYL) ? undefined : parsedReturnToYL);
+    const returnToYLVal = r.touchback ? undefined : (Number.isNaN(parsedReturnToYL) ? undefined : parsedReturnToYL);
     const losVal = 35; // kickoff spot — own 35
     // Not capped at the goal line — a kick that carries into or out of the end zone
     // keeps its true landing spot (105 = mid end zone, 110 = back line, 115 = 5 out).
@@ -1909,8 +1912,8 @@ export default function KickoffSessionPage() {
                             </td>
                             {koReturnYardsEnabled && <td className="py-1 px-1">
                               <input
-                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder="YL"
-                                value={row.touchback ? "25" : (row.returnToYL ?? "")}
+                                type="text" inputMode="numeric" pattern="[0-9]*" placeholder={row.touchback ? "—" : "YL"}
+                                value={row.touchback ? "" : (row.returnToYL ?? "")}
                                 onChange={(e) => updateRow(idx, "returnToYL", e.target.value)}
                                 readOnly={viewOnly || isSaved || !!row.touchback}
                                 title="Yard line where the return ended (e.g. 15)"
@@ -1925,7 +1928,9 @@ export default function KickoffSessionPage() {
                                 onChange={(e) => {
                                   const checked = e.target.checked;
                                   updateRow(idx, "touchback", checked);
-                                  if (checked) updateRow(idx, "returnToYL", "25");
+                                  // No real return on a touchback — the ball is just
+                                  // spotted at the 25 by rule, so clear any typed YL.
+                                  if (checked) updateRow(idx, "returnToYL", "");
                                 }}
                                 title="Touchback"
                                 className="w-4 h-4 accent-red-500 cursor-pointer disabled:cursor-not-allowed"
@@ -2211,9 +2216,8 @@ export default function KickoffSessionPage() {
                 const dirToNum = (d: string): number | null => d === "1" ? 1 : d === "0.5" ? 0.5 : d === "OB" ? 0 : null;
                 const dirVals = kicks.map((k) => dirToNum(k.direction)).filter((v): v is number => v != null);
                 const dirPct = dirVals.length > 0 ? `${Math.round((dirVals.reduce((s, v) => s + v, 0) / dirVals.length) * 100)}%` : "—";
-                const netKicks = kicks.filter((k) => k.returnToYL != null);
-                const totalNet = netKicks.reduce((s, k) => s + (100 - (k.returnToYL as number) - (k.los ?? 35)), 0);
-                const avgNetG = netKicks.length > 0 ? (totalNet / netKicks.length).toFixed(1) : "—";
+                const netVals = kicks.map((k) => koNetYards(k)).filter((v): v is number => v != null);
+                const avgNetG = netVals.length > 0 ? (netVals.reduce((s, v) => s + v, 0) / netVals.length).toFixed(1) : "—";
                 if (sAtt === 0) {
                   return <p className="text-xs text-muted">Save a kickoff to see it on the field.</p>;
                 }

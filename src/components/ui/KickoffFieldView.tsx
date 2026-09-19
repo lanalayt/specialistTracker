@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { getCurrentTheme } from "@/lib/themeColors";
+import { koNetYards } from "@/lib/stats";
 import type { KickoffEntry } from "@/types";
 
 interface Props {
@@ -241,7 +242,7 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
           const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
           const dist = k.distance || (landingSpot(k) - los);
-          const net = k.returnToYL != null ? 100 - k.returnToYL - los : null;
+          const net = koNetYards(k);
           return (
             <g>
               <rect x={tx - 75} y={ty - 28} width={150} height={36} rx={6} fill="rgba(0,0,0,0.9)" stroke="rgba(255,255,255,0.25)" strokeWidth={1} />

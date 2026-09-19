@@ -366,6 +366,17 @@ export function avgKONet(totalNet: number, netAtt: number): string {
   return netAtt > 0 ? (totalNet / netAtt).toFixed(1) : "—";
 }
 
+// A touchback is spotted at the receiving team's own 25 by rule — no actual
+// return happened, so entries never carry a returnToYL for one. Net is
+// computed as this fixed spot instead, everywhere net yards is derived.
+export const KICKOFF_TOUCHBACK_YL = 25;
+export function koNetYards(k: { returnToYL?: number; los?: number; result?: string }): number | null {
+  const los = k.los ?? 35;
+  if (k.result === "TB") return 100 - KICKOFF_TOUCHBACK_YL - los;
+  if (k.returnToYL != null) return 100 - k.returnToYL - los;
+  return null;
+}
+
 // ─── Long Snap benchmark ──────────────────────────────────────────────────────
 
 export function getSnapBenchmark(snapType: SnapType, time: number): SnapBenchmark {
@@ -415,8 +426,9 @@ export function processKickoff(
   const htEnabled = typeConfig ? typeConfig.hangTime : true;
   const hasDist = distance > 0 && metricEnabled;
   const hasHang = hangTime > 0 && htEnabled;
-  const hasNet = returnToYL != null;
-  const net = hasNet ? 100 - (returnToYL as number) - (los ?? 35) : 0;
+  const netVal = koNetYards({ returnToYL, los, result });
+  const hasNet = netVal != null;
+  const net = hasNet ? (netVal as number) : 0;
 
   if (!statsMap[athlete]) {
     statsMap = { ...statsMap, [athlete]: emptyKickoffStats() };

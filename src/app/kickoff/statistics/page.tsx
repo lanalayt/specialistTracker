@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useKickoff } from "@/lib/kickoffContext";
+import { koNetYards } from "@/lib/stats";
 import type { KickoffEntry, KickoffHash } from "@/types";
 import { KICKOFF_HASHES } from "@/types";
 import clsx from "clsx";
@@ -126,8 +127,9 @@ function addEntry(s: AthleteKOStats, e: KickoffEntry, directions?: { id: string;
   if (e.direction) {
     dirCounts[e.direction] = (dirCounts[e.direction] || 0) + 1;
   }
-  const hasNet = e.returnToYL != null;
-  const net = hasNet ? 100 - (e.returnToYL as number) - (e.los ?? 35) : 0;
+  const netVal = koNetYards(e);
+  const hasNet = netVal != null;
+  const net = hasNet ? (netVal as number) : 0;
   return {
     att: s.att + 1,
     totalDist: s.totalDist + (e.distance > 0 ? e.distance : 0),
