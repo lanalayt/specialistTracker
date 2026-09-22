@@ -395,6 +395,23 @@ export default function PuntingSessionPage() {
   const [opponent, setOpponent] = useState<string>(draft.opponent ?? "");
   const [gameTime, setGameTime] = useState<string>(draft.gameTime ?? "");
 
+  // Once the coach navigates away after committing, the recap shouldn't
+  // linger — clear that mode's draft so the next visit lands on a fresh
+  // log instead of resurfacing the old summary. Refs avoid a stale
+  // closure in the unmount cleanup below.
+  const committedRef = useRef(committed);
+  useEffect(() => { committedRef.current = committed; }, [committed]);
+  const sessionModeRef = useRef(sessionMode);
+  useEffect(() => { sessionModeRef.current = sessionMode; }, [sessionMode]);
+  useEffect(() => {
+    return () => {
+      if (committedRef.current && sessionModeRef.current) {
+        const tid = getTeamId();
+        if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(sessionModeRef.current));
+      }
+    };
+  }, []);
+
   // Game mode forces manual entry (no live session)
   useEffect(() => {
     if (sessionMode === "game" && !manualEntry) setManualEntry(true);

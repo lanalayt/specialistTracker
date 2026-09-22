@@ -108,6 +108,21 @@ export default function LongSnapFGSessionPage() {
     if (tid && tid !== "local-dev") saveDraft(tid, CLOUD_DRAFT_KEY, { rows, weather, snapMarkers, committed });
   }, [rows, weather, snapMarkers, committed]);
 
+  // Once the coach navigates away after committing, the recap shouldn't
+  // linger — clear the draft so the next visit lands on a fresh log
+  // instead of resurfacing the old summary. A ref avoids a stale closure
+  // in the unmount cleanup below.
+  const committedRef = useRef(committed);
+  useEffect(() => { committedRef.current = committed; }, [committed]);
+  useEffect(() => {
+    return () => {
+      if (committedRef.current) {
+        const tid = getTeamId();
+        if (tid && tid !== "local-dev") clearDraft(tid, CLOUD_DRAFT_KEY);
+      }
+    };
+  }, []);
+
   const [draftSaved, setDraftSaved] = useState(false);
   const handleSaveDraft = () => {
     const tid = getTeamId();

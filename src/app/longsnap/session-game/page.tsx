@@ -97,6 +97,21 @@ export default function LongSnapGameSessionPage() {
     if (tid && tid !== "local-dev") saveDraft(tid, META_KEY, { opponent, gameTime, weather });
   }, [opponent, gameTime, weather]);
 
+  // Once the coach navigates away after committing, the drafts shouldn't
+  // linger — clear them so the next visit lands on a truly fresh log
+  // instead of restoring the just-committed rows. A ref avoids a stale
+  // closure in the unmount cleanup below.
+  const committedRef = useRef(committed);
+  useEffect(() => { committedRef.current = committed; }, [committed]);
+  useEffect(() => {
+    return () => {
+      if (committedRef.current) {
+        const tid = getTeamId();
+        if (tid && tid !== "local-dev") { clearDraft(tid, PUNT_KEY); clearDraft(tid, FG_KEY); clearDraft(tid, META_KEY); }
+      }
+    };
+  }, []);
+
   const formatAutoDecimal = (raw: string): string => {
     const digits = raw.replace(/\D/g, "");
     if (!digits) return "";
