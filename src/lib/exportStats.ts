@@ -134,6 +134,72 @@ function aoaToSheet(rows: Row[]) {
   return ws;
 }
 
+// The AOA rows built above are flattened for Excel (a lone-cell row is a
+// section/sub-section title, a blank row separates sections, and the row
+// right after a title is that section's own column header). A PDF can't
+// read that shape directly — split it back into individual {title, head,
+// body} tables instead of feeding the whole thing to one autoTable call
+// (which would otherwise use only the very first row as the header and
+// dump every other row — titles, real headers, and data alike — into a
+// single mismatched body).
+interface PdfSection { title?: string; head?: Row; body: Row[] }
+
+function aoaToPdfSections(aoa: Row[]): PdfSection[] {
+  const sections: PdfSection[] = [];
+  let i = 0;
+  while (i < aoa.length) {
+    while (i < aoa.length && aoa[i].length === 0) i++;
+    if (i >= aoa.length) break;
+    let title: string | undefined;
+    if (aoa[i].length === 1) {
+      title = String(aoa[i][0]);
+      i++;
+    }
+    const rows: Row[] = [];
+    while (i < aoa.length && aoa[i].length > 0) {
+      rows.push(aoa[i]);
+      i++;
+    }
+    if (rows.length === 0) {
+      sections.push({ title, body: [] });
+    } else {
+      sections.push({ title, head: rows[0], body: rows.slice(1) });
+    }
+  }
+  return sections;
+}
+
+// Renders each section as its own heading + table (or just a heading for a
+// group label like "BY HASH / POSITION" that has no table of its own),
+// paginating when a section wouldn't fit on the current page.
+function renderAoaPdfSections(doc: any, autoTable: any, aoa: Row[], startY: number, fontSize = 8): void {
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let y = startY;
+  aoaToPdfSections(aoa).forEach((sec) => {
+    if (y > pageHeight - 30) {
+      doc.addPage();
+      y = 20;
+    }
+    if (sec.title) {
+      doc.setFontSize(11);
+      doc.text(sec.title, 14, y);
+      y += 6;
+    }
+    if (sec.head) {
+      autoTable(doc, {
+        head: [sec.head.map(String)],
+        body: sec.body.map((r) => r.map(String)),
+        startY: y,
+        styles: { fontSize },
+        margin: { left: 14, right: 14 },
+      });
+      y = (doc.lastAutoTable?.finalY ?? y) + 8;
+    } else {
+      y += 2;
+    }
+  });
+}
+
 // ─── FG Kicking Export ──────────────────────────────────────────────────────
 
 const POS_LABELS: Record<FGPosition, string> = { LH: "Left Hash", RH: "Right Hash", LM: "Left Mid", M: "Middle", RM: "Right Mid" };
@@ -758,14 +824,7 @@ export function exportFGStatsPDF(
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
         doc.setFontSize(14);
         doc.text(title, 14, 15);
-        if (aoa.length > 0) {
-          autoTable(doc, {
-            head: [aoa[0].map(String)],
-            body: aoa.slice(1).map((r) => r.map(String)),
-            startY: 20,
-            styles: { fontSize: 8 },
-          });
-        }
+        renderAoaPdfSections(doc, autoTable, aoa, 22);
       };
 
       const allStats = computeFGStats(athletes, history, () => true);
@@ -804,14 +863,7 @@ export function exportPuntStatsPDF(
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
         doc.setFontSize(14);
         doc.text(title, 14, 15);
-        if (aoa.length > 0) {
-          autoTable(doc, {
-            head: [aoa[0].map(String)],
-            body: aoa.slice(1).map((r) => r.map(String)),
-            startY: 20,
-            styles: { fontSize: 7 },
-          });
-        }
+        renderAoaPdfSections(doc, autoTable, aoa, 22, 7);
       };
 
       const allStats = computePuntStats(athletes, history, () => true);
@@ -843,14 +895,7 @@ export function exportKickoffStatsPDF(
         if (doc.getNumberOfPages() > 1 || title !== "All Time") doc.addPage();
         doc.setFontSize(14);
         doc.text(title, 14, 15);
-        if (aoa.length > 0) {
-          autoTable(doc, {
-            head: [aoa[0].map(String)],
-            body: aoa.slice(1).map((r) => r.map(String)),
-            startY: 20,
-            styles: { fontSize: 8 },
-          });
-        }
+        renderAoaPdfSections(doc, autoTable, aoa, 22);
       };
 
       const allStats = computeKOStats(athletes, history);
