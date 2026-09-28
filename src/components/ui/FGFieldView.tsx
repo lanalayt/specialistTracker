@@ -1,12 +1,18 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { getCurrentTheme } from "@/lib/themeColors";
-import type { FGKick, FGPosition } from "@/types";
+import type { FGKick, FGPosition, FGResult } from "@/types";
 
 interface Props {
   kicks: FGKick[];
   currentKick?: { dist: number; pos?: string; result?: string } | null;
+  // When provided, the end dot on a make/miss-with-direction kick (YC/YL/YR/
+  // XL/XR — not XS/XB/X, which have no real lateral position to drag) becomes
+  // draggable left/right, constrained to the kick's own make-or-miss side of
+  // the uprights, and this fires with the patch to apply once the coach lets
+  // go. Omit to keep the view read-only (tap only).
+  onMove?: (kick: FGKick, patch: Partial<FGKick>) => void;
 }
 
 const W = 520;
@@ -26,6 +32,15 @@ function proj(dist: number, lat: number): { x: number; y: number } {
   const halfW = NEAR_HALF_W - t * (NEAR_HALF_W - FAR_HALF_W);
   const normLat = (lat - 26.5) / 53;
   return { x: CENTER_X + normLat * halfW * 2, y };
+}
+
+// Inverse of proj()'s X mapping at a fixed dist — screen x back to lateral
+// field position, used while dragging the end dot (whose dist never changes).
+function screenXToLat(x: number, dist: number): number {
+  const t = 1 - Math.max(0, Math.min(1, dist / MAX_DIST));
+  const halfW = NEAR_HALF_W - t * (NEAR_HALF_W - FAR_HALF_W);
+  const normLat = (x - CENTER_X) / (halfW * 2);
+  return normLat * 53 + 26.5;
 }
 
 const HASH_L = 18.5;
@@ -49,13 +64,37 @@ function kickerDist(fgDist: number): number {
 
 // Uprights — wide lateral spread so they're visible even at far perspective
 // Position at dist=0 (very back of end zone)
-const UPRIGHT_L = proj(0, 15);
-const UPRIGHT_R = proj(0, 38);
+const UPRIGHT_LAT_L = 15;
+const UPRIGHT_LAT_R = 38;
+const UPRIGHT_L = proj(0, UPRIGHT_LAT_L);
+const UPRIGHT_R = proj(0, UPRIGHT_LAT_R);
 const POST_CENTER = proj(0, 26.5);
 const CROSSBAR_Y = POST_CENTER.y;
 const UPRIGHT_TOP_Y = CROSSBAR_Y - 110; // very tall uprights
 
-function renderKick(key: string | number, kick: { dist: number; pos?: string; result?: string }, opacity: number) {
+// Results that carry a real lateral (left/center/right) position and can be
+// dragged — XS (short) never reached the goal line, and XB/X (blocked/
+// unspecified miss) aren't inherently about direction, so none of those get
+// a drag handle.
+const DRAGGABLE_RESULTS = new Set(["YC", "YL", "YR", "XL", "XR"]);
+
+// Snap a raw lateral drag position to the nearest valid result — restricted
+// to makes or misses depending on the kick's own current result, so a drag
+// can never turn a miss into a make (or vice versa).
+function nearestResult(lat: number, isMake: boolean): FGResult {
+  const candidates: [FGResult, number][] = isMake
+    ? [["YL", 21], ["YC", 26.5], ["YR", 32]]
+    : [["XL", 12], ["XR", 41]];
+  let best = candidates[0][0];
+  let bestDist = Infinity;
+  candidates.forEach(([name, val]) => {
+    const d = Math.abs(val - lat);
+    if (d < bestDist) { bestDist = d; best = name; }
+  });
+  return best;
+}
+
+function renderKick(key: string | number, kick: { dist: number; pos?: string; result?: string }, opacity: number, endLatOverride?: number) {
   const distance = kick.dist || 0;
   if (distance <= 0) return null;
   const isMake = typeof kick.result === "string" && kick.result.startsWith("Y");
@@ -66,7 +105,7 @@ function renderKick(key: string | number, kick: { dist: number; pos?: string; re
 
   // End point: makes go to the uprights (dist=0) and above crossbar
   // Misses go to dist=0 but laterally outside the uprights (or short)
-  const endLat = resultEndLat(kick.result || "");
+  const endLat = endLatOverride ?? resultEndLat(kick.result || "");
   let end: { x: number; y: number };
   if (isShort) {
     end = proj((startDist + GOAL_LINE_DIST) / 2, endLat);
@@ -86,27 +125,84 @@ function renderKick(key: string | number, kick: { dist: number; pos?: string; re
 
   const color = isMake ? "#22c55e" : "#ef4444";
   const d = `M ${start.x} ${start.y} Q ${mid.x} ${mid.y} ${end.x} ${end.y}`;
-  return (
+  return { node: (
     <g key={key}>
       <path d={d} fill="none" stroke={color} strokeWidth={7} opacity={opacity * 0.12} strokeLinecap="round" filter="url(#fgBlur)" />
       <path d={d} fill="none" stroke={color} strokeWidth={2.5} opacity={opacity} strokeLinecap="round" />
       <circle cx={start.x} cy={start.y} r={5} fill="#3b82f6" stroke="white" strokeWidth={1.5} opacity={opacity} />
       {!isShort && <circle cx={end.x} cy={end.y} r={4} fill={color} stroke="white" strokeWidth={1} opacity={opacity * 0.8} />}
     </g>
-  );
+  ), end, isShort };
 }
 
 const RESULT_LABELS: Record<string, string> = { YC: "Made (C)", YL: "Made (L)", YR: "Made (R)", XL: "Miss L", XR: "Miss R", XS: "Short" };
 
-export function FGFieldView({ kicks, currentKick }: Props) {
+export function FGFieldView({ kicks, currentKick, onMove }: Props) {
   const [ezColor, setEzColor] = useState("#991b1b");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragLat, setDragLat] = useState<number>(26.5);
+  const fgKicks = kicks.filter((k) => !k.isPAT);
   useEffect(() => {
     const t = getCurrentTheme(); if (t.primary) setEzColor(t.primary);
   }, []);
   const handleKickTap = useCallback((idx: number) => {
     setSelectedIdx((prev) => (prev === idx ? null : idx));
   }, []);
+
+  const toFieldLat = useCallback((clientX: number): number => {
+    const svg = svgRef.current;
+    if (!svg) return 26.5;
+    const rect = svg.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    return screenXToLat((clientX - rect.left) * scaleX, 0);
+  }, []);
+
+  // Distinguishes a tap (show the tooltip, as before) from an actual drag
+  // (reposition) — a pointer that never moves more than a few px is a tap.
+  const dragStartClientX = useRef(0);
+  const DRAG_THRESHOLD = 4;
+
+  const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
+    if (!onMove) return;
+    const k = fgKicks[idx];
+    if (!k || !DRAGGABLE_RESULTS.has(k.result)) return;
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    dragStartClientX.current = e.clientX;
+    setDragIdx(idx);
+    setDragLat(resultEndLat(k.result));
+  }, [onMove, fgKicks]);
+
+  const handleDragMove = useCallback((e: React.PointerEvent) => {
+    if (dragIdx == null) return;
+    const k = fgKicks[dragIdx];
+    if (!k) return;
+    const isMake = typeof k.result === "string" && k.result.startsWith("Y");
+    const raw = toFieldLat(e.clientX);
+    // Clamp the live drag itself to the correct side of the uprights, so the
+    // dot can never visually rest inside them for a miss, or outside for a
+    // make, even mid-drag.
+    const clamped = isMake
+      ? Math.max(UPRIGHT_LAT_L, Math.min(UPRIGHT_LAT_R, raw))
+      : (raw < 26.5 ? Math.min(raw, UPRIGHT_LAT_L) : Math.max(raw, UPRIGHT_LAT_R));
+    setDragLat(clamped);
+  }, [dragIdx, fgKicks, toFieldLat]);
+
+  const handleDragEnd = useCallback((e: React.PointerEvent) => {
+    if (dragIdx == null) return;
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    const idx = dragIdx;
+    const k = fgKicks[idx];
+    const moved = Math.abs(e.clientX - dragStartClientX.current) >= DRAG_THRESHOLD;
+    setDragIdx(null);
+    if (!k) return;
+    if (!moved) { handleKickTap(idx); return; }
+    const isMake = typeof k.result === "string" && k.result.startsWith("Y");
+    const result = nearestResult(dragLat, isMake);
+    if (result !== k.result) onMove?.(k, { result });
+  }, [dragIdx, fgKicks, dragLat, onMove, handleKickTap]);
 
   // Turf stripes
   const stripes: React.ReactNode[] = [];
@@ -132,11 +228,6 @@ export function FGFieldView({ kicks, currentKick }: Props) {
       const nL = proj(dist, 9); const nR = proj(dist, 44);
       const scale = 1 - (dist / MAX_DIST) * 0.5;
       const fs = Math.max(8, 16 * scale);
-      // Numbers sit ON the yard line (half above, half below)
-      // Left number at dist-0.3 and dist+0.3 to straddle
-      const above = proj(dist - 0.8, 9); const below = proj(dist + 0.8, 9);
-      const aboveR = proj(dist - 0.8, 44); const belowR = proj(dist + 0.8, 44);
-      // Top digit above the line, bottom digit below — simplified: just center on line
       [{ p: nL, k: "l" }, { p: nR, k: "r" }].forEach(({ p, k }) => {
         yardEls.push(
           <text key={`yn-${yd}-${k}`} x={p.x} y={p.y + fs * 0.35} textAnchor="middle" fontSize={fs}
@@ -168,7 +259,6 @@ export function FGFieldView({ kicks, currentKick }: Props) {
   }
 
   const pylons = [proj(GOAL_LINE_DIST, 0), proj(GOAL_LINE_DIST, 53), proj(0, 0), proj(0, 53)];
-  const fgKicks = kicks.filter((k) => !k.isPAT);
 
   return (
     <div className="card-2 p-3 bg-gradient-to-b from-slate-900 to-surface-2">
@@ -180,7 +270,15 @@ export function FGFieldView({ kicks, currentKick }: Props) {
           <span className="flex items-center gap-1"><span className="w-5 h-[3px] rounded bg-[#ef4444]" /> Miss</span>
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full mx-auto rounded-lg overflow-hidden" style={{ maxHeight: 500 }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full mx-auto rounded-lg overflow-hidden"
+        style={{ maxHeight: 500, touchAction: dragIdx != null ? "none" : undefined }}
+        onPointerMove={handleDragMove}
+        onPointerUp={handleDragEnd}
+        onPointerCancel={handleDragEnd}
+      >
         <defs>
           <linearGradient id="fg-sky" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#020617" /><stop offset="50%" stopColor="#0f172a" /><stop offset="100%" stopColor="#1e293b" />
@@ -227,31 +325,43 @@ export function FGFieldView({ kicks, currentKick }: Props) {
         {/* Kicks rendered AFTER uprights so arcs draw on top */}
         {fgKicks.map((k, i) => {
           const isSelected = selectedIdx === i;
-          const arc = renderKick(i, { dist: k.dist, pos: k.pos, result: k.result }, isSelected ? 1 : 0.75);
-          if (!arc) return null;
-          // Hit area
+          const isDragging = dragIdx === i;
+          const rendered = renderKick(i, { dist: k.dist, pos: k.pos, result: k.result }, isSelected || isDragging ? 1 : 0.75, isDragging ? dragLat : undefined);
+          if (!rendered) return null;
+          const { node: arc, end } = rendered;
+          const canDrag = !!onMove && DRAGGABLE_RESULTS.has(k.result);
+          // Hit area for tap (uses the actual, non-dragged path so it lines up with what's drawn)
           const startDist = kickerDist(k.dist);
           const startLat = posLat(k.pos);
           const start = proj(startDist, startLat);
-          const endLat = resultEndLat(k.result || "");
+          const endLat = isDragging ? dragLat : resultEndLat(k.result || "");
           const isShort = k.result === "XS";
           const isMake = typeof k.result === "string" && k.result.startsWith("Y");
-          let end = isShort ? proj((startDist + GOAL_LINE_DIST) / 2, endLat) : proj(0, endLat);
-          if (isMake && !isShort) end = { ...end, y: CROSSBAR_Y - 25 };
+          let hitEnd = isShort ? proj((startDist + GOAL_LINE_DIST) / 2, endLat) : proj(0, endLat);
+          if (isMake && !isShort) hitEnd = { ...hitEnd, y: CROSSBAR_Y - 25 };
           const midDist = isShort ? (startDist + (startDist + GOAL_LINE_DIST) / 2) / 2 : startDist / 2;
           const mid = proj(midDist, (startLat + endLat) / 2);
           mid.y -= 30 + (k.dist / 60) * 50;
-          const hitD = `M ${start.x} ${start.y} Q ${mid.x} ${mid.y} ${end.x} ${end.y}`;
+          const hitD = `M ${start.x} ${start.y} Q ${mid.x} ${mid.y} ${hitEnd.x} ${hitEnd.y}`;
           return (
-            <g key={`tap-${i}`} onClick={() => handleKickTap(i)} style={{ cursor: "pointer" }}>
-              <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
-              {arc}
+            <g key={`tap-${i}`}>
+              <g onClick={() => handleKickTap(i)} style={{ cursor: "pointer" }}>
+                <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
+                {arc}
+              </g>
+              {canDrag && (
+                <circle
+                  cx={end.x} cy={end.y} r={12} fill="transparent"
+                  style={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
+                  onPointerDown={(ev) => handleDragStart(i, ev)}
+                />
+              )}
             </g>
           );
         })}
-        {currentKick && currentKick.dist > 0 && renderKick("preview", currentKick, 1)}
+        {currentKick && currentKick.dist > 0 && renderKick("preview", currentKick, 1)?.node}
         {/* Tooltip for selected kick */}
-        {selectedIdx != null && fgKicks[selectedIdx] && (() => {
+        {selectedIdx != null && dragIdx == null && fgKicks[selectedIdx] && (() => {
           const k = fgKicks[selectedIdx];
           const startDist = kickerDist(k.dist);
           const start = proj(startDist, posLat(k.pos));
@@ -268,7 +378,11 @@ export function FGFieldView({ kicks, currentKick }: Props) {
           );
         })()}
       </svg>
-      {fgKicks.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{fgKicks.length} kick{fgKicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}</p>}
+      {fgKicks.length > 0 && (
+        <p className="text-[10px] text-muted text-right mt-1.5">
+          {fgKicks.length} kick{fgKicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · drag a make/miss dot side to side to fix it" : ""}
+        </p>
+      )}
     </div>
   );
 }

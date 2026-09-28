@@ -2323,6 +2323,9 @@ export default function PuntingSessionPage() {
                     const hangVal = parseFloat(hangTime) || undefined;
                     return { los: l, landingYL: ly, hangTime: hangVal, direction: directionalAccuracy };
                   })()}
+                  onMove={(punt, patch) => {
+                    setSessionPunts((prev) => prev.map((p) => (p.kickNum != null && p.kickNum === punt.kickNum) || p === punt ? { ...p, ...patch } : p));
+                  }}
                 />
               </>
             ) : (
@@ -3290,6 +3293,9 @@ export default function PuntingSessionPage() {
               })()}
               <PuntFieldView
                 punts={sessionPunts.filter((p) => p.los != null && p.landingYL != null)}
+                onMove={(punt, patch) => {
+                  setSessionPunts((prev) => prev.map((p) => (p.kickNum != null && p.kickNum === punt.kickNum) || p === punt ? { ...p, ...patch } : p));
+                }}
               />
             </>
           ) : (() => {

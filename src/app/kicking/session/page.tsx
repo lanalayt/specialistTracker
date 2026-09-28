@@ -2659,7 +2659,12 @@ export default function KickingSessionPage() {
                   </div>
                 );
               })()}
-              <FGFieldView kicks={sessionKicks} />
+              <FGFieldView
+                kicks={sessionKicks}
+                onMove={(kick, patch) => {
+                  setSessionKicks((prev) => prev.map((k) => (k.kickNum != null && k.kickNum === kick.kickNum) || k === kick ? { ...k, ...patch } : k));
+                }}
+              />
             </>
           ) : (() => {
             const kickRows = sessionKicks.length > 0 ? sessionKicks : filledRows.map(({ r }) => ({

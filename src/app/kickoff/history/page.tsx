@@ -442,9 +442,14 @@ function KickoffHistoryContent() {
               )}
             </div>
             {/* Game field view */}
-            {selected.mode === "game" && entries.some((e) => e.los != null && e.landingYL != null) && (
+            {selected.mode === "game" && (editing ? editEntries : entries).some((e) => e.los != null && e.landingYL != null) && (
               <div className="mb-4">
-                <KickoffFieldView kicks={entries.filter((e) => e.los != null && e.landingYL != null)} />
+                <KickoffFieldView
+                  kicks={(editing ? editEntries : entries).filter((e) => e.los != null && e.landingYL != null)}
+                  onMove={editing ? (kick, patch) => {
+                    setEditEntries((prev) => prev.map((e) => (e.kickNum != null && e.kickNum === kick.kickNum) || e === kick ? { ...e, ...patch } : e));
+                  } : undefined}
+                />
               </div>
             )}
             {/* Per-athlete recap stats */}

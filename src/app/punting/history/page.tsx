@@ -623,10 +623,13 @@ function PuntHistoryContent() {
               )}
             </div>
             {/* Game chart — field view for games */}
-            {selected.mode === "game" && punts.some((p) => p.los != null && p.landingYL != null) && (
+            {selected.mode === "game" && (editing ? editEntries : punts).some((p) => p.los != null && p.landingYL != null) && (
               <div className="mb-4">
                 <PuntFieldView
-                  punts={punts.filter((p) => p.los != null && p.landingYL != null)}
+                  punts={(editing ? editEntries : punts).filter((p) => p.los != null && p.landingYL != null)}
+                  onMove={editing ? (punt, patch) => {
+                    setEditEntries((prev) => prev.map((p) => (p.kickNum != null && p.kickNum === punt.kickNum) || p === punt ? { ...p, ...patch } : p));
+                  } : undefined}
                 />
               </div>
             )}

@@ -2256,7 +2256,12 @@ export default function KickoffSessionPage() {
                   </div>
                 );
               })()}
-              <KickoffFieldView kicks={sessionKicks.filter((k) => k.los != null && k.landingYL != null)} />
+              <KickoffFieldView
+                kicks={sessionKicks.filter((k) => k.los != null && k.landingYL != null)}
+                onMove={(kick, patch) => {
+                  setSessionKicks((prev) => prev.map((k) => (k.kickNum != null && k.kickNum === kick.kickNum) || k === kick ? { ...k, ...patch } : k));
+                }}
+              />
             </>
           ) : (() => {
             // Practice: top-line session stats cover DIRECTIONAL (deep) kicks only.

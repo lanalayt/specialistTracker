@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { getCurrentTheme } from "@/lib/themeColors";
-import type { PuntEntry } from "@/types";
+import type { PuntEntry, PuntHash } from "@/types";
 
 interface Props {
   punts: PuntEntry[];
   currentPunt?: { los: number; landingYL: number; hangTime?: number; hash?: string } | null;
+  // When provided, the landing dot on each punt becomes draggable — up/down
+  // only, snapping to the nearest hash — and this fires with the patch to
+  // apply once the coach lets go. Omit to keep the view read-only (tap only).
+  onMove?: (punt: PuntEntry, patch: Partial<PuntEntry>) => void;
 }
 
 const W = 780;
@@ -28,9 +32,28 @@ function proj(fieldX: number, fieldY: number): { x: number; y: number } {
   return { x: W / 2 + xT * halfWidth, y };
 }
 
-function hashToFieldY(hash: string | undefined): number {
-  switch (hash) { case "LH": return 18; case "LM": return 22; case "M": return 26.5; case "RM": return 31; case "RH": return 35; default: return 26.5; }
+// Inverse of proj()'s Y mapping — screen Y back to lateral field position
+// (0-53), used while dragging the landing dot.
+function screenYToFieldY(y: number): number {
+  const yT = Math.max(0, Math.min(1, (y - TOP_Y) / (BOTTOM_Y - TOP_Y)));
+  return yT * 53;
 }
+
+const HASH_Y: Record<PuntHash, number> = { LH: 18, LM: 22, M: 26.5, RM: 31, RH: 35 };
+function hashToFieldY(hash: string | undefined): number {
+  return HASH_Y[hash as PuntHash] ?? 26.5;
+}
+// Snap a raw lateral field position to whichever hash it's closest to.
+function nearestHash(fieldY: number): PuntHash {
+  let best: PuntHash = "M";
+  let bestDist = Infinity;
+  (Object.keys(HASH_Y) as PuntHash[]).forEach((h) => {
+    const d = Math.abs(HASH_Y[h] - fieldY);
+    if (d < bestDist) { bestDist = d; best = h; }
+  });
+  return best;
+}
+
 function hangLift(ht: number | undefined): number { const h = Math.max(0.5, Math.min(ht ?? 3, 6)); return 20 + (h / 6) * 100; }
 
 // Yards the return traveled back from the landing spot, derived from where
@@ -41,9 +64,8 @@ function returnRunYds(p: { landingYL?: number; returnYards?: number; returnToYL?
   return p.returnYards ?? 0;
 }
 
-function renderArc(key: string | number, los: number, landing: number, ht: number | undefined, retYds: number | undefined, fc: boolean, hash: string | undefined, opacity: number, color = "#06b6d4", sw = 2.5) {
+function renderArc(key: string | number, los: number, landing: number, fy: number, ht: number | undefined, retYds: number | undefined, fc: boolean, opacity: number, color = "#06b6d4", sw = 2.5) {
   if (landing <= los) return null;
-  const fy = hashToFieldY(hash);
   const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
   const lift = hangLift(ht);
   const cpY = ((s.y + e.y) / 2) - 2 * lift;
@@ -65,15 +87,57 @@ function renderArc(key: string | number, los: number, landing: number, ht: numbe
   );
 }
 
-export function PuntFieldView({ punts, currentPunt }: Props) {
+export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
   const [ezColor, setEzColor] = useState("#991b1b");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragFieldY, setDragFieldY] = useState<number>(26.5);
   useEffect(() => {
     const t = getCurrentTheme(); if (t.primary) setEzColor(t.primary);
   }, []);
   const handleArcTap = useCallback((idx: number) => {
     setSelectedIdx((prev) => (prev === idx ? null : idx));
   }, []);
+
+  const toFieldY = useCallback((clientY: number): number => {
+    const svg = svgRef.current;
+    if (!svg) return 26.5;
+    const rect = svg.getBoundingClientRect();
+    const scaleY = H / rect.height;
+    return screenYToFieldY((clientY - rect.top) * scaleY);
+  }, []);
+
+  // Distinguishes a tap (show the tooltip, as before) from an actual drag
+  // (reposition) — a pointer that never moves more than a few px is a tap.
+  const dragStartClientY = useRef(0);
+  const DRAG_THRESHOLD = 4;
+
+  const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
+    if (!onMove) return;
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    dragStartClientY.current = e.clientY;
+    setDragIdx(idx);
+    setDragFieldY(hashToFieldY(punts[idx]?.hash));
+  }, [onMove, punts]);
+
+  const handleDragMove = useCallback((e: React.PointerEvent) => {
+    if (dragIdx == null) return;
+    setDragFieldY(toFieldY(e.clientY));
+  }, [dragIdx, toFieldY]);
+
+  const handleDragEnd = useCallback((e: React.PointerEvent) => {
+    if (dragIdx == null) return;
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    const idx = dragIdx;
+    const p = punts[idx];
+    const moved = Math.abs(e.clientY - dragStartClientY.current) >= DRAG_THRESHOLD;
+    setDragIdx(null);
+    if (!moved) { handleArcTap(idx); return; }
+    const hash = nearestHash(toFieldY(e.clientY));
+    if (p && onMove && hash !== p.hash) onMove(p, { hash });
+  }, [dragIdx, punts, onMove, toFieldY, handleArcTap]);
 
   // Turf stripes (playing field only: 0-100)
   const stripes: React.ReactNode[] = [];
@@ -144,7 +208,15 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
           <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-dashed border-[#f59e0b]" /> Return</span>
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full rounded-lg overflow-hidden" style={{ maxHeight: 380 }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full rounded-lg overflow-hidden"
+        style={{ maxHeight: 380, touchAction: dragIdx != null ? "none" : undefined }}
+        onPointerMove={handleDragMove}
+        onPointerUp={handleDragEnd}
+        onPointerCancel={handleDragEnd}
+      >
         <defs>
           <linearGradient id="pv-sky" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#020617" /><stop offset="40%" stopColor="#0f172a" /><stop offset="100%" stopColor="#1e293b" />
@@ -191,23 +263,33 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
         {punts.map((p, i) => {
           if (p.los == null || p.landingYL == null) return null;
           const isSelected = selectedIdx === i;
-          const arc = renderArc(i, p.los, p.landingYL, p.hangTime, returnRunYds(p), !!p.fairCatch, p.hash, isSelected ? 1 : 0.7, isSelected ? "#22d3ee" : "#06b6d4", isSelected ? 3.5 : 2.5);
+          const isDragging = dragIdx === i;
+          const fy = isDragging ? dragFieldY : hashToFieldY(p.hash);
+          const arc = renderArc(i, p.los, p.landingYL, fy, p.hangTime, returnRunYds(p), !!p.fairCatch, isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#22d3ee" : "#06b6d4", isSelected || isDragging ? 3.5 : 2.5);
           if (!arc) return null;
           // Invisible wider hit area for tap
-          const fy = hashToFieldY(p.hash);
           const s = proj(p.los, fy); const e = proj(p.landingYL, fy); const m = proj((p.los + p.landingYL) / 2, fy);
           const cpY = ((s.y + e.y) / 2) - 2 * hangLift(p.hangTime);
           const hitD = `M ${s.x} ${s.y} Q ${m.x} ${cpY} ${e.x} ${e.y}`;
           return (
-            <g key={`tap-${i}`} onClick={() => handleArcTap(i)} style={{ cursor: "pointer" }}>
-              <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
-              {arc}
+            <g key={`tap-${i}`}>
+              <g onClick={() => handleArcTap(i)} style={{ cursor: "pointer" }}>
+                <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
+                {arc}
+              </g>
+              {onMove && (
+                <circle
+                  cx={e.x} cy={e.y} r={12} fill="transparent"
+                  style={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
+                  onPointerDown={(ev) => handleDragStart(i, ev)}
+                />
+              )}
             </g>
           );
         })}
-        {currentPunt && currentPunt.landingYL > currentPunt.los && renderArc("preview", currentPunt.los, currentPunt.landingYL, currentPunt.hangTime, 0, false, currentPunt.hash, 1, "#22d3ee", 3.5)}
+        {currentPunt && currentPunt.landingYL > currentPunt.los && renderArc("preview", currentPunt.los, currentPunt.landingYL, hashToFieldY(currentPunt.hash), currentPunt.hangTime, 0, false, 1, "#22d3ee", 3.5)}
         {/* Tooltip for selected punt */}
-        {selectedIdx != null && punts[selectedIdx] && (() => {
+        {selectedIdx != null && dragIdx == null && punts[selectedIdx] && (() => {
           const p = punts[selectedIdx];
           if (p.los == null || p.landingYL == null) return null;
           const fy = hashToFieldY(p.hash);
@@ -228,7 +310,11 @@ export function PuntFieldView({ punts, currentPunt }: Props) {
           );
         })()}
       </svg>
-      {punts.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{punts.length} punt{punts.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}</p>}
+      {punts.length > 0 && (
+        <p className="text-[10px] text-muted text-right mt-1.5">
+          {punts.length} punt{punts.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · drag the landing dot up/down to fix its hash" : ""}
+        </p>
+      )}
     </div>
   );
 }

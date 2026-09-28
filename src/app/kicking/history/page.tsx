@@ -568,9 +568,14 @@ function KickingHistoryContent() {
               )}
             </div>
             {/* Game field view */}
-            {selected.mode === "game" && kicks.length > 0 && (
+            {selected.mode === "game" && (editing ? editEntries : kicks).length > 0 && (
               <div className="mb-4">
-                <FGFieldView kicks={kicks} />
+                <FGFieldView
+                  kicks={editing ? editEntries : kicks}
+                  onMove={editing ? (kick, patch) => {
+                    setEditEntries((prev) => prev.map((k) => (k.kickNum != null && k.kickNum === kick.kickNum) || k === kick ? { ...k, ...patch } : k));
+                  } : undefined}
+                />
               </div>
             )}
             {/* Per-athlete recap stats */}

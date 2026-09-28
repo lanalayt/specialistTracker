@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { getCurrentTheme } from "@/lib/themeColors";
 import { koNetYards } from "@/lib/stats";
-import type { KickoffEntry } from "@/types";
+import type { KickoffEntry, KickoffHash } from "@/types";
 
 interface Props {
   kicks: KickoffEntry[];
   currentKick?: { los?: number; landingYL?: number; distance?: number; hangTime?: number } | null;
+  // When provided, the landing dot on each kick becomes draggable — up/down
+  // only, snapping to the nearest hash — and this fires with the patch to
+  // apply once the coach lets go. Omit to keep the view read-only (tap only).
+  onMove?: (kick: KickoffEntry, patch: Partial<KickoffEntry>) => void;
 }
 
 const W = 780;
@@ -36,6 +40,28 @@ function proj(fieldX: number, fieldY: number): { x: number; y: number } {
   return { x: W / 2 + xT * halfWidth, y };
 }
 
+// Inverse of proj()'s Y mapping — screen Y back to lateral field position
+// (0-53), used while dragging the landing dot.
+function screenYToFieldY(y: number): number {
+  const yT = Math.max(0, Math.min(1, (y - TOP_Y) / (BOTTOM_Y - TOP_Y)));
+  return yT * 53;
+}
+
+const KO_HASH_Y: Record<KickoffHash, number> = { LH: 18, LM: 22, M: 26.5, RM: 31, RH: 35 };
+function koHashToFieldY(hash: string | undefined): number {
+  return KO_HASH_Y[hash as KickoffHash] ?? 26.5;
+}
+// Snap a raw lateral field position to whichever hash it's closest to.
+function nearestHash(fieldY: number): KickoffHash {
+  let best: KickoffHash = "M";
+  let bestDist = Infinity;
+  (Object.keys(KO_HASH_Y) as KickoffHash[]).forEach((h) => {
+    const d = Math.abs(KO_HASH_Y[h] - fieldY);
+    if (d < bestDist) { bestDist = d; best = h; }
+  });
+  return best;
+}
+
 // Keep an absurd distance inside the drawn area; real kickoffs stay well short of this.
 function clampToField(fieldX: number): number { return Math.max(FIELD_MIN, Math.min(FIELD_MAX, fieldX)); }
 
@@ -59,10 +85,9 @@ function returnRunYds(k: { los?: number; landingYL?: number; distance?: number; 
   return Math.max(0, landing - endSpot);
 }
 
-function renderArc(key: string | number, los: number, landingRaw: number, ht: number | undefined, retYds: number | undefined, opacity: number, color = "#f59e0b", sw = 2.5) {
+function renderArc(key: string | number, los: number, landingRaw: number, fy: number, ht: number | undefined, retYds: number | undefined, opacity: number, color = "#f59e0b", sw = 2.5) {
   const landing = clampToField(landingRaw);
   if (landing <= los) return null;
-  const fy = 26.5;
   const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
   const lift = hangLift(ht);
   const cpY = ((s.y + e.y) / 2) - 2 * lift;
@@ -83,15 +108,57 @@ function renderArc(key: string | number, los: number, landingRaw: number, ht: nu
   );
 }
 
-export function KickoffFieldView({ kicks, currentKick }: Props) {
+export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
   const [ezColor, setEzColor] = useState("#991b1b");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragFieldY, setDragFieldY] = useState<number>(26.5);
   useEffect(() => {
     const t = getCurrentTheme(); if (t.primary) setEzColor(t.primary);
   }, []);
   const handleArcTap = useCallback((idx: number) => {
     setSelectedIdx((prev) => (prev === idx ? null : idx));
   }, []);
+
+  const toFieldY = useCallback((clientY: number): number => {
+    const svg = svgRef.current;
+    if (!svg) return 26.5;
+    const rect = svg.getBoundingClientRect();
+    const scaleY = H / rect.height;
+    return screenYToFieldY((clientY - rect.top) * scaleY);
+  }, []);
+
+  // Distinguishes a tap (show the tooltip, as before) from an actual drag
+  // (reposition) — a pointer that never moves more than a few px is a tap.
+  const dragStartClientY = useRef(0);
+  const DRAG_THRESHOLD = 4;
+
+  const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
+    if (!onMove) return;
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    dragStartClientY.current = e.clientY;
+    setDragIdx(idx);
+    setDragFieldY(koHashToFieldY(kicks[idx]?.hash));
+  }, [onMove, kicks]);
+
+  const handleDragMove = useCallback((e: React.PointerEvent) => {
+    if (dragIdx == null) return;
+    setDragFieldY(toFieldY(e.clientY));
+  }, [dragIdx, toFieldY]);
+
+  const handleDragEnd = useCallback((e: React.PointerEvent) => {
+    if (dragIdx == null) return;
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    const idx = dragIdx;
+    const k = kicks[idx];
+    const moved = Math.abs(e.clientY - dragStartClientY.current) >= DRAG_THRESHOLD;
+    setDragIdx(null);
+    if (!moved) { handleArcTap(idx); return; }
+    const hash = nearestHash(toFieldY(e.clientY));
+    if (k && onMove && hash !== k.hash) onMove(k, { hash });
+  }, [dragIdx, kicks, onMove, toFieldY, handleArcTap]);
 
   const stripes: React.ReactNode[] = [];
   for (let fx = 0; fx < 100; fx += 5) {
@@ -164,7 +231,15 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           <span className="flex items-center gap-1"><span className="w-4 border-t-2 border-dashed border-[#f43f5e]" /> Return</span>
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full rounded-lg overflow-hidden" style={{ maxHeight: 380 }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full rounded-lg overflow-hidden"
+        style={{ maxHeight: 380, touchAction: dragIdx != null ? "none" : undefined }}
+        onPointerMove={handleDragMove}
+        onPointerUp={handleDragEnd}
+        onPointerCancel={handleDragEnd}
+      >
         <defs>
           <linearGradient id="ko-sky" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#020617" /><stop offset="40%" stopColor="#0f172a" /><stop offset="100%" stopColor="#1e293b" />
@@ -214,30 +289,40 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           const los = k.los ?? 35; const landing = clampToField(landingSpot(k));
           if (landing <= los) return null;
           const isSelected = selectedIdx === i;
-          const arc = renderArc(i, los, landing, k.hangTime, returnRunYds(k), isSelected ? 1 : 0.7, isSelected ? "#fbbf24" : "#f59e0b", isSelected ? 3.5 : 2.5);
+          const isDragging = dragIdx === i;
+          const fy = isDragging ? dragFieldY : koHashToFieldY(k.hash);
+          const arc = renderArc(i, los, landing, fy, k.hangTime, returnRunYds(k), isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#fbbf24" : "#f59e0b", isSelected || isDragging ? 3.5 : 2.5);
           if (!arc) return null;
-          const fy = 26.5;
           const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
           const cpY = ((s.y + e.y) / 2) - 2 * hangLift(k.hangTime);
           const hitD = `M ${s.x} ${s.y} Q ${m.x} ${cpY} ${e.x} ${e.y}`;
           return (
-            <g key={`tap-${i}`} onClick={() => handleArcTap(i)} style={{ cursor: "pointer" }}>
-              <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
-              {arc}
+            <g key={`tap-${i}`}>
+              <g onClick={() => handleArcTap(i)} style={{ cursor: "pointer" }}>
+                <path d={hitD} fill="none" stroke="transparent" strokeWidth={16} />
+                {arc}
+              </g>
+              {onMove && (
+                <circle
+                  cx={e.x} cy={e.y} r={12} fill="transparent"
+                  style={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
+                  onPointerDown={(ev) => handleDragStart(i, ev)}
+                />
+              )}
             </g>
           );
         })}
         {currentKick && (() => {
           const los = currentKick.los ?? 35; const landing = clampToField(landingSpot(currentKick));
           if (landing <= los) return null;
-          return renderArc("preview", los, landing, currentKick.hangTime, 0, 1, "#fbbf24", 3.5);
+          return renderArc("preview", los, landing, 26.5, currentKick.hangTime, 0, 1, "#fbbf24", 3.5);
         })()}
         {/* Tooltip for selected kickoff */}
-        {selectedIdx != null && kicks[selectedIdx] && (() => {
+        {selectedIdx != null && dragIdx == null && kicks[selectedIdx] && (() => {
           const k = kicks[selectedIdx];
           const los = k.los ?? 35; const landing = clampToField(landingSpot(k));
           if (landing <= los) return null;
-          const fy = 26.5;
+          const fy = koHashToFieldY(k.hash);
           const sP = proj(los, fy); const eP = proj(landing, fy);
           const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
           const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
@@ -254,7 +339,11 @@ export function KickoffFieldView({ kicks, currentKick }: Props) {
           );
         })()}
       </svg>
-      {kicks.length > 0 && <p className="text-[10px] text-muted text-right mt-1.5">{kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}</p>}
+      {kicks.length > 0 && (
+        <p className="text-[10px] text-muted text-right mt-1.5">
+          {kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · drag the landing dot up/down to fix its hash" : ""}
+        </p>
+      )}
     </div>
   );
 }
