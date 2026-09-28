@@ -425,6 +425,19 @@ export function puntHasNetData(p: PuntNetEntry): boolean {
   return !!p.blocked && p.los != null && (isPuntTouchback(p) || p.returnToYL != null);
 }
 
+// Net yards for a single punt — gross minus whatever the penalty formula
+// above says it lost (a return, a touchback, or the block's own math).
+export function puntNetYards(p: PuntNetEntry): number {
+  return (p.yards ?? 0) - puntNetPenalty(p);
+}
+
+// Yards the return actually gained, for display — same magnitude as the net
+// penalty except a touchback never had a real return to show.
+export function puntReturnYards(p: PuntNetEntry): number {
+  if (isPuntTouchback(p)) return 0;
+  return puntNetPenalty(p);
+}
+
 // ─── Long Snap benchmark ──────────────────────────────────────────────────────
 
 export function getSnapBenchmark(snapType: SnapType, time: number): SnapBenchmark {

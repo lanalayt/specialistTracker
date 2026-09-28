@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
 import { useAuth } from "@/lib/auth";
-import { puntNetPenalty, puntHasNetData } from "@/lib/stats";
+import { puntNetPenalty, puntHasNetData, puntNetYards, puntReturnYards } from "@/lib/stats";
 import { exportPuntSession, exportSessionPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
@@ -751,7 +751,9 @@ function PuntHistoryContent() {
                         <th className="table-header text-left">Athlete</th>
                         <th className="table-header">Type</th>
                         <th className="table-header">Yds</th>
+                        <th className="table-header">Net</th>
                         <th className="table-header">Hang</th>
+                        <th className="table-header">Ret</th>
                         <th className="table-header">OT</th>
                         <th className="table-header">Dir</th>
                         {displayPunts.some((p) => p.blocked) || editing ? <th className="table-header" title="Blocked — no distance or hang time">Blk</th> : null}
@@ -790,25 +792,41 @@ function PuntHistoryContent() {
                             <td className="table-cell text-muted">{p.type ? (typeLabels[p.type] ?? p.type) : "—"}</td>
                           )}
                           {editing ? (
+                            <td className="table-cell p-1">
+                              {p.blocked ? (
+                                <span className="text-xs text-muted">—</span>
+                              ) : isYardLineType(p.type, puntTypes) ? (
+                                <input type="text" inputMode="numeric" placeholder="YL" value={p.poochLandingYardLine || ""} onChange={(e) => updateEntry(i, "poochLandingYardLine", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-make" />
+                              ) : (
+                                <input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
+                              )}
+                            </td>
+                          ) : (
+                            <td className={clsx("table-cell", isYardLineType(p.type, puntTypes) && "!text-make font-semibold")}>
+                              {isYardLineType(p.type, puntTypes)
+                                ? (p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? `${p.poochLandingYardLine} YL` : "—")
+                                : p.yards > 0 ? `${p.yards} yd` : "—"}
+                            </td>
+                          )}
+                          <td className="table-cell text-muted">{puntHasNetData(p) ? `${puntNetYards(p)} yd` : "—"}</td>
+                          {editing ? (
+                            <td className="table-cell p-1">
+                              {p.blocked ? (
+                                <span className="text-xs text-muted">—</span>
+                              ) : tracksHangTime(p.type, puntTypes) || p.hangTime > 0 ? (
+                                <input type="text" inputMode="numeric" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
+                              ) : (
+                                <span className="text-xs text-muted">—</span>
+                              )}
+                            </td>
+                          ) : (
+                            <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
+                          )}
+                          <td className="table-cell text-muted">
+                            {puntReturnYards(p) > 0 ? `${puntReturnYards(p)} yd` : p.touchback ? "TB" : p.fairCatch ? "FC" : "—"}
+                          </td>
+                          {editing ? (
                             <>
-                              <td className="table-cell p-1">
-                                {p.blocked ? (
-                                  <span className="text-xs text-muted">—</span>
-                                ) : isYardLineType(p.type, puntTypes) ? (
-                                  <input type="text" inputMode="numeric" placeholder="YL" value={p.poochLandingYardLine || ""} onChange={(e) => updateEntry(i, "poochLandingYardLine", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-make" />
-                                ) : (
-                                  <input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
-                                )}
-                              </td>
-                              <td className="table-cell p-1">
-                                {p.blocked ? (
-                                  <span className="text-xs text-muted">—</span>
-                                ) : tracksHangTime(p.type, puntTypes) || p.hangTime > 0 ? (
-                                  <input type="text" inputMode="numeric" value={timeValue(i, "hangTime", p.hangTime)} onChange={(e) => updateTime(i, "hangTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
-                                ) : (
-                                  <span className="text-xs text-muted">—</span>
-                                )}
-                              </td>
                               <td className="table-cell p-1"><input type="text" inputMode="numeric" value={timeValue(i, "opTime", p.opTime || 0)} onChange={(e) => updateTime(i, "opTime", e.target.value)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>
                               <td className="table-cell p-1">
                                 {p.blocked ? (
@@ -841,12 +859,6 @@ function PuntHistoryContent() {
                             </>
                           ) : (
                             <>
-                              <td className={clsx("table-cell", isYardLineType(p.type, puntTypes) && "!text-make font-semibold")}>
-                                {isYardLineType(p.type, puntTypes)
-                                  ? (p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? `${p.poochLandingYardLine} YL` : "—")
-                                  : p.yards > 0 ? `${p.yards} yd` : "—"}
-                              </td>
-                              <td className="table-cell text-muted">{p.hangTime > 0 ? `${p.hangTime.toFixed(2)}s` : "—"}</td>
                               <td className="table-cell text-muted">{(p.opTime || 0) > 0 ? `${p.opTime.toFixed(2)}s` : "—"}</td>
                               <td className={`table-cell font-bold ${p.blocked ? "text-muted font-normal" : p.directionalAccuracy === 1 ? "text-make" : p.directionalAccuracy === 0 ? "text-miss" : "text-amber-400"}`}>{p.blocked ? "—" : p.directionalAccuracy != null ? (p.directionalAccuracy === 0.5 ? "0.5" : p.directionalAccuracy) : "—"}</td>
                               {displayPunts.some((dp) => dp.blocked) && (
