@@ -64,15 +64,15 @@ function returnRunYds(p: { landingYL?: number; returnYards?: number; returnToYL?
   return p.returnYards ?? 0;
 }
 
-function renderArc(key: string | number, los: number, landing: number, fy: number, ht: number | undefined, retYds: number | undefined, fc: boolean, opacity: number, color = "#06b6d4", sw = 2.5) {
+function renderArc(key: string | number, los: number, landing: number, fyStart: number, fyEnd: number, ht: number | undefined, retYds: number | undefined, fc: boolean, opacity: number, color = "#06b6d4", sw = 2.5) {
   if (landing <= los) return null;
-  const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
+  const s = proj(los, fyStart); const e = proj(landing, fyEnd); const m = proj((los + landing) / 2, (fyStart + fyEnd) / 2);
   const lift = hangLift(ht);
   const cpY = ((s.y + e.y) / 2) - 2 * lift;
   const d = `M ${s.x} ${s.y} Q ${m.x} ${cpY} ${e.x} ${e.y}`;
   let ret: React.ReactNode = null;
   if (!fc && (retYds ?? 0) > 0) {
-    const re = proj(Math.max(los, landing - (retYds ?? 0)), fy);
+    const re = proj(Math.max(los, landing - (retYds ?? 0)), fyEnd);
     ret = <line x1={e.x} y1={e.y} x2={re.x} y2={re.y} stroke="#f59e0b" strokeWidth={2} strokeDasharray="5,3" opacity={opacity} />;
   }
   const fcM = fc ? <text x={e.x} y={e.y - 10} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#a78bfa" opacity={opacity}>FC</text> : null;
@@ -125,7 +125,8 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
     el.setPointerCapture?.(pointerId);
     dragStartClientY.current = clientY;
     setDragIdx(idx);
-    setDragFieldY(hashToFieldY(punts[idx]?.hash));
+    // Only the landing spot moves — the LOS/snap hash is never touched.
+    setDragFieldY(hashToFieldY(punts[idx]?.landingHash ?? punts[idx]?.hash));
   }, [punts]);
 
   const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
@@ -178,7 +179,9 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
     setDragIdx(null);
     if (!moved) { handleArcTap(idx); return; }
     const hash = nearestHash(toFieldY(e.clientY));
-    if (p && onMove && hash !== p.hash) onMove(p, { hash });
+    // Writes landingHash (the landing spot only) — never the punt's own
+    // `hash`, which is the snap/LOS position and must stay put.
+    if (p && onMove && hash !== (p.landingHash ?? p.hash)) onMove(p, { landingHash: hash });
   }, [dragIdx, punts, onMove, toFieldY, handleArcTap]);
 
   // Turf stripes (playing field only: 0-100)
@@ -311,11 +314,15 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
           if (p.los == null || p.landingYL == null) return null;
           const isSelected = selectedIdx === i;
           const isDragging = dragIdx === i;
-          const fy = isDragging ? dragFieldY : hashToFieldY(p.hash);
-          const arc = renderArc(i, p.los, p.landingYL, fy, p.hangTime, returnRunYds(p), !!p.fairCatch, isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#22d3ee" : "#06b6d4", isSelected || isDragging ? 3.5 : 2.5);
+          // The LOS end always sits at the punt's own hash — only the
+          // landing end can be dragged, and only its own lateral position
+          // (landingHash) changes.
+          const fyStart = hashToFieldY(p.hash);
+          const fyEnd = isDragging ? dragFieldY : hashToFieldY(p.landingHash ?? p.hash);
+          const arc = renderArc(i, p.los, p.landingYL, fyStart, fyEnd, p.hangTime, returnRunYds(p), !!p.fairCatch, isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#22d3ee" : "#06b6d4", isSelected || isDragging ? 3.5 : 2.5);
           if (!arc) return null;
           // Invisible wider hit area for tap
-          const s = proj(p.los, fy); const e = proj(p.landingYL, fy); const m = proj((p.los + p.landingYL) / 2, fy);
+          const s = proj(p.los, fyStart); const e = proj(p.landingYL, fyEnd); const m = proj((p.los + p.landingYL) / 2, (fyStart + fyEnd) / 2);
           const cpY = ((s.y + e.y) / 2) - 2 * hangLift(p.hangTime);
           const hitD = `M ${s.x} ${s.y} Q ${m.x} ${cpY} ${e.x} ${e.y}`;
           return (
@@ -334,13 +341,12 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
             </g>
           );
         })}
-        {currentPunt && currentPunt.landingYL > currentPunt.los && renderArc("preview", currentPunt.los, currentPunt.landingYL, hashToFieldY(currentPunt.hash), currentPunt.hangTime, 0, false, 1, "#22d3ee", 3.5)}
+        {currentPunt && currentPunt.landingYL > currentPunt.los && renderArc("preview", currentPunt.los, currentPunt.landingYL, hashToFieldY(currentPunt.hash), hashToFieldY(currentPunt.hash), currentPunt.hangTime, 0, false, 1, "#22d3ee", 3.5)}
         {/* Tooltip for selected punt */}
         {selectedIdx != null && dragIdx == null && punts[selectedIdx] && (() => {
           const p = punts[selectedIdx];
           if (p.los == null || p.landingYL == null) return null;
-          const fy = hashToFieldY(p.hash);
-          const sP = proj(p.los, fy); const eP = proj(p.landingYL, fy);
+          const sP = proj(p.los, hashToFieldY(p.hash)); const eP = proj(p.landingYL, hashToFieldY(p.landingHash ?? p.hash));
           const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
           const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
           return (
@@ -359,7 +365,7 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
       </svg>
       {punts.length > 0 && (
         <p className="text-[10px] text-muted text-right mt-1.5">
-          {punts.length} punt{punts.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · click-drag (or press & hold) the landing dot to fix its hash" : ""}
+          {punts.length} punt{punts.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · click-drag (or press & hold) the landing dot to fix where it came down" : ""}
         </p>
       )}
     </div>

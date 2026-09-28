@@ -117,6 +117,12 @@ export interface PuntEntry {
   // Punt was blocked — no distance/hang time apply, so those are excluded
   // from averages even though the punt still counts as an attempt.
   blocked?: boolean;
+  // Lateral position of the LANDING spot on the field diagram, independent of
+  // `hash` (which is the snap/kick position used everywhere else — stats,
+  // exports, the history "Loc" column — and must never change from a drag).
+  // Falls back to `hash` when unset, matching the diagram's look before this
+  // existed. Only ever set by dragging the diagram's landing dot.
+  landingHash?: PuntHash;
 }
 
 // ─── Punt stats ─────────────────────────────────────────────────────────────
@@ -174,6 +180,11 @@ export interface KickoffEntry {
   // Game mode only: absolute field positions 0..100
   los?: number;
   landingYL?: number;
+  // Lateral position of the LANDING spot on the field diagram, independent of
+  // `hash` (which is the tee/kick position used everywhere else — stats,
+  // the history "Loc" column — and must never change from a drag). Falls
+  // back to `hash` when unset. Only ever set by dragging the landing dot.
+  landingHash?: KickoffHash;
 }
 
 // ─── Kickoff stats ──────────────────────────────────────────────────────────

@@ -85,16 +85,16 @@ function returnRunYds(k: { los?: number; landingYL?: number; distance?: number; 
   return Math.max(0, landing - endSpot);
 }
 
-function renderArc(key: string | number, los: number, landingRaw: number, fy: number, ht: number | undefined, retYds: number | undefined, opacity: number, color = "#f59e0b", sw = 2.5) {
+function renderArc(key: string | number, los: number, landingRaw: number, fyStart: number, fyEnd: number, ht: number | undefined, retYds: number | undefined, opacity: number, color = "#f59e0b", sw = 2.5) {
   const landing = clampToField(landingRaw);
   if (landing <= los) return null;
-  const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
+  const s = proj(los, fyStart); const e = proj(landing, fyEnd); const m = proj((los + landing) / 2, (fyStart + fyEnd) / 2);
   const lift = hangLift(ht);
   const cpY = ((s.y + e.y) / 2) - 2 * lift;
   const d = `M ${s.x} ${s.y} Q ${m.x} ${cpY} ${e.x} ${e.y}`;
   let ret: React.ReactNode = null;
   if ((retYds ?? 0) > 0) {
-    const re = proj(Math.max(los, landing - (retYds ?? 0)), fy);
+    const re = proj(Math.max(los, landing - (retYds ?? 0)), fyEnd);
     ret = <line x1={e.x} y1={e.y} x2={re.x} y2={re.y} stroke="#f43f5e" strokeWidth={2} strokeDasharray="5,3" opacity={opacity} />;
   }
   return (
@@ -146,7 +146,8 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
     el.setPointerCapture?.(pointerId);
     dragStartClientY.current = clientY;
     setDragIdx(idx);
-    setDragFieldY(koHashToFieldY(kicks[idx]?.hash));
+    // Only the landing spot moves — the tee/kick hash is never touched.
+    setDragFieldY(koHashToFieldY(kicks[idx]?.landingHash ?? kicks[idx]?.hash));
   }, [kicks]);
 
   const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
@@ -199,7 +200,9 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
     setDragIdx(null);
     if (!moved) { handleArcTap(idx); return; }
     const hash = nearestHash(toFieldY(e.clientY));
-    if (k && onMove && hash !== k.hash) onMove(k, { hash });
+    // Writes landingHash (the landing spot only) — never the kick's own
+    // `hash`, which is the tee/kick position and must stay put.
+    if (k && onMove && hash !== (k.landingHash ?? k.hash)) onMove(k, { landingHash: hash });
   }, [dragIdx, kicks, onMove, toFieldY, handleArcTap]);
 
   const stripes: React.ReactNode[] = [];
@@ -337,10 +340,14 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
           if (landing <= los) return null;
           const isSelected = selectedIdx === i;
           const isDragging = dragIdx === i;
-          const fy = isDragging ? dragFieldY : koHashToFieldY(k.hash);
-          const arc = renderArc(i, los, landing, fy, k.hangTime, returnRunYds(k), isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#fbbf24" : "#f59e0b", isSelected || isDragging ? 3.5 : 2.5);
+          // The tee end always sits at the kick's own hash — only the
+          // landing end can be dragged, and only its own lateral position
+          // (landingHash) changes.
+          const fyStart = koHashToFieldY(k.hash);
+          const fyEnd = isDragging ? dragFieldY : koHashToFieldY(k.landingHash ?? k.hash);
+          const arc = renderArc(i, los, landing, fyStart, fyEnd, k.hangTime, returnRunYds(k), isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#fbbf24" : "#f59e0b", isSelected || isDragging ? 3.5 : 2.5);
           if (!arc) return null;
-          const s = proj(los, fy); const e = proj(landing, fy); const m = proj((los + landing) / 2, fy);
+          const s = proj(los, fyStart); const e = proj(landing, fyEnd); const m = proj((los + landing) / 2, (fyStart + fyEnd) / 2);
           const cpY = ((s.y + e.y) / 2) - 2 * hangLift(k.hangTime);
           const hitD = `M ${s.x} ${s.y} Q ${m.x} ${cpY} ${e.x} ${e.y}`;
           return (
@@ -362,15 +369,14 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
         {currentKick && (() => {
           const los = currentKick.los ?? 35; const landing = clampToField(landingSpot(currentKick));
           if (landing <= los) return null;
-          return renderArc("preview", los, landing, 26.5, currentKick.hangTime, 0, 1, "#fbbf24", 3.5);
+          return renderArc("preview", los, landing, 26.5, 26.5, currentKick.hangTime, 0, 1, "#fbbf24", 3.5);
         })()}
         {/* Tooltip for selected kickoff */}
         {selectedIdx != null && dragIdx == null && kicks[selectedIdx] && (() => {
           const k = kicks[selectedIdx];
           const los = k.los ?? 35; const landing = clampToField(landingSpot(k));
           if (landing <= los) return null;
-          const fy = koHashToFieldY(k.hash);
-          const sP = proj(los, fy); const eP = proj(landing, fy);
+          const sP = proj(los, koHashToFieldY(k.hash)); const eP = proj(landing, koHashToFieldY(k.landingHash ?? k.hash));
           const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
           const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
           const dist = k.distance || (landingSpot(k) - los);
@@ -388,7 +394,7 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
       </svg>
       {kicks.length > 0 && (
         <p className="text-[10px] text-muted text-right mt-1.5">
-          {kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · click-drag (or press & hold) the landing dot to fix its hash" : ""}
+          {kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · click-drag (or press & hold) the landing dot to fix where it came down" : ""}
         </p>
       )}
     </div>
