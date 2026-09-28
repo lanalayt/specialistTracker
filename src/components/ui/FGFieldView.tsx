@@ -163,19 +163,54 @@ export function FGFieldView({ kicks, currentKick, onMove }: Props) {
   // (reposition) — a pointer that never moves more than a few px is a tap.
   const dragStartClientX = useRef(0);
   const DRAG_THRESHOLD = 4;
+  // Touch/pen must be pressed-and-held before a drag engages, so a normal
+  // tap (or a scroll gesture that happens to start on a dot) isn't mistaken
+  // for a reposition. Mouse still drags immediately on click, as before.
+  const LONG_PRESS_MS = 350;
+  const PRESS_CANCEL_PX = 10;
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStart = useRef({ x: 0, y: 0 });
+  const pendingIdx = useRef<number | null>(null);
+
+  const armDrag = useCallback((idx: number, el: Element, pointerId: number, clientX: number) => {
+    const k = fgKicks[idx];
+    if (!k) return;
+    el.setPointerCapture?.(pointerId);
+    dragStartClientX.current = clientX;
+    setDragIdx(idx);
+    setDragLat(resultEndLat(k.result));
+  }, [fgKicks]);
 
   const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
     if (!onMove) return;
     const k = fgKicks[idx];
     if (!k || !DRAGGABLE_RESULTS.has(k.result)) return;
     e.stopPropagation();
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    dragStartClientX.current = e.clientX;
-    setDragIdx(idx);
-    setDragLat(resultEndLat(k.result));
-  }, [onMove, fgKicks]);
+    if (e.pointerType === "mouse") {
+      armDrag(idx, e.target as Element, e.pointerId, e.clientX);
+      return;
+    }
+    const el = e.target as Element;
+    const pointerId = e.pointerId;
+    pressStart.current = { x: e.clientX, y: e.clientY };
+    pendingIdx.current = idx;
+    pressTimer.current = setTimeout(() => {
+      pressTimer.current = null;
+      armDrag(idx, el, pointerId, pressStart.current.x);
+    }, LONG_PRESS_MS);
+  }, [onMove, fgKicks, armDrag]);
 
   const handleDragMove = useCallback((e: React.PointerEvent) => {
+    if (pressTimer.current != null) {
+      const dx = e.clientX - pressStart.current.x;
+      const dy = e.clientY - pressStart.current.y;
+      if (Math.hypot(dx, dy) > PRESS_CANCEL_PX) {
+        clearTimeout(pressTimer.current);
+        pressTimer.current = null;
+        pendingIdx.current = null;
+      }
+      return;
+    }
     if (dragIdx == null) return;
     const k = fgKicks[dragIdx];
     if (!k) return;
@@ -191,6 +226,15 @@ export function FGFieldView({ kicks, currentKick, onMove }: Props) {
   }, [dragIdx, fgKicks, toFieldLat]);
 
   const handleDragEnd = useCallback((e: React.PointerEvent) => {
+    if (pressTimer.current != null) {
+      // Released before the hold finished — treat it as a plain tap.
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+      const idx = pendingIdx.current;
+      pendingIdx.current = null;
+      if (idx != null) handleKickTap(idx);
+      return;
+    }
     if (dragIdx == null) return;
     (e.target as Element).releasePointerCapture?.(e.pointerId);
     const idx = dragIdx;
@@ -380,7 +424,7 @@ export function FGFieldView({ kicks, currentKick, onMove }: Props) {
       </svg>
       {fgKicks.length > 0 && (
         <p className="text-[10px] text-muted text-right mt-1.5">
-          {fgKicks.length} kick{fgKicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · drag a make/miss dot side to side to fix it" : ""}
+          {fgKicks.length} kick{fgKicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · click-drag (or press & hold) a make/miss dot to fix it" : ""}
         </p>
       )}
     </div>

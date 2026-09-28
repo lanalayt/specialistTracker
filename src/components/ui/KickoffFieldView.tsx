@@ -133,22 +133,64 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
   // (reposition) — a pointer that never moves more than a few px is a tap.
   const dragStartClientY = useRef(0);
   const DRAG_THRESHOLD = 4;
+  // Touch/pen must be pressed-and-held before a drag engages, so a normal
+  // tap (or a scroll gesture that happens to start on a dot) isn't mistaken
+  // for a reposition. Mouse still drags immediately on click, as before.
+  const LONG_PRESS_MS = 350;
+  const PRESS_CANCEL_PX = 10;
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStart = useRef({ x: 0, y: 0 });
+  const pendingIdx = useRef<number | null>(null);
+
+  const armDrag = useCallback((idx: number, el: Element, pointerId: number, clientY: number) => {
+    el.setPointerCapture?.(pointerId);
+    dragStartClientY.current = clientY;
+    setDragIdx(idx);
+    setDragFieldY(koHashToFieldY(kicks[idx]?.hash));
+  }, [kicks]);
 
   const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
     if (!onMove) return;
     e.stopPropagation();
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    dragStartClientY.current = e.clientY;
-    setDragIdx(idx);
-    setDragFieldY(koHashToFieldY(kicks[idx]?.hash));
-  }, [onMove, kicks]);
+    if (e.pointerType === "mouse") {
+      armDrag(idx, e.target as Element, e.pointerId, e.clientY);
+      return;
+    }
+    const el = e.target as Element;
+    const pointerId = e.pointerId;
+    pressStart.current = { x: e.clientX, y: e.clientY };
+    pendingIdx.current = idx;
+    pressTimer.current = setTimeout(() => {
+      pressTimer.current = null;
+      armDrag(idx, el, pointerId, pressStart.current.y);
+    }, LONG_PRESS_MS);
+  }, [onMove, armDrag]);
 
   const handleDragMove = useCallback((e: React.PointerEvent) => {
+    if (pressTimer.current != null) {
+      const dx = e.clientX - pressStart.current.x;
+      const dy = e.clientY - pressStart.current.y;
+      if (Math.hypot(dx, dy) > PRESS_CANCEL_PX) {
+        clearTimeout(pressTimer.current);
+        pressTimer.current = null;
+        pendingIdx.current = null;
+      }
+      return;
+    }
     if (dragIdx == null) return;
     setDragFieldY(toFieldY(e.clientY));
   }, [dragIdx, toFieldY]);
 
   const handleDragEnd = useCallback((e: React.PointerEvent) => {
+    if (pressTimer.current != null) {
+      // Released before the hold finished — treat it as a plain tap.
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+      const idx = pendingIdx.current;
+      pendingIdx.current = null;
+      if (idx != null) handleArcTap(idx);
+      return;
+    }
     if (dragIdx == null) return;
     (e.target as Element).releasePointerCapture?.(e.pointerId);
     const idx = dragIdx;
@@ -341,7 +383,7 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
       </svg>
       {kicks.length > 0 && (
         <p className="text-[10px] text-muted text-right mt-1.5">
-          {kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · drag the landing dot up/down to fix its hash" : ""}
+          {kicks.length} kickoff{kicks.length !== 1 ? "s" : ""} {selectedIdx != null ? "· tap arc to deselect" : "· tap an arc for details"}{onMove ? " · click-drag (or press & hold) the landing dot to fix its hash" : ""}
         </p>
       )}
     </div>
