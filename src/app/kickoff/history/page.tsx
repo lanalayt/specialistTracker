@@ -578,14 +578,41 @@ function KickoffHistoryContent() {
                         </>
                       )}
                       {selected.mode === "game" && (
-                        <td className={clsx("table-cell font-bold", e.result === "TB" ? "text-miss" : "text-muted")}>
-                          {e.result === "TB" ? "TB" : "—"}
-                        </td>
+                        editing ? (
+                          <td className="table-cell text-center p-1">
+                            <input
+                              type="checkbox"
+                              checked={e.result === "TB"}
+                              onChange={(ev) => {
+                                updateEntry(i, "result", ev.target.checked ? "TB" : undefined);
+                                if (ev.target.checked) updateEntry(i, "returnToYL", undefined);
+                              }}
+                              className="w-4 h-4 accent-miss cursor-pointer"
+                            />
+                          </td>
+                        ) : (
+                          <td className={clsx("table-cell font-bold", e.result === "TB" ? "text-miss" : "text-muted")}>
+                            {e.result === "TB" ? "TB" : "—"}
+                          </td>
+                        )
                       )}
                       {selected.mode === "game" && (
-                        <td className="table-cell text-accent font-semibold">
-                          {e.returnToYL != null ? e.returnToYL : "—"}
-                        </td>
+                        editing ? (
+                          <td className="table-cell p-1">
+                            <input
+                              type="text" inputMode="numeric" pattern="[0-9]*"
+                              value={e.returnToYL ?? ""}
+                              disabled={e.result === "TB"}
+                              onChange={(ev) => updateEntry(i, "returnToYL", ev.target.value === "" ? undefined : (parseInt(ev.target.value) || 0))}
+                              placeholder={e.result === "TB" ? "—" : "YL"}
+                              className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200 disabled:opacity-40"
+                            />
+                          </td>
+                        ) : (
+                          <td className="table-cell text-accent font-semibold">
+                            {e.returnToYL != null ? e.returnToYL : "—"}
+                          </td>
+                        )
                       )}
                       {editing && (
                         <td className="table-cell text-center p-1">

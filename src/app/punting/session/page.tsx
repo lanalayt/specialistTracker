@@ -385,16 +385,21 @@ export default function PuntingSessionPage() {
   // Once the coach navigates away after committing, the recap shouldn't
   // linger — clear that mode's draft so the next visit lands on a fresh
   // log instead of resurfacing the old summary. Refs avoid a stale
-  // closure in the unmount cleanup below.
+  // closure in the unmount cleanup below. sessionMode stays null until the
+  // coach actively picks Practice/Game — a resurfaced recap from a stale
+  // draft never goes through that picker, so fall back to initialMode
+  // (which is how that draft got loaded in the first place) or the clear
+  // silently no-ops and the stale recap keeps coming back.
   const committedRef = useRef(committed);
   useEffect(() => { committedRef.current = committed; }, [committed]);
   const sessionModeRef = useRef(sessionMode);
   useEffect(() => { sessionModeRef.current = sessionMode; }, [sessionMode]);
   useEffect(() => {
     return () => {
-      if (committedRef.current && sessionModeRef.current) {
+      const modeToClear = sessionModeRef.current ?? initialMode;
+      if (committedRef.current && modeToClear) {
         const tid = getTeamId();
-        if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(sessionModeRef.current));
+        if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(modeToClear));
       }
     };
   }, []);
@@ -1397,9 +1402,13 @@ export default function PuntingSessionPage() {
     // Reset snap state (kept through the recap so late snaps could be added).
     setSnapLogsMap({});
     setCommittedSnapId(null);
-    if (sessionMode) {
+    // sessionMode is still null if this recap came from a stale draft the
+    // coach never actively re-entered — fall back to initialMode so that
+    // draft actually gets cleared instead of silently no-opping.
+    const modeToClear = sessionMode ?? initialMode;
+    if (modeToClear) {
       const tid = getTeamId();
-      if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(sessionMode));
+      if (tid && tid !== "local-dev") clearDraft(tid, cloudDraftKey(modeToClear));
     }
     setSessionMode(null);
   };
