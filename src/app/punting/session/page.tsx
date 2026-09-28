@@ -13,7 +13,7 @@ import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, PuntType, PuntHash, PuntLandingZone } from "@/types";
 import { PUNT_HASHES } from "@/types";
 import { insertSession as insertSnapSession, updateSession as updateSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
-import { genId as genSnapId } from "@/lib/stats";
+import { genId as genSnapId, puntNetPenalty, puntFinalSpot, puntHasNetData } from "@/lib/stats";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
@@ -65,21 +65,8 @@ function tracksHangTime(type: string | undefined | null, typeConfigs: PuntTypeCo
   return !isPoochType(type); // fallback
 }
 
-// Touchback penalty: ball comes out to the 20, so net loses 20 yards vs gross
-// Also touchbacks do NOT count as inside-20 or inside-10
-function isTB(p: { touchback?: boolean; landingZones?: string[] }): boolean {
-  return !!(p.touchback || p.landingZones?.includes("TB"));
-}
-function puntNetPenalty(p: { touchback?: boolean; landingZones?: string[]; returnYards?: number; returnToYL?: number; landingYL?: number }): number {
-  if (isTB(p)) return 20;
-  if (p.returnToYL != null) return Math.max(0, (p.landingYL ?? 0) - p.returnToYL);
-  return p.returnYards ?? 0;
-}
-function puntFinalSpot(p: { landingYL?: number; touchback?: boolean; landingZones?: string[]; returnYards?: number; returnToYL?: number }): number {
-  if (isTB(p)) return 0; // touchback = not inside 20
-  if (p.returnToYL != null) return p.returnToYL;
-  return (p.landingYL ?? 0) - (p.returnYards ?? 0);
-}
+// isPuntTouchback / puntNetPenalty / puntFinalSpot / puntHasNetData live in
+// @/lib/stats so the net formula can't drift from the Statistics/History pages.
 
 // Parse a yard-line input into an absolute field position 0..100
 // where 0 = own goal line and 100 = opponent goal line.
@@ -843,11 +830,20 @@ export default function PuntingSessionPage() {
       return;
     }
     const isBlocked = !!r.blocked;
-    // Blocked punts never had a snap-to-landing sequence, so LOS/landing YL
-    // aren't required and don't feed a distance.
-    const losVal = isBlocked ? NaN : parseYardLine(r.los, "-");      // LOS defaults to own side
+    // Blocked punts never had a snap-to-landing sequence, so landing YL isn't
+    // required and doesn't feed a distance — but LOS is still worth entering
+    // (optional, unlike a normal punt) since a block's return counts against
+    // Net relative to that spot.
+    const losVal = parseYardLine(r.los, "-");      // LOS defaults to own side
     const landingYLVal = isBlocked ? NaN : parseYardLine(r.landingYL, "+"); // Landing defaults to opponent side
-    if (!isBlocked && (isNaN(losVal) || isNaN(landingYLVal))) {
+    const losTyped = (r.los ?? "").trim() !== "";
+    if (isBlocked) {
+      if (losTyped && isNaN(losVal)) {
+        alert("LOS yard line must be 0–50.\nUse - for own side (default), + for opponent.\nExample: LOS=-20");
+        setErrorRows((prev) => new Set([...prev, rowIdx]));
+        return;
+      }
+    } else if (isNaN(losVal) || isNaN(landingYLVal)) {
       alert("Yard lines must be 0–50.\nLOS: use - for own side (default), + for opponent.\nLanding: no sign or + for opponent side (default), - for own side.\nExamples: LOS=-20, Landing=25 or +25");
       setErrorRows((prev) => new Set([...prev, rowIdx]));
       return;
@@ -894,7 +890,7 @@ export default function PuntingSessionPage() {
       landingZones: zones,
       directionalAccuracy: daVal,
       kickNum,
-      los: isBlocked ? undefined : losVal,
+      los: isNaN(losVal) ? undefined : losVal,
       landingYL: isBlocked ? undefined : landingYLVal,
       returnToYL: returnToYLVal,
       fairCatch: r.fairCatch || undefined,
@@ -1055,17 +1051,20 @@ export default function PuntingSessionPage() {
     let retToYLVal: number | undefined = undefined;
     let poochYLVal: number | undefined = undefined;
     const isPooch = isYardLineType(plan.type, puntTypes);
-    // Blocked punts have no real distance, hang time, or LOS/landing — the
-    // snap never resulted in a normal kick, whatever the type/entry mode.
+    // Ret YL rides along in game mode regardless of blocked — a block's
+    // return (if any) still counts against Net relative to LOS.
+    if (sessionMode === "game") {
+      retToYLVal = returnToYLInput !== "" ? parseInt(returnToYLInput) : undefined;
+      if (retToYLVal != null && isNaN(retToYLVal)) retToYLVal = undefined;
+    }
+    // Blocked punts have no real distance, hang time, or landing spot — the
+    // snap never resulted in a normal kick. LOS still matters (see above).
     if (blocked) {
-      losVal = undefined;
       landingYLVal = undefined;
       ydsVal = 0;
     } else {
       if (sessionMode === "game" && losVal != null && landingYLVal != null) {
         ydsVal = Math.max(0, landingYLVal - losVal);
-        retToYLVal = returnToYLInput !== "" ? parseInt(returnToYLInput) : undefined;
-        if (retToYLVal != null && isNaN(retToYLVal)) retToYLVal = undefined;
       }
       // Practice + yard-line entry: distance falls out of the two yard lines, and
       // the yard lines ride along on the entry so the punt can be charted later.
@@ -1866,14 +1865,13 @@ export default function PuntingSessionPage() {
                         <div>
                           <p className="label">LOS</p>
                           <input
-                            className={clsx("input text-center text-lg font-bold", blocked && "opacity-40")}
+                            className="input text-center text-lg font-bold"
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            placeholder={blocked ? "—" : "yd"}
-                            value={blocked ? "" : los}
+                            placeholder="yd"
+                            value={los}
                             onChange={(e) => setLos(e.target.value)}
-                            disabled={blocked}
                           />
                         </div>
                         <div>
@@ -2063,7 +2061,14 @@ export default function PuntingSessionPage() {
                       <div className="text-xs text-muted text-center">
                         Net: <span className="text-slate-200 font-semibold">
                           {(() => {
-                            const l = parseInt(los) || 0;
+                            const l = parseInt(los);
+                            if (isNaN(l)) return "—";
+                            if (blocked) {
+                              // No gross on a block — net is just where the return
+                              // ended (if logged) relative to LOS.
+                              const retAbs = parseInt(returnToYLInput);
+                              return isNaN(retAbs) ? "—" : `${retAbs - l} yd`;
+                            }
                             const ly = parseInt(landingYL) || 0;
                             const gross = Math.max(0, ly - l);
                             if (gross <= 0) return "—";
@@ -2271,9 +2276,13 @@ export default function PuntingSessionPage() {
                   const sAtt = punts.length;
                   const ydsCount = punts.filter((p) => p.yards > 0).length;
                   const totalGross = punts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
-                  const totalNetPenalty = punts.reduce((s, p) => s + puntNetPenalty(p), 0);
+                  // A blocked punt never counts toward gross/hang/DA, but still counts
+                  // toward Net once the coach has logged LOS and where it was returned.
+                  const netEntries = punts.filter((p) => puntHasNetData(p));
+                  const totalNetPenalty = netEntries.reduce((s, p) => s + puntNetPenalty(p), 0);
+                  const totalGrossForNet = netEntries.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
                   const avgGross = ydsCount > 0 ? (totalGross / ydsCount).toFixed(1) : "—";
-                  const avgNet = ydsCount > 0 ? ((totalGross - totalNetPenalty) / ydsCount).toFixed(1) : "—";
+                  const avgNet = netEntries.length > 0 ? ((totalGrossForNet - totalNetPenalty) / netEntries.length).toFixed(1) : "—";
                   const htCount = punts.filter((p) => p.hangTime > 0).length;
                   const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
                   const inside20 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
@@ -2385,9 +2394,13 @@ export default function PuntingSessionPage() {
             const all = committedPunts;
             const ydsE = all.filter((p) => p.yards > 0);
             const totalGross = ydsE.reduce((s, p) => s + p.yards, 0);
-            const totalNetPenalty = all.reduce((s, p) => s + puntNetPenalty(p), 0);
+            // A blocked punt never counts toward gross/hang/DA, but still counts
+            // toward Net once the coach has logged LOS and where it was returned.
+            const netEntries = all.filter((p) => puntHasNetData(p));
+            const totalNetPenalty = netEntries.reduce((s, p) => s + puntNetPenalty(p), 0);
+            const totalGrossForNet = netEntries.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
             const avgGross = ydsE.length > 0 ? (totalGross / ydsE.length).toFixed(1) : "—";
-            const avgNet = ydsE.length > 0 ? ((totalGross - totalNetPenalty) / ydsE.length).toFixed(1) : "—";
+            const avgNet = netEntries.length > 0 ? ((totalGrossForNet - totalNetPenalty) / netEntries.length).toFixed(1) : "—";
             const htE = all.filter((p) => p.hangTime > 0);
             const avgHangAll = htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) : "—";
             const i20 = all.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
@@ -2423,9 +2436,10 @@ export default function PuntingSessionPage() {
                       const att = ap.length;
                       const yardsEntries = ap.filter((p) => p.yards > 0);
                       const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
-                      const netPenaltyTotal = ap.reduce((s, p) => s + puntNetPenalty(p), 0);
-                      const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
-                      const netAvg = yardsEntries.length > 0 ? ((grossTotal - netPenaltyTotal) / yardsEntries.length).toFixed(1) : "—";
+                      const apNetEntries = ap.filter((p) => puntHasNetData(p));
+                      const netPenaltyTotal = apNetEntries.reduce((s, p) => s + puntNetPenalty(p), 0);
+                      const grossTotal = apNetEntries.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
+                      const netAvg = apNetEntries.length > 0 ? ((grossTotal - netPenaltyTotal) / apNetEntries.length).toFixed(1) : "—";
                       const hangEntries = ap.filter((p) => p.hangTime > 0);
                       const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                       const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
@@ -2770,7 +2784,10 @@ export default function PuntingSessionPage() {
                               <td colSpan={2} className="py-1 px-1 relative">
                                 <div className="flex items-center justify-center relative">
                                   {row.blocked ? (
-                                    <span className="text-xs font-bold text-miss">⊘ Blocked</span>
+                                    <>
+                                      <span className="text-[9px] text-miss/50 absolute left-1">{row.los ?? ""}</span>
+                                      <span className="text-xs font-bold text-miss">⊘ Blocked</span>
+                                    </>
                                   ) : (
                                     <>
                                       <span className="text-[9px] text-make/30 absolute left-1">{row.los ?? ""}</span>
@@ -2788,13 +2805,12 @@ export default function PuntingSessionPage() {
                               <>
                                 <td className="py-1 px-1">
                                   <input
-                                    type="text" inputMode="text" placeholder={row.blocked ? "—" : "-20"}
-                                    value={row.blocked ? "" : (row.los ?? "")}
+                                    type="text" inputMode="text" placeholder="-20"
+                                    value={row.los ?? ""}
                                     onChange={(e) => updateRow(idx, "los", e.target.value)}
                                     readOnly={viewOnly}
-                                    disabled={!!row.blocked}
-                                    title="Use -X for own side, +X for opponent side (e.g. -20 or +25)"
-                                    className={clsx("w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60", row.blocked && "opacity-40")}
+                                    title={row.blocked ? "Yard line the snap started from" : "Use -X for own side, +X for opponent side (e.g. -20 or +25)"}
+                                    className="w-full bg-transparent border border-red-500/40 rounded px-1 py-1 text-xs text-slate-200 text-center focus:outline-none focus:border-red-500/60"
                                   />
                                 </td>
                                 <td className="py-1 px-1">
@@ -2883,7 +2899,8 @@ export default function PuntingSessionPage() {
                                   updateRow(idx, "blocked", checked);
                                   if (checked) {
                                     updateRow(idx, "hangTime", "");
-                                    updateRow(idx, "los", "");
+                                    // LOS and Ret YL stay — a block still needs a starting
+                                    // spot and a return spot so it can count against Net.
                                     updateRow(idx, "landingYL", "");
                                     updateRow(idx, "fairCatch", false);
                                     updateRow(idx, "directionalAccuracy", "");
@@ -3233,9 +3250,13 @@ export default function PuntingSessionPage() {
                 const sAtt = punts.length;
                 const ydsCount = punts.filter((p) => p.yards > 0).length;
                 const totalGross = punts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
-                const totalNetPenalty = punts.reduce((s, p) => s + puntNetPenalty(p), 0);
+                // A blocked punt never counts toward gross/hang/DA, but still counts
+                // toward Net once the coach has logged LOS and where it was returned.
+                const netEntries = punts.filter((p) => puntHasNetData(p));
+                const totalNetPenalty = netEntries.reduce((s, p) => s + puntNetPenalty(p), 0);
+                const totalGrossForNet = netEntries.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
                 const avgGross = ydsCount > 0 ? (totalGross / ydsCount).toFixed(1) : "—";
-                const avgNet = ydsCount > 0 ? ((totalGross - totalNetPenalty) / ydsCount).toFixed(1) : "—";
+                const avgNet = netEntries.length > 0 ? ((totalGrossForNet - totalNetPenalty) / netEntries.length).toFixed(1) : "—";
                 const htCount = punts.filter((p) => p.hangTime > 0).length;
                 const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
                 const inside20 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;

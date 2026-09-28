@@ -377,6 +377,54 @@ export function koNetYards(k: { returnToYL?: number; los?: number; result?: stri
   return null;
 }
 
+// ─── Punt net yards ─────────────────────────────────────────────────────────
+// Shared by the punting session, statistics, and history pages so the net
+// formula can't drift between them.
+
+type PuntNetEntry = {
+  touchback?: boolean;
+  landingZones?: string[];
+  returnYards?: number;
+  returnToYL?: number;
+  landingYL?: number;
+  los?: number;
+  blocked?: boolean;
+  yards?: number;
+};
+
+// Touchback penalty: ball comes out to the 20, so net loses 20 yards vs gross.
+// Touchbacks also do NOT count as inside-20 or inside-10.
+export function isPuntTouchback(p: { touchback?: boolean; landingZones?: string[] }): boolean {
+  return !!(p.touchback || p.landingZones?.includes("TB"));
+}
+
+export function puntNetPenalty(p: PuntNetEntry): number {
+  if (isPuntTouchback(p)) return 20;
+  if (p.returnToYL != null) {
+    // Blocked punts have no landingYL (no real kick, so no gross to net
+    // against) — the penalty here has to turn a 0 gross straight into
+    // (finalSpot - los), not read landingYL - returnToYL like a normal punt.
+    if (p.blocked) return (p.los ?? 0) - p.returnToYL;
+    return Math.max(0, (p.landingYL ?? 0) - p.returnToYL);
+  }
+  return p.returnYards ?? 0;
+}
+
+// Final field spot after the return, for the inside-20/inside-10 count —
+// deliberately 0 for a touchback so it never qualifies as inside the 20.
+export function puntFinalSpot(p: PuntNetEntry): number {
+  if (isPuntTouchback(p)) return 0;
+  if (p.returnToYL != null) return p.returnToYL;
+  return (p.landingYL ?? 0) - (p.returnYards ?? 0);
+}
+
+// A blocked punt has no gross yards, but still counts toward Net once the
+// coach has logged where the snap started and where the return ended.
+export function puntHasNetData(p: PuntNetEntry): boolean {
+  if ((p.yards ?? 0) > 0) return true;
+  return !!p.blocked && p.los != null && (isPuntTouchback(p) || p.returnToYL != null);
+}
+
 // ─── Long Snap benchmark ──────────────────────────────────────────────────────
 
 export function getSnapBenchmark(snapType: SnapType, time: number): SnapBenchmark {

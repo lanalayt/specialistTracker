@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
 import { useAuth } from "@/lib/auth";
+import { puntNetPenalty, puntHasNetData } from "@/lib/stats";
 import { exportPuntSession, exportSessionPDF } from "@/lib/exportStats";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { PuntFieldView } from "@/components/ui/PuntFieldView";
@@ -638,13 +639,12 @@ function PuntHistoryContent() {
                 const att = ap.length;
                 const yardsEntries = ap.filter((p) => !isYardLineType(p.type, puntTypes) && p.yards > 0);
                 const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
-                const grossTotal = yardsEntries.reduce((s, p) => s + p.yards, 0);
-                const netPenalty = yardsEntries.reduce((s, p) => {
-                  if (p.touchback || p.landingZones?.includes("TB")) return s + 20;
-                  if (p.returnToYL != null) return s + Math.max(0, (p.landingYL ?? 0) - p.returnToYL);
-                  return s + (p.returnYards ?? 0);
-                }, 0);
-                const avgNet = yardsEntries.length > 0 ? ((grossTotal - netPenalty) / yardsEntries.length).toFixed(1) : "—";
+                // A blocked punt never counts toward Avg Dist above, but still
+                // counts toward Net once the coach has logged LOS and the return.
+                const netEntries = ap.filter((p) => puntHasNetData(p));
+                const grossTotal = netEntries.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
+                const netPenalty = netEntries.reduce((s, p) => s + puntNetPenalty(p), 0);
+                const avgNet = netEntries.length > 0 ? ((grossTotal - netPenalty) / netEntries.length).toFixed(1) : "—";
                 const ylEntries = ap.filter((p) => isYardLineType(p.type, puntTypes) && p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
                 const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylEntries.length).toFixed(1) : null;
                 const hangEntries = ap.filter((p) => p.hangTime > 0 && tracksHangTime(p.type, puntTypes));

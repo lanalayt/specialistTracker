@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
-import { processPunt, emptyPuntStats } from "@/lib/stats";
+import { processPunt, emptyPuntStats, puntNetPenalty, puntHasNetData, isPuntTouchback } from "@/lib/stats";
 import { PUNT_HASHES } from "@/types";
 import type { PuntHash, PuntStatBucket, PuntAthleteStats, PuntEntry } from "@/types";
 import clsx from "clsx";
@@ -519,12 +519,27 @@ function PuntStatsView({
     return all;
   }, [history, puntFilter]);
 
+  // A blocked punt never counts toward gross/hang/inside-20/total — those
+  // stay scoped to gamePunts above — but it still counts toward Net once the
+  // coach has logged LOS and where it was returned, so that's tracked
+  // separately over the full game history rather than gamePunts.
+  const netPunts = useMemo(() => {
+    const all: PuntEntry[] = [];
+    history.forEach((session) => {
+      if (session.mode !== "game") return;
+      (session.entries ?? []).forEach((p) => {
+        if (puntFilter && !puntFilter(p)) return;
+        if (puntHasNetData(p)) all.push(p);
+      });
+    });
+    return all;
+  }, [history, puntFilter]);
+
   // Stat highlights derived from all game punts
   const gameHighlights = useMemo(() => {
     const n = gamePunts.length;
     if (n === 0) return null;
     let grossTotal = 0;
-    let returnTotal = 0;
     let hangTotal = 0;
     let hangCount = 0;
     let touchbacks = 0;
@@ -539,31 +554,27 @@ function PuntStatsView({
       }
       if (p.fairCatch) fairCatches += 1;
       const yl = p.landingYL ?? 0;
-      const isTouchback = p.touchback || yl >= 100;
-      if (isTouchback) {
+      if (isPuntTouchback(p)) {
         touchbacks += 1;
       } else {
         if (yl >= 80 && yl < 100) inside20 += 1;
         if (yl >= 90 && yl < 100) inside10 += 1;
-        // Return penalty: derived from where the return ended (returnToYL,
-        // an absolute field position) when present, else the legacy raw-
-        // yards field for older entries. Touchbacks use the fixed 20 below.
-        returnTotal += p.returnToYL != null ? Math.max(0, yl - p.returnToYL) : (p.returnYards ?? 0);
       }
     });
-    // NCAA net punt average: (gross − return yards − 20 per touchback) / punts
-    const net = (grossTotal - returnTotal - 20 * touchbacks) / n;
+    const netTotalPenalty = netPunts.reduce((s, p) => s + puntNetPenalty(p), 0);
+    const netTotalGross = netPunts.reduce((s, p) => s + (p.yards > 0 ? p.yards : 0), 0);
+    const netAverage = netPunts.length > 0 ? ((netTotalGross - netTotalPenalty) / netPunts.length).toFixed(1) : "—";
     return {
       total: n,
       avgDistance: (grossTotal / n).toFixed(1),
-      netAverage: net.toFixed(1),
+      netAverage,
       avgHang: hangCount > 0 ? (hangTotal / hangCount).toFixed(2) : "—",
       inside20,
       inside10,
       touchbacks,
       fairCatches,
     };
-  }, [gamePunts]);
+  }, [gamePunts, netPunts]);
 
   // Group allTypeIds by category
   const typesByCategory = useMemo(() => {
