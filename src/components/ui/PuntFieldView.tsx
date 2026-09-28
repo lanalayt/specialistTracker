@@ -217,21 +217,26 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
       const fsTop = 10;
       // Directional arrow: triangle pointing toward nearest end zone
       const arrowDir = fx <= 50 ? -1 : 1; // -1 = left, 1 = right
-      const arrowOffsetX = arrowDir * 12;
+      const arrowOffsetX = arrowDir * 16;
+      const arrowGapPx = 4; // clearance so the arrow never touches the number
       [{ p: botPos, size: fs, k: "b" }, { p: topPos, size: fsTop, k: "t" }].forEach(({ p, size, k }) => {
         yardLines.push(
           <text key={`yn-${fx}-${k}`} x={p.x} y={p.y + size * 0.35} textAnchor="middle" fontSize={size}
             fontWeight="900" fill="rgba(255,255,255,0.2)" fontFamily="'Arial Black', sans-serif"
             letterSpacing="2" stroke="rgba(255,255,255,0.06)" strokeWidth={0.5}>{display}</text>
         );
-        // Arrow
+        // Arrow — mirrored by arrowDir so it actually points left on the
+        // left half of the field (it used to collapse to a sliver there),
+        // offset clear of the digits so it never overlaps the number.
         if (display !== 50) {
-          const ax = p.x + arrowOffsetX * (size / 14);
+          const ax = p.x + arrowOffsetX * (size / 14) + arrowDir * arrowGapPx;
           const ay = p.y + size * 0.15;
           const as = size * 0.25;
+          const tipX = ax + as * arrowDir;
+          const baseX = ax - as * arrowDir;
           yardLines.push(
             <polygon key={`ya-${fx}-${k}`}
-              points={`${ax - as},${ay - as} ${ax + as * arrowDir},${ay} ${ax - as},${ay + as}`}
+              points={`${baseX},${ay - as} ${tipX},${ay} ${baseX},${ay + as}`}
               fill="rgba(255,255,255,0.15)" />
           );
         }
@@ -285,8 +290,8 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
         {/* Hash marks */}
         {Array.from({ length: 100 }, (_, yd) => yd + 1).map((yd) => {
           return [18.5, 34.5].map((lat) => {
-            const a = proj(yd, lat - 0.3); const b = proj(yd, lat + 0.3);
-            return <line key={`h-${yd}-${lat}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(255,255,255,0.12)" strokeWidth={0.8} />;
+            const a = proj(yd, lat - 0.45); const b = proj(yd, lat + 0.45);
+            return <line key={`h-${yd}-${lat}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(255,255,255,0.4)" strokeWidth={1.4} />;
           });
         })}
         {/* Goalposts at very back of each end zone */}
