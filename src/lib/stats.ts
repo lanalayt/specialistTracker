@@ -216,11 +216,15 @@ export function processPunt(
   const htEnabled = typeConfig ? typeConfig.hangTime : true;
   // Determine which metrics have data (0 = not entered for numeric fields).
   // Yard-line (pooch) types are measured by landing yard line, never distance,
-  // so they must not feed the distance/gross average — even if an entry still
-  // carries a stray yards value (e.g. a punt switched from a distance type to
-  // a yard-line type). Their landing yard line is tracked separately below.
+  // so a practice entry's yards must not feed the distance/gross average —
+  // even if it still carries a stray yards value (e.g. a punt switched from
+  // a distance type to a yard-line type). Their landing yard line is tracked
+  // separately below. Game mode is different: los/landingYL are always
+  // logged for every punt regardless of type, so a yard-line type's yards
+  // there is a real, game-computed distance, not a stray leftover — count it.
   // Blocked punts likewise never have real distance/hang time.
-  const hasYards = yards > 0 && !isYardLine && !punt.blocked;
+  const hasRealGameYards = punt.los != null && punt.landingYL != null;
+  const hasYards = yards > 0 && (!isYardLine || hasRealGameYards) && !punt.blocked;
   const hasHang = hangTime > 0 && htEnabled && !punt.blocked;
   const hasOT = opTime > 0;
   const daRaw = punt.directionalAccuracy;

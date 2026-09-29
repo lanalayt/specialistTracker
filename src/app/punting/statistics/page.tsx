@@ -288,8 +288,8 @@ function CategorySection({
                 <tr>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-left py-1.5 px-1.5">Athlete</th>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Att</th>
-                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>
                   {hasDistData && <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Dist</th>}
+                  <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">Avg YL</th>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">HT</th>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">OT</th>
                   <th className="text-[10px] font-semibold text-muted uppercase tracking-wider text-right py-1.5 px-1.5">DA</th>
@@ -315,8 +315,8 @@ function CategorySection({
                     <tr key={a.id} className="hover:bg-surface/30 transition-colors">
                       <td className="text-xs font-medium text-slate-100 text-left py-1.5 px-1.5 border-t border-border/50 truncate max-w-[80px]">{a.name}</td>
                       <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{o.att || "—"}</td>
-                      <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{ylVal}</td>
                       {hasDistData && <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{distVal}</td>}
+                      <td className="text-xs text-accent font-semibold text-right py-1.5 px-1.5 border-t border-border/50">{ylVal}</td>
                       <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{htVal}</td>
                       <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{otVal}</td>
                       <td className="text-xs text-slate-200 text-right py-1.5 px-1.5 border-t border-border/50">{daVal}</td>
