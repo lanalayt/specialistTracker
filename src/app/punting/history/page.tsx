@@ -791,23 +791,31 @@ function PuntHistoryContent() {
                           ) : (
                             <td className="table-cell text-muted">{p.type ? (typeLabels[p.type] ?? p.type) : "—"}</td>
                           )}
-                          {editing ? (
-                            <td className="table-cell p-1">
-                              {p.blocked ? (
-                                <span className="text-xs text-muted">—</span>
-                              ) : isYardLineType(p.type, puntTypes) ? (
-                                <input type="text" inputMode="numeric" placeholder="YL" value={p.poochLandingYardLine || ""} onChange={(e) => updateEntry(i, "poochLandingYardLine", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-make" />
-                              ) : (
-                                <input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
-                              )}
-                            </td>
-                          ) : (
-                            <td className={clsx("table-cell", isYardLineType(p.type, puntTypes) && "!text-make font-semibold")}>
-                              {isYardLineType(p.type, puntTypes)
-                                ? (p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? `${p.poochLandingYardLine} YL` : "—")
-                                : p.yards > 0 ? `${p.yards} yd` : "—"}
-                            </td>
-                          )}
+                          {(() => {
+                            // Game mode always shows gross yards here, even for a
+                            // type the coach has configured to measure by yard
+                            // line (e.g. Pooch) — the yard-line reading still
+                            // feeds Avg YL elsewhere, this column just isn't it
+                            // for a game log. Practice keeps the YL display.
+                            const showYL = selected.mode !== "game" && isYardLineType(p.type, puntTypes);
+                            return editing ? (
+                              <td className="table-cell p-1">
+                                {p.blocked ? (
+                                  <span className="text-xs text-muted">—</span>
+                                ) : showYL ? (
+                                  <input type="text" inputMode="numeric" placeholder="YL" value={p.poochLandingYardLine || ""} onChange={(e) => updateEntry(i, "poochLandingYardLine", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-make" />
+                                ) : (
+                                  <input type="text" inputMode="numeric" value={p.yards || ""} onChange={(e) => updateEntry(i, "yards", parseInt(e.target.value) || 0)} className="w-14 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" />
+                                )}
+                              </td>
+                            ) : (
+                              <td className={clsx("table-cell", showYL && "!text-make font-semibold")}>
+                                {showYL
+                                  ? (p.poochLandingYardLine != null && p.poochLandingYardLine > 0 ? `${p.poochLandingYardLine} YL` : "—")
+                                  : p.yards > 0 ? `${p.yards} yd` : "—"}
+                              </td>
+                            );
+                          })()}
                           <td className="table-cell text-muted">{puntHasNetData(p) ? `${puntNetYards(p)} yd` : "—"}</td>
                           {editing ? (
                             <td className="table-cell p-1">
