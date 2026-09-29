@@ -2183,12 +2183,6 @@ export default function KickingSessionPage() {
                 >
                   ⬆ Import
                 </button>
-                <button
-                  onClick={addRow}
-                  className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
-                >
-                  + Row
-                </button>
               </div>
             )}
           </div>
@@ -2561,6 +2555,18 @@ export default function KickingSessionPage() {
                     </tr>
                   );
                 })}
+                {!viewOnly && (
+                  <tr>
+                    <td colSpan={99} className="py-1.5 px-1 text-center">
+                      <button
+                        onClick={addRow}
+                        className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all"
+                      >
+                        + Row
+                      </button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

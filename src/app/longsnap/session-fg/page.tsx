@@ -229,9 +229,6 @@ export default function LongSnapFGSessionPage() {
             FG / PAT Snap Log
             {filledRows.length > 0 && <span className="text-accent">({filledRows.length})</span>}
           </h2>
-          {!viewOnly && (
-            <button onClick={addRow} className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">+ Row</button>
-          )}
         </div>
 
         {/* Table */}
@@ -302,6 +299,13 @@ export default function LongSnapFGSessionPage() {
                   </td>
                 </tr>
               ))}
+              {!viewOnly && (
+                <tr>
+                  <td colSpan={99} className="py-1.5 px-1 text-center">
+                    <button onClick={addRow} className="text-xs px-2.5 py-1 rounded-input border border-border text-muted hover:text-white hover:bg-surface-2 font-semibold transition-all">+ Row</button>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
