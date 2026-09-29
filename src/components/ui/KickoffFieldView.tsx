@@ -9,8 +9,9 @@ interface Props {
   kicks: KickoffEntry[];
   currentKick?: { los?: number; landingYL?: number; distance?: number; hangTime?: number } | null;
   // When provided, the landing dot on each kick becomes draggable — up/down
-  // only, snapping to the nearest hash — and this fires with the patch to
-  // apply once the coach lets go. Omit to keep the view read-only (tap only).
+  // only, freely anywhere across the field width (sideline to sideline) —
+  // and this fires with the patch to apply once the coach lets go. Omit to
+  // keep the view read-only (tap only).
   onMove?: (kick: KickoffEntry, patch: Partial<KickoffEntry>) => void;
 }
 
@@ -50,16 +51,6 @@ function screenYToFieldY(y: number): number {
 const KO_HASH_Y: Record<KickoffHash, number> = { LH: 18, LM: 22, M: 26.5, RM: 31, RH: 35 };
 function koHashToFieldY(hash: string | undefined): number {
   return KO_HASH_Y[hash as KickoffHash] ?? 26.5;
-}
-// Snap a raw lateral field position to whichever hash it's closest to.
-function nearestHash(fieldY: number): KickoffHash {
-  let best: KickoffHash = "M";
-  let bestDist = Infinity;
-  (Object.keys(KO_HASH_Y) as KickoffHash[]).forEach((h) => {
-    const d = Math.abs(KO_HASH_Y[h] - fieldY);
-    if (d < bestDist) { bestDist = d; best = h; }
-  });
-  return best;
 }
 
 // Keep an absurd distance inside the drawn area; real kickoffs stay well short of this.
@@ -147,7 +138,8 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
     dragStartClientY.current = clientY;
     setDragIdx(idx);
     // Only the landing spot moves — the tee/kick hash is never touched.
-    setDragFieldY(koHashToFieldY(kicks[idx]?.landingHash ?? kicks[idx]?.hash));
+    const k = kicks[idx];
+    setDragFieldY(k?.landingLat ?? koHashToFieldY(k?.hash));
   }, [kicks]);
 
   const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
@@ -199,10 +191,12 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
     const moved = Math.abs(e.clientY - dragStartClientY.current) >= DRAG_THRESHOLD;
     setDragIdx(null);
     if (!moved) { handleArcTap(idx); return; }
-    const hash = nearestHash(toFieldY(e.clientY));
-    // Writes landingHash (the landing spot only) — never the kick's own
-    // `hash`, which is the tee/kick position and must stay put.
-    if (k && onMove && hash !== (k.landingHash ?? k.hash)) onMove(k, { landingHash: hash });
+    // Free placement anywhere across the field width (sideline to sideline —
+    // toFieldY already clamps to 0..53) — not snapped to a hash. Writes
+    // landingLat (the landing spot only), never the kick's own `hash`, which
+    // is the tee/kick position and must stay put.
+    const lat = toFieldY(e.clientY);
+    if (k && onMove && lat !== (k.landingLat ?? koHashToFieldY(k.hash))) onMove(k, { landingLat: lat });
   }, [dragIdx, kicks, onMove, toFieldY, handleArcTap]);
 
   const stripes: React.ReactNode[] = [];
@@ -341,10 +335,10 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
           const isSelected = selectedIdx === i;
           const isDragging = dragIdx === i;
           // The tee end always sits at the kick's own hash — only the
-          // landing end can be dragged, and only its own lateral position
-          // (landingHash) changes.
+          // landing end can be dragged, freely across the field width
+          // (landingLat), never snapped to a hash.
           const fyStart = koHashToFieldY(k.hash);
-          const fyEnd = isDragging ? dragFieldY : koHashToFieldY(k.landingHash ?? k.hash);
+          const fyEnd = isDragging ? dragFieldY : (k.landingLat ?? koHashToFieldY(k.hash));
           const arc = renderArc(i, los, landing, fyStart, fyEnd, k.hangTime, returnRunYds(k), isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#fbbf24" : "#f59e0b", isSelected || isDragging ? 3.5 : 2.5);
           if (!arc) return null;
           const s = proj(los, fyStart); const e = proj(landing, fyEnd); const m = proj((los + landing) / 2, (fyStart + fyEnd) / 2);
@@ -376,7 +370,7 @@ export function KickoffFieldView({ kicks, currentKick, onMove }: Props) {
           const k = kicks[selectedIdx];
           const los = k.los ?? 35; const landing = clampToField(landingSpot(k));
           if (landing <= los) return null;
-          const sP = proj(los, koHashToFieldY(k.hash)); const eP = proj(landing, koHashToFieldY(k.landingHash ?? k.hash));
+          const sP = proj(los, koHashToFieldY(k.hash)); const eP = proj(landing, k.landingLat ?? koHashToFieldY(k.hash));
           const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
           const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
           const dist = k.distance || (landingSpot(k) - los);

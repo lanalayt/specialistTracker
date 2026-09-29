@@ -8,8 +8,9 @@ interface Props {
   punts: PuntEntry[];
   currentPunt?: { los: number; landingYL: number; hangTime?: number; hash?: string } | null;
   // When provided, the landing dot on each punt becomes draggable — up/down
-  // only, snapping to the nearest hash — and this fires with the patch to
-  // apply once the coach lets go. Omit to keep the view read-only (tap only).
+  // only, freely anywhere across the field width (sideline to sideline) —
+  // and this fires with the patch to apply once the coach lets go. Omit to
+  // keep the view read-only (tap only).
   onMove?: (punt: PuntEntry, patch: Partial<PuntEntry>) => void;
 }
 
@@ -42,16 +43,6 @@ function screenYToFieldY(y: number): number {
 const HASH_Y: Record<PuntHash, number> = { LH: 18, LM: 22, M: 26.5, RM: 31, RH: 35 };
 function hashToFieldY(hash: string | undefined): number {
   return HASH_Y[hash as PuntHash] ?? 26.5;
-}
-// Snap a raw lateral field position to whichever hash it's closest to.
-function nearestHash(fieldY: number): PuntHash {
-  let best: PuntHash = "M";
-  let bestDist = Infinity;
-  (Object.keys(HASH_Y) as PuntHash[]).forEach((h) => {
-    const d = Math.abs(HASH_Y[h] - fieldY);
-    if (d < bestDist) { bestDist = d; best = h; }
-  });
-  return best;
 }
 
 function hangLift(ht: number | undefined): number { const h = Math.max(0.5, Math.min(ht ?? 3, 6)); return 20 + (h / 6) * 100; }
@@ -126,7 +117,8 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
     dragStartClientY.current = clientY;
     setDragIdx(idx);
     // Only the landing spot moves — the LOS/snap hash is never touched.
-    setDragFieldY(hashToFieldY(punts[idx]?.landingHash ?? punts[idx]?.hash));
+    const p = punts[idx];
+    setDragFieldY(p?.landingLat ?? hashToFieldY(p?.hash));
   }, [punts]);
 
   const handleDragStart = useCallback((idx: number, e: React.PointerEvent) => {
@@ -178,10 +170,12 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
     const moved = Math.abs(e.clientY - dragStartClientY.current) >= DRAG_THRESHOLD;
     setDragIdx(null);
     if (!moved) { handleArcTap(idx); return; }
-    const hash = nearestHash(toFieldY(e.clientY));
-    // Writes landingHash (the landing spot only) — never the punt's own
-    // `hash`, which is the snap/LOS position and must stay put.
-    if (p && onMove && hash !== (p.landingHash ?? p.hash)) onMove(p, { landingHash: hash });
+    // Free placement anywhere across the field width (sideline to sideline —
+    // toFieldY already clamps to 0..53) — not snapped to a hash. Writes
+    // landingLat (the landing spot only), never the punt's own `hash`, which
+    // is the snap/LOS position and must stay put.
+    const lat = toFieldY(e.clientY);
+    if (p && onMove && lat !== (p.landingLat ?? hashToFieldY(p.hash))) onMove(p, { landingLat: lat });
   }, [dragIdx, punts, onMove, toFieldY, handleArcTap]);
 
   // Turf stripes (playing field only: 0-100)
@@ -315,10 +309,10 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
           const isSelected = selectedIdx === i;
           const isDragging = dragIdx === i;
           // The LOS end always sits at the punt's own hash — only the
-          // landing end can be dragged, and only its own lateral position
-          // (landingHash) changes.
+          // landing end can be dragged, freely across the field width
+          // (landingLat), never snapped to a hash.
           const fyStart = hashToFieldY(p.hash);
-          const fyEnd = isDragging ? dragFieldY : hashToFieldY(p.landingHash ?? p.hash);
+          const fyEnd = isDragging ? dragFieldY : (p.landingLat ?? hashToFieldY(p.hash));
           const arc = renderArc(i, p.los, p.landingYL, fyStart, fyEnd, p.hangTime, returnRunYds(p), !!p.fairCatch, isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#22d3ee" : "#06b6d4", isSelected || isDragging ? 3.5 : 2.5);
           if (!arc) return null;
           // Invisible wider hit area for tap
@@ -346,7 +340,7 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
         {selectedIdx != null && dragIdx == null && punts[selectedIdx] && (() => {
           const p = punts[selectedIdx];
           if (p.los == null || p.landingYL == null) return null;
-          const sP = proj(p.los, hashToFieldY(p.hash)); const eP = proj(p.landingYL, hashToFieldY(p.landingHash ?? p.hash));
+          const sP = proj(p.los, hashToFieldY(p.hash)); const eP = proj(p.landingYL, p.landingLat ?? hashToFieldY(p.hash));
           const tx = Math.max(80, Math.min(W - 80, (sP.x + eP.x) / 2));
           const ty = Math.max(55, Math.min(H - 60, (sP.y + eP.y) / 2));
           return (
