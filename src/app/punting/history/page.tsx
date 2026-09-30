@@ -667,11 +667,12 @@ function PuntHistoryContent() {
               };
               // mode: "blend" shows gross/net and Avg YL together (games);
               // "distance"/"yardline" show only the relevant metric (per type).
+              // Net is game-only — practice has no returns, so it just mirrors gross.
               const StatGrid = ({ s, mode }: { s: ReturnType<typeof statSet>; mode: "blend" | "distance" | "yardline" }) => (
                 <div className="grid grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
                   <div><span className="text-muted">Att</span> <span className="text-slate-200 font-medium ml-1">{s.att}</span></div>
                   {mode !== "yardline" && <div><span className="text-muted">Gross</span> <span className="text-slate-200 font-medium ml-1">{s.avgDist}</span></div>}
-                  {mode !== "yardline" && <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{s.avgNet}</span></div>}
+                  {mode === "blend" && <div><span className="text-muted">Net</span> <span className="text-slate-200 font-medium ml-1">{s.avgNet}</span></div>}
                   {(mode === "yardline" || (mode === "blend" && s.avgYL)) && <div><span className="text-muted">Avg YL</span> <span className="text-accent font-medium ml-1">{s.avgYL ?? "—"}</span></div>}
                   <div><span className="text-muted">Hang</span> <span className="text-slate-200 font-medium ml-1">{s.avgHang}{s.avgHang !== "—" ? "s" : ""}</span></div>
                   <div><span className="text-muted">OT</span> <span className="text-slate-200 font-medium ml-1">{s.avgOT}{s.avgOT !== "—" ? "s" : ""}</span></div>
@@ -751,7 +752,7 @@ function PuntHistoryContent() {
                         <th className="table-header text-left">Athlete</th>
                         <th className="table-header">Type</th>
                         <th className="table-header">Yds</th>
-                        <th className="table-header">Net</th>
+                        {selected.mode === "game" && <th className="table-header">Net</th>}
                         <th className="table-header">Hang</th>
                         <th className="table-header">Ret</th>
                         <th className="table-header">OT</th>
@@ -816,7 +817,7 @@ function PuntHistoryContent() {
                               </td>
                             );
                           })()}
-                          <td className="table-cell text-muted">{puntHasNetData(p) ? `${puntNetYards(p)} yd` : "—"}</td>
+                          {selected.mode === "game" && <td className="table-cell text-muted">{puntHasNetData(p) ? `${puntNetYards(p)} yd` : "—"}</td>}
                           {editing ? (
                             <td className="table-cell p-1">
                               {p.blocked ? (
