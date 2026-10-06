@@ -288,7 +288,7 @@ function KickingHistoryContent() {
                   )}
                   <p className="text-xs text-muted mt-0.5">
                     {sk.length} kick{sk.length !== 1 ? "s" : ""} ·{" "}
-                    <span className={modeFilter === "game" ? "text-red-400" : "text-accent"}>{makePct(sk.length, sm)}</span>
+                    <span className={modeFilter === "game" ? (sk.length > 0 && sm === sk.length ? "text-make" : "text-red-400") : "text-accent"}>{makePct(sk.length, sm)}</span>
                   </p>
                 </button>
               );
