@@ -83,6 +83,13 @@ export interface FGKick {
   starred?: boolean;
   kickNum?: number;
   holder?: string;
+  // Free-placed end point on the game FG chart, set by dragging the end dot.
+  // endLat is the lateral spot at the goal post (same 0..53 scale as the
+  // field, can sit outside it for a wide miss); endHeight is how far above
+  // the crossbar it crossed, in chart units. Unset → default spot for the
+  // result (Made L/C/R, Miss L/R).
+  endLat?: number;
+  endHeight?: number;
 }
 
 // ─── Punt entry ─────────────────────────────────────────────────────────────
