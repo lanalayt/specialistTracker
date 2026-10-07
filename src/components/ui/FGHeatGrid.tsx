@@ -44,22 +44,22 @@ export function FGHeatGrid({ grid }: FGHeatGridProps) {
             <table className="w-full text-xs">
               <thead>
                 <tr>
-                  <th className="text-left text-muted pb-2 pr-2 font-medium w-10">Pos</th>
-                  {DIST_RANGES.map((dr) => (
-                    <th key={dr} className="text-center text-muted pb-2 font-medium px-1">
-                      {dr}
+                  <th className="text-left text-muted pb-2 pr-2 font-medium w-12">Dist</th>
+                  {POSITIONS.map((pos) => (
+                    <th key={pos} className="text-center text-muted pb-2 font-medium px-1">
+                      {pos}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {POSITIONS.map((pos) => (
-                  <tr key={pos}>
-                    <td className="text-muted pr-2 py-0.5 font-semibold">{pos}</td>
-                    {DIST_RANGES.map((dr) => {
+                {DIST_RANGES.map((dr) => (
+                  <tr key={dr}>
+                    <td className="text-muted pr-2 py-0.5 font-semibold whitespace-nowrap">{dr}</td>
+                    {POSITIONS.map((pos) => {
                       const cell = grid[pos]?.[dr] ?? { att: 0, made: 0 };
                       return (
-                        <td key={dr} className="py-0.5 px-0.5">
+                        <td key={pos} className="py-0.5 px-0.5">
                           <div
                             className={clsx(
                               "rounded text-center py-1.5 min-w-[42px] text-xs",
