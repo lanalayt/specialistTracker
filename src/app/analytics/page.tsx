@@ -9,7 +9,7 @@ import { PuntProvider, usePunt } from "@/lib/puntContext";
 import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider, useLongSnap } from "@/lib/longSnapContext";
 import { getCachedSettings } from "@/lib/settingsSync";
-import { makePct } from "@/lib/stats";
+import { makePct, getDistRange } from "@/lib/stats";
 import type { FGKick, PuntEntry, LongSnapEntry } from "@/types";
 import { DIST_RANGES } from "@/types";
 import { KickerIcon, PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
@@ -157,8 +157,7 @@ function KickingAnalytics({ selectedAthlete, modeFilter }: { selectedAthlete: st
   // Build distance bar chart from filtered history
   const allFilteredKicks = filteredHistory.flatMap((s) => (s.entries ?? []) as FGKick[]);
   const distData = DIST_RANGES.map((dr) => {
-    const [lo, hi] = dr.split("-").map(Number);
-    const inRange = allFilteredKicks.filter((k) => !k.isPAT && k.dist >= lo && k.dist <= (hi || 999));
+    const inRange = allFilteredKicks.filter((k) => !k.isPAT && getDistRange(k.dist) === dr);
     return { range: dr, Made: inRange.filter((k) => k.result.startsWith("Y")).length, Missed: inRange.filter((k) => !k.result.startsWith("Y")).length };
   });
 
