@@ -11,6 +11,8 @@ import clsx from "clsx";
 import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
+import { formatOpponent } from "@/lib/opponent";
+import OpponentInput from "@/components/ui/OpponentInput";
 
 const INIT_ROWS = 12;
 
@@ -183,7 +185,7 @@ export default function LongSnapGameSessionPage() {
 
     if (allSnaps.length === 0) return;
 
-    const label = opponent ? `vs ${opponent}` : new Date().toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
+    const label = opponent ? formatOpponent(opponent) : new Date().toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" });
     commitPractice(allSnaps, label, weather, "game", opponent, gameTime);
     setCommitted(true);
   };
@@ -202,7 +204,7 @@ export default function LongSnapGameSessionPage() {
       <main className="flex-1 overflow-y-auto p-4 lg:p-6 max-w-4xl">
         <div className="space-y-4 text-center">
           <p className="text-xs font-semibold text-make uppercase tracking-wider">Game Committed</p>
-          {opponent && <p className="text-lg font-black text-red-400">vs {opponent}</p>}
+          {opponent && <p className="text-lg font-black text-red-400">{formatOpponent(opponent)}</p>}
           <p className="text-sm text-muted">{filledPunt.length} punt snaps · {filledFG.length} FG snaps</p>
           <button onClick={handleNewSession} className="btn-primary py-3 px-8 text-sm">← Back to Log</button>
         </div>
@@ -215,8 +217,8 @@ export default function LongSnapGameSessionPage() {
       {/* Game header */}
       <div className="bg-red-500/10 border border-red-500/30 rounded-card p-4 space-y-3">
         <p className="text-[10px] font-black text-red-400 uppercase tracking-widest text-center">Game Mode</p>
-        <div className="grid grid-cols-3 gap-2">
-          <input type="text" placeholder="Opponent" value={opponent} onChange={(e) => setOpponent(e.target.value)} className="input text-sm py-1.5 text-center" />
+        <div className="grid grid-cols-2 gap-2">
+          <OpponentInput value={opponent} onChange={setOpponent} className="col-span-2" inputClassName="input text-sm py-1.5" />
           <input type="text" placeholder="Game Time" value={gameTime} onChange={(e) => setGameTime(e.target.value)} className="input text-sm py-1.5 text-center" />
           <input type="text" placeholder="Weather" value={weather} onChange={(e) => setWeather(e.target.value)} className="input text-sm py-1.5 text-center" />
         </div>

@@ -23,6 +23,8 @@ import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftStore";
 import { loadAthletes as loadAthleteList, type StoredAthlete } from "@/lib/athleteStore";
+import { formatOpponent } from "@/lib/opponent";
+import OpponentInput from "@/components/ui/OpponentInput";
 
 const INIT_ROWS = 12;
 
@@ -574,7 +576,7 @@ export default function PuntingSessionPage() {
     if (!mainDraftHydrated.current || !sessionMode) return;
     // Merge current input fields into partialInputs for the active punt
     const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, startYL, landYL } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, poochYL, startYL, landYL } }
       : partialInputs;
     saveDraftForMode({
       rows,
@@ -593,14 +595,14 @@ export default function PuntingSessionPage() {
       gameTime,
       practiceDistMode,
     }, sessionMode);
-  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, blocked, committed, committedPunts, weather, sessionMode, opponent, gameTime, practiceDistMode, startYL, landYL]);
+  }, [rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices, currentPuntIdx, sessionPunts, partialInputs, yards, hangTime, opTime, directionalAccuracy, starred, blocked, committed, committedPunts, weather, sessionMode, opponent, gameTime, practiceDistMode, poochYL, startYL, landYL]);
 
   // ── Switch between practice / game mode with independent drafts ──
   const switchMode = (newMode: "practice" | "game") => {
     if (newMode === sessionMode) return;
     // Save current state to current mode's draft
     const mergedPartials = sessionActive
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, startYL, landYL } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, poochYL, startYL, landYL } }
       : partialInputs;
     const currentDraft: SessionDraft = {
       rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices,
@@ -1167,6 +1169,7 @@ export default function PuntingSessionPage() {
       setDirectionalAccuracy(nextPartial.directionalAccuracy);
       setStarred(nextPartial.starred);
       setBlocked(nextPartial.blocked ?? false);
+      setPoochYL(nextPartial.poochYL ?? "");
     } else {
       setYards("");
       setHangTime("");
@@ -1481,7 +1484,7 @@ export default function PuntingSessionPage() {
   // ── Save Draft to cloud ──────────────────────────────────────
   const handleSaveDraft = () => {
     const mergedPartials = sessionActive && !isPlannedLogged(currentPuntIdx)
-      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, startYL, landYL } }
+      ? { ...partialInputs, [currentPuntIdx]: { yards, hangTime, opTime, directionalAccuracy, starred, blocked, poochYL, startYL, landYL } }
       : partialInputs;
     const draft: SessionDraft = {
       rows, manualEntry, sessionActive, plannedPunts, plannedRowIndices,
@@ -1558,7 +1561,7 @@ export default function PuntingSessionPage() {
                   </span>
                   <span className="text-sm font-black uppercase tracking-widest">GAME — PUNT</span>
                 </div>
-                {opponent && <span className="text-sm font-bold">vs {opponent}</span>}
+                {opponent && <span className="text-sm font-bold">{formatOpponent(opponent)}</span>}
                 <span className="text-xs opacity-80">
                   {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   {gameTime && ` · ${gameTime}`}
@@ -1577,7 +1580,7 @@ export default function PuntingSessionPage() {
                             {sessionMode === "game" ? "Game Committed" : "Session Committed"}
                           </p>
                           {sessionMode === "game" && opponent && (
-                            <p className="text-lg font-black text-red-400 mt-1">vs {opponent}</p>
+                            <p className="text-lg font-black text-red-400 mt-1">{formatOpponent(opponent)}</p>
                           )}
                           <p className="text-lg font-bold text-slate-100 mt-1">
                             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
@@ -2385,7 +2388,7 @@ export default function PuntingSessionPage() {
                 {sessionMode === "game" ? "Game Committed" : "Practice Committed"}
               </p>
               {sessionMode === "game" && opponent && (
-                <p className="text-lg font-black text-red-400 mt-1">vs {opponent}</p>
+                <p className="text-lg font-black text-red-400 mt-1">{formatOpponent(opponent)}</p>
               )}
               <p className="text-lg font-bold text-slate-100 mt-1">
                 {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
@@ -2586,12 +2589,10 @@ export default function PuntingSessionPage() {
               </div>
               {sessionMode === "game" && (
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
+                  <OpponentInput
                     value={opponent}
-                    onChange={(e) => setOpponent(e.target.value)}
-                    placeholder="vs Opponent"
-                    className="bg-surface-2 border border-red-500/40 text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-red-500/60 placeholder:text-muted"
+                    onChange={setOpponent}
+                    inputClassName="bg-surface-2 border border-red-500/40 text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-red-500/60 placeholder:text-muted"
                   />
                   <input
                     type="text"

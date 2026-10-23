@@ -10,6 +10,8 @@ import { KickoffFieldView } from "@/components/ui/KickoffFieldView";
 import { getCachedSettings, loadSettingsFromCloud } from "@/lib/settingsSync";
 import type { KickoffEntry, Session } from "@/types";
 import clsx from "clsx";
+import { formatOpponent } from "@/lib/opponent";
+import OpponentInput from "@/components/ui/OpponentInput";
 
 // Direction score options, mirroring the kickoff settings (numeric or field).
 interface KoDir { id: string; label: string; score?: number }
@@ -264,7 +266,7 @@ function KickoffHistoryContent() {
                   )}
                 >
                   <p className="text-sm font-semibold text-slate-200">
-                    {s.mode === "game" && s.opponent ? `vs ${s.opponent}` : s.label}
+                    {s.mode === "game" && s.opponent ? formatOpponent(s.opponent) : s.label}
                   </p>
                   {s.mode === "game" && s.opponent && (
                     <p className="text-[10px] text-muted">{s.label}{s.gameTime ? ` · ${s.gameTime}` : ""}</p>
@@ -313,13 +315,13 @@ function KickoffHistoryContent() {
                     className="input text-sm px-2 py-1 w-auto"
                   />
                   {selected.mode === "game" && (
-                    <input
-                      type="text"
-                      defaultValue={selected.opponent ?? ""}
-                      placeholder="Opponent"
-                      onBlur={(e) => updateSessionOpponent(selected.id, e.target.value.trim())}
-                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                      className="input text-sm px-2 py-1 w-32"
+                    <OpponentInput
+                      key={selected.id}
+                      value={selected.opponent ?? ""}
+                      onChange={(v) => updateSessionOpponent(selected.id, v)}
+                      commitOnBlur
+                      className="w-56"
+                      inputClassName="input text-sm px-2 py-1"
                     />
                   )}
                   <button
@@ -333,7 +335,7 @@ function KickoffHistoryContent() {
                 <div className="flex items-center gap-2 flex-wrap">
                   {selected.mode === "game" && selected.opponent && (
                     <span className="px-2 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-400 text-[10px] font-black uppercase tracking-wider">
-                      GAME vs {selected.opponent}
+                      GAME {formatOpponent(selected.opponent)}
                     </span>
                   )}
                   <h2 className="text-lg font-bold text-slate-100">{selected.label}</h2>

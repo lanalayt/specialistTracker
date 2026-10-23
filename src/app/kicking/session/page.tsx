@@ -26,6 +26,8 @@ import { useAuth } from "@/lib/auth";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftStore";
+import { formatOpponent } from "@/lib/opponent";
+import OpponentInput from "@/components/ui/OpponentInput";
 
 const INIT_ROWS = 12;
 
@@ -1248,7 +1250,7 @@ export default function KickingSessionPage() {
                   </span>
                   <span className="text-sm font-black uppercase tracking-widest">GAME — FG</span>
                 </div>
-                {opponent && <span className="text-sm font-bold">vs {opponent}</span>}
+                {opponent && <span className="text-sm font-bold">{formatOpponent(opponent)}</span>}
                 <span className="text-xs opacity-80">
                   {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                   {gameTime && ` · ${gameTime}`}
@@ -1267,7 +1269,7 @@ export default function KickingSessionPage() {
                             {sessionMode === "game" ? "Game Committed" : "Session Committed"}
                           </p>
                           {sessionMode === "game" && opponent && (
-                            <p className="text-lg font-black text-red-400 mt-1">vs {opponent}</p>
+                            <p className="text-lg font-black text-red-400 mt-1">{formatOpponent(opponent)}</p>
                           )}
                           <p className="text-lg font-bold text-slate-100 mt-1">
                             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
@@ -2127,12 +2129,10 @@ export default function KickingSessionPage() {
               </div>
               {sessionMode === "game" && (
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
+                  <OpponentInput
                     value={opponent}
-                    onChange={(e) => setOpponent(e.target.value)}
-                    placeholder="vs Opponent"
-                    className="bg-surface-2 border border-red-500/40 text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-red-500/60 placeholder:text-muted"
+                    onChange={setOpponent}
+                    inputClassName="bg-surface-2 border border-red-500/40 text-slate-200 px-2.5 py-1.5 rounded-input text-xs focus:outline-none focus:border-red-500/60 placeholder:text-muted"
                   />
                   <input
                     type="text"

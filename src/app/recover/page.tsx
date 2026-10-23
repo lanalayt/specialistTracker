@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { getTeamId } from "@/lib/teamData";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
+import { formatOpponent } from "@/lib/opponent";
 
 interface SessionInfo {
   id: string;
@@ -190,7 +191,7 @@ function RecoverContent() {
                     <div className="space-y-1">
                       {gameSessions.map((s) => (
                         <p key={s.id} className="text-xs text-slate-300">
-                          {new Date(s.date).toLocaleDateString()} — {s.sport} — {s.label} {s.opponent ? `vs ${s.opponent}` : ""} — {s.entryCount} entries
+                          {new Date(s.date).toLocaleDateString()} — {s.sport} — {s.label} {s.opponent ? formatOpponent(s.opponent) : ""} — {s.entryCount} entries
                         </p>
                       ))}
                     </div>
