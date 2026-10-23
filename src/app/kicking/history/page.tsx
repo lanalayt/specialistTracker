@@ -15,6 +15,7 @@ import type { FGKick, Session } from "@/types";
 import clsx from "clsx";
 import { formatOpponent } from "@/lib/opponent";
 import OpponentInput from "@/components/ui/OpponentInput";
+import { sortByKickNum } from "@/lib/kickOrder";
 
 // Auto-decimal: raw digits become a time with the last two as hundredths
 // (e.g. "132" -> "1.32", "5" -> "0.05"). A typed dot is ignored.
@@ -158,7 +159,7 @@ function KickingHistoryContent() {
   const [editEntries, setEditEntries] = useState<FGKick[]>([]);
   // Raw text for decimal inputs while editing, so "1." / "1.0" survive typing.
   const [rawTimes, setRawTimes] = useState<Record<string, string>>({});
-  const startEditing = () => { setEditEntries((selected?.entries ?? []) as FGKick[]); setRawTimes({}); setEditing(true); };
+  const startEditing = () => { setEditEntries(sortByKickNum((selected?.entries ?? []) as FGKick[])); setRawTimes({}); setEditing(true); };
   const cancelEditing = () => { setEditing(false); setEditEntries([]); setRawTimes({}); };
   // Drop any blank rows added but never filled in (no athlete) before saving.
   const saveEditing = () => { if (selected) { updateSessionEntries(selected.id, editEntries.filter((k) => k.athlete)); setEditing(false); setEditEntries([]); setRawTimes({}); } };
@@ -208,7 +209,7 @@ function KickingHistoryContent() {
     const next = kicks.map((k, i) => (i === idx ? { ...k, starred: nextVal } : k));
     updateSessionEntries(selected.id, next);
   };
-  const kicks = (selected?.entries ?? []) as FGKick[];
+  const kicks = sortByKickNum((selected?.entries ?? []) as FGKick[]);
   const makes = kicks.filter((k) => k.result.startsWith("Y")).length;
   // Athletes already in this session, for the Athlete dropdown when editing/adding.
   const athleteIdByName: Record<string, string> = {};

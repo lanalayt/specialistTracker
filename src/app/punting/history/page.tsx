@@ -13,6 +13,7 @@ import type { PuntEntry, Session } from "@/types";
 import clsx from "clsx";
 import { formatOpponent } from "@/lib/opponent";
 import OpponentInput from "@/components/ui/OpponentInput";
+import { sortByKickNum } from "@/lib/kickOrder";
 
 interface PuntTypeConfig { id: string; label: string; category: string; metric?: "distance" | "yardline"; hangTime?: boolean }
 
@@ -163,7 +164,7 @@ function PuntHistoryContent() {
   }, [history, sessionParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = filteredHistory.find((s) => s.id === selectedId);
-  const punts = (selected?.entries ?? []) as PuntEntry[];
+  const punts = sortByKickNum((selected?.entries ?? []) as PuntEntry[]);
   // Athletes already in this session, for the Athlete dropdown when editing/adding.
   const athleteIdByName: Record<string, string> = {};
   punts.forEach((p) => { if (p.athlete && !(p.athlete in athleteIdByName)) athleteIdByName[p.athlete] = p.athleteId; });

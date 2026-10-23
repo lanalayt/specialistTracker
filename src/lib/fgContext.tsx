@@ -19,6 +19,7 @@ import { getTeamId } from "@/lib/teamData";
 import { insertSession, loadSessions, updateSession as updateSessionRow, softDeleteSession, useSessionSync, stampSessionWrite } from "@/lib/sessionStore";
 import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, setAthleteNumber as setAthleteNumberRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
+import { sortByKickNum } from "@/lib/kickOrder";
 
 interface FGContextValue {
   athletes: StoredAthlete[];
@@ -165,7 +166,7 @@ export function FGProvider({ children, sportKey = "KICKING" }: { children: React
         mode,
         opponent: opponent || undefined,
         gameTime: gameTime || undefined,
-        entries: kicks,
+        entries: sortByKickNum(kicks),
       };
 
       setSessions((prev) => [...prev, session]);

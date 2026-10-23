@@ -10,6 +10,7 @@ import { insertSession, loadSessions, updateSession as updateSessionRow, softDel
 import { loadAthletes, insertAthlete, removeAthlete as removeAthleteRow, setAthleteNumber as setAthleteNumberRow, useAthleteSync, stampAthleteWrite, type StoredAthlete } from "@/lib/athleteStore";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settingsSync";
+import { sortByKickNum } from "@/lib/kickOrder";
 
 interface KickoffContextValue {
   athletes: StoredAthlete[];
@@ -127,7 +128,7 @@ export function KickoffProvider({ children, sportKey = "KICKOFF" }: { children: 
       id: genId(), teamId: tid ?? "local", sport: sportKey as Session["sport"],
       label: label ?? sessionLabel(), date: new Date().toISOString(),
       weather: weather || undefined, mode,
-      opponent: opponent || undefined, gameTime: gameTime || undefined, entries,
+      opponent: opponent || undefined, gameTime: gameTime || undefined, entries: sortByKickNum(entries),
     };
     setSessions((prev) => [...prev, session]);
     if (tid && tid !== "local-dev") { stampSessionWrite(tid); insertSession(tid, session); }

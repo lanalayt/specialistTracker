@@ -12,6 +12,7 @@ import type { KickoffEntry, Session } from "@/types";
 import clsx from "clsx";
 import { formatOpponent } from "@/lib/opponent";
 import OpponentInput from "@/components/ui/OpponentInput";
+import { sortByKickNum } from "@/lib/kickOrder";
 
 // Direction score options, mirroring the kickoff settings (numeric or field).
 interface KoDir { id: string; label: string; score?: number }
@@ -174,7 +175,7 @@ function KickoffHistoryContent() {
   }, [history, sessionParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = filteredHistory.find((s) => s.id === selectedId);
-  const entries = (selected?.entries ?? []) as KickoffEntry[];
+  const entries = sortByKickNum((selected?.entries ?? []) as KickoffEntry[]);
   // Athletes already in this session, for the Athlete dropdown when editing/adding.
   const athleteIdByName: Record<string, string> = {};
   entries.forEach((e) => { if (e.athlete && !(e.athlete in athleteIdByName)) athleteIdByName[e.athlete] = e.athleteId; });
