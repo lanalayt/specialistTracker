@@ -140,6 +140,8 @@ function PuntSettingsContent() {
   const [newDir, setNewDir] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Punt type id whose chart-color picker is open.
+  const [colorPickerFor, setColorPickerFor] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [pendingRenames, setPendingRenames] = useState<{ id: string; oldLabel: string; newLabel: string; category: string; metric: "distance" | "yardline"; hangTime: boolean; color?: string }[]>([]);
   const [savedSettings, setSavedSettings] = useState<PuntSettings>({
@@ -369,32 +371,54 @@ function PuntSettingsContent() {
                           />
                           <span className="text-[10px] text-muted">Hang Time</span>
                         </label>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] text-muted">Chart Color:</span>
-                        {PUNT_TYPE_COLORS.map((c) => {
-                          const active = (t.color ?? DEFAULT_PUNT_ARC_COLOR) === c.value;
-                          return (
-                            <button
-                              key={c.value}
-                              type="button"
-                              title={c.name}
-                              aria-label={`${c.name}${active ? " (selected)" : ""}`}
-                              onClick={() => setTypes(types.map((x) => {
-                                if (x.id !== t.id) return x;
-                                // Cyan is the default — store it as "no color" so untouched types stay unchanged.
-                                const { color: _old, ...rest } = x;
-                                void _old;
-                                return c.value === DEFAULT_PUNT_ARC_COLOR ? rest : { ...rest, color: c.value };
-                              }))}
-                              className={clsx(
-                                "w-5 h-5 rounded-full border-2 transition-transform",
-                                active ? "border-white scale-110" : "border-transparent hover:scale-110"
-                              )}
-                              style={{ backgroundColor: c.value }}
+                        {/* Chart color: one dot that opens a small picker */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setColorPickerFor(colorPickerFor === t.id ? null : t.id)}
+                            className="flex items-center gap-1.5"
+                            title="Chart color"
+                          >
+                            <span
+                              className="w-4 h-4 rounded-full border border-white/40"
+                              style={{ backgroundColor: t.color ?? DEFAULT_PUNT_ARC_COLOR }}
                             />
-                          );
-                        })}
+                            <span className="text-[10px] text-muted">Color</span>
+                          </button>
+                          {colorPickerFor === t.id && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setColorPickerFor(null)} />
+                              <div className="absolute right-0 top-full mt-1.5 z-50 bg-surface border border-border rounded-input p-2 shadow-lg grid grid-cols-3 gap-2">
+                                {PUNT_TYPE_COLORS.map((c) => {
+                                  const active = (t.color ?? DEFAULT_PUNT_ARC_COLOR) === c.value;
+                                  return (
+                                    <button
+                                      key={c.value}
+                                      type="button"
+                                      title={c.name}
+                                      aria-label={`${c.name}${active ? " (selected)" : ""}`}
+                                      onClick={() => {
+                                        setTypes(types.map((x) => {
+                                          if (x.id !== t.id) return x;
+                                          // Cyan is the default — store it as "no color" so untouched types stay unchanged.
+                                          const { color: _old, ...rest } = x;
+                                          void _old;
+                                          return c.value === DEFAULT_PUNT_ARC_COLOR ? rest : { ...rest, color: c.value };
+                                        }));
+                                        setColorPickerFor(null);
+                                      }}
+                                      className={clsx(
+                                        "w-6 h-6 rounded-full border-2 transition-transform",
+                                        active ? "border-white scale-110" : "border-transparent hover:scale-110"
+                                      )}
+                                      style={{ backgroundColor: c.value }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
