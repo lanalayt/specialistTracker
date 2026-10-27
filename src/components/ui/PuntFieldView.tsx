@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { getCurrentTheme } from "@/lib/themeColors";
+import { loadPuntTypeColors, DEFAULT_PUNT_ARC_COLOR } from "@/lib/puntColors";
 import type { PuntEntry, PuntHash } from "@/types";
 
 interface Props {
@@ -80,6 +81,8 @@ function renderArc(key: string | number, los: number, landing: number, fyStart: 
 
 export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
   const [ezColor, setEzColor] = useState("#991b1b");
+  // Read per render so a color saved in Punt Settings shows up once the cache refreshes.
+  const typeColors = loadPuntTypeColors();
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -313,7 +316,11 @@ export function PuntFieldView({ punts, currentPunt, onMove }: Props) {
           // (landingLat), never snapped to a hash.
           const fyStart = hashToFieldY(p.hash);
           const fyEnd = isDragging ? dragFieldY : (p.landingLat ?? hashToFieldY(p.hash));
-          const arc = renderArc(i, p.los, p.landingYL, fyStart, fyEnd, p.hangTime, returnRunYds(p), !!p.fairCatch, isSelected || isDragging ? 1 : 0.7, isSelected || isDragging ? "#22d3ee" : "#06b6d4", isSelected || isDragging ? 3.5 : 2.5);
+          // Flight line uses the punt type's color from Punt Settings; types
+          // without one keep the default cyan (brighter when selected).
+          const typeColor = typeColors[p.type as string];
+          const arcColor = typeColor ?? (isSelected || isDragging ? "#22d3ee" : DEFAULT_PUNT_ARC_COLOR);
+          const arc = renderArc(i, p.los, p.landingYL, fyStart, fyEnd, p.hangTime, returnRunYds(p), !!p.fairCatch, isSelected || isDragging ? 1 : 0.7, arcColor, isSelected || isDragging ? 3.5 : 2.5);
           if (!arc) return null;
           // Invisible wider hit area for tap
           const s = proj(p.los, fyStart); const e = proj(p.landingYL, fyEnd); const m = proj((p.los + p.landingYL) / 2, (fyStart + fyEnd) / 2);

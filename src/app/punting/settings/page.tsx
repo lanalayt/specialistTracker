@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { loadSettingsFromCloud, saveSettingsToCloud, getCachedSettings } from "@/lib/settingsSync";
+import { PUNT_TYPE_COLORS, DEFAULT_PUNT_ARC_COLOR } from "@/lib/puntColors";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Toggle } from "@/components/ui/Toggle";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
@@ -18,6 +19,8 @@ export interface PuntTypeConfig {
   category: string;
   metric: "distance" | "yardline";
   hangTime: boolean;
+  // Flight-line color on the game field charts; unset = default cyan.
+  color?: string;
 }
 
 export interface PuntCategory {
@@ -84,6 +87,7 @@ function migrateType(t: Record<string, unknown>): PuntTypeConfig {
     category,
     metric: (t.metric as "distance" | "yardline") ?? (upper.includes("POOCH") ? "yardline" : "distance"),
     hangTime: typeof t.hangTime === "boolean" ? t.hangTime : !upper.includes("POOCH"),
+    ...(typeof t.color === "string" && t.color ? { color: t.color } : {}),
   };
 }
 
@@ -137,7 +141,7 @@ function PuntSettingsContent() {
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [pendingRenames, setPendingRenames] = useState<{ id: string; oldLabel: string; newLabel: string; category: string; metric: "distance" | "yardline"; hangTime: boolean }[]>([]);
+  const [pendingRenames, setPendingRenames] = useState<{ id: string; oldLabel: string; newLabel: string; category: string; metric: "distance" | "yardline"; hangTime: boolean; color?: string }[]>([]);
   const [savedSettings, setSavedSettings] = useState<PuntSettings>({
     puntCategories: DEFAULT_CATEGORIES,
     puntTypes: DEFAULT_TYPES,
@@ -252,7 +256,7 @@ function PuntSettingsContent() {
     for (const t of types) {
       const saved = savedSettings.puntTypes.find((s) => s.id === t.id);
       if (saved && saved.label !== t.label) {
-        renames.push({ id: t.id, oldLabel: saved.label, newLabel: t.label, category: t.category, metric: t.metric, hangTime: t.hangTime });
+        renames.push({ id: t.id, oldLabel: saved.label, newLabel: t.label, category: t.category, metric: t.metric, hangTime: t.hangTime, color: t.color });
       }
     }
     if (renames.length > 0) {
@@ -278,7 +282,7 @@ function PuntSettingsContent() {
         newId = `${current.newLabel.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_${suffix}`;
         suffix++;
       }
-      updatedTypes.push({ id: newId, label: current.newLabel, category: current.category, metric: current.metric, hangTime: current.hangTime });
+      updatedTypes.push({ id: newId, label: current.newLabel, category: current.category, metric: current.metric, hangTime: current.hangTime, ...(current.color ? { color: current.color } : {}) });
     }
     // "rename" — label already changed in state, nothing extra needed
 
@@ -365,6 +369,32 @@ function PuntSettingsContent() {
                           />
                           <span className="text-[10px] text-muted">Hang Time</span>
                         </label>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-muted">Chart Color:</span>
+                        {PUNT_TYPE_COLORS.map((c) => {
+                          const active = (t.color ?? DEFAULT_PUNT_ARC_COLOR) === c.value;
+                          return (
+                            <button
+                              key={c.value}
+                              type="button"
+                              title={c.name}
+                              aria-label={`${c.name}${active ? " (selected)" : ""}`}
+                              onClick={() => setTypes(types.map((x) => {
+                                if (x.id !== t.id) return x;
+                                // Cyan is the default — store it as "no color" so untouched types stay unchanged.
+                                const { color: _old, ...rest } = x;
+                                void _old;
+                                return c.value === DEFAULT_PUNT_ARC_COLOR ? rest : { ...rest, color: c.value };
+                              }))}
+                              className={clsx(
+                                "w-5 h-5 rounded-full border-2 transition-transform",
+                                active ? "border-white scale-110" : "border-transparent hover:scale-110"
+                              )}
+                              style={{ backgroundColor: c.value }}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
