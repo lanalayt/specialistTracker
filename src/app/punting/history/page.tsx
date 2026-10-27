@@ -219,7 +219,8 @@ function PuntHistoryContent() {
       // distance / yard-line fields so the averages reflect the new metric.
       // A yard-line (pooch) type must not keep a gross-distance value that
       // would still count toward Avg Distance — and vice versa.
-      if (field === "type") {
+      // Games keep gross yards for every type, so only reconcile in practice.
+      if (field === "type" && selected?.mode !== "game") {
         if (isYardLineType(value as string, puntTypes)) next.yards = 0;
         else next.poochLandingYardLine = undefined;
       }
@@ -638,12 +639,14 @@ function PuntHistoryContent() {
             )}
             {/* Per-athlete recap stats */}
             {(() => {
-              // Compute a stat set for a group of punts. Distance-metric punts
-              // feed gross/net; yard-line (pooch) punts feed Avg YL. Hang counts
-              // only punts whose type tracks it.
+              const isGame = selected.mode === "game";
+              // Compute a stat set for a group of punts. In practice, distance-
+              // metric punts feed gross; yard-line (pooch) punts feed Avg YL and
+              // hang counts only types that track it. In games every punt type
+              // feeds gross and hang.
               const statSet = (ap: PuntEntry[]) => {
                 const att = ap.length;
-                const yardsEntries = ap.filter((p) => !isYardLineType(p.type, puntTypes) && p.yards > 0);
+                const yardsEntries = ap.filter((p) => (isGame || !isYardLineType(p.type, puntTypes)) && p.yards > 0);
                 const avgDist = yardsEntries.length > 0 ? (yardsEntries.reduce((s, p) => s + p.yards, 0) / yardsEntries.length).toFixed(1) : "—";
                 // A blocked punt never counts toward Avg Dist above, but still
                 // counts toward Net once the coach has logged LOS and the return.
@@ -653,7 +656,7 @@ function PuntHistoryContent() {
                 const avgNet = netEntries.length > 0 ? ((grossTotal - netPenalty) / netEntries.length).toFixed(1) : "—";
                 const ylEntries = ap.filter((p) => isYardLineType(p.type, puntTypes) && p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
                 const avgYL = ylEntries.length > 0 ? (ylEntries.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylEntries.length).toFixed(1) : null;
-                const hangEntries = ap.filter((p) => p.hangTime > 0 && tracksHangTime(p.type, puntTypes));
+                const hangEntries = ap.filter((p) => p.hangTime > 0 && (isGame || tracksHangTime(p.type, puntTypes)));
                 const avgHang = hangEntries.length > 0 ? (hangEntries.reduce((s, p) => s + p.hangTime, 0) / hangEntries.length).toFixed(2) : "—";
                 const otEntries = ap.filter((p) => (p.opTime || 0) > 0);
                 const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
@@ -692,7 +695,6 @@ function PuntHistoryContent() {
               });
               const athleteNames = Object.keys(byAthlete);
               if (athleteNames.length === 0) return null;
-              const isGame = selected.mode === "game";
               // Group the practice breakdown by main category (Directional,
               // Pooch, Rugby, Banana) — NOT by individual sub-type (e.g. a
               // coach's custom "Red"/"Blue" directional types roll up together).
