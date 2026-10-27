@@ -13,7 +13,7 @@ import { PuntFieldView } from "@/components/ui/PuntFieldView";
 import type { PuntEntry, PuntType, PuntHash, PuntLandingZone } from "@/types";
 import { PUNT_HASHES } from "@/types";
 import { insertSession as insertSnapSession, updateSession as updateSnapSession, stampSessionWrite as stampSnapWrite } from "@/lib/sessionStore";
-import { genId as genSnapId, puntNetPenalty, puntFinalSpot, puntHasNetData } from "@/lib/stats";
+import { genId as genSnapId, puntNetPenalty, puntHasNetData, isPuntInside20, isPuntInside10 } from "@/lib/stats";
 import clsx from "clsx";
 import { useDragReorder } from "@/lib/useDragReorder";
 import { loadSettingsFromCloud, getCachedSettings, getAppPref, setAppPref } from "@/lib/settingsSync";
@@ -2297,8 +2297,8 @@ export default function PuntingSessionPage() {
                   const avgNet = netEntries.length > 0 ? ((totalGrossForNet - totalNetPenalty) / netEntries.length).toFixed(1) : "—";
                   const htCount = punts.filter((p) => p.hangTime > 0).length;
                   const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
-                  const inside20 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
-                  const inside10 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
+                  const inside20 = punts.filter((p) => isPuntInside20(p)).length;
+                  const inside10 = punts.filter((p) => isPuntInside10(p)).length;
                   const numDAPunts = punts.filter((p) => typeof p.directionalAccuracy === "number");
                   const daCount = numDAPunts.length;
                   const daSum = numDAPunts.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);
@@ -2418,8 +2418,8 @@ export default function PuntingSessionPage() {
             const avgNet = netEntries.length > 0 ? ((totalGrossForNet - totalNetPenalty) / netEntries.length).toFixed(1) : "—";
             const htE = all.filter((p) => p.hangTime > 0);
             const avgHangAll = htE.length > 0 ? (htE.reduce((s, p) => s + p.hangTime, 0) / htE.length).toFixed(2) : "—";
-            const i20 = all.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
-            const i10 = all.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
+            const i20 = all.filter((p) => isPuntInside20(p)).length;
+            const i10 = all.filter((p) => isPuntInside10(p)).length;
             const tbCount = all.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
             const fcCount = all.filter((p) => p.fairCatch || p.landingZones?.includes("fairCatch")).length;
 
@@ -2461,8 +2461,8 @@ export default function PuntingSessionPage() {
                       const avgOT = otEntries.length > 0 ? (otEntries.reduce((s, p) => s + (p.opTime || 0), 0) / otEntries.length).toFixed(2) : "—";
                       const daEntries = ap.filter((p) => typeof p.directionalAccuracy === "number" && p.directionalAccuracy >= 0);
                       const dirPct = daEntries.length > 0 ? `${Math.round((daEntries.reduce((s, p) => s + numDA(p.directionalAccuracy), 0) / daEntries.length) * 100)}%` : "—";
-                      const apI20 = ap.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
-                      const apI10 = ap.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
+                      const apI20 = ap.filter((p) => isPuntInside20(p)).length;
+                      const apI10 = ap.filter((p) => isPuntInside10(p)).length;
                       const apTB = ap.filter((p) => p.touchback || p.landingZones?.includes("TB")).length;
                       const ylE = ap.filter((p) => p.poochLandingYardLine != null && p.poochLandingYardLine > 0);
                       const avgYLVal = ylE.length > 0 ? (ylE.reduce((s, p) => s + (p.poochLandingYardLine ?? 0), 0) / ylE.length).toFixed(1) : null;
@@ -3272,8 +3272,8 @@ export default function PuntingSessionPage() {
                 const avgNet = netEntries.length > 0 ? ((totalGrossForNet - totalNetPenalty) / netEntries.length).toFixed(1) : "—";
                 const htCount = punts.filter((p) => p.hangTime > 0).length;
                 const avgHang = htCount > 0 ? (punts.reduce((s, p) => s + p.hangTime, 0) / htCount).toFixed(2) : "—";
-                const inside20 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 80).length;
-                const inside10 = punts.filter((p) => p.landingYL != null && puntFinalSpot(p) >= 90).length;
+                const inside20 = punts.filter((p) => isPuntInside20(p)).length;
+                const inside10 = punts.filter((p) => isPuntInside10(p)).length;
                 const numDAPunts2 = punts.filter((p) => typeof p.directionalAccuracy === "number");
                 const daCount = numDAPunts2.length;
                 const daSum = numDAPunts2.reduce((s, p) => s + numDA(p.directionalAccuracy), 0);

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { usePunt } from "@/lib/puntContext";
-import { processPunt, emptyPuntStats, puntNetPenalty, puntHasNetData, isPuntTouchback } from "@/lib/stats";
+import { processPunt, emptyPuntStats, puntNetPenalty, puntHasNetData, isPuntTouchback, isPuntInside20, isPuntInside10 } from "@/lib/stats";
 import { PUNT_HASHES } from "@/types";
 import type { PuntHash, PuntStatBucket, PuntAthleteStats, PuntEntry } from "@/types";
 import clsx from "clsx";
@@ -553,12 +553,11 @@ function PuntStatsView({
         hangCount += 1;
       }
       if (p.fairCatch) fairCatches += 1;
-      const yl = p.landingYL ?? 0;
       if (isPuntTouchback(p)) {
         touchbacks += 1;
       } else {
-        if (yl >= 80 && yl < 100) inside20 += 1;
-        if (yl >= 90 && yl < 100) inside10 += 1;
+        if (isPuntInside20(p)) inside20 += 1;
+        if (isPuntInside10(p)) inside10 += 1;
       }
     });
     const netTotalPenalty = netPunts.reduce((s, p) => s + puntNetPenalty(p), 0);

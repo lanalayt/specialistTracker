@@ -422,6 +422,15 @@ export function puntFinalSpot(p: PuntNetEntry): number {
   return (p.landingYL ?? 0) - (p.returnYards ?? 0);
 }
 
+// Inside-20 / inside-10 are judged on where the ball ends up after any
+// return, and the 20 (or 10) itself doesn't count — it must be past it.
+export function isPuntInside20(p: PuntNetEntry): boolean {
+  return p.landingYL != null && puntFinalSpot(p) > 80;
+}
+export function isPuntInside10(p: PuntNetEntry): boolean {
+  return p.landingYL != null && puntFinalSpot(p) > 90;
+}
+
 // A blocked punt has no gross yards, but still counts toward Net once the
 // coach has logged where the snap started and where the return ended.
 export function puntHasNetData(p: PuntNetEntry): boolean {
