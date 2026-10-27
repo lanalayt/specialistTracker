@@ -388,7 +388,9 @@ function PuntSettingsContent() {
                           {colorPickerFor === t.id && (
                             <>
                               <div className="fixed inset-0 z-40" onClick={() => setColorPickerFor(null)} />
-                              <div className="absolute right-0 top-full mt-1.5 z-50 bg-surface border border-border rounded-input p-2 shadow-lg grid grid-cols-3 gap-2">
+                              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 w-60 bg-surface border border-border rounded-card p-3 shadow-2xl">
+                                <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Chart Color</p>
+                                <div className="grid grid-cols-3 gap-2">
                                 {PUNT_TYPE_COLORS.map((c) => {
                                   const active = (t.color ?? DEFAULT_PUNT_ARC_COLOR) === c.value;
                                   return (
@@ -408,13 +410,22 @@ function PuntSettingsContent() {
                                         setColorPickerFor(null);
                                       }}
                                       className={clsx(
-                                        "w-6 h-6 rounded-full border-2 transition-transform",
-                                        active ? "border-white scale-110" : "border-transparent hover:scale-110"
+                                        "flex flex-col items-center gap-1 p-1.5 rounded-input transition-colors",
+                                        active ? "bg-surface-2" : "hover:bg-surface-2"
                                       )}
-                                      style={{ backgroundColor: c.value }}
-                                    />
+                                    >
+                                      <span
+                                        className={clsx(
+                                          "w-8 h-8 rounded-full border-2",
+                                          active ? "border-white" : "border-transparent"
+                                        )}
+                                        style={{ backgroundColor: c.value }}
+                                      />
+                                      <span className={clsx("text-[10px]", active ? "text-white font-semibold" : "text-muted")}>{c.name}</span>
+                                    </button>
                                   );
                                 })}
+                                </div>
                               </div>
                             </>
                           )}
