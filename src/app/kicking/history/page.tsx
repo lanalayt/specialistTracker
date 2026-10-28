@@ -95,14 +95,31 @@ function KickingHistoryContent() {
   const [makeMode, setMakeMode] = useState<"simple" | "detailed">(() =>
     getCachedSettings<{ makeMode?: string }>("fgSettings")?.makeMode === "simple" ? "simple" : "detailed"
   );
+  const [missMode, setMissMode] = useState<"simple" | "detailed">(() =>
+    getCachedSettings<{ missMode?: string }>("fgSettings")?.missMode === "simple" ? "simple" : "detailed"
+  );
 
   useEffect(() => {
-    loadSettingsFromCloud<{ makeMode?: string }>("fgSettings").then((cloud) => {
+    loadSettingsFromCloud<{ makeMode?: string; missMode?: string }>("fgSettings").then((cloud) => {
       if (cloud?.makeMode === "simple" || cloud?.makeMode === "detailed") {
         setMakeMode(cloud.makeMode);
       }
+      if (cloud?.missMode === "simple" || cloud?.missMode === "detailed") {
+        setMissMode(cloud.missMode);
+      }
     });
   }, []);
+
+  // Edit dropdown follows FG settings (same options as the session page). The
+  // kick's current value stays listed so older detailed results aren't lost.
+  const resultEditOptions = (current: string): string[] => {
+    const makes = makeMode === "simple" ? ["YC"] : ["YL", "YC", "YR"];
+    const misses = missMode === "simple" ? ["X"] : ["XL", "XS", "XR", "XB"];
+    const opts = [...makes, ...misses];
+    return current && !opts.includes(current) ? [...opts, current] : opts;
+  };
+  const resultEditLabel = (r: string): string =>
+    r === "YC" && makeMode === "simple" ? "\u2713 Good" : (RESULT_EDIT_LABELS[r] ?? r);
   const { isAthlete, canEdit } = useAuth();
   const viewOnly = isAthlete && !canEdit;
   const searchParams = useSearchParams();
@@ -720,7 +737,7 @@ function KickingHistoryContent() {
                           </td>
                           <td className="table-cell p-1">
                             <select value={k.result} onChange={(e) => updateEntry(i, "result", e.target.value)} className="bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-slate-200">
-                              {["YL","YC","YR","XL","XS","XR","XB","X"].map((r) => <option key={r} value={r}>{RESULT_EDIT_LABELS[r] ?? r}</option>)}
+                              {resultEditOptions(k.result).map((r) => <option key={r} value={r}>{resultEditLabel(r)}</option>)}
                             </select>
                           </td>
                           {!hideScore && <td className="table-cell p-1"><input type="text" inputMode="numeric" value={k.score || ""} onChange={(e) => updateEntry(i, "score", parseInt(e.target.value) || 0)} className="w-10 bg-surface-2 border border-accent/40 rounded px-1 py-0.5 text-xs text-center text-slate-200" /></td>}
