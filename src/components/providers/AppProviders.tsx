@@ -261,7 +261,7 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
   useEffect(() => {
     if (isLoading || user) return;
     const PUBLIC = ["/login", "/signup", "/reset-password"];
-    if (!pathname || PUBLIC.some((r) => pathname.startsWith(r))) return;
+    if (!pathname || pathname === "/" || PUBLIC.some((r) => pathname.startsWith(r))) return;
     let cancelled = false;
     const t = setTimeout(async () => {
       if (cancelled) return;
