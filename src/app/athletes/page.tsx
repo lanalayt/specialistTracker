@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header, MobileNav } from "@/components/layout/Header";
 import { RoleGuard } from "@/components/auth/RoleGuard";
@@ -13,6 +13,8 @@ import { getTeamId } from "@/lib/teamData";
 import { useState as useStateReact, useEffect } from "react";
 import clsx from "clsx";
 
+const ROSTER_KEY = "ROSTER";
+
 function AthletesContent() {
   const fg = useFG();
   const punt = usePunt();
@@ -24,6 +26,10 @@ function AthletesContent() {
   const [popupName, setPopupName] = useState("");
   const [popupPhases, setPopupPhases] = useState<Record<string, boolean>>({});
   const [holders, setHolders] = useState<StoredAthlete[]>([]);
+  // Master roster: every athlete on the team, whether or not they're in any
+  // phase. Unchecking every phase keeps the name here.
+  const [roster, setRoster] = useState<StoredAthlete[] | null>(null);
+  const removedNames = useRef<Set<string>>(new Set());
   const [isNewAthlete, setIsNewAthlete] = useState(false);
   const [popupSaving, setPopupSaving] = useState(false);
 
@@ -32,8 +38,9 @@ function AthletesContent() {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
       if (!tid) return;
-      const h = await loadAthletes(tid, "HOLDING");
+      const [h, r] = await Promise.all([loadAthletes(tid, "HOLDING"), loadAthletes(tid, ROSTER_KEY)]);
       setHolders(h);
+      setRoster(r);
       // Sync disabled — athletes page handles both keys on add/remove
     }
     loadHoldersAndSync();
@@ -47,8 +54,29 @@ function AthletesContent() {
       ...kickoff.athletes.map((a) => a.name),
       ...snap.athletes.map((a) => a.name),
       ...holders.map((a) => a.name),
+      ...(roster ?? []).map((a) => a.name),
     ])
   );
+
+  // Register anyone who's in a phase but not yet on the master roster (athletes
+  // added before the roster existed), so later unchecking every phase keeps them.
+  const rosterNames = new Set((roster ?? []).map((a) => a.name));
+  const missingFromRoster = roster === null ? [] : allNames.filter((n) => !rosterNames.has(n) && !removedNames.current.has(n));
+  const missingKey = missingFromRoster.join("\u0000");
+  useEffect(() => {
+    if (!missingKey) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    const names = missingKey.split("\u0000");
+    (async () => {
+      const added: StoredAthlete[] = [];
+      for (const n of names) {
+        const a = await insertAthlete(tid, ROSTER_KEY, n);
+        if (a) added.push(a);
+      }
+      if (added.length) setRoster((prev) => [...(prev ?? []), ...added.filter((a) => !(prev ?? []).some((p) => p.name === a.name))]);
+    })();
+  }, [missingKey]);
 
   const handleAdd = () => {
     const trimmed = newName.trim();
@@ -71,6 +99,14 @@ function AthletesContent() {
       if (puntAthlete) punt.removeAthlete(puntAthlete.id);
       if (koAthlete) kickoff.removeAthlete(koAthlete.id);
       if (snapAthlete) snap.removeAthlete(snapAthlete.id);
+      removedNames.current.add(name);
+      const tid = getTeamId();
+      const holder = holders.find((a) => a.name === name);
+      const rosterEntry = (roster ?? []).find((a) => a.name === name);
+      if (tid && holder) removeAthleteById(tid, holder.id);
+      if (tid && rosterEntry) removeAthleteById(tid, rosterEntry.id);
+      setHolders((prev) => prev.filter((a) => a.name !== name));
+      setRoster((prev) => (prev ?? []).filter((a) => a.name !== name));
       setConfirmRemove(null);
     } else {
       setConfirmRemove(name);
@@ -100,7 +136,7 @@ function AthletesContent() {
       }
     }
     // Update athlete name in each sport's athlete table (all modes)
-    const sports = ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP", "HOLDING", "ATHLETE_KICKING", "ATHLETE_PUNTING", "ATHLETE_KICKOFF", "ATHLETE_LONGSNAP", "SCOUT_FG", "SCOUT_PUNT", "SCOUT_KO", "SCOUT_SNAP"];
+    const sports = [ROSTER_KEY, "KICKING", "PUNTING", "KICKOFF", "LONGSNAP", "HOLDING", "ATHLETE_KICKING", "ATHLETE_PUNTING", "ATHLETE_KICKOFF", "ATHLETE_LONGSNAP", "SCOUT_FG", "SCOUT_PUNT", "SCOUT_KO", "SCOUT_SNAP"];
     for (const sport of sports) {
       const athletes = await loadAthletes(tid, sport);
       const found = athletes.find((a) => a.name === oldName);
@@ -287,6 +323,7 @@ function AthletesContent() {
                   if (isNewAthlete) {
                     // Add new athlete to selected phases (team + athlete mode keys)
                     const tid = getTeamId();
+                    if (tid) await insertAthlete(tid, ROSTER_KEY, name);
                     if (popupPhases.KICKING) {
                       fg.addAthletes([name]);
                       if (tid) await insertAthlete(tid, "ATHLETE_KICKING", name);

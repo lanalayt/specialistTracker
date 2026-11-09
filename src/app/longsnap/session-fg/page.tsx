@@ -14,6 +14,7 @@ import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { LongSnapCommitModal } from "@/components/ui/LongSnapCommitModal";
 import { SnapSessionSummary } from "@/components/ui/SnapSessionSummary";
+import { withCurrent } from "@/lib/athleteOptions";
 
 const DRAFT_SUFFIX = "fg";
 const INIT_ROWS = 12;
@@ -254,7 +255,7 @@ export default function LongSnapFGSessionPage() {
                   <td className="py-1 px-1">
                     <select value={row.athlete} onChange={(e) => updateRow(idx, "athlete", e.target.value)} disabled={viewOnly} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60">
                       <option value="">—</option>
-                      {athleteNames.map((a) => <option key={a} value={a}>{a}</option>)}
+                      {withCurrent(athleteNames, row.athlete).map((a) => <option key={a} value={a}>{a}</option>)}
                     </select>
                   </td>
                   <td className="py-1 px-1 text-center">

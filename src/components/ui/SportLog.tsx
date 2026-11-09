@@ -5,6 +5,7 @@ import type { FGKick, FGPosition, FGResult } from "@/types";
 import { POSITIONS, RESULTS, MAKE_RESULTS } from "@/types";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import clsx from "clsx";
+import { withCurrent } from "@/lib/athleteOptions";
 
 const RESULT_LABELS: Record<FGResult, string> = {
   YL: "✓ Good ←",
@@ -173,7 +174,7 @@ export function SportLog({
                       onChange={(e) => updateRow(row.id, "athlete", e.target.value)}
                     >
                       <option value="">—</option>
-                      {athletes.map((a) => (
+                      {withCurrent(athletes, row.athlete).map((a) => (
                         <option key={a} value={a}>
                           {a}
                         </option>

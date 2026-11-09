@@ -28,6 +28,7 @@ import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftStore";
 import { formatOpponent } from "@/lib/opponent";
 import OpponentInput from "@/components/ui/OpponentInput";
+import { withCurrent } from "@/lib/athleteOptions";
 
 const INIT_ROWS = 12;
 
@@ -2284,8 +2285,8 @@ export default function KickingSessionPage() {
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
-                            {athletes.map((a) => (
-                              <option key={a.name} value={a.name}>{a.name}</option>
+                            {withCurrent(athletes.map((a) => a.name), row.athlete).map((n) => (
+                              <option key={n} value={n}>{n}</option>
                             ))}
                           </select>
                         )}
