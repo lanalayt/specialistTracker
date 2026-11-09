@@ -1414,7 +1414,7 @@ export default function KickoffSessionPage() {
                       )}
                     </div>
 
-                    {/* Endzone + Fair Catch checkboxes */}
+                    {/* Endzone checkbox (Fair Catch is game-only) */}
                     <div className="flex items-center gap-6">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -1425,15 +1425,6 @@ export default function KickoffSessionPage() {
                         />
                         <span className="text-sm font-semibold text-slate-200">Endzone</span>
                         <span className="text-[10px] text-muted">(auto at 65+)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={fairCatch}
-                          onChange={(e) => setFairCatch(e.target.checked)}
-                          className="w-5 h-5 accent-accent cursor-pointer"
-                        />
-                        <span className="text-sm font-semibold text-slate-200">Fair Catch</span>
                       </label>
                     </div>
 
@@ -1799,9 +1790,6 @@ export default function KickoffSessionPage() {
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border" title="Endzone">
                         EZ
                       </th>
-                      <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-10 border-b border-border" title="Fair Catch">
-                        FC
-                      </th>
                       {koDirEnabled && (
                       <th className="bg-surface-2 text-muted font-bold py-2 px-1 text-center w-14 border-b border-border">
                         Dir
@@ -2056,16 +2044,6 @@ export default function KickoffSessionPage() {
                               disabled={viewOnly}
                               onChange={(e) => updateRow(idx, "endzone", e.target.checked)}
                               title="Endzone"
-                              className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
-                            />
-                          </td>
-                          <td className="py-1 px-1 text-center">
-                            <input
-                              type="checkbox"
-                              checked={!!row.fairCatch}
-                              disabled={viewOnly}
-                              onChange={(e) => updateRow(idx, "fairCatch", e.target.checked)}
-                              title="Fair Catch"
                               className="w-4 h-4 accent-accent cursor-pointer disabled:cursor-not-allowed"
                             />
                           </td>
