@@ -80,9 +80,14 @@ function AthletesContent() {
       if (puntAthlete) punt.removeAthlete(puntAthlete.id);
       if (koAthlete) kickoff.removeAthlete(koAthlete.id);
       if (snapAthlete) snap.removeAthlete(snapAthlete.id);
+      const tid = getTeamId();
+      const holderAthlete = holders.find((a) => a.name === name);
+      if (holderAthlete) {
+        if (tid) removeAthleteById(tid, holderAthlete.id);
+        setHolders((prev) => prev.filter((a) => a.id !== holderAthlete.id));
+      }
       const rosterAthlete = rosterOnly.find((a) => a.name === name);
       if (rosterAthlete) {
-        const tid = getTeamId();
         if (tid) removeAthleteById(tid, rosterAthlete.id);
         setRosterOnly((prev) => prev.filter((a) => a.id !== rosterAthlete.id));
       }
