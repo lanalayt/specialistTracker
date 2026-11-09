@@ -13,6 +13,9 @@ import { getTeamId } from "@/lib/teamData";
 import { useState as useStateReact, useEffect } from "react";
 import clsx from "clsx";
 
+// athletes.sport key for athletes on the master list with no phases selected.
+const ROSTER_KEY = "ROSTER";
+
 function AthletesContent() {
   const fg = useFG();
   const punt = usePunt();
@@ -24,6 +27,10 @@ function AthletesContent() {
   const [popupName, setPopupName] = useState("");
   const [popupPhases, setPopupPhases] = useState<Record<string, boolean>>({});
   const [holders, setHolders] = useState<StoredAthlete[]>([]);
+  // Athletes kept on the master list with no phases selected. The list is
+  // otherwise built from the phase rosters, so without this an athlete with
+  // every phase unchecked would disappear.
+  const [rosterOnly, setRosterOnly] = useState<StoredAthlete[]>([]);
   const [isNewAthlete, setIsNewAthlete] = useState(false);
   const [popupSaving, setPopupSaving] = useState(false);
 
@@ -34,6 +41,7 @@ function AthletesContent() {
       if (!tid) return;
       const h = await loadAthletes(tid, "HOLDING");
       setHolders(h);
+      setRosterOnly(await loadAthletes(tid, ROSTER_KEY));
       // Sync disabled — athletes page handles both keys on add/remove
     }
     loadHoldersAndSync();
@@ -47,6 +55,7 @@ function AthletesContent() {
       ...kickoff.athletes.map((a) => a.name),
       ...snap.athletes.map((a) => a.name),
       ...holders.map((a) => a.name),
+      ...rosterOnly.map((a) => a.name),
     ])
   );
 
@@ -71,6 +80,12 @@ function AthletesContent() {
       if (puntAthlete) punt.removeAthlete(puntAthlete.id);
       if (koAthlete) kickoff.removeAthlete(koAthlete.id);
       if (snapAthlete) snap.removeAthlete(snapAthlete.id);
+      const rosterAthlete = rosterOnly.find((a) => a.name === name);
+      if (rosterAthlete) {
+        const tid = getTeamId();
+        if (tid) removeAthleteById(tid, rosterAthlete.id);
+        setRosterOnly((prev) => prev.filter((a) => a.id !== rosterAthlete.id));
+      }
       setConfirmRemove(null);
     } else {
       setConfirmRemove(name);
@@ -100,7 +115,7 @@ function AthletesContent() {
       }
     }
     // Update athlete name in each sport's athlete table (all modes)
-    const sports = ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP", "HOLDING", "ATHLETE_KICKING", "ATHLETE_PUNTING", "ATHLETE_KICKOFF", "ATHLETE_LONGSNAP", "SCOUT_FG", "SCOUT_PUNT", "SCOUT_KO", "SCOUT_SNAP"];
+    const sports = ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP", "HOLDING", ROSTER_KEY, "ATHLETE_KICKING", "ATHLETE_PUNTING", "ATHLETE_KICKOFF", "ATHLETE_LONGSNAP", "SCOUT_FG", "SCOUT_PUNT", "SCOUT_KO", "SCOUT_SNAP"];
     for (const sport of sports) {
       const athletes = await loadAthletes(tid, sport);
       const found = athletes.find((a) => a.name === oldName);
@@ -135,6 +150,21 @@ function AthletesContent() {
     } else {
       await insertAthlete(tid, sportKey, name);
       if (mirror) await insertAthlete(tid, mirror, name);
+    }
+  };
+
+  // Keep the athlete on the master list when no phases are selected; drop the
+  // placeholder row once they belong to at least one phase again.
+  const syncRosterOnly = async (name: string, phases: Record<string, boolean>) => {
+    const tid = getTeamId();
+    if (!tid) return;
+    const hasAnyPhase = Object.values(phases).some(Boolean);
+    if (hasAnyPhase) {
+      const rows = await loadAthletes(tid, ROSTER_KEY);
+      const found = rows.find((a) => a.name === name);
+      if (found) await removeAthleteById(tid, found.id);
+    } else {
+      await insertAthlete(tid, ROSTER_KEY, name);
     }
   };
 
@@ -306,6 +336,7 @@ function AthletesContent() {
                     if (popupPhases.HOLDING) {
                       if (tid) await insertAthlete(tid, "HOLDING", name);
                     }
+                    await syncRosterOnly(name, popupPhases);
                     setIsNewAthlete(false);
                     setPopupAthlete(null);
                     window.location.reload();
@@ -327,6 +358,7 @@ function AthletesContent() {
                       await toggleSport(popupAthlete, key, key, original[key]);
                     }
                   }
+                  await syncRosterOnly(popupAthlete, popupPhases);
                   window.location.reload();
                 }}
                 className="btn-primary w-full py-2 text-sm font-bold disabled:opacity-60 flex items-center justify-center gap-2"
