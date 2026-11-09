@@ -191,7 +191,7 @@ const DEFAULT_KO_CATEGORIES: KOCategoryConfig[] = [
   { id: "ONSIDE", label: "Onside", enabled: true },
 ];
 
-function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string; score?: number }[]; directionMode: "numeric" | "field"; directionEnabled: boolean; returnYardsEnabled: boolean } {
+function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: string; label: string; score?: number }[]; directionMode: "numeric" | "field"; directionEnabled: boolean; returnYardsEnabled: boolean; positions: KickoffHash[] } {
   const defaultScores = [1, 0.5, 0, -1];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parsed = getCachedSettings<any>("kickoffSettings");
@@ -221,10 +221,13 @@ function loadKickoffSettings(): { types: KOTypeConfig[]; directions: { id: strin
         directionMode: mode,
         directionEnabled: parsed.directionEnabled !== false,
         returnYardsEnabled: parsed.returnYardsEnabled !== false,
+        positions: Array.isArray(parsed.enabledPositions)
+          ? KICKOFF_HASHES.filter((h) => parsed.enabledPositions.includes(h))
+          : KICKOFF_HASHES,
       };
     }
   } catch {}
-  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true, returnYardsEnabled: true };
+  return { types: DEFAULT_KO_TYPES, directions: DEFAULT_KO_DIRS, directionMode: "numeric", directionEnabled: true, returnYardsEnabled: true, positions: KICKOFF_HASHES };
 }
 
 // Legacy labels for old data
@@ -256,6 +259,13 @@ export default function KickoffSessionPage() {
   const [koDirs, setKoDirs] = useState(() => koSettings.directions);
   const [koDirEnabled, setKoDirEnabled] = useState(() => koSettings.directionEnabled);
   const [koReturnYardsEnabled, setKoReturnYardsEnabled] = useState(() => koSettings.returnYardsEnabled);
+  const [koPositions, setKoPositions] = useState<KickoffHash[]>(() => koSettings.positions);
+  // Positions to offer in a dropdown: the enabled ones, plus the row's current
+  // value if it was set before that position was turned off.
+  const positionOptions = (current?: string): KickoffHash[] =>
+    current && !koPositions.includes(current as KickoffHash) && KICKOFF_HASHES.includes(current as KickoffHash)
+      ? KICKOFF_HASHES.filter((h) => h === current || koPositions.includes(h))
+      : koPositions;
   const koTypeLabels: Record<string, string> = {};
   koTypes.forEach((t) => { koTypeLabels[t.id] = t.label; });
   const koDirLabels: Record<string, string> = {};
@@ -268,6 +278,7 @@ export default function KickoffSessionPage() {
       setKoTypes(fresh.types);
       setKoDirs(fresh.directions);
       setKoDirEnabled(fresh.directionEnabled);
+      setKoPositions((prev) => (prev.join() === fresh.positions.join() ? prev : fresh.positions));
     };
     reload();
     const interval = setInterval(reload, 2000);
@@ -286,6 +297,7 @@ export default function KickoffSessionPage() {
       setKoDirs(fresh.directions);
       setKoDirEnabled(fresh.directionEnabled);
       setKoReturnYardsEnabled(fresh.returnYardsEnabled);
+      setKoPositions(fresh.positions);
     });
   }, []);
 
@@ -1341,7 +1353,7 @@ export default function KickoffSessionPage() {
                           className="input text-sm py-2 w-full"
                         >
                           {!currentPlan.hash && <option value="">—</option>}
-                          {KICKOFF_HASHES.map((h) => (
+                          {positionOptions(currentPlan.hash).map((h) => (
                             <option key={h} value={h}>{POS_LABELS[h]}</option>
                           ))}
                         </select>
@@ -1872,7 +1884,7 @@ export default function KickoffSessionPage() {
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
-                            {KICKOFF_HASHES.map((h) => (
+                            {positionOptions(row.hash).map((h) => (
                               <option key={h} value={h}>{POS_LABELS[h]}</option>
                             ))}
                           </select>
