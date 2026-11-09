@@ -2256,7 +2256,7 @@ export default function KickoffSessionPage() {
             </>
           ) : (() => {
             // Practice: top-line session stats cover DIRECTIONAL (deep) kicks only.
-            const kickRows = sessionKicks.length > 0 ? sessionKicks.filter((k) => koCategoryOf(k.type, koTypes) === "DEEP") : filledRows.map(({ r }) => ({
+            const kickRows = sessionKicks.length > 0 ? sessionKicks.filter((k) => koCategoryOf(k.type, koTypes) === "DEEP") : filledRows.filter(({ r }) => koCategoryOf(r.type, koTypes) === "DEEP").map(({ r }) => ({
               distance: parseFloat(r.distance) || 0,
               hangTime: parseFloat(r.hangTime) || 0,
               endzone: r.endzone,
