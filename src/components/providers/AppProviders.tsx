@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { AuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase";
 import { setTeamId, getTeamId } from "@/lib/teamData";
-import { loadAndApplyTheme, applyTheme } from "@/lib/themeColors";
+import { loadAndApplyTheme, applyTheme, DEFAULT_THEME } from "@/lib/themeColors";
 import { ensureTeamExists, useTeamSettingsSync, type TeamSettings } from "@/lib/teamSettingsStore";
 import { preloadSettings, subscribeSettingsRealtime } from "@/lib/settingsSync";
 import { TutorialProvider } from "@/components/ui/Tutorial";
@@ -242,7 +242,7 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
     await supabase.auth.signOut();
     setUser(null);
     // Reset theme to default
-    applyTheme({ primary: "#00d4a0", secondary: "#0a0f14", tertiary: "#1f2f42" });
+    applyTheme(DEFAULT_THEME);
     window.location.href = "/login";
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

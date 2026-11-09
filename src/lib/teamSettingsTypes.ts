@@ -20,9 +20,9 @@ export const TEAM_DEFAULTS: Omit<TeamSettings, "id"> = {
   name: "My Team",
   school: "My School",
   dashTitle: "Special Teams Dashboard",
-  colorPrimary: "#00d4a0",
+  colorPrimary: "#d29d00",
   colorSecondary: "#0a0f14",
-  colorTertiary: "#1f2f42",
+  colorTertiary: "#00d4a0",
   logo: null,
   enabledSports: ["KICKING", "PUNTING", "KICKOFF", "LONGSNAP"],
 };
