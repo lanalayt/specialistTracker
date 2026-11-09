@@ -36,6 +36,9 @@ interface PuntSettings {
   directionEnabled: boolean;
   directionMode: DirectionMode;
   directionOptions: { id: string; label: string; score?: number }[];
+  /** Each direction system's own list, so switching Numeric ⇄ Field-Based
+   *  doesn't bring back options that were deleted. */
+  directionOptionsByMode?: Partial<Record<DirectionMode, { id: string; label: string; score?: number }[]>>;
   opTimeEnabled: boolean;
 }
 
@@ -110,6 +113,7 @@ function loadSettings(): PuntSettings {
         directionEnabled: parsed.directionEnabled !== false,
         directionMode: mode,
         directionOptions: parsed.directionOptions?.length > 0 ? parsed.directionOptions : defaultDirs,
+        directionOptionsByMode: parsed.directionOptionsByMode ?? {},
         opTimeEnabled: parsed.opTimeEnabled !== false,
       };
     }
@@ -137,6 +141,7 @@ function PuntSettingsContent() {
   const [dirEnabled, setDirEnabled] = useState(true);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
   const [dirOptions, setDirOptions] = useState<{ id: string; label: string; score?: number }[]>(NUMERIC_DIRECTIONS);
+  const [dirByMode, setDirByMode] = useState<NonNullable<PuntSettings["directionOptionsByMode"]>>({});
   const [opTimeEnabled, setOpTimeEnabled] = useState(true);
   const [newDir, setNewDir] = useState("");
   const [saved, setSaved] = useState(false);
@@ -185,6 +190,7 @@ function PuntSettingsContent() {
     setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
     setDirOptions(ensureScores(s.directionOptions, s.directionMode));
+    setDirByMode(s.directionOptionsByMode ?? {});
     setOpTimeEnabled(s.opTimeEnabled);
     setSavedSettings(s);
     setLoaded(true);
@@ -200,6 +206,7 @@ function PuntSettingsContent() {
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionOptions?.length > 0) setDirOptions(ensureScores(cloud.directionOptions, cloud.directionMode || "numeric"));
+        if (cloud.directionOptionsByMode) setDirByMode(cloud.directionOptionsByMode);
         if (typeof cloud.opTimeEnabled === "boolean") setOpTimeEnabled(cloud.opTimeEnabled);
         setSavedSettings({
           puntCategories: cloud.puntCategories?.length > 0 ? cloud.puntCategories : DEFAULT_CATEGORIES,
@@ -227,8 +234,13 @@ function PuntSettingsContent() {
   }, [categories, types, dirEnabled, dirMode, dirOptions, opTimeEnabled, savedSettings, loaded]);
 
   const handleDirModeChange = (mode: DirectionMode) => {
+    if (mode === dirMode) return;
+    // Remember this mode's list (with any deletions) and restore the other
+    // mode's list instead of resetting it to the defaults.
+    const stash = { ...dirByMode, [dirMode]: dirOptions };
+    setDirByMode(stash);
     setDirMode(mode);
-    setDirOptions(mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS);
+    setDirOptions(ensureScores(stash[mode] ?? (mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS), mode));
   };
 
   const handleAddType = (categoryId: string) => {
@@ -254,7 +266,7 @@ function PuntSettingsContent() {
 
   const executeSave = (typesToSave: PuntTypeConfig[]) => {
     interactedRef.current = true;
-    const settings: PuntSettings = { puntCategories: categories, puntTypes: typesToSave, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, opTimeEnabled };
+    const settings: PuntSettings = { puntCategories: categories, puntTypes: typesToSave, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, directionOptionsByMode: { ...dirByMode, [dirMode]: dirOptions }, opTimeEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setTypes(typesToSave);
     setSavedSettings(settings);

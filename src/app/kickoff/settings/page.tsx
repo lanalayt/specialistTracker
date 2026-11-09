@@ -33,6 +33,9 @@ interface KickoffSettings {
   directionEnabled: boolean;
   directionMode: DirectionMode;
   directionMetrics: { id: string; label: string; score?: number }[];
+  /** Each direction system's own list, so switching Numeric ⇄ Field-Based
+   *  doesn't bring back options that were deleted. */
+  directionMetricsByMode?: Partial<Record<DirectionMode, { id: string; label: string; score?: number }[]>>;
   returnYardsEnabled?: boolean;
   /** Kickoff positions that show up in the Position dropdowns. */
   enabledPositions?: string[];
@@ -109,6 +112,7 @@ function loadSettings(): KickoffSettings {
         directionEnabled: parsed.directionEnabled !== false,
         directionMode: parsed.directionMode === "field" ? "field" : "numeric",
         directionMetrics: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : NUMERIC_DIRECTIONS,
+        directionMetricsByMode: parsed.directionMetricsByMode ?? {},
         returnYardsEnabled: parsed.returnYardsEnabled !== false,
         enabledPositions: Array.isArray(parsed.enabledPositions) ? parsed.enabledPositions : DEFAULT_POSITIONS,
       };
@@ -129,6 +133,7 @@ function KickoffSettingsContent() {
   const [dirEnabled, setDirEnabled] = useState(true);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
   const [directions, setDirections] = useState<{ id: string; label: string; score?: number }[]>(NUMERIC_DIRECTIONS);
+  const [dirByMode, setDirByMode] = useState<NonNullable<KickoffSettings["directionMetricsByMode"]>>({});
   const [newTypes, setNewTypes] = useState<Record<string, string>>({});
   const [newDir, setNewDir] = useState("");
   const [returnYardsEnabled, setReturnYardsEnabled] = useState(true);
@@ -157,6 +162,7 @@ function KickoffSettingsContent() {
     setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
     setDirections(s.directionMetrics);
+    setDirByMode(s.directionMetricsByMode ?? {});
     if (typeof s.returnYardsEnabled === "boolean") setReturnYardsEnabled(s.returnYardsEnabled);
     setPositions(s.enabledPositions ?? DEFAULT_POSITIONS);
     setSavedSettings(s);
@@ -173,6 +179,7 @@ function KickoffSettingsContent() {
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionMetrics?.length > 0) setDirections(cloud.directionMetrics);
+        if (cloud.directionMetricsByMode) setDirByMode(cloud.directionMetricsByMode);
         if (typeof cloud.returnYardsEnabled === "boolean") setReturnYardsEnabled(cloud.returnYardsEnabled);
         if (Array.isArray(cloud.enabledPositions)) setPositions(cloud.enabledPositions);
         setSavedSettings({
@@ -211,8 +218,13 @@ function KickoffSettingsContent() {
   };
 
   const handleDirModeChange = (mode: DirectionMode) => {
+    if (mode === dirMode) return;
+    // Remember this mode's list (with any deletions) and restore the other
+    // mode's list instead of resetting it to the defaults.
+    const stash = { ...dirByMode, [dirMode]: directions };
+    setDirByMode(stash);
     setDirMode(mode);
-    setDirections(mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS);
+    setDirections(stash[mode] ?? (mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS));
   };
 
   const handleAddType = (categoryId: string) => {
@@ -240,7 +252,7 @@ function KickoffSettingsContent() {
 
   const executeSave = (typesToSave: KOTypeConfig[]) => {
     interactedRef.current = true;
-    const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionEnabled: dirEnabled, directionMode: dirMode, directionMetrics: directions, returnYardsEnabled, enabledPositions: positions };
+    const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionEnabled: dirEnabled, directionMode: dirMode, directionMetrics: directions, directionMetricsByMode: { ...dirByMode, [dirMode]: directions }, returnYardsEnabled, enabledPositions: positions };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setTypes(typesToSave);
     setSavedSettings(settings);
