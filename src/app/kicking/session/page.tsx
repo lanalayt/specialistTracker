@@ -310,7 +310,7 @@ export default function KickingSessionPage() {
   const [committedSnapId, setCommittedSnapId] = useState<string | null>(null);
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
-  const [holderEnabled, setHolderEnabled] = useState(true);
+  const [holderEnabled, setHolderEnabled] = useState(false);
   // Snap logs draft in session_drafts (DB), not localStorage. Hydrate first so
   // the empty initial state can't clobber a saved draft.
   const snapDraftHydrated = useRef(false);

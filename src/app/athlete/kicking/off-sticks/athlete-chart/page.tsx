@@ -63,7 +63,7 @@ function AthleteChartInner() {
   const [snapLogsMap, setSnapLogsMap] = useState<Record<string, SnapLogEntry[]>>({});
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
-  const [holderEnabled, setHolderEnabled] = useState(true);
+  const [holderEnabled, setHolderEnabled] = useState(false);
 
   // Load holderEnabled from FG settings (DB source of truth)
   useEffect(() => {
