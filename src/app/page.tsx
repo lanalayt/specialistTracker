@@ -44,7 +44,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="relative px-4 pt-28 sm:px-6 sm:pt-32">
+      <section className="relative px-4 pt-24 sm:px-6 sm:pt-24">
         <div aria-hidden className="pointer-events-none absolute inset-0" style={{ backgroundImage: FIELD_LINES }} />
         <div
           aria-hidden
@@ -56,9 +56,17 @@ export default function LandingPage() {
           <img
             src="/logo-stacked.svg"
             alt="Specialist Tracker"
-            className="w-72 sm:w-96 lg:w-[460px]"
+            className="w-60 sm:w-80 lg:w-[360px]"
             style={{ filter: "drop-shadow(0 0 60px rgba(0,212,160,0.35))" }}
           />
+        </div>
+
+        {/* App showcase */}
+        <div className="relative mt-6 sm:mt-8">
+          <ScreenshotCarousel slides={SLIDES} />
+        </div>
+
+        <div className="relative mx-auto flex max-w-5xl flex-col items-center pb-24 pt-20 text-center">
           <h1 className="mt-6 max-w-4xl text-4xl font-black uppercase leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl">
             Every kick. Every punt.{" "}
             <span className="bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(90deg, #00d4a0, #E5B649)" }}>
@@ -77,11 +85,6 @@ export default function LandingPage() {
               Create an account
             </Link>
           </div>
-        </div>
-
-        {/* App showcase */}
-        <div className="relative mt-20 pb-24">
-          <ScreenshotCarousel slides={SLIDES} />
         </div>
       </section>
 

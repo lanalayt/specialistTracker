@@ -3,14 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type Slide = {
-  /** Image path under /public, e.g. "/landing/dashboard.png". Omit to show a placeholder frame. */
+  /**
+   * Path under /public, e.g. "/landing/dashboard.png" or "/landing/charting.mp4".
+   * Videos (.mp4 / .webm) autoplay muted on loop. Omit to show a placeholder frame.
+   */
   src?: string;
   title: string;
   caption: string;
 };
 
-const INTERVAL_MS = 5000;
+const INTERVAL_MS = 6000;
 
+const isVideo = (src: string) => /\.(mp4|webm|mov)$/i.test(src);
+
+/**
+ * 3D "cover flow" carousel: one slide front and centre, the previous and next
+ * slides smaller and angled behind it on the left and right. Every few seconds
+ * everything shifts left: the right slide comes to the front, the front slide
+ * moves to the left, and a new slide comes in on the right.
+ */
 export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -25,11 +36,18 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
     return () => clearTimeout(t);
   }, [index, paused, count, go]);
 
+  // Position of slide i relative to the front slide: 0 = front, 1 = right, -1 = left.
+  const offsetOf = (i: number) => {
+    let o = (((i - index) % count) + count) % count;
+    if (o > count / 2) o -= count;
+    return o;
+  };
+
   const current = slides[index];
 
   return (
     <div
-      className="relative mx-auto w-full max-w-6xl"
+      className="relative mx-auto w-full max-w-7xl"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
@@ -40,72 +58,86 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
         touchX.current = null;
       }}
     >
-      {/* Glow behind the frame */}
+      {/* Glow behind the stage */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-x-10 -inset-y-16 -z-10 blur-3xl"
-        style={{ background: "radial-gradient(60% 50% at 50% 50%, rgba(0,212,160,0.28), transparent 70%)" }}
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-full blur-3xl"
+        style={{ background: "radial-gradient(45% 55% at 50% 50%, rgba(0,212,160,0.30), transparent 70%)" }}
       />
 
-      {/* Browser frame */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl" style={{ boxShadow: "0 40px 120px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,212,160,0.12)" }}>
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <span className="h-3 w-3 rounded-full" style={{ background: "#ef4444" }} />
-          <span className="h-3 w-3 rounded-full" style={{ background: "#f59e0b" }} />
-          <span className="h-3 w-3 rounded-full" style={{ background: "#00d4a0" }} />
-          <div className="ml-4 hidden flex-1 truncate rounded-pill bg-surface-2 px-4 py-1 text-xs text-muted sm:block">
-            specialisttracker · {current.title}
-          </div>
-        </div>
-
-        <div className="relative aspect-[16/10] w-full bg-bg">
-          {slides.map((s, i) => (
+      {/* Stage */}
+      <div className="relative aspect-[2/1] w-full sm:aspect-[12/5]" style={{ perspective: "1800px" }}>
+        {slides.map((s, i) => {
+          const o = offsetOf(i);
+          const abs = Math.abs(o);
+          const visible = abs <= 1;
+          const transform =
+            o === 0
+              ? "translate(-50%, -50%)"
+              : `translate(-50%, -50%) translateX(${o * (visible ? 52 : 90)}%) scale(${visible ? 0.72 : 0.5}) rotateY(${o > 0 ? -22 : 22}deg)`;
+          return (
             <div
               key={s.title}
-              className="absolute inset-0 transition-all duration-700 ease-out"
+              role={o === 0 ? undefined : "button"}
+              aria-label={o === 0 ? undefined : `Show ${s.title}`}
+              aria-hidden={!visible}
+              onClick={o === 0 ? undefined : () => go(i)}
+              className="absolute left-1/2 top-1/2 aspect-[16/10] w-[78%] transition-all duration-[900ms] sm:w-[58%]"
               style={{
-                opacity: i === index ? 1 : 0,
-                transform: i === index ? "scale(1)" : "scale(1.03)",
+                transform,
+                transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+                zIndex: 30 - abs * 10,
+                opacity: o === 0 ? 1 : visible ? 0.55 : 0,
+                filter: o === 0 ? "none" : "brightness(0.6) blur(1px)",
+                cursor: o === 0 ? "default" : "pointer",
+                pointerEvents: visible ? "auto" : "none",
               }}
-              aria-hidden={i !== index}
             >
-              {s.src ? (
-                <img src={s.src} alt={s.title} className="h-full w-full object-cover object-top" />
-              ) : (
-                <Placeholder title={s.title} />
-              )}
+              <div
+                className="h-full w-full overflow-hidden rounded-2xl border border-border bg-bg"
+                style={{
+                  boxShadow:
+                    o === 0
+                      ? "0 50px 120px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,212,160,0.25), 0 0 80px -10px rgba(0,212,160,0.35)"
+                      : "0 30px 80px -20px rgba(0,0,0,0.9)",
+                }}
+              >
+                <SlideMedia slide={s} active={o === 0} />
+              </div>
             </div>
-          ))}
+          );
+        })}
 
-          {/* Arrows */}
-          {count > 1 && (
-            <>
-              <button
-                type="button"
-                aria-label="Previous screenshot"
-                onClick={() => go(index - 1)}
-                className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-border text-xl text-slate-100 transition hover:scale-105"
-                style={{ background: "rgba(10,15,20,0.75)" }}
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                aria-label="Next screenshot"
-                onClick={() => go(index + 1)}
-                className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-border text-xl text-slate-100 transition hover:scale-105"
-                style={{ background: "rgba(10,15,20,0.75)" }}
-              >
-                ›
-              </button>
-            </>
-          )}
-        </div>
+        {/* Arrows */}
+        {count > 1 && (
+          <>
+            <button
+              type="button"
+              aria-label="Previous"
+              onClick={() => go(index - 1)}
+              className="absolute left-1 top-1/2 z-40 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-border text-xl text-slate-100 transition hover:scale-105 sm:left-4"
+              style={{ background: "rgba(10,15,20,0.8)" }}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              aria-label="Next"
+              onClick={() => go(index + 1)}
+              className="absolute right-1 top-1/2 z-40 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-border text-xl text-slate-100 transition hover:scale-105 sm:right-4"
+              style={{ background: "rgba(10,15,20,0.8)" }}
+            >
+              ›
+            </button>
+          </>
+        )}
       </div>
 
       {/* Caption + progress */}
       <div className="mt-8 text-center">
-        <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{current.title}</h3>
+        <h3 key={current.title} className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+          {current.title}
+        </h3>
         <p className="mx-auto mt-2 max-w-xl text-muted">{current.caption}</p>
         <div className="mt-6 flex items-center justify-center gap-2">
           {slides.map((s, i) => (
@@ -136,11 +168,45 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
   );
 }
 
-/** Stand-in frame shown until a real screenshot is added for the slide. */
+function SlideMedia({ slide, active }: { slide: Slide; active: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Restart a recording from the beginning each time it comes to the front.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (active) {
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, [active]);
+
+  if (!slide.src) return <Placeholder title={slide.title} />;
+  if (isVideo(slide.src)) {
+    return (
+      <video
+        ref={videoRef}
+        src={slide.src}
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        className="h-full w-full object-cover object-top"
+      />
+    );
+  }
+  return <img src={slide.src} alt={slide.title} className="h-full w-full object-cover object-top" />;
+}
+
+/** Stand-in frame shown until a real screenshot or recording is added for the slide. */
 function Placeholder({ title }: { title: string }) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center"
-      style={{ background: "repeating-linear-gradient(135deg, var(--surface) 0 18px, var(--bg) 18px 36px)" }}>
+    <div
+      className="flex h-full w-full flex-col items-center justify-center gap-3 text-center"
+      style={{ background: "repeating-linear-gradient(135deg, var(--surface) 0 18px, var(--bg) 18px 36px)" }}
+    >
       <img src="/logo-mark.svg" alt="" className="h-14 w-14 opacity-80" />
       <p className="text-lg font-bold">{title}</p>
       <p className="text-sm text-muted">Screenshot goes here</p>
