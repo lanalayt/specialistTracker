@@ -7,6 +7,7 @@ import { PUNT_TYPE_COLORS, DEFAULT_PUNT_ARC_COLOR } from "@/lib/puntColors";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Toggle } from "@/components/ui/Toggle";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
+import { HexColorInput } from "@/components/ui/HexColorInput";
 import { useAuth } from "@/lib/auth";
 
 const STORAGE_KEY = "puntSettings";
@@ -142,6 +143,15 @@ function PuntSettingsContent() {
   const [dirty, setDirty] = useState(false);
   // Punt type id whose chart-color picker is open.
   const [colorPickerFor, setColorPickerFor] = useState<string | null>(null);
+  const setTypeColor = (id: string, color: string) => {
+    setTypes((prev) => prev.map((x) => {
+      if (x.id !== id) return x;
+      // Cyan is the default — store it as "no color" so untouched types stay unchanged.
+      const { color: _old, ...rest } = x;
+      void _old;
+      return color.toLowerCase() === DEFAULT_PUNT_ARC_COLOR ? rest : { ...rest, color: color.toLowerCase() };
+    }));
+  };
   const [loaded, setLoaded] = useState(false);
   const [pendingRenames, setPendingRenames] = useState<{ id: string; oldLabel: string; newLabel: string; category: string; metric: "distance" | "yardline"; hangTime: boolean; color?: string }[]>([]);
   const [savedSettings, setSavedSettings] = useState<PuntSettings>({
@@ -400,13 +410,7 @@ function PuntSettingsContent() {
                                       title={c.name}
                                       aria-label={`${c.name}${active ? " (selected)" : ""}`}
                                       onClick={() => {
-                                        setTypes(types.map((x) => {
-                                          if (x.id !== t.id) return x;
-                                          // Cyan is the default — store it as "no color" so untouched types stay unchanged.
-                                          const { color: _old, ...rest } = x;
-                                          void _old;
-                                          return c.value === DEFAULT_PUNT_ARC_COLOR ? rest : { ...rest, color: c.value };
-                                        }));
+                                        setTypeColor(t.id, c.value);
                                         setColorPickerFor(null);
                                       }}
                                       className={clsx(
@@ -425,6 +429,22 @@ function PuntSettingsContent() {
                                     </button>
                                   );
                                 })}
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
+                                  <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Custom</span>
+                                  <input
+                                    type="color"
+                                    value={t.color ?? DEFAULT_PUNT_ARC_COLOR}
+                                    onChange={(e) => setTypeColor(t.id, e.target.value)}
+                                    aria-label="Pick a custom chart color"
+                                    className="w-7 h-7 rounded-input border border-border cursor-pointer bg-transparent shrink-0"
+                                  />
+                                  <HexColorInput
+                                    value={t.color ?? DEFAULT_PUNT_ARC_COLOR}
+                                    onChange={(hex) => setTypeColor(t.id, hex)}
+                                    className="flex-1"
+                                    ariaLabel="Chart color hex code"
+                                  />
                                 </div>
                               </div>
                             </>
