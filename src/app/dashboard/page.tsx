@@ -12,6 +12,7 @@ import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
 import { useTeamSettings } from "@/lib/teamSettingsStore";
 import { makePct } from "@/lib/stats";
+import { getCachedSettings, loadSettingsFromCloud } from "@/lib/settingsSync";
 import { MAKE_RESULTS } from "@/types";
 import type { FGKick, PuntEntry, KickoffEntry, Session } from "@/types";
 import Link from "next/link";
@@ -25,11 +26,26 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
 ];
 
 // KO "directional" = deep kicks (not sky/squib/onside).
-const isDeepKO = (type?: string) => !/SKY|SQUIB|ONSIDE/i.test(type || "");
+type KOSettingsLite = { kickoffTypes?: { id: string; category?: string }[] };
+
+/** type id → category from KO settings, so custom or renamed Sky/Squib/Onside
+ *  types are classified by their actual category, not by their name. */
+function koCategoryMap(settings: KOSettingsLite | null): Record<string, string> {
+  const map: Record<string, string> = {};
+  (settings?.kickoffTypes ?? []).forEach((t) => { if (t.category) map[t.id] = t.category; });
+  return map;
+}
+
+function isDeepKO(type: string | undefined, catMap: Record<string, string>): boolean {
+  const t = type || "";
+  if (catMap[t]) return catMap[t] === "DEEP";
+  // Legacy / unknown types: fall back to the name.
+  return !/SKY|SQUIB|ONSIDE/i.test(t);
+}
 // Some legacy/imported kicks carry pos "PAT" without the isPAT flag set.
 const isPatKick = (k: { isPAT?: boolean; pos?: string }) => k.isPAT === true || k.pos === "PAT";
 
-function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepOnly: boolean) {
+function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepOnly: boolean, koCats: Record<string, string> = {}) {
   const fgKicks = fgH.flatMap((s) => (s.entries ?? []) as FGKick[]).filter((k) => !isPatKick(k));
   const makes = fgKicks.filter((k) => MAKE_RESULTS.includes(k.result));
   const longFG = makes.reduce((m, k) => Math.max(m, k.dist), 0);
@@ -42,7 +58,7 @@ function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepO
   const puntHangE = punts.filter((p) => p.hangTime > 0);
 
   let kos = koH.flatMap((s) => (s.entries ?? []) as KickoffEntry[]);
-  if (koDeepOnly) kos = kos.filter((k) => isDeepKO(k.type));
+  if (koDeepOnly) kos = kos.filter((k) => isDeepKO(k.type, koCats));
   const koDistE = kos.filter((k) => k.distance > 0);
   const koHangE = kos.filter((k) => k.hangTime > 0);
 
@@ -56,14 +72,14 @@ function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepO
   };
 }
 
-function HighlightCards({ h, accent }: { h: ReturnType<typeof highlightsFor>; accent?: boolean }) {
+function HighlightCards({ h, accent, koDeepOnly }: { h: ReturnType<typeof highlightsFor>; accent?: boolean; koDeepOnly?: boolean }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
       <StatCard label="FG %" value={h.fgPct} accent={accent} glow={accent} />
       <StatCard label="Long FG" value={h.longFG} accent={accent} glow={accent} />
       <StatCard label="Punt Avg" value={h.puntAvg} accent={accent} glow={accent} />
       <StatCard label="Punt Hang" value={h.puntHang} accent={accent} glow={accent} />
-      <StatCard label="KO Avg Dist" value={h.koAvgDist} accent={accent} glow={accent} />
+      <StatCard label={koDeepOnly ? "Deep KO Avg Dist" : "KO Avg Dist"} value={h.koAvgDist} accent={accent} glow={accent} />
       <StatCard label="KO Hang" value={h.koHang} accent={accent} glow={accent} />
     </div>
   );
@@ -74,6 +90,16 @@ function Highlights() {
   const { history: puntH } = usePunt();
   const { history: koH } = useKickoff();
 
+  // KO settings decide which types are "Deep". Use the warm cache now and
+  // refresh from the DB in case it hadn't loaded yet.
+  const [koSettings, setKoSettings] = useState<KOSettingsLite | null>(() => getCachedSettings<KOSettingsLite>("kickoffSettings"));
+  useEffect(() => {
+    let alive = true;
+    loadSettingsFromCloud<KOSettingsLite>("kickoffSettings").then((s) => { if (alive && s) setKoSettings(s); });
+    return () => { alive = false; };
+  }, []);
+  const koCats = koCategoryMap(koSettings);
+
   const isGame = (s: Session) => s.mode === "game";
   const gameFG = fgH.filter(isGame);
   const gamePunt = puntH.filter(isGame);
@@ -81,7 +107,7 @@ function Highlights() {
   const hasGame = gameFG.length + gamePunt.length + gameKO.length > 0;
 
   // Practice highlights: KO stats are directional (deep) only.
-  const practice = highlightsFor(fgH.filter((s) => !isGame(s)), puntH.filter((s) => !isGame(s)), koH.filter((s) => !isGame(s)), true);
+  const practice = highlightsFor(fgH.filter((s) => !isGame(s)), puntH.filter((s) => !isGame(s)), koH.filter((s) => !isGame(s)), true, koCats);
   // Season highlights: games only, all-inclusive. Shown above once games exist.
   const season = hasGame ? highlightsFor(gameFG, gamePunt, gameKO, false) : null;
 
@@ -97,7 +123,7 @@ function Highlights() {
       )}
       <div>
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Practice Highlights</h2>
-        <HighlightCards h={practice} />
+        <HighlightCards h={practice} koDeepOnly />
       </div>
     </div>
   );
