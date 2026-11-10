@@ -66,7 +66,7 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
       />
 
       {/* Stage */}
-      <div className="relative aspect-[2/1] w-full sm:aspect-[12/5]" style={{ perspective: "1800px" }}>
+      <div className="relative aspect-[16/9] w-full sm:aspect-[12/5]" style={{ perspective: "1800px" }}>
         {slides.map((s, i) => {
           const o = offsetOf(i);
           const abs = Math.abs(o);
@@ -82,7 +82,7 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
               aria-label={o === 0 ? undefined : `Show ${s.title}`}
               aria-hidden={!visible}
               onClick={o === 0 ? undefined : () => go(i)}
-              className="absolute left-1/2 top-1/2 aspect-[16/10] w-[78%] transition-all duration-[900ms] sm:w-[58%]"
+              className="absolute left-1/2 top-1/2 aspect-[3/2] w-[78%] transition-all duration-[900ms] sm:w-[58%]"
               style={{
                 transform,
                 transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",

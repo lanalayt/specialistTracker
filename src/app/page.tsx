@@ -4,13 +4,33 @@ import { ScreenshotCarousel, type Slide } from "@/components/landing/ScreenshotC
 // Public landing page. Logged-in visitors are sent straight to /dashboard by
 // the middleware, so this is only ever shown to people who aren't signed in.
 
-// Add real screenshots to /public/landing/ and set `src` on each slide.
+// Screenshots live in /public/landing/. A slide can also be a screen recording (.mp4/.webm).
 const SLIDES: Slide[] = [
-  { title: "Dashboard", caption: "Your whole special teams unit at a glance." },
-  { title: "Live charting", caption: "Chart every rep from the sideline, right from your phone." },
-  { title: "Statistics", caption: "Season and career numbers for every specialist." },
-  { title: "Session history", caption: "Go back to any practice or game and see every kick." },
-  { title: "Scouting", caption: "Chart opponents and keep every report in one place." },
+  {
+    src: "/landing/dashboard.jpg",
+    title: "Dashboard",
+    caption: "Practice highlights and recent sessions for your whole unit at a glance.",
+  },
+  {
+    src: "/landing/fg-session.jpg",
+    title: "Live FG charting",
+    caption: "Log every kick live with operation time, a make chart by position and distance, and a miss breakdown.",
+  },
+  {
+    src: "/landing/fg-statistics.jpg",
+    title: "Statistics",
+    caption: "Make %, kick score, long FG and operation time for every athlete, broken down by hash.",
+  },
+  {
+    src: "/landing/snap-charting.jpg",
+    title: "Snap charting",
+    caption: "Chart accuracy, laces and spiral on every snap and see exactly where it hit the target.",
+  },
+  {
+    src: "/landing/punt-charting-games.jpg",
+    title: "Charting games",
+    caption: "Make practice competitive with Line Golf, Punt Battle and the Big Ball Calculator.",
+  },
 ];
 
 const PHASES = [
