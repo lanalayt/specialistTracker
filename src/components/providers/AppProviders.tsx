@@ -260,7 +260,7 @@ export function AppProviders({ children, bootstrap = null }: { children: React.R
   // client has no session. Clear any stale token and send them to login.
   useEffect(() => {
     if (isLoading || user) return;
-    const PUBLIC = ["/login", "/signup", "/reset-password"];
+    const PUBLIC = ["/login", "/signup", "/reset-password", "/tutorials"];
     if (!pathname || pathname === "/" || PUBLIC.some((r) => pathname.startsWith(r))) return;
     let cancelled = false;
     const t = setTimeout(async () => {

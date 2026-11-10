@@ -67,6 +67,9 @@ export default function LandingPage() {
             <img src="/logo-mark.svg" alt="" className="h-9 w-9" />
           </Link>
           <nav className="flex items-center gap-2">
+            <Link href="/tutorials" className="px-2 text-sm font-medium text-muted transition hover:text-slate-100 sm:px-3">
+              Tutorials
+            </Link>
             <Link href="/login" className="btn-ghost">Log in</Link>
             <Link href="/signup" className="btn-primary">Sign up</Link>
           </nav>
@@ -149,6 +152,32 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Tutorials */}
+      <section className="px-4 py-24 sm:px-6">
+        <div
+          className="relative mx-auto flex max-w-5xl flex-col items-center gap-8 overflow-hidden rounded-card border border-border p-8 text-center sm:p-12 md:flex-row md:text-left"
+          style={{ background: "linear-gradient(135deg, var(--surface-2), var(--bg))" }}
+        >
+          <div aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: "linear-gradient(90deg, #00d4a0, #E5B649)" }} />
+          <div
+            className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full border-2 text-4xl text-accent"
+            style={{ borderColor: "#00d4a0", boxShadow: "0 0 40px rgba(0,212,160,0.35)" }}
+          >
+            ▶
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold uppercase tracking-[0.3em] text-accent">Learn the app</p>
+            <h2 className="mt-2 text-3xl font-black uppercase tracking-tight sm:text-4xl">Video tutorials</h2>
+            <p className="mt-3 text-muted">
+              Short walkthroughs of charting, stats, scouting and setting up your team, so your staff can get going fast.
+            </p>
+          </div>
+          <Link href="/tutorials" className="btn-primary flex-shrink-0 px-8 py-4 text-base">
+            Watch tutorials
+          </Link>
         </div>
       </section>
 
