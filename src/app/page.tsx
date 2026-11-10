@@ -12,6 +12,11 @@ const SLIDES: Slide[] = [
     caption: "Practice highlights and recent sessions for your whole unit at a glance.",
   },
   {
+    src: "/landing/snap-charting.jpg",
+    title: "Manual Charting",
+    caption: "Manually input stats after a practice for every phase.",
+  },
+  {
     src: "/landing/fg-session.jpg",
     title: "Live FG charting",
     caption: "Log every kick live with operation time, a make chart by position and distance, and a miss breakdown.",
@@ -25,11 +30,6 @@ const SLIDES: Slide[] = [
     src: "/landing/fg-statistics.jpg",
     title: "Statistics",
     caption: "Make %, kick score, long FG and operation time for every athlete, broken down by hash.",
-  },
-  {
-    src: "/landing/snap-charting.jpg",
-    title: "Snap charting",
-    caption: "Chart accuracy, laces and spiral on every snap and see exactly where it hit the target.",
   },
   {
     src: "/landing/scouting.jpg",
