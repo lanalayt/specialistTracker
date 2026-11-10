@@ -27,6 +27,11 @@ const SLIDES: Slide[] = [
     caption: "Chart accuracy, laces and spiral on every snap and see exactly where it hit the target.",
   },
   {
+    src: "/landing/scouting.jpg",
+    title: "Scouting",
+    caption: "Chart kickers kick by kick and get instant rankings you can export.",
+  },
+  {
     src: "/landing/punt-charting-games.jpg",
     title: "Charting games",
     caption: "Make practice competitive with Line Golf, Punt Battle and the Big Ball Calculator.",
