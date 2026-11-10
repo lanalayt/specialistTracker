@@ -33,8 +33,8 @@ const SLIDES: Slide[] = [
   },
   {
     src: "/landing/scouting.jpg",
-    title: "Scouting",
-    caption: "Chart kickers kick by kick and get instant rankings you can export.",
+    title: "Scouting Mode",
+    caption: "Chart your recruits to get rankings as well as detailed bios on every athlete.",
   },
   {
     src: "/landing/punt-charting-games.jpg",
