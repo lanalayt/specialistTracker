@@ -518,7 +518,7 @@ export default function KickingStatisticsPage() {
         const holders = Object.keys(holderData);
         if (holders.length === 0) return null;
         return (
-          <CollapsibleSection title="By Holder" defaultOpen>
+          <CollapsibleSection title="By Holder">
             <div className="space-y-4">
               {holders.map((h) => {
                 const kicks = holderData[h].kicks;
