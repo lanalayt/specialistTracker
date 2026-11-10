@@ -17,6 +17,11 @@ const SLIDES: Slide[] = [
     caption: "Log every kick live with operation time, a make chart by position and distance, and a miss breakdown.",
   },
   {
+    src: "/landing/punt-game-charting.jpg",
+    title: "Game charting",
+    caption: "Chart every punt on game day with gross, net, hang, operation time and returns, plotted on a live punt chart.",
+  },
+  {
     src: "/landing/fg-statistics.jpg",
     title: "Statistics",
     caption: "Make %, kick score, long FG and operation time for every athlete, broken down by hash.",
