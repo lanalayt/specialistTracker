@@ -99,7 +99,14 @@ function TutorialCard({ tutorial }: { tutorial: Tutorial }) {
             loading="lazy"
           />
         ) : tutorial.src ? (
-          <video src={tutorial.src} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full" />
+          <video
+            src={tutorial.src}
+            poster={tutorial.poster}
+            controls
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 h-full w-full"
+          />
         ) : (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center gap-2"

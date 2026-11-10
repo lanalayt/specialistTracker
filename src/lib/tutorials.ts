@@ -11,6 +11,8 @@ export type Tutorial = {
   description: string;
   youtube?: string;
   src?: string;
+  /** Optional preview image shown before a video file plays. */
+  poster?: string;
 };
 
 export type TutorialSection = {
@@ -45,7 +47,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     title: "Punting",
     icon: "/punter.png",
     tutorials: [
-      { title: "Charting a punt session", description: "Gross, hang time, punt type and direction for every rep." },
+      {
+        title: "Charting a punt session",
+        description: "Manually enter a practice: athlete, type, yards, hang time, op time and direction for every punt.",
+        src: "/tutorials/punt-manual-charting.mp4",
+        poster: "/tutorials/punt-manual-charting.jpg",
+      },
       { title: "Game charting", description: "Chart punts on game day with net, returns and the live punt chart." },
       { title: "Charting games", description: "Line Golf, Punt Battle and the Big Ball Calculator." },
     ],
