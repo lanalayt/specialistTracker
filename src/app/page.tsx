@@ -101,10 +101,16 @@ export default function LandingPage() {
 
         <div className="relative mx-auto flex max-w-5xl flex-col items-center pb-24 pt-20 text-center">
           <h1 className="mt-6 max-w-4xl text-4xl font-black uppercase leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl">
-            Every kick. Every punt.{" "}
-            <span className="bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(90deg, #00d4a0, #E5B649)" }}>
-              Every snap.
-            </span>
+            {["Every kick", "Every punt", "Every snap"].map((line) => (
+              <span key={line} className="block">
+                <span
+                  className="inline-block bg-clip-text pb-1 text-transparent"
+                  style={{ backgroundImage: "linear-gradient(90deg, #00d4a0, #E5B649)" }}
+                >
+                  {line}
+                </span>
+              </span>
+            ))}
           </h1>
           <p className="mt-6 max-w-2xl text-lg text-muted sm:text-xl">
             The performance platform built for special teams. Chart practice and game reps, and see the numbers that
