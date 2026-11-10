@@ -48,7 +48,7 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     icon: "/punter.png",
     tutorials: [
       {
-        title: "Charting a punt session",
+        title: "Charting a Punt Session - Manually",
         description: "Manually enter a practice: athlete, type, yards, hang time, op time and direction for every punt.",
         src: "/tutorials/punt-manual-charting.mp4",
         poster: "/tutorials/punt-manual-charting.jpg",
