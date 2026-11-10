@@ -3306,7 +3306,12 @@ export default function PuntingSessionPage() {
               yards: parseFloat(r.yards) || 0,
               hangTime: parseFloat(r.hangTime) || 0,
               opTime: parseFloat(r.opTime) || 0,
-              directionalAccuracy: r.directionalAccuracy ? (parseFloat(r.directionalAccuracy) || 0) : undefined,
+              // Field-based direction stores an option id (e.g. "SL-NUM"); score it the same way commit does.
+              directionalAccuracy: r.directionalAccuracy
+                ? (dirMode === "field"
+                  ? (DA_OPTIONS.find((o) => o.value === r.directionalAccuracy)?.score ?? 0)
+                  : (parseFloat(r.directionalAccuracy) || 0))
+                : undefined,
             }));
             const athleteNames = [...new Set(allPunts.map((p) => p.athlete))];
 
