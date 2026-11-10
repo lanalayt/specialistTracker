@@ -38,7 +38,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     title: "FG Kicking",
     icon: "/kicker-fg.png",
     tutorials: [
-      { title: "Charting a practice session", description: "Log kicks live with distance, position, result and operation time." },
+      {
+        title: "Charting a FG Session - Manually",
+        description: "Manually enter a practice: athlete, distance, position, result, kick score and op time for every kick.",
+        src: "/tutorials/fg-manual-charting.mp4",
+        poster: "/tutorials/fg-manual-charting.jpg",
+      },
       { title: "Reading your FG statistics", description: "Make %, kick score, long FG and splits by hash." },
     ],
   },
