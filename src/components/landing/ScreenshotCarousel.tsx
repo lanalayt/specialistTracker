@@ -24,7 +24,9 @@ const isVideo = (src: string) => /\.(mp4|webm|mov)$/i.test(src);
  */
 export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [zoomed, setZoomed] = useState<Slide | null>(null);
+  const paused = hovering || zoomed !== null;
   const touchX = useRef<number | null>(null);
   const count = slides.length;
 
@@ -43,13 +45,21 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
     return o;
   };
 
+  // Close the enlarged view with Escape.
+  useEffect(() => {
+    if (!zoomed) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setZoomed(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomed]);
+
   const current = slides[index];
 
   return (
     <div
-      className="relative mx-auto w-full max-w-7xl"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      className="relative mx-auto w-full max-w-[1440px]"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
       onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
       onTouchEnd={(e) => {
         if (touchX.current === null) return;
@@ -66,30 +76,32 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
       />
 
       {/* Stage */}
-      <div className="relative aspect-[16/9] w-full sm:aspect-[12/5]" style={{ perspective: "1800px" }}>
+      <div className="relative flex aspect-[16/9] w-full items-center justify-center sm:aspect-[12/5]" style={{ perspective: "1800px" }}>
         {slides.map((s, i) => {
           const o = offsetOf(i);
           const abs = Math.abs(o);
           const visible = abs <= 1;
+          // The front slide has no transform at all so the browser draws it pixel-sharp.
           const transform =
             o === 0
-              ? "translate(-50%, -50%)"
-              : `translate(-50%, -50%) translateX(${o * (visible ? 52 : 90)}%) scale(${visible ? 0.72 : 0.5}) rotateY(${o > 0 ? -22 : 22}deg)`;
+              ? "none"
+              : `translateX(${o * (visible ? 48 : 85)}%) scale(${visible ? 0.66 : 0.5}) rotateY(${o > 0 ? -22 : 22}deg)`;
+          const canZoom = o === 0 && !!s.src && !isVideo(s.src);
           return (
             <div
               key={s.title}
-              role={o === 0 ? undefined : "button"}
-              aria-label={o === 0 ? undefined : `Show ${s.title}`}
+              role={o === 0 && !canZoom ? undefined : "button"}
+              aria-label={o === 0 ? (canZoom ? `Enlarge ${s.title}` : undefined) : `Show ${s.title}`}
               aria-hidden={!visible}
-              onClick={o === 0 ? undefined : () => go(i)}
-              className="absolute left-1/2 top-1/2 aspect-[3/2] w-[78%] transition-all duration-[900ms] sm:w-[58%]"
+              onClick={o === 0 ? (canZoom ? () => setZoomed(s) : undefined) : () => go(i)}
+              className="group absolute aspect-[3/2] w-[78%] transition-all duration-[900ms] sm:w-[58%] lg:w-[62%]"
               style={{
                 transform,
                 transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
                 zIndex: 30 - abs * 10,
                 opacity: o === 0 ? 1 : visible ? 0.55 : 0,
                 filter: o === 0 ? "none" : "brightness(0.6) blur(1px)",
-                cursor: o === 0 ? "default" : "pointer",
+                cursor: o === 0 ? (canZoom ? "zoom-in" : "default") : "pointer",
                 pointerEvents: visible ? "auto" : "none",
               }}
             >
@@ -104,6 +116,14 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
               >
                 <SlideMedia slide={s} active={o === 0} />
               </div>
+              {canZoom && (
+                <span
+                  className="pointer-events-none absolute right-3 top-3 hidden items-center gap-1.5 rounded-pill border border-border px-3 py-1 text-xs font-semibold text-slate-100 opacity-0 transition group-hover:opacity-100 sm:flex"
+                  style={{ background: "rgba(10,15,20,0.85)" }}
+                >
+                  ⤢ Click to enlarge
+                </span>
+              )}
             </div>
           );
         })}
@@ -163,6 +183,24 @@ export function ScreenshotCarousel({ slides }: { slides: Slide[] }) {
           ))}
         </div>
       </div>
+      {/* Enlarged view */}
+      {zoomed?.src && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={zoomed.title}
+          onClick={() => setZoomed(null)}
+          className="fixed inset-0 z-[100] flex cursor-zoom-out flex-col items-center justify-center gap-4 p-4"
+          style={{ background: "rgba(5,8,11,0.92)" }}
+        >
+          <img
+            src={zoomed.src}
+            alt={zoomed.title}
+            className="max-h-[85vh] max-w-[95vw] rounded-xl border border-border object-contain"
+          />
+          <p className="text-sm text-muted">{zoomed.title} · click anywhere or press Esc to close</p>
+        </div>
+      )}
       <style>{`@keyframes st-progress { from { width: 0% } to { width: 100% } }`}</style>
     </div>
   );
