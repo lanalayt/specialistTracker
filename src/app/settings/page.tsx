@@ -14,6 +14,7 @@ import { updateTeamSettings, stampTeamSettingsWrite, patchTeamSettingsCache, use
 import { PRESETS, DEFAULT_THEME, saveTheme, loadAndApplyTheme, loadCustomThemes, saveCustomThemes, loadCustomThemesFromCloud, type ThemeColors, type SavedTheme } from "@/lib/themeColors";
 import { useTeamLogo } from "@/lib/useTeamLogo";
 import clsx from "clsx";
+import { HexColorInput } from "@/components/ui/HexColorInput";
 import React from "react";
 
 // Rendered as its own component so its hooks are never called conditionally.
@@ -275,7 +276,7 @@ function SettingsContent() {
                     className="w-12 h-12 rounded-input border-2 border-border cursor-pointer bg-transparent"
                   />
                   <span className="text-[10px] text-muted font-semibold">Primary</span>
-                  <span className="text-[9px] text-slate-400 font-mono">{theme.primary}</span>
+                  <HexColorInput value={theme.primary} onChange={(hex) => handleColorChange("primary", hex)} className="w-20" ariaLabel="primary color hex code" />
                 </div>
                 <div className="flex flex-col items-center gap-1.5">
                   <input
@@ -285,7 +286,7 @@ function SettingsContent() {
                     className="w-12 h-12 rounded-input border-2 border-border cursor-pointer bg-transparent"
                   />
                   <span className="text-[10px] text-muted font-semibold">Background</span>
-                  <span className="text-[9px] text-slate-400 font-mono">{theme.secondary}</span>
+                  <HexColorInput value={theme.secondary} onChange={(hex) => handleColorChange("secondary", hex)} className="w-20" ariaLabel="secondary color hex code" />
                 </div>
                 <div className="flex flex-col items-center gap-1.5">
                   <input
@@ -295,7 +296,7 @@ function SettingsContent() {
                     className="w-12 h-12 rounded-input border-2 border-border cursor-pointer bg-transparent"
                   />
                   <span className="text-[10px] text-muted font-semibold">Borders</span>
-                  <span className="text-[9px] text-slate-400 font-mono">{theme.tertiary}</span>
+                  <HexColorInput value={theme.tertiary} onChange={(hex) => handleColorChange("tertiary", hex)} className="w-20" ariaLabel="tertiary color hex code" />
                 </div>
               </div>
             </div>

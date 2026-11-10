@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getTeamId } from "@/lib/teamData";
 import {
   loadScoutAthletes,
+  renameScoutAthleteInSessions,
   saveScoutAthletes,
   removeScoutAthlete,
   loadScoutProfiles,
@@ -263,6 +264,8 @@ export default function ScoutAthletesPage() {
         }
       }
       setAllNames((prev) => prev.map((n) => n === originalName ? profile.name : n).sort((a, b) => a.localeCompare(b)));
+      // Carry their already-charted kicks/punts/snaps over to the new name.
+      await renameScoutAthleteInSessions(tid, originalName, profile.name);
     }
     updated[profile.name] = profile;
     setProfiles(updated);
@@ -298,6 +301,8 @@ export default function ScoutAthletesPage() {
     }
 
     setProfileOpen(null);
+    // Refresh their charts under the new name.
+    if (originalName && originalName !== profile.name) await loadData();
   };
 
   return (

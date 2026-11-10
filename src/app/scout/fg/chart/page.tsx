@@ -368,7 +368,8 @@ function ScoutFGChartInner() {
   useUnsavedWarning(getResultCount() > 0 && !saved);
 
   const addAthlete = async (name: string) => {
-    const trimmed = name.trim();
+    // Number only is fine — the athlete is listed as "#25" until a name is added.
+    const trimmed = name.trim() || (newAthleteNum.trim() ? `#${newAthleteNum.trim()}` : "");
     if (!trimmed || athleteNames.includes(trimmed)) return;
     const updated = [...athleteNames, trimmed];
     setAthleteNames(updated);
@@ -529,9 +530,9 @@ function ScoutFGChartInner() {
             ))}
           </div>
           <div className="flex gap-2">
-            <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
+            <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => { if (e.key === "Enter") addAthlete(newAthleteName); }} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
             <input type="text" value={newAthleteName} onChange={(e) => setNewAthleteName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addAthlete(newAthleteName); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
-            <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
+            <button onClick={() => addAthlete(newAthleteName)} disabled={!newAthleteName.trim() && !newAthleteNum.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
           </div>
           {selectedPlayers.length > 0 && (
             <p className="text-xs text-muted">Order: {selectedPlayers.map((p) => scoutDisplayName(p, scoutNumbers)).join(" → ")}</p>

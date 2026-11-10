@@ -12,6 +12,7 @@ import { KickoffProvider, useKickoff } from "@/lib/kickoffContext";
 import { LongSnapProvider } from "@/lib/longSnapContext";
 import { useTeamSettings } from "@/lib/teamSettingsStore";
 import { makePct } from "@/lib/stats";
+import { getCachedSettings, loadSettingsFromCloud } from "@/lib/settingsSync";
 import { MAKE_RESULTS } from "@/types";
 import type { FGKick, PuntEntry, KickoffEntry, Session } from "@/types";
 import Link from "next/link";
@@ -25,11 +26,45 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
 ];
 
 // KO "directional" = deep kicks (not sky/squib/onside).
-const isDeepKO = (type?: string) => !/SKY|SQUIB|ONSIDE/i.test(type || "");
+type KOSettingsLite = { kickoffTypes?: { id: string; category?: string; metric?: string }[] };
+type KOTypeMeta = Record<string, { category?: string; metric?: string }>;
+
+/** type id → category + metric from KO settings, so custom or renamed
+ *  Sky/Squib/Onside types are classified by their actual settings. */
+function koTypeMeta(settings: KOSettingsLite | null): KOTypeMeta {
+  const map: KOTypeMeta = {};
+  (settings?.kickoffTypes ?? []).forEach((t) => { map[t.id] = { category: t.category, metric: t.metric }; });
+  return map;
+}
+
+/** KO settings, from the warm cache, refreshed from the DB on mount. */
+function useKoTypeMeta(): KOTypeMeta {
+  const [settings, setSettings] = useState<KOSettingsLite | null>(() => getCachedSettings<KOSettingsLite>("kickoffSettings"));
+  useEffect(() => {
+    let alive = true;
+    loadSettingsFromCloud<KOSettingsLite>("kickoffSettings").then((s) => { if (alive && s) setSettings(s); });
+    return () => { alive = false; };
+  }, []);
+  return koTypeMeta(settings);
+}
+
+function isDeepKO(type: string | undefined, meta: KOTypeMeta): boolean {
+  const t = type || "";
+  if (meta[t]?.category) return meta[t].category === "DEEP";
+  // Legacy / unknown types: fall back to the name.
+  return !/SKY|SQUIB|ONSIDE/i.test(t);
+}
+
+/** Only "distance" types store a real distance. "Yard Line" types (e.g. sky
+ *  kicks) store the landing yard line in the same field, so they must not be
+ *  averaged in as distance. */
+function hasKODistance(k: { type?: string; distance: number }, meta: KOTypeMeta): boolean {
+  return k.distance > 0 && (meta[k.type || ""]?.metric ?? "distance") === "distance";
+}
 // Some legacy/imported kicks carry pos "PAT" without the isPAT flag set.
 const isPatKick = (k: { isPAT?: boolean; pos?: string }) => k.isPAT === true || k.pos === "PAT";
 
-function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepOnly: boolean) {
+function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepOnly: boolean, koMeta: KOTypeMeta = {}) {
   const fgKicks = fgH.flatMap((s) => (s.entries ?? []) as FGKick[]).filter((k) => !isPatKick(k));
   const makes = fgKicks.filter((k) => MAKE_RESULTS.includes(k.result));
   const longFG = makes.reduce((m, k) => Math.max(m, k.dist), 0);
@@ -42,8 +77,8 @@ function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepO
   const puntHangE = punts.filter((p) => p.hangTime > 0);
 
   let kos = koH.flatMap((s) => (s.entries ?? []) as KickoffEntry[]);
-  if (koDeepOnly) kos = kos.filter((k) => isDeepKO(k.type));
-  const koDistE = kos.filter((k) => k.distance > 0);
+  if (koDeepOnly) kos = kos.filter((k) => isDeepKO(k.type, koMeta));
+  const koDistE = kos.filter((k) => hasKODistance(k, koMeta));
   const koHangE = kos.filter((k) => k.hangTime > 0);
 
   return {
@@ -56,14 +91,14 @@ function highlightsFor(fgH: Session[], puntH: Session[], koH: Session[], koDeepO
   };
 }
 
-function HighlightCards({ h, accent }: { h: ReturnType<typeof highlightsFor>; accent?: boolean }) {
+function HighlightCards({ h, accent, koDeepOnly }: { h: ReturnType<typeof highlightsFor>; accent?: boolean; koDeepOnly?: boolean }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
       <StatCard label="FG %" value={h.fgPct} accent={accent} glow={accent} />
       <StatCard label="Long FG" value={h.longFG} accent={accent} glow={accent} />
       <StatCard label="Punt Avg" value={h.puntAvg} accent={accent} glow={accent} />
       <StatCard label="Punt Hang" value={h.puntHang} accent={accent} glow={accent} />
-      <StatCard label="KO Avg Dist" value={h.koAvgDist} accent={accent} glow={accent} />
+      <StatCard label={koDeepOnly ? "Deep KO Avg Dist" : "KO Avg Dist"} value={h.koAvgDist} accent={accent} glow={accent} />
       <StatCard label="KO Hang" value={h.koHang} accent={accent} glow={accent} />
     </div>
   );
@@ -74,6 +109,9 @@ function Highlights() {
   const { history: puntH } = usePunt();
   const { history: koH } = useKickoff();
 
+  // KO settings decide which types are "Deep" and which store a distance.
+  const koMeta = useKoTypeMeta();
+
   const isGame = (s: Session) => s.mode === "game";
   const gameFG = fgH.filter(isGame);
   const gamePunt = puntH.filter(isGame);
@@ -81,9 +119,9 @@ function Highlights() {
   const hasGame = gameFG.length + gamePunt.length + gameKO.length > 0;
 
   // Practice highlights: KO stats are directional (deep) only.
-  const practice = highlightsFor(fgH.filter((s) => !isGame(s)), puntH.filter((s) => !isGame(s)), koH.filter((s) => !isGame(s)), true);
+  const practice = highlightsFor(fgH.filter((s) => !isGame(s)), puntH.filter((s) => !isGame(s)), koH.filter((s) => !isGame(s)), true, koMeta);
   // Season highlights: games only, all-inclusive. Shown above once games exist.
-  const season = hasGame ? highlightsFor(gameFG, gamePunt, gameKO, false) : null;
+  const season = hasGame ? highlightsFor(gameFG, gamePunt, gameKO, false, koMeta) : null;
 
   return (
     <div className="space-y-5">
@@ -97,7 +135,7 @@ function Highlights() {
       )}
       <div>
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Practice Highlights</h2>
-        <HighlightCards h={practice} />
+        <HighlightCards h={practice} koDeepOnly />
       </div>
     </div>
   );
@@ -111,6 +149,7 @@ const SPORT_LABELS: Record<string, { label: string; iconEl: React.ReactNode; bas
 };
 
 function DashboardContent() {
+  const koMeta = useKoTypeMeta();
   const fg = useFG();
   const punt = usePunt();
   const kickoff = useKickoff();
@@ -262,9 +301,9 @@ function DashboardContent() {
                       const avgHang = htEntries.length > 0 ? (htEntries.reduce((s, p) => s + p.hangTime, 0) / htEntries.length).toFixed(2) : "—";
                       recap = `${att} punt${att !== 1 ? "s" : ""} · ${avgDist} avg · ${avgHang}s hang`;
                     } else if (session.sport === "KICKOFF") {
-                      const kicks = (session.entries ?? []) as unknown as { distance: number; hangTime: number }[];
+                      const kicks = (session.entries ?? []) as unknown as { type?: string; distance: number; hangTime: number }[];
                       const att = kicks.length;
-                      const distEntries = kicks.filter((k) => k.distance > 0);
+                      const distEntries = kicks.filter((k) => hasKODistance(k, koMeta));
                       const avgDist = distEntries.length > 0 ? (distEntries.reduce((s, k) => s + k.distance, 0) / distEntries.length).toFixed(1) : "—";
                       const htEntries = kicks.filter((k) => k.hangTime > 0);
                       const avgHang = htEntries.length > 0 ? (htEntries.reduce((s, k) => s + k.hangTime, 0) / htEntries.length).toFixed(2) : "—";

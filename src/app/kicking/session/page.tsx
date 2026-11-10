@@ -28,6 +28,7 @@ import { getTeamId } from "@/lib/teamData";
 import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftStore";
 import { formatOpponent } from "@/lib/opponent";
 import OpponentInput from "@/components/ui/OpponentInput";
+import { withCurrent } from "@/lib/athleteOptions";
 
 const INIT_ROWS = 12;
 
@@ -309,7 +310,7 @@ export default function KickingSessionPage() {
   const [committedSnapId, setCommittedSnapId] = useState<string | null>(null);
   const [snapAthletes, setSnapAthletes] = useState<string[]>([]);
   const [holderAthletes, setHolderAthletes] = useState<string[]>([]);
-  const [holderEnabled, setHolderEnabled] = useState(true);
+  const [holderEnabled, setHolderEnabled] = useState(false);
   // Snap logs draft in session_drafts (DB), not localStorage. Hydrate first so
   // the empty initial state can't clobber a saved draft.
   const snapDraftHydrated = useRef(false);
@@ -2284,8 +2285,8 @@ export default function KickingSessionPage() {
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
-                            {athletes.map((a) => (
-                              <option key={a.name} value={a.name}>{a.name}</option>
+                            {withCurrent(athletes.map((a) => a.name), row.athlete).map((n) => (
+                              <option key={n} value={n}>{n}</option>
                             ))}
                           </select>
                         )}
@@ -2667,29 +2668,40 @@ export default function KickingSessionPage() {
               />
             </>
           ) : (() => {
-            const kickRows = sessionKicks.length > 0 ? sessionKicks : filledRows.map(({ r }) => ({
-              dist: parseInt(r.dist) || 0,
-              result: r.result || "",
-              score: parseInt(r.score) || 0,
-              isPAT: r.pos === "PAT",
-            })).filter((k) => k.result);
-            const fgKicks = kickRows.filter((k) => !k.isPAT);
-            const att = fgKicks.length;
-            const made = fgKicks.filter((k) => k.result.startsWith("Y")).length;
-            const longFG = fgKicks.reduce((m, k) => k.result.startsWith("Y") ? Math.max(m, k.dist) : m, 0);
-            if (att === 0) {
+            // Same stat progression as Live Mode, built from the log rows that
+            // have a result entered.
+            const kickRows: FGKick[] = sessionKicks.length > 0 ? sessionKicks : filledRows
+              .filter(({ r }) => r.result)
+              .map(({ r }) => ({
+                athleteId: r.athlete,
+                athlete: r.athlete || "—",
+                dist: r.pos === "PAT" ? 0 : (parseInt(r.dist) || 0),
+                pos: r.pos as FGPosition,
+                result: r.result as FGResult,
+                score: parseInt(r.score) || 0,
+                isPAT: r.pos === "PAT" || undefined,
+              }));
+            if (kickRows.length === 0) {
               return (
                 <div className="flex items-center justify-center h-24 text-xs text-muted">
                   Session stats will appear here
                 </div>
               );
             }
+            const fgKicks = kickRows.filter((k) => !k.isPAT);
+            const sessionMakes = fgKicks.filter((k) => k.result.startsWith("Y")).length;
+            const sessionAtt = fgKicks.length;
+            const sessionLong = fgKicks.reduce((max, k) => k.result.startsWith("Y") ? Math.max(max, k.dist) : max, 0);
+            const sessionAvgScore = sessionAtt > 0 ? (fgKicks.reduce((sum, k) => sum + k.score, 0) / sessionAtt).toFixed(1) : "—";
             return (
-              <div className="grid grid-cols-3 gap-2">
-                <StatCard label="Made" value={`${made}/${att}`} accent glow />
-                <StatCard label="%" value={makePct(att, made)} />
-                <StatCard label="Long" value={longFG > 0 ? `${longFG}` : "—"} />
-              </div>
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  <StatCard label="Session %" value={makePct(sessionAtt, sessionMakes)} accent glow />
+                  <StatCard label="Avg Score" value={sessionAvgScore} />
+                  <StatCard label="Long FG" value={sessionLong > 0 ? `${sessionLong} yd` : "—"} />
+                </div>
+                <LiveFGStats kicks={kickRows} />
+              </>
             );
           })()}
         </div>

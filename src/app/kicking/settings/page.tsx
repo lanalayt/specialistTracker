@@ -30,7 +30,7 @@ const DEFAULT_SETTINGS: FGSettings = {
   scoreEnabled: "practice",
   scoreOptions: DEFAULT_SCORE_OPTIONS,
   opTimeEnabled: true,
-  holderEnabled: true,
+  holderEnabled: false,
 };
 
 function parseScoreMode(val: unknown): ScoreMode {
@@ -73,7 +73,7 @@ function FGSettingsContent() {
   const [scoreEnabled, setScoreEnabled] = useState<ScoreMode>("practice");
   const [scoreOptions, setScoreOptions] = useState<string[]>(DEFAULT_SCORE_OPTIONS);
   const [opTimeEnabled, setOpTimeEnabled] = useState(true);
-  const [holderEnabled, setHolderEnabled] = useState(true);
+  const [holderEnabled, setHolderEnabled] = useState(false);
   const [newScore, setNewScore] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -96,7 +96,7 @@ function FGSettingsContent() {
     setScoreEnabled(local.scoreEnabled);
     setScoreOptions(local.scoreOptions);
     setOpTimeEnabled(local.opTimeEnabled);
-    setHolderEnabled(local.holderEnabled !== false);
+    setHolderEnabled(local.holderEnabled === true);
     setSavedSettings(local);
     setLoaded(true);
 
@@ -118,7 +118,7 @@ function FGSettingsContent() {
           scoreEnabled: parseScoreMode(cloud.scoreEnabled),
           scoreOptions: Array.isArray(cloud.scoreOptions) && cloud.scoreOptions.length > 0 ? cloud.scoreOptions : DEFAULT_SCORE_OPTIONS,
           opTimeEnabled: cloud.opTimeEnabled !== false,
-          holderEnabled: cloud.holderEnabled !== false,
+          holderEnabled: cloud.holderEnabled === true,
         });
       }
     });
@@ -134,7 +134,7 @@ function FGSettingsContent() {
       scoreEnabled !== savedSettings.scoreEnabled ||
       JSON.stringify(scoreOptions) !== JSON.stringify(savedSettings.scoreOptions) ||
       opTimeEnabled !== savedSettings.opTimeEnabled ||
-      holderEnabled !== (savedSettings.holderEnabled !== false);
+      holderEnabled !== (savedSettings.holderEnabled === true);
     setDirty(changed);
     if (changed) setSaved(false);
   }, [snapDistance, makeMode, missMode, scoreEnabled, scoreOptions, opTimeEnabled, holderEnabled, savedSettings, loaded]);

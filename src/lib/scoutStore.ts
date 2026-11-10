@@ -374,10 +374,33 @@ export async function saveScoutNumbers(teamId: string, _sport: string, numbers: 
   }
 }
 
+/**
+ * Rename an athlete inside every saved scout chart (all disciplines), so a
+ * number-only athlete ("#25") keeps their charted data once a name is added.
+ */
+export async function renameScoutAthleteInSessions(teamId: string, oldName: string, newName: string): Promise<void> {
+  if (!teamId || teamId === "local-dev" || oldName === newName) return;
+  const supabase = createClient();
+  for (const sport of ["SCOUT_FG", "SCOUT_PUNT", "SCOUT_KO", "SCOUT_SNAP"]) {
+    const sessions = await loadScoutSessions(teamId, sport);
+    for (const sess of sessions) {
+      const entries = sess.entries as { athlete?: string; athleteId?: string }[];
+      if (!entries.some((e) => e.athlete === oldName || e.athleteId === oldName)) continue;
+      const renamed = entries.map((e) => ({
+        ...e,
+        ...(e.athlete === oldName ? { athlete: newName } : {}),
+        ...(e.athleteId === oldName ? { athleteId: newName } : {}),
+      }));
+      await supabase.from("sessions").update({ entries: renamed, updated_at: new Date().toISOString() }).eq("team_id", teamId).eq("id", sess.id);
+    }
+  }
+}
+
 /** Display name with optional jersey number prefix */
 export function scoutDisplayName(name: string, numbers?: Record<string, string>): string {
   const num = numbers?.[name];
-  return num ? `#${num} ${name}` : name;
+  // Number-only athletes are stored as "#25" — don't show "#25 #25".
+  return num && name !== `#${num}` ? `#${num} ${name}` : name;
 }
 
 /** The scout disciplines an athlete can be charted in. */

@@ -12,9 +12,9 @@ export interface ThemeColors {
 }
 
 export const DEFAULT_THEME: ThemeColors = {
-  primary: "#00d4a0",
+  primary: "#d29d00",
   secondary: "#0a0f14",
-  tertiary: "#1f2f42",
+  tertiary: "#00d4a0",
 };
 
 function parseHex(hex: string): [number, number, number] {

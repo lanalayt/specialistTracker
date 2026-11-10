@@ -100,7 +100,8 @@ function ScoutPuntInner() {
   }, []);
 
   const addLiveAthlete = async () => {
-    const trimmed = newLiveAthlete.trim();
+    // Number only is fine — the athlete is listed as "#25" until a name is added.
+    const trimmed = newLiveAthlete.trim() || (newAthleteNum.trim() ? `#${newAthleteNum.trim()}` : "");
     if (!trimmed || liveAthletes.includes(trimmed)) return;
     const updated = [...liveAthletes, trimmed];
     setLiveAthletes(updated);
@@ -332,9 +333,9 @@ function ScoutPuntInner() {
                 ))}
               </div>
               <div className="flex gap-2">
-                <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
+                <input type="text" inputMode="numeric" value={newAthleteNum} onChange={(e) => setNewAthleteNum(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="#" className="input w-14 text-center text-sm font-bold py-1.5" />
                 <input type="text" value={newLiveAthlete} onChange={(e) => setNewLiveAthlete(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addLiveAthlete(); }} placeholder="Type name to add..." className="input flex-1 text-sm py-1.5" />
-                <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
+                <button onClick={addLiveAthlete} disabled={!newLiveAthlete.trim() && !newAthleteNum.trim()} className="btn-primary px-4 py-1.5 text-xs font-bold disabled:opacity-40">Add</button>
               </div>
               <button onClick={() => { setLiveAthlete(selectedLive.includes(liveAthlete) ? liveAthlete : (selectedLive[0] ?? "")); setLiveStep("input"); }} disabled={selectedLive.length === 0} className="btn-primary w-full py-2.5 text-sm font-bold disabled:opacity-40">Start Live Input</button>
             </div>

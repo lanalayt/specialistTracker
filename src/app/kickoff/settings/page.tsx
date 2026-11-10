@@ -33,8 +33,22 @@ interface KickoffSettings {
   directionEnabled: boolean;
   directionMode: DirectionMode;
   directionMetrics: { id: string; label: string; score?: number }[];
+  /** Each direction system's own list, so switching Numeric ⇄ Field-Based
+   *  doesn't bring back options that were deleted. */
+  directionMetricsByMode?: Partial<Record<DirectionMode, { id: string; label: string; score?: number }[]>>;
   returnYardsEnabled?: boolean;
+  /** Kickoff positions that show up in the Position dropdowns. */
+  enabledPositions?: string[];
 }
+
+const ALL_POSITIONS: { id: string; label: string }[] = [
+  { id: "LH", label: "LH" },
+  { id: "LM", label: "LM" },
+  { id: "M", label: "M" },
+  { id: "RM", label: "RM" },
+  { id: "RH", label: "RH" },
+];
+const DEFAULT_POSITIONS = ALL_POSITIONS.map((p) => p.id);
 
 const DEFAULT_CATEGORIES: KOCategory[] = [
   { id: "DEEP", label: "Deep Kickoffs", enabled: true },
@@ -98,6 +112,9 @@ function loadSettings(): KickoffSettings {
         directionEnabled: parsed.directionEnabled !== false,
         directionMode: parsed.directionMode === "field" ? "field" : "numeric",
         directionMetrics: parsed.directionMetrics?.length > 0 ? parsed.directionMetrics : NUMERIC_DIRECTIONS,
+        directionMetricsByMode: parsed.directionMetricsByMode ?? {},
+        returnYardsEnabled: parsed.returnYardsEnabled !== false,
+        enabledPositions: Array.isArray(parsed.enabledPositions) ? parsed.enabledPositions : DEFAULT_POSITIONS,
       };
     }
   } catch {}
@@ -116,9 +133,11 @@ function KickoffSettingsContent() {
   const [dirEnabled, setDirEnabled] = useState(true);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
   const [directions, setDirections] = useState<{ id: string; label: string; score?: number }[]>(NUMERIC_DIRECTIONS);
+  const [dirByMode, setDirByMode] = useState<NonNullable<KickoffSettings["directionMetricsByMode"]>>({});
   const [newTypes, setNewTypes] = useState<Record<string, string>>({});
   const [newDir, setNewDir] = useState("");
   const [returnYardsEnabled, setReturnYardsEnabled] = useState(true);
+  const [positions, setPositions] = useState<string[]>(DEFAULT_POSITIONS);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -143,7 +162,9 @@ function KickoffSettingsContent() {
     setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
     setDirections(s.directionMetrics);
+    setDirByMode(s.directionMetricsByMode ?? {});
     if (typeof s.returnYardsEnabled === "boolean") setReturnYardsEnabled(s.returnYardsEnabled);
+    setPositions(s.enabledPositions ?? DEFAULT_POSITIONS);
     setSavedSettings(s);
     setLoaded(true);
 
@@ -158,7 +179,9 @@ function KickoffSettingsContent() {
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionMetrics?.length > 0) setDirections(cloud.directionMetrics);
+        if (cloud.directionMetricsByMode) setDirByMode(cloud.directionMetricsByMode);
         if (typeof cloud.returnYardsEnabled === "boolean") setReturnYardsEnabled(cloud.returnYardsEnabled);
+        if (Array.isArray(cloud.enabledPositions)) setPositions(cloud.enabledPositions);
         setSavedSettings({
           kickoffTypes: cloud.kickoffTypes?.length > 0
             ? (cloud.kickoffTypes as unknown as Record<string, unknown>[]).map(migrateType)
@@ -168,6 +191,7 @@ function KickoffSettingsContent() {
           directionMode: cloud.directionMode || "numeric",
           directionMetrics: cloud.directionMetrics?.length > 0 ? cloud.directionMetrics : NUMERIC_DIRECTIONS,
           returnYardsEnabled: cloud.returnYardsEnabled !== false,
+          enabledPositions: Array.isArray(cloud.enabledPositions) ? cloud.enabledPositions : DEFAULT_POSITIONS,
         });
       }
     });
@@ -181,14 +205,26 @@ function KickoffSettingsContent() {
       dirEnabled !== savedSettings.directionEnabled ||
       dirMode !== savedSettings.directionMode ||
       JSON.stringify(directions) !== JSON.stringify(savedSettings.directionMetrics) ||
-      returnYardsEnabled !== (savedSettings.returnYardsEnabled !== false);
+      returnYardsEnabled !== (savedSettings.returnYardsEnabled !== false) ||
+      JSON.stringify(positions) !== JSON.stringify(savedSettings.enabledPositions ?? DEFAULT_POSITIONS);
     setDirty(changed);
     if (changed) setSaved(false);
-  }, [types, categories, dirEnabled, dirMode, directions, savedSettings, loaded]);
+  }, [types, categories, dirEnabled, dirMode, directions, returnYardsEnabled, positions, savedSettings, loaded]);
+
+  const togglePosition = (id: string) => {
+    const next = positions.includes(id) ? positions.filter((p) => p !== id) : [...positions, id];
+    // Keep the canonical LH → RH order
+    setPositions(DEFAULT_POSITIONS.filter((p) => next.includes(p)));
+  };
 
   const handleDirModeChange = (mode: DirectionMode) => {
+    if (mode === dirMode) return;
+    // Remember this mode's list (with any deletions) and restore the other
+    // mode's list instead of resetting it to the defaults.
+    const stash = { ...dirByMode, [dirMode]: directions };
+    setDirByMode(stash);
     setDirMode(mode);
-    setDirections(mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS);
+    setDirections(stash[mode] ?? (mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS));
   };
 
   const handleAddType = (categoryId: string) => {
@@ -216,7 +252,7 @@ function KickoffSettingsContent() {
 
   const executeSave = (typesToSave: KOTypeConfig[]) => {
     interactedRef.current = true;
-    const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionEnabled: dirEnabled, directionMode: dirMode, directionMetrics: directions, returnYardsEnabled };
+    const settings: KickoffSettings = { kickoffTypes: typesToSave, kickoffCategories: categories, directionEnabled: dirEnabled, directionMode: dirMode, directionMetrics: directions, directionMetricsByMode: { ...dirByMode, [dirMode]: directions }, returnYardsEnabled, enabledPositions: positions };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setTypes(typesToSave);
     setSavedSettings(settings);
@@ -463,6 +499,27 @@ function KickoffSettingsContent() {
         )}
       </div>
       </div>
+      </div>
+
+      {/* Kickoff Position */}
+      <div className="card space-y-3">
+        <div>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">Kickoff Position<Tooltip text="Choose which spots you kick off from. Unchecked positions won't appear in the Position dropdown in practice (manual and live) or the game log." /></p>
+          <p className="text-[10px] text-muted mt-0.5">Only checked positions show up when entering a kick&apos;s position</p>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          {ALL_POSITIONS.map((p) => (
+            <label key={p.id} className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={positions.includes(p.id)}
+                onChange={() => togglePosition(p.id)}
+                className="accent-accent"
+              />
+              <span className="text-sm text-slate-200">{p.label}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       {/* Return To Yard Line toggle */}

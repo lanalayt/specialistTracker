@@ -13,6 +13,7 @@ import { loadDraft, saveDraft, clearDraft } from "@/lib/draftStore";
 import { loadSettingsFromCloud, getCachedSettings } from "@/lib/settingsSync";
 import { formatOpponent } from "@/lib/opponent";
 import OpponentInput from "@/components/ui/OpponentInput";
+import { withCurrent } from "@/lib/athleteOptions";
 
 const INIT_ROWS = 12;
 
@@ -249,7 +250,7 @@ export default function LongSnapGameSessionPage() {
                     <td className="py-1 px-1">
                       <select value={row.athlete} onChange={(e) => updatePuntRow(idx, "athlete", e.target.value)} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60">
                         <option value="">—</option>
-                        {athleteNames.map((a) => <option key={a} value={a}>{a}</option>)}
+                        {withCurrent(athleteNames, row.athlete).map((a) => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </td>
                     <td className="py-1 px-1">
@@ -310,7 +311,7 @@ export default function LongSnapGameSessionPage() {
                     <td className="py-1 px-1">
                       <select value={row.athlete} onChange={(e) => updateFGRow(idx, "athlete", e.target.value)} className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60">
                         <option value="">—</option>
-                        {athleteNames.map((a) => <option key={a} value={a}>{a}</option>)}
+                        {withCurrent(athleteNames, row.athlete).map((a) => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </td>
                     <td className="py-1 px-1 text-center">

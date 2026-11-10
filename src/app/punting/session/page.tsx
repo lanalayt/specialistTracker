@@ -25,6 +25,7 @@ import { loadDraft, saveDraft, clearDraft, getCachedDraft } from "@/lib/draftSto
 import { loadAthletes as loadAthleteList, type StoredAthlete } from "@/lib/athleteStore";
 import { formatOpponent } from "@/lib/opponent";
 import OpponentInput from "@/components/ui/OpponentInput";
+import { withCurrent } from "@/lib/athleteOptions";
 
 const INIT_ROWS = 12;
 
@@ -293,14 +294,12 @@ const DEFAULT_DA_OPTIONS = [
   { value: "1", label: "1.0 ✓" },
   { value: "0.5", label: "0.5" },
   { value: "0", label: "0 ★" },
-  { value: "-1", label: "OB" },
 ];
 
 const FIELD_DA_OPTIONS = [
   { value: "SL-NUM", label: "Sideline-Numbers", score: 1 },
   { value: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
   { value: "TO_FIELD", label: "To The Field", score: 0 },
-  { value: "OB", label: "OB", score: -1 },
 ];
 
 function loadOpTimeEnabled(): boolean {
@@ -2747,8 +2746,8 @@ export default function PuntingSessionPage() {
                             className="w-full bg-transparent border border-border/50 rounded px-1 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent/60 disabled:opacity-60"
                           >
                             <option value="">—</option>
-                            {athletes.map((a) => (
-                              <option key={a.id} value={a.name}>{a.name}</option>
+                            {withCurrent(athletes.map((a) => a.name), row.athlete).map((n) => (
+                              <option key={n} value={n}>{n}</option>
                             ))}
                           </select>
                         )}

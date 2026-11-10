@@ -77,6 +77,11 @@ function FGStatTable({ athletes, statsMap, getValue, showScore = true, maxScore 
 }
 
 function FGArchiveStats({ athletes, statsMap }: { athletes: SimpleAthlete[]; statsMap: Record<string, AthleteStats> }) {
+  // Hide hash/position and distance boxes that have no kicks
+  const hasPosKicks = (pos: FGPosition) =>
+    athletes.some((a) => (statsMap[a.name]?.position[pos]?.att ?? 0) > 0);
+  const hasDistKicks = (range: (typeof DIST_RANGES)[number]) =>
+    athletes.some((a) => (statsMap[a.name]?.distance[range]?.att ?? 0) > 0);
   return (
     <div className="space-y-4">
       {/* Overall */}
@@ -182,29 +187,33 @@ function FGArchiveStats({ athletes, statsMap }: { athletes: SimpleAthlete[]; sta
       {/* By Position */}
       <CollapsibleSection title="By Hash / Position">
         <div className="space-y-3">
+          {(["LH", "RH"] as FGPosition[]).some((pos) => hasPosKicks(pos)) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {(["LH", "RH"] as FGPosition[]).map((pos) => (
+            {(["LH", "RH"] as FGPosition[]).filter((pos) => hasPosKicks(pos)).map((pos) => (
               <div key={pos} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[pos]}</p>
                 <FGStatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} />
               </div>
             ))}
           </div>
+          )}
+          {(["LM", "M", "RM"] as FGPosition[]).some((pos) => hasPosKicks(pos)) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {(["LM", "M", "RM"] as FGPosition[]).map((pos) => (
+            {(["LM", "M", "RM"] as FGPosition[]).filter((pos) => hasPosKicks(pos)).map((pos) => (
               <div key={pos} className="card-2">
                 <p className="text-xs font-semibold text-slate-300 mb-2">{POS_LABELS[pos]}</p>
                 <FGStatTable athletes={athletes} statsMap={statsMap} getValue={(s) => s.position[pos]} />
               </div>
             ))}
           </div>
+          )}
         </div>
       </CollapsibleSection>
 
       {/* By Distance */}
       <CollapsibleSection title="By Distance">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {DIST_RANGES.map((range) => {
+          {DIST_RANGES.filter((range) => hasDistKicks(range)).map((range) => {
             const maxScore = range === "50-59" || range === "60+" ? 4 : 3;
             return (
               <div key={range} className="card-2">

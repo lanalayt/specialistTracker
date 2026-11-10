@@ -7,6 +7,7 @@ import { PUNT_TYPE_COLORS, DEFAULT_PUNT_ARC_COLOR } from "@/lib/puntColors";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Toggle } from "@/components/ui/Toggle";
 import { RenameTypeModal } from "@/components/ui/RenameTypeModal";
+import { HexColorInput } from "@/components/ui/HexColorInput";
 import { useAuth } from "@/lib/auth";
 
 const STORAGE_KEY = "puntSettings";
@@ -35,6 +36,9 @@ interface PuntSettings {
   directionEnabled: boolean;
   directionMode: DirectionMode;
   directionOptions: { id: string; label: string; score?: number }[];
+  /** Each direction system's own list, so switching Numeric ⇄ Field-Based
+   *  doesn't bring back options that were deleted. */
+  directionOptionsByMode?: Partial<Record<DirectionMode, { id: string; label: string; score?: number }[]>>;
   opTimeEnabled: boolean;
 }
 
@@ -61,14 +65,12 @@ const NUMERIC_DIRECTIONS = [
   { id: "1", label: "1.0 ✓" },
   { id: "0.5", label: "0.5" },
   { id: "0", label: "0 ★" },
-  { id: "-1", label: "OB" },
 ];
 
 const FIELD_DIRECTIONS = [
   { id: "SL-NUM", label: "Sideline-Numbers", score: 1 },
   { id: "NUM-HASH", label: "Numbers-Hash", score: 0.5 },
   { id: "TO_FIELD", label: "To The Field", score: 0 },
-  { id: "OB", label: "OB", score: -1 },
 ];
 
 function migrateType(t: Record<string, unknown>): PuntTypeConfig {
@@ -109,6 +111,7 @@ function loadSettings(): PuntSettings {
         directionEnabled: parsed.directionEnabled !== false,
         directionMode: mode,
         directionOptions: parsed.directionOptions?.length > 0 ? parsed.directionOptions : defaultDirs,
+        directionOptionsByMode: parsed.directionOptionsByMode ?? {},
         opTimeEnabled: parsed.opTimeEnabled !== false,
       };
     }
@@ -136,12 +139,22 @@ function PuntSettingsContent() {
   const [dirEnabled, setDirEnabled] = useState(true);
   const [dirMode, setDirMode] = useState<DirectionMode>("numeric");
   const [dirOptions, setDirOptions] = useState<{ id: string; label: string; score?: number }[]>(NUMERIC_DIRECTIONS);
+  const [dirByMode, setDirByMode] = useState<NonNullable<PuntSettings["directionOptionsByMode"]>>({});
   const [opTimeEnabled, setOpTimeEnabled] = useState(true);
   const [newDir, setNewDir] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   // Punt type id whose chart-color picker is open.
   const [colorPickerFor, setColorPickerFor] = useState<string | null>(null);
+  const setTypeColor = (id: string, color: string) => {
+    setTypes((prev) => prev.map((x) => {
+      if (x.id !== id) return x;
+      // Cyan is the default — store it as "no color" so untouched types stay unchanged.
+      const { color: _old, ...rest } = x;
+      void _old;
+      return color.toLowerCase() === DEFAULT_PUNT_ARC_COLOR ? rest : { ...rest, color: color.toLowerCase() };
+    }));
+  };
   const [loaded, setLoaded] = useState(false);
   const [pendingRenames, setPendingRenames] = useState<{ id: string; oldLabel: string; newLabel: string; category: string; metric: "distance" | "yardline"; hangTime: boolean; color?: string }[]>([]);
   const [savedSettings, setSavedSettings] = useState<PuntSettings>({
@@ -175,6 +188,7 @@ function PuntSettingsContent() {
     setDirEnabled(s.directionEnabled);
     setDirMode(s.directionMode);
     setDirOptions(ensureScores(s.directionOptions, s.directionMode));
+    setDirByMode(s.directionOptionsByMode ?? {});
     setOpTimeEnabled(s.opTimeEnabled);
     setSavedSettings(s);
     setLoaded(true);
@@ -190,6 +204,7 @@ function PuntSettingsContent() {
         if (typeof cloud.directionEnabled === "boolean") setDirEnabled(cloud.directionEnabled);
         if (cloud.directionMode) setDirMode(cloud.directionMode);
         if (cloud.directionOptions?.length > 0) setDirOptions(ensureScores(cloud.directionOptions, cloud.directionMode || "numeric"));
+        if (cloud.directionOptionsByMode) setDirByMode(cloud.directionOptionsByMode);
         if (typeof cloud.opTimeEnabled === "boolean") setOpTimeEnabled(cloud.opTimeEnabled);
         setSavedSettings({
           puntCategories: cloud.puntCategories?.length > 0 ? cloud.puntCategories : DEFAULT_CATEGORIES,
@@ -217,8 +232,13 @@ function PuntSettingsContent() {
   }, [categories, types, dirEnabled, dirMode, dirOptions, opTimeEnabled, savedSettings, loaded]);
 
   const handleDirModeChange = (mode: DirectionMode) => {
+    if (mode === dirMode) return;
+    // Remember this mode's list (with any deletions) and restore the other
+    // mode's list instead of resetting it to the defaults.
+    const stash = { ...dirByMode, [dirMode]: dirOptions };
+    setDirByMode(stash);
     setDirMode(mode);
-    setDirOptions(mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS);
+    setDirOptions(ensureScores(stash[mode] ?? (mode === "field" ? FIELD_DIRECTIONS : NUMERIC_DIRECTIONS), mode));
   };
 
   const handleAddType = (categoryId: string) => {
@@ -244,7 +264,7 @@ function PuntSettingsContent() {
 
   const executeSave = (typesToSave: PuntTypeConfig[]) => {
     interactedRef.current = true;
-    const settings: PuntSettings = { puntCategories: categories, puntTypes: typesToSave, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, opTimeEnabled };
+    const settings: PuntSettings = { puntCategories: categories, puntTypes: typesToSave, directionEnabled: dirEnabled, directionMode: dirMode, directionOptions: dirOptions, directionOptionsByMode: { ...dirByMode, [dirMode]: dirOptions }, opTimeEnabled };
     saveSettingsToCloud(STORAGE_KEY, settings);
     setTypes(typesToSave);
     setSavedSettings(settings);
@@ -400,13 +420,7 @@ function PuntSettingsContent() {
                                       title={c.name}
                                       aria-label={`${c.name}${active ? " (selected)" : ""}`}
                                       onClick={() => {
-                                        setTypes(types.map((x) => {
-                                          if (x.id !== t.id) return x;
-                                          // Cyan is the default — store it as "no color" so untouched types stay unchanged.
-                                          const { color: _old, ...rest } = x;
-                                          void _old;
-                                          return c.value === DEFAULT_PUNT_ARC_COLOR ? rest : { ...rest, color: c.value };
-                                        }));
+                                        setTypeColor(t.id, c.value);
                                         setColorPickerFor(null);
                                       }}
                                       className={clsx(
@@ -425,6 +439,22 @@ function PuntSettingsContent() {
                                     </button>
                                   );
                                 })}
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
+                                  <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Custom</span>
+                                  <input
+                                    type="color"
+                                    value={t.color ?? DEFAULT_PUNT_ARC_COLOR}
+                                    onChange={(e) => setTypeColor(t.id, e.target.value)}
+                                    aria-label="Pick a custom chart color"
+                                    className="w-7 h-7 rounded-input border border-border cursor-pointer bg-transparent shrink-0"
+                                  />
+                                  <HexColorInput
+                                    value={t.color ?? DEFAULT_PUNT_ARC_COLOR}
+                                    onChange={(hex) => setTypeColor(t.id, hex)}
+                                    className="flex-1"
+                                    ariaLabel="Chart color hex code"
+                                  />
                                 </div>
                               </div>
                             </>
