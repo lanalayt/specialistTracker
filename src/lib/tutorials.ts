@@ -45,12 +45,6 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     icon: "/kicker-fg.png",
     tutorials: [
       {
-        title: "Charting a FG Session - Manually",
-        description: "Enter a practice after the fact from film or notes, star key reps, and commit it to your stats.",
-        src: "/tutorials/fg-manual-charting.mp4",
-        poster: "/tutorials/fg-manual-charting.jpg",
-      },
-      {
         title: "Charting a FG Session - Live",
         description: "Plan your kicks, then log each one live with the result, op timer and kick score.",
         src: "/tutorials/fg-live-charting.mp4",
@@ -70,12 +64,6 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     title: "Punting",
     icon: "/punter.png",
     tutorials: [
-      {
-        title: "Charting a Punt Session - Manually",
-        description: "Enter a practice after the fact from film or notes, see what you can customize, and commit it to your stats.",
-        src: "/tutorials/punt-manual-charting.mp4",
-        poster: "/tutorials/punt-manual-charting.jpg",
-      },
       { title: "Game charting", description: "Chart punts on game day with net, returns and the live punt chart." },
       { title: "Charting games", description: "Line Golf, Punt Battle and the Big Ball Calculator." },
     ],
