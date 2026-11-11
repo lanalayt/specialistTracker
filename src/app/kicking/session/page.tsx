@@ -1928,6 +1928,7 @@ export default function KickingSessionPage() {
             })}
             onConfirm={handleConfirmCommit}
             onCancel={() => setPendingKicks(null)}
+            title={sessionMode === "game" ? "Commit Game" : "Commit Practice"}
             weather={weather}
             onWeatherChange={setWeather}
             snapCount={allSnapEntries.length}
@@ -2726,6 +2727,7 @@ export default function KickingSessionPage() {
           })}
           onConfirm={handleConfirmCommit}
           onCancel={() => setPendingKicks(null)}
+          title={sessionMode === "game" ? "Commit Game" : "Commit Practice"}
           weather={weather}
           onWeatherChange={setWeather}
           snapCount={allSnapEntries.length}

@@ -2363,6 +2363,7 @@ export default function PuntingSessionPage() {
             })}
             onConfirm={handleConfirmCommit}
             onCancel={() => setPendingPunts(null)}
+            title={sessionMode === "game" ? "Commit Game" : "Commit Practice"}
             weather={weather}
             onWeatherChange={setWeather}
           />
@@ -3384,6 +3385,7 @@ export default function PuntingSessionPage() {
           })}
           onConfirm={handleConfirmCommit}
           onCancel={() => setPendingPunts(null)}
+          title={sessionMode === "game" ? "Commit Game" : "Commit Practice"}
           weather={weather}
           onWeatherChange={setWeather}
         />
