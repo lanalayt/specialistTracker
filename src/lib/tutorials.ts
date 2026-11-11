@@ -31,6 +31,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
       { title: "Creating your team", description: "Sign up, name your team and set your school colors." },
       { title: "Adding athletes", description: "Build your roster and assign each athlete to their phases." },
       { title: "Inviting coaches and athletes", description: "Give staff and players their own logins." },
+      {
+        title: "Manual Charting (FG, Kickoff & Punting)",
+        description: "Enter a practice from film or notes, customize types and metrics, star key reps, and commit it to your stats.",
+        src: "/tutorials/manual-charting.mp4",
+        poster: "/tutorials/manual-charting.jpg",
+      },
     ],
   },
   {
