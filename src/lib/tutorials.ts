@@ -56,6 +56,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
         src: "/tutorials/fg-game-charting.mp4",
         poster: "/tutorials/fg-game-charting.jpg",
       },
+      {
+        title: "FG Settings",
+        description: "Snap distance, make and miss tracking, op time, holders and kick score explained.",
+        src: "/tutorials/fg-settings.mp4",
+        poster: "/tutorials/fg-settings.jpg",
+      },
       { title: "Reading your FG statistics", description: "Make %, kick score, long FG and splits by hash." },
     ],
   },
