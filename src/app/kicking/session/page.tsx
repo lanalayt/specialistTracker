@@ -752,6 +752,7 @@ export default function KickingSessionPage() {
       pos: r.pos as FGPosition,
       result: r.result as FGResult,
       score: parseInt(r.score) || 0,
+      opTime: (parseFloat(r.opTime) || 0) > 0 ? parseFloat(r.opTime) : undefined,
       isPAT: r.pos === "PAT" || undefined,
       starred: r.starred || undefined,
     }));
