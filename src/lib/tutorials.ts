@@ -33,7 +33,7 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
       { title: "Inviting coaches and athletes", description: "Give staff and players their own logins." },
       {
         title: "Manual Charting (FG, Kickoff & Punting)",
-        description: "Enter a practice from film or notes, customize types and metrics, star key reps, and commit it to your stats.",
+        description: "Enter a practice from film or notes, star key reps, and commit it to your stats.",
         src: "/tutorials/manual-charting.mp4",
         poster: "/tutorials/manual-charting.jpg",
       },
