@@ -66,7 +66,7 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     tutorials: [
       {
         title: "Charting a Punt Session - Manually",
-        description: "Manually enter a practice: athlete, type, yards, hang time, op time and direction for every punt.",
+        description: "Enter a practice after the fact from film or notes, see what you can customize, and commit it to your stats.",
         src: "/tutorials/punt-manual-charting.mp4",
         poster: "/tutorials/punt-manual-charting.jpg",
       },
