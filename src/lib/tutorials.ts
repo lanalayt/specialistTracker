@@ -50,6 +50,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
         src: "/tutorials/fg-live-charting.mp4",
         poster: "/tutorials/fg-live-charting.jpg",
       },
+      {
+        title: "Charting a FG Game",
+        description: "Enter each kick on game day, save it to the chart and drag it to where the ball went.",
+        src: "/tutorials/fg-game-charting.mp4",
+        poster: "/tutorials/fg-game-charting.jpg",
+      },
       { title: "Reading your FG statistics", description: "Make %, kick score, long FG and splits by hash." },
     ],
   },
