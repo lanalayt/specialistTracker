@@ -40,7 +40,7 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     tutorials: [
       {
         title: "Charting a FG Session - Manually",
-        description: "Manually enter a practice: athlete, distance, position, result, kick score and op time for every kick.",
+        description: "Enter a practice after the fact from film or notes, star key reps, and commit it to your stats.",
         src: "/tutorials/fg-manual-charting.mp4",
         poster: "/tutorials/fg-manual-charting.jpg",
       },
