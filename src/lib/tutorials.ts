@@ -31,12 +31,6 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
       { title: "Creating your team", description: "Sign up, name your team and set your school colors." },
       { title: "Adding athletes", description: "Build your roster and assign each athlete to their phases." },
       { title: "Inviting coaches and athletes", description: "Give staff and players their own logins." },
-      {
-        title: "Manual Charting (FG, Kickoff & Punting)",
-        description: "Enter a practice from film or notes, star key reps, and commit it to your stats.",
-        src: "/tutorials/manual-charting.mp4",
-        poster: "/tutorials/manual-charting.jpg",
-      },
     ],
   },
   {
@@ -44,6 +38,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     title: "FG Kicking",
     icon: "/kicker-fg.png",
     tutorials: [
+      {
+        title: "Manual Charting (FG, Kickoff & Punting)",
+        description: "Enter a practice from film or notes, star key reps, and commit it to your stats.",
+        src: "/tutorials/manual-charting.mp4",
+        poster: "/tutorials/manual-charting.jpg",
+      },
       {
         title: "Charting a FG Session - Live",
         description: "Plan your kicks, then log each one live with the result, op timer and kick score.",
@@ -64,6 +64,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     title: "Punting",
     icon: "/punter.png",
     tutorials: [
+      {
+        title: "Manual Charting (FG, Kickoff & Punting)",
+        description: "Enter a practice from film or notes, star key reps, and commit it to your stats.",
+        src: "/tutorials/manual-charting.mp4",
+        poster: "/tutorials/manual-charting.jpg",
+      },
       { title: "Game charting", description: "Chart punts on game day with net, returns and the live punt chart." },
       { title: "Charting games", description: "Line Golf, Punt Battle and the Big Ball Calculator." },
     ],
@@ -73,6 +79,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
     title: "Kickoff",
     icon: "/kickoff-kicker.png",
     tutorials: [
+      {
+        title: "Manual Charting (FG, Kickoff & Punting)",
+        description: "Enter a practice from film or notes, star key reps, and commit it to your stats.",
+        src: "/tutorials/manual-charting.mp4",
+        poster: "/tutorials/manual-charting.jpg",
+      },
       { title: "Charting kickoffs", description: "Track depth, hang time and placement." },
     ],
   },
