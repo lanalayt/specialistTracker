@@ -19,11 +19,6 @@ const AUTH_ROUTES = ["/login", "/signup", "/onboard"];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Redirect root to dashboard
-  if (pathname === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
   // On localhost (HTTP), Supabase Secure cookies are rejected by the browser,
   // so skip the cookie gate and let the client-side auth context handle it.
   const host = request.headers.get("host") ?? "";
@@ -36,6 +31,13 @@ export async function middleware(request: NextRequest) {
   const hasAuthCookie = request.cookies.getAll().some(
     (c) => c.name.startsWith("sb-") && c.name.includes("-auth-token")
   );
+
+  // Root is the public landing page; signed-in users skip it and go to the app.
+  if (pathname === "/") {
+    return hasAuthCookie
+      ? NextResponse.redirect(new URL("/dashboard", request.url))
+      : NextResponse.next();
+  }
 
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
   const isAuthRoute = AUTH_ROUTES.some((p) => pathname.startsWith(p));

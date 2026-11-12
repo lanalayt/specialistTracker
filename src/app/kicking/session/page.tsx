@@ -752,6 +752,7 @@ export default function KickingSessionPage() {
       pos: r.pos as FGPosition,
       result: r.result as FGResult,
       score: parseInt(r.score) || 0,
+      opTime: (parseFloat(r.opTime) || 0) > 0 ? parseFloat(r.opTime) : undefined,
       isPAT: r.pos === "PAT" || undefined,
       starred: r.starred || undefined,
     }));
@@ -1928,6 +1929,7 @@ export default function KickingSessionPage() {
             })}
             onConfirm={handleConfirmCommit}
             onCancel={() => setPendingKicks(null)}
+            title={sessionMode === "game" ? "Commit Game" : "Commit Practice"}
             weather={weather}
             onWeatherChange={setWeather}
             snapCount={allSnapEntries.length}
@@ -2726,6 +2728,7 @@ export default function KickingSessionPage() {
           })}
           onConfirm={handleConfirmCommit}
           onCancel={() => setPendingKicks(null)}
+          title={sessionMode === "game" ? "Commit Game" : "Commit Practice"}
           weather={weather}
           onWeatherChange={setWeather}
           snapCount={allSnapEntries.length}

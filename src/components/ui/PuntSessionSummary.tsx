@@ -10,6 +10,8 @@ interface PuntSessionSummaryProps {
   onCancel: () => void;
   weather?: string;
   onWeatherChange?: (value: string) => void;
+  /** Dialog heading, e.g. "Commit Game" in game mode. */
+  title?: string;
 }
 
 export function PuntSessionSummary({
@@ -19,6 +21,7 @@ export function PuntSessionSummary({
   onCancel,
   weather,
   onWeatherChange,
+  title = "Commit Practice",
 }: PuntSessionSummaryProps) {
   // Only count punts with actual yardage for distance averages
   const ydsEntries = punts.filter((p) => p.yards > 0);
@@ -50,7 +53,7 @@ export function PuntSessionSummary({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-surface border border-border rounded-card w-full max-w-md shadow-accent-lg">
         <div className="p-5 border-b border-border">
-          <h2 className="text-lg font-bold text-slate-100">Commit Practice</h2>
+          <h2 className="text-lg font-bold text-slate-100">{title}</h2>
           <p className="text-sm text-muted mt-0.5">{label}</p>
         </div>
 

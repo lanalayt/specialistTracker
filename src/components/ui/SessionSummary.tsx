@@ -15,6 +15,8 @@ interface SessionSummaryProps {
   weather?: string;
   onWeatherChange?: (value: string) => void;
   onLogSnap?: () => void;
+  /** Dialog heading, e.g. "Commit Game" in game mode. */
+  title?: string;
 }
 
 export function SessionSummary({
@@ -27,6 +29,7 @@ export function SessionSummary({
   weather,
   onWeatherChange,
   onLogSnap,
+  title = "Commit Practice",
 }: SessionSummaryProps) {
   const fgKicks = kicks.filter((k) => !k.isPAT);
   const patKicks = kicks.filter((k) => k.isPAT);
@@ -59,7 +62,7 @@ export function SessionSummary({
       <div className="bg-surface border border-border rounded-card w-full max-w-md shadow-accent-lg">
         {/* Header */}
         <div className="p-5 border-b border-border">
-          <h2 className="text-lg font-bold text-slate-100">Commit Practice</h2>
+          <h2 className="text-lg font-bold text-slate-100">{title}</h2>
           <p className="text-sm text-muted mt-0.5">{label}</p>
         </div>
 
