@@ -76,6 +76,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
         src: "/tutorials/manual-charting.mp4",
         poster: "/tutorials/manual-charting.jpg",
       },
+      {
+        title: "Charting a Punt Session - Live",
+        description: "Run your punt period live: op & hang timer, total distance or yard lines, direction score, then commit.",
+        src: "/tutorials/punt-live-charting.mp4",
+        poster: "/tutorials/punt-live-charting.jpg",
+      },
       { title: "Game charting", description: "Chart punts on game day with net, returns and the live punt chart." },
       { title: "Charting games", description: "Line Golf, Punt Battle and the Big Ball Calculator." },
     ],
