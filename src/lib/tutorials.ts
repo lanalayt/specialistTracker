@@ -82,6 +82,12 @@ export const TUTORIAL_SECTIONS: TutorialSection[] = [
         src: "/tutorials/punt-live-charting.mp4",
         poster: "/tutorials/punt-live-charting.jpg",
       },
+      {
+        title: "Punt Settings",
+        description: "Punt type names and colors, metrics per punt style, turning types on or off, and direction score.",
+        src: "/tutorials/punt-settings.mp4",
+        poster: "/tutorials/punt-settings.jpg",
+      },
       { title: "Game charting", description: "Chart punts on game day with net, returns and the live punt chart." },
       { title: "Charting games", description: "Line Golf, Punt Battle and the Big Ball Calculator." },
     ],
