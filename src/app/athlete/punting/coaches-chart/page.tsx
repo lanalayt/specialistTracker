@@ -86,6 +86,7 @@ export default function PuntCoachesChartPage() {
 
   const [puntTypes, setPuntTypes] = useState<PuntTypeConfig[]>(DEFAULT_TYPES);
   const [puntCategories, setPuntCategories] = useState<PuntCategory[]>(DEFAULT_CATEGORIES);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     const apply = () => {
@@ -94,7 +95,7 @@ export default function PuntCoachesChartPage() {
       setPuntCategories(categories);
     };
     apply();
-    loadSettingsFromCloud("puntSettings").then(apply);
+    loadSettingsFromCloud("puntSettings").then(apply).finally(() => setSettingsLoaded(true));
   }, []);
 
   const enabledCategories = puntCategories.filter((c) => c.enabled);
@@ -188,6 +189,24 @@ export default function PuntCoachesChartPage() {
       return updated;
     }));
   };
+
+  // Keep every row's category/type valid for the team's configured punt types.
+  // Otherwise a stale id (e.g. the default "DIR_STRAIGHT" when the team uses custom
+  // types) gets saved while the dropdown visually shows the first option instead.
+  useEffect(() => {
+    if (!settingsLoaded || enabledCategories.length === 0) return;
+    let changed = false;
+    const fixed = puntRows.map((r) => {
+      const category = enabledCategories.some((c) => c.id === r.category) ? r.category : enabledCategories[0].id;
+      const types = getTypesForCategory(category);
+      const typeId = types.some((t) => t.id === r.typeId) ? r.typeId : (types[0]?.id ?? r.typeId);
+      if (category === r.category && typeId === r.typeId) return r;
+      changed = true;
+      return { ...r, category, typeId };
+    });
+    if (changed) setPuntRows(fixed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puntRows, puntTypes, puntCategories, settingsLoaded]);
 
   const addRow = () => {
     const firstCat = enabledCategories[0]?.id ?? "DIRECTIONAL";

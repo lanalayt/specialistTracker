@@ -90,6 +90,7 @@ export default function KickoffCoachesChartPage() {
 
   const [koTypes, setKoTypes] = useState<KOTypeConfig[]>(DEFAULT_TYPES);
   const [koCategories, setKoCategories] = useState<KOCategory[]>(DEFAULT_CATEGORIES);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     const apply = () => {
@@ -98,7 +99,7 @@ export default function KickoffCoachesChartPage() {
       setKoCategories(categories);
     };
     apply();
-    loadSettingsFromCloud("kickoffSettings").then(apply);
+    loadSettingsFromCloud("kickoffSettings").then(apply).finally(() => setSettingsLoaded(true));
   }, []);
 
   const getTypesForCategory = (catId: string) => koTypes.filter((t) => t.category === catId);
@@ -173,6 +174,23 @@ export default function KickoffCoachesChartPage() {
   const togglePlayer = (name: string) => setSelectedPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
   const selectAll = () => setSelectedPlayers(athleteNames);
   const toggleReassignPlayer = (name: string) => setReassignPlayers((prev) => prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]);
+
+  // Keep every row's category/type valid for the team's configured kickoff types,
+  // so a stale id is never saved while the dropdown visually shows another option.
+  useEffect(() => {
+    if (!settingsLoaded || koCategories.length === 0) return;
+    let changed = false;
+    const fixed = koRows.map((r) => {
+      const category = koCategories.some((c) => c.id === r.category) ? r.category : koCategories[0].id;
+      const types = getTypesForCategory(category);
+      const typeId = types.some((t) => t.id === r.typeId) ? r.typeId : (types[0]?.id ?? r.typeId);
+      if (category === r.category && typeId === r.typeId) return r;
+      changed = true;
+      return { ...r, category, typeId };
+    });
+    if (changed) setKoRows(fixed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [koRows, koTypes, koCategories, settingsLoaded]);
 
   const addRow = () => {
     const firstCat = koCategories[0]?.id ?? "DEEP";
