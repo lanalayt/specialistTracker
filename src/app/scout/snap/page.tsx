@@ -17,6 +17,7 @@ import { HolderStrikeZone } from "@/components/ui/HolderStrikeZone";
 import { PunterStrikeZone } from "@/components/ui/PunterStrikeZone";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
+import { MobileRankCard } from "@/components/ui/MobileRankCard";
 import clsx from "clsx";
 
 interface SnapEntry {
@@ -377,7 +378,27 @@ function ScoutSnapInner() {
               <p className="text-sm text-muted py-8 text-center">No {rankingTab === "short" ? "short snap" : "long snap"} data yet.</p>
             ) : (
               <div className="card space-y-3">
-                <div className="overflow-x-auto">
+                <div className="sm:hidden divide-y divide-white/5 -my-1">
+                  {activeRanked.map((r, i) => (
+                    <MobileRankCard
+                      key={`${r.sessionId}-${r.name}`}
+                      rank={i + 1}
+                      name={<button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); setProfileSession(r.sessionId); }} className="text-left hover:text-amber-400 transition-colors underline decoration-dotted decoration-white/30 underline-offset-2">{r.name}</button>}
+                      meta={`${r.count} snap${r.count !== 1 ? "s" : ""}${rankingTab === "long" && r.avgTime ? ` · ${r.avgTime.toFixed(2)}s avg` : ""}`}
+                      stat={`${r.pct}%`}
+                      statSub={`${r.total}/${r.maxScore}`}
+                      extraAction={{ label: "See chart", onClick: () => setDetailOpen(r) }}
+                      selectMode={selectMode}
+                      selected={selectedRows.has(`${r.sessionId}|||${r.name}`)}
+                      onToggleSelect={() => toggleRowSelection(`${r.sessionId}|||${r.name}`)}
+                      onRowClick={() => setActionTarget({ sessionId: r.sessionId, name: r.name })}
+                      onInfo={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId })}
+                      infoActive={!!(r.notes || r.weather)}
+                      onDelete={() => handleDeleteRow(r.name, r.sessionId)}
+                    />
+                  ))}
+                </div>
+                <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr>

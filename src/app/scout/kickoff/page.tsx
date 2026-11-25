@@ -16,6 +16,7 @@ import { InfoModal } from "@/components/ui/InfoModal";
 import { ScoutProfileModal } from "@/components/ui/ScoutProfileModal";
 import { Header } from "@/components/layout/Header";
 import Link from "next/link";
+import { MobileRankCard } from "@/components/ui/MobileRankCard";
 import clsx from "clsx";
 
 interface KOEntry { athlete: string; kickNum: number; distance: number; hangTime: number; directionGood: boolean; score: number }
@@ -405,7 +406,27 @@ function ScoutKOInner() {
             ) : (
               <div className="card space-y-3">
                 <p className="text-[10px] text-muted text-center">Click a chart to edit</p>
-                <div className="overflow-x-auto">
+                <div className="sm:hidden divide-y divide-white/5 -my-1">
+                  {ranked.map((r, i) => (
+                    <MobileRankCard
+                      key={`${r.sessionId}-${r.name}`}
+                      rank={i + 1}
+                      name={<button onClick={(e) => { e.stopPropagation(); setProfileOpen(r.name); setProfileSession(r.sessionId); }} className="text-left hover:text-amber-400 transition-colors underline decoration-dotted decoration-white/30 underline-offset-2">{scoutDisplayName(r.name, scoutNumbers)}</button>}
+                      meta={`${r.entries.length} kick${r.entries.length !== 1 ? "s" : ""}`}
+                      stat={r.avg.toFixed(2)}
+                      statSub="Avg"
+                      reps={r.entries.map((e, j) => ({ label: `K${j + 1}`, value: e.distance, sub: `${e.hangTime.toFixed(2)}s`, good: e.directionGood }))}
+                      selectMode={selectMode}
+                      selected={selectedRows.has(`${r.sessionId}|||${r.name}`)}
+                      onToggleSelect={() => toggleRowSelection(`${r.sessionId}|||${r.name}`)}
+                      onRowClick={() => setActionTarget({ sessionId: r.sessionId, name: r.name })}
+                      onInfo={() => setInfoModal({ name: r.name, notes: r.notes, weather: r.weather, date: r.date, sessionId: r.sessionId })}
+                      infoActive={!!(r.notes || r.weather)}
+                      onDelete={() => handleDeleteRow(r.name, r.sessionId)}
+                    />
+                  ))}
+                </div>
+                <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr>
