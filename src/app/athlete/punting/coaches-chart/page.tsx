@@ -111,10 +111,30 @@ export default function PuntCoachesChartPage() {
   // Draft persistence in session_drafts (DB), not localStorage. Don't save until
   // the DB draft has hydrated, so the initial state can't clobber it.
   const draftHydrated = useRef(false);
+  // Editing an existing assigned chart (?edit=<id>): load it into the builder instead of the draft.
+  const [editingChart, setEditingChart] = useState<AssignedChart | null>(null);
   useEffect(() => {
     (async () => {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      const editId = new URLSearchParams(window.location.search).get("edit");
+      if (editId && tid) {
+        const chart = (await loadAssignedCharts(tid)).find((c) => c.id === editId);
+        if (chart) {
+          const { types, categories } = loadPuntSettings();
+          const rows: PuntRow[] = ((chart.puntTypes ?? []) as any[]).map((pt) => {
+            const typeConfig = types.find((t) => t.id === pt.typeId);
+            const catConfig = categories.find((c) => c.label === pt.type || c.id === pt.type);
+            return { category: typeConfig?.category ?? catConfig?.id ?? "DIRECTIONAL", count: pt.count ?? 0, typeId: pt.typeId ?? typeConfig?.id ?? "DIR_STRAIGHT", hash: pt.hash ?? "M", yardLine: pt.yardLine };
+          });
+          if (rows.length) setPuntRows(rows);
+          setSelectedPlayers(chart.athletes);
+          setDueDate(chart.dueDate ? chart.dueDate.slice(0, 10) : "");
+          setChartAction("assign");
+          setEditingChart(chart);
+          return; // never hydrate or save the draft while editing
+        }
+      }
       if (tid && tid !== "local-dev") {
         const d = await loadDraft<{ puntRows?: PuntRow[]; selectedPlayers?: string[]; chartAction?: "assign" | "now"; dueDate?: string }>(tid, DRAFT_KEY);
         if (d) {
@@ -189,14 +209,22 @@ export default function PuntCoachesChartPage() {
       const catConfig = puntCategories.find((c) => c.id === r.category);
       return { type: catConfig?.label ?? r.category, typeId: r.typeId, typeLabel: typeConfig?.label ?? r.typeId, count: r.count, hash: r.hash, yardLine: r.yardLine || undefined };
     });
+    const puntTypesOut = puntTypeBreakdown.map((p) => ({ type: p.type, typeId: p.typeId, typeLabel: p.typeLabel, count: p.count, hash: p.hash, yardLine: p.yardLine } as any));
+    const existing = await loadAssignedCharts(tid);
+    if (editingChart) {
+      const completedBy = Object.fromEntries(Object.entries(editingChart.completedBy).filter(([a]) => selectedPlayers.includes(a)));
+      await saveAssignedCharts(tid, existing.map((c) => c.id === editingChart.id ? { ...c, dueDate, athletes: selectedPlayers, reps: totalReps, puntTypes: puntTypesOut, completedBy } : c));
+      setSaved(true);
+      loadCharts();
+      return;
+    }
     const chart: AssignedChart = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "ATHLETE_PUNTING", createdBy: user?.name ?? "Coach", createdAt: new Date().toISOString(),
       dueDate, athletes: selectedPlayers, kicks: [], reps: totalReps,
-      puntTypes: puntTypeBreakdown.map((p) => ({ type: p.type, typeId: p.typeId, typeLabel: p.typeLabel, count: p.count, hash: p.hash, yardLine: p.yardLine } as any)),
+      puntTypes: puntTypesOut,
       completedBy: {},
     };
-    const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
     setSaved(true);
     { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, DRAFT_KEY); }
@@ -287,9 +315,15 @@ export default function PuntCoachesChartPage() {
   return (
     <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
       <Link href="/athlete/punting/session" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
-      <h2 className="text-lg font-bold text-slate-100">{isCoach ? "Coaches Chart" : "Assigned Charts"}</h2>
+      <h2 className="text-lg font-bold text-slate-100">{editingChart ? "Edit Assigned Chart" : isCoach ? "Coaches Chart" : "Assigned Charts"}</h2>
 
-      {isCoach && (saved ? (
+      {isCoach && saved && editingChart ? (
+        <div className="space-y-4 text-center py-8">
+          <p className="text-2xl font-black text-sky-400">Chart Updated!</p>
+          <p className="text-sm text-muted">{totalReps} punts — {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""}</p>
+          <Link href="/athlete" className="btn-primary block max-w-sm mx-auto py-3 text-sm text-center">Done</Link>
+        </div>
+      ) : isCoach && (saved ? (
         <div className="space-y-4 text-center py-8">
           <p className="text-2xl font-black text-sky-400">Chart Assigned!</p>
           <p className="text-sm text-muted">{totalReps} punts — {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""}</p>
@@ -341,10 +375,10 @@ export default function PuntCoachesChartPage() {
             </div>
           </div>
 
-          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+          {!editingChart && <div className="flex rounded-input border border-border overflow-hidden w-fit">
             <button onClick={() => setChartAction("now")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", chartAction === "now" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Chart Now</button>
             <button onClick={() => setChartAction("assign")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", chartAction === "assign" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Assign Chart</button>
-          </div>
+          </div>}
 
           {chartAction === "assign" && (
             <div>
@@ -355,7 +389,7 @@ export default function PuntCoachesChartPage() {
 
           {chartAction === "assign" ? (
             <button onClick={handleAssign} disabled={totalReps <= 0 || selectedPlayers.length === 0 || !dueDate} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">
-              Assign Chart ({totalReps} punt{totalReps !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
+              {editingChart ? "Save Changes" : "Assign Chart"} ({totalReps} punt{totalReps !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
             </button>
           ) : (
             <Link

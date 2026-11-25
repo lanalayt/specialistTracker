@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { PuntFootIcon, KickoffTeeIcon, SnapperIcon } from "@/components/ui/SportIcons";
 import { useAuth } from "@/lib/auth";
 import { getTeamId } from "@/lib/teamData";
-import { loadAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
+import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import Link from "next/link";
 import React from "react";
 
@@ -20,6 +20,10 @@ const KO_HASH_LABELS: Record<string, string> = { LH: "Left Hash", LM: "Left Midd
 
 function chartPathFor(sport: string): string {
   return sport === "ATHLETE_PUNTING" ? "/athlete/punting/athlete-chart" : sport === "ATHLETE_KICKOFF" ? "/athlete/kickoff/athlete-chart" : "/athlete/kicking/off-sticks/athlete-chart";
+}
+
+function editPathFor(sport: string): string {
+  return sport === "ATHLETE_PUNTING" ? "/athlete/punting/coaches-chart" : sport === "ATHLETE_KICKOFF" ? "/athlete/kickoff/coaches-chart" : "/athlete/kicking/off-sticks/coaches-chart";
 }
 
 function sportLabel(sport: string): string {
@@ -54,9 +58,25 @@ function buildPreviewRows(chart: AssignedChart): PreviewRow[] {
 }
 
 export default function AthleteDashboardPage() {
-  const { user } = useAuth();
+  const { user, isCoach } = useAuth();
   const [charts, setCharts] = useState<AssignedChart[]>([]);
   const [previewChart, setPreviewChart] = useState<AssignedChart | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteChart = async (chart: AssignedChart) => {
+    if (!window.confirm("Delete this assigned chart? This cannot be undone.")) return;
+    const tid = getTeamId();
+    if (!tid) return;
+    setDeleting(true);
+    try {
+      const existing = await loadAssignedCharts(tid);
+      await saveAssignedCharts(tid, existing.filter((c) => c.id !== chart.id));
+      setCharts(await loadAssignedCharts(tid));
+      setPreviewChart(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -203,6 +223,12 @@ export default function AthleteDashboardPage() {
                 <Link href={`${chartPathFor(previewChart.sport)}?assigned=${previewChart.id}`} className="btn-primary w-full py-3 text-sm font-bold block text-center">
                   Start Chart{pending.length > 0 ? ` (${pending.join(", ")})` : ""}
                 </Link>
+                {isCoach && (
+                  <div className="flex gap-2">
+                    <Link href={`${editPathFor(previewChart.sport)}?edit=${previewChart.id}`} className="btn-ghost flex-1 py-2 text-xs font-semibold text-center">Edit Chart</Link>
+                    <button onClick={() => handleDeleteChart(previewChart)} disabled={deleting} className="flex-1 py-2 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-colors disabled:opacity-40">{deleting ? "Deleting…" : "Delete Chart"}</button>
+                  </div>
+                )}
                 <button onClick={() => setPreviewChart(null)} className="w-full text-xs text-muted hover:text-white transition-colors py-1">Close</button>
               </div>
             </div>
