@@ -376,10 +376,16 @@ export function MobileNav() {
   const isScout = pathname.startsWith("/scout");
   const isAthlete = pathname.startsWith("/athlete/") || pathname === "/athlete";
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
-
   const items = isScout ? SCOUT_MOBILE_NAV : isAthlete ? ATHLETE_MOBILE_NAV : NAV_ITEMS.slice(0, 5);
+
+  const matches = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  // Highlight only the most specific matching tab, so the Home tab (e.g. /athlete)
+  // isn't also lit when you're inside a section like /athlete/punting.
+  const activeHref = items
+    .map((i) => i.href)
+    .filter(matches)
+    .sort((x, y) => y.length - x.length)[0];
+  const isActive = (href: string) => href === activeHref;
   const activeColor = isScout ? "text-amber-400" : isAthlete ? "text-sky-400" : "text-accent";
   // Custom theme colors (accent, etc.) are plain CSS vars, not Tailwind's
   // RGB-channel format, so bg-accent/NN produces no rule — use the app's
