@@ -16,7 +16,6 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
   { href: "/athlete/longsnap", iconEl: <SnapperIcon size={44} />, label: "Snapping" },
 ];
 
-const KO_HASH_LABELS: Record<string, string> = { LH: "Left Hash", LM: "Left Middle", M: "Middle", RM: "Right Middle", RH: "Right Hash" };
 
 const SPORT_PATHS: Record<string, { chart: string; edit: string; label: string; noun: string }> = {
   ATHLETE_KICKING: { chart: "/athlete/kicking/off-sticks/athlete-chart", edit: "/athlete/kicking/off-sticks/coaches-chart", label: "FG", noun: "kick" },
@@ -74,7 +73,7 @@ function buildPreviewRows(chart: AssignedChart): PreviewRow[] {
     }
   } else if (chart.sport === "ATHLETE_KICKOFF") {
     for (const r of chart.koRows ?? []) {
-      for (let i = 0; i < r.count; i++) reps.push({ title: prettyLabel(r.typeLabel), subtitle: KO_HASH_LABELS[r.hash] ?? hashName(r.hash) });
+      for (let i = 0; i < r.count; i++) reps.push({ title: prettyLabel(r.typeLabel), subtitle: hashName(r.hash) });
     }
   } else {
     for (const k of chart.kicks) reps.push({ title: `${k.distance} yd`, subtitle: hashName(k.hash) });
