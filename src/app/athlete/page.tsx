@@ -18,16 +18,24 @@ const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; labe
 
 const KO_HASH_LABELS: Record<string, string> = { LH: "Left Hash", LM: "Left Middle", M: "Middle", RM: "Right Middle", RH: "Right Hash" };
 
+const SPORT_PATHS: Record<string, { chart: string; edit: string; label: string; noun: string }> = {
+  ATHLETE_KICKING: { chart: "/athlete/kicking/off-sticks/athlete-chart", edit: "/athlete/kicking/off-sticks/coaches-chart", label: "FG", noun: "kick" },
+  ATHLETE_PUNTING: { chart: "/athlete/punting/athlete-chart", edit: "/athlete/punting/coaches-chart", label: "Punt", noun: "punt" },
+  ATHLETE_KICKOFF: { chart: "/athlete/kickoff/athlete-chart", edit: "/athlete/kickoff/coaches-chart", label: "KO", noun: "kickoff" },
+  ATHLETE_LONGSNAP: { chart: "/athlete/longsnap/athlete-chart", edit: "/athlete/longsnap/coaches-chart", label: "Snap", noun: "snap" },
+};
+const sportInfo = (sport: string) => SPORT_PATHS[sport] ?? SPORT_PATHS.ATHLETE_KICKING;
+
 function chartPathFor(sport: string): string {
-  return sport === "ATHLETE_PUNTING" ? "/athlete/punting/athlete-chart" : sport === "ATHLETE_KICKOFF" ? "/athlete/kickoff/athlete-chart" : "/athlete/kicking/off-sticks/athlete-chart";
+  return sportInfo(sport).chart;
 }
 
 function editPathFor(sport: string): string {
-  return sport === "ATHLETE_PUNTING" ? "/athlete/punting/coaches-chart" : sport === "ATHLETE_KICKOFF" ? "/athlete/kickoff/coaches-chart" : "/athlete/kicking/off-sticks/coaches-chart";
+  return sportInfo(sport).edit;
 }
 
 function sportLabel(sport: string): string {
-  return sport === "ATHLETE_KICKING" ? "FG" : sport === "ATHLETE_PUNTING" ? "Punt" : "KO";
+  return sportInfo(sport).label;
 }
 
 const HASH_NAMES: Record<string, string> = {
@@ -58,6 +66,11 @@ function buildPreviewRows(chart: AssignedChart): PreviewRow[] {
       const title = sub && sub !== category ? sub : category;
       const bits = [title !== category ? category : "", pt.hash ? hashName(pt.hash) : "", pt.yardLine ? `LOS ${pt.yardLine}` : ""].filter(Boolean);
       for (let i = 0; i < (pt.count ?? 0); i++) reps.push({ title, subtitle: bits.join(" · ") });
+    }
+  } else if (chart.sport === "ATHLETE_LONGSNAP") {
+    for (const r of (chart.puntTypes ?? []) as any[]) {
+      const isPunt = (r.typeId ?? r.type) === "PUNT";
+      for (let i = 0; i < (r.count ?? 0); i++) reps.push({ title: isPunt ? "Long snap" : "Short snap", subtitle: isPunt ? "Punt" : "Field goal" });
     }
   } else if (chart.sport === "ATHLETE_KICKOFF") {
     for (const r of chart.koRows ?? []) {
@@ -202,7 +215,7 @@ export default function AthleteDashboardPage() {
       {previewChart && (() => {
         const rows = buildPreviewRows(previewChart);
         const total = rows.length ? rows[rows.length - 1].end : (previewChart.reps ?? 0);
-        const noun = previewChart.sport === "ATHLETE_PUNTING" ? "punt" : "kick";
+        const noun = sportInfo(previewChart.sport).noun;
         const pending = previewChart.athletes.filter((a) => !previewChart.completedBy[a]);
         const completed = previewChart.athletes.filter((a) => !!previewChart.completedBy[a]);
         const isOverdue = !!previewChart.dueDate && new Date(previewChart.dueDate) < new Date(new Date().toDateString());

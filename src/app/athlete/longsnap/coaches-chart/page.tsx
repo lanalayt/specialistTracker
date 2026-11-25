@@ -54,10 +54,25 @@ export default function SnapCoachesChartPage() {
   // Draft persistence in session_drafts (DB), not localStorage. Don't save until
   // the DB draft has hydrated, so the initial state can't clobber it.
   const draftHydrated = useRef(false);
+  // Editing an existing assigned chart (?edit=<id>): load it into the builder instead of the draft.
+  const [editingChart, setEditingChart] = useState<AssignedChart | null>(null);
   useEffect(() => {
     (async () => {
       let tid = getTeamId();
       for (let i = 0; i < 15 && !tid; i++) { await new Promise((r) => setTimeout(r, 100)); tid = getTeamId(); }
+      const editId = new URLSearchParams(window.location.search).get("edit");
+      if (editId && tid) {
+        const chart = (await loadAssignedCharts(tid)).find((c) => c.id === editId);
+        if (chart) {
+          const rows: SnapRow[] = ((chart.puntTypes ?? []) as any[]).map((r) => ({ snapType: (r.typeId ?? r.type) === "PUNT" ? "PUNT" : "FG", count: r.count ?? 0 }));
+          if (rows.length) setSnapRows(rows);
+          setSelectedPlayers(chart.athletes);
+          setDueDate(chart.dueDate ? chart.dueDate.slice(0, 10) : "");
+          setChartAction("assign");
+          setEditingChart(chart);
+          return; // never hydrate or save the draft while editing
+        }
+      }
       if (tid && tid !== "local-dev") {
         const d = await loadDraft<{ snapRows?: SnapRow[]; selectedPlayers?: string[] }>(tid, DRAFT_KEY);
         if (d) {
@@ -96,14 +111,22 @@ export default function SnapCoachesChartPage() {
     if (totalSnaps <= 0 || selectedPlayers.length === 0 || !dueDate) return;
     const tid = getTeamId();
     if (!tid) return;
+    const snapTypesOut = snapRows.map((r) => ({ type: r.snapType, typeId: r.snapType, typeLabel: r.snapType === "FG" ? "FG / Short Snap" : "Punt / Long Snap", count: r.count, hash: "" })) as any;
+    const existing = await loadAssignedCharts(tid);
+    if (editingChart) {
+      const completedBy = Object.fromEntries(Object.entries(editingChart.completedBy).filter(([a]) => selectedPlayers.includes(a)));
+      await saveAssignedCharts(tid, existing.map((c) => c.id === editingChart.id ? { ...c, dueDate, athletes: selectedPlayers, reps: totalSnaps, puntTypes: snapTypesOut, completedBy } : c));
+      setSaved(true);
+      loadChartsData();
+      return;
+    }
     const chart: AssignedChart = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sport: "ATHLETE_LONGSNAP", createdBy: user?.name ?? "Coach", createdAt: new Date().toISOString(),
       dueDate, athletes: selectedPlayers, kicks: [], reps: totalSnaps,
-      puntTypes: snapRows.map((r) => ({ type: r.snapType, typeId: r.snapType, typeLabel: r.snapType === "FG" ? "FG / Short Snap" : "Punt / Long Snap", count: r.count, hash: "" })) as any,
+      puntTypes: snapTypesOut,
       completedBy: {},
     };
-    const existing = await loadAssignedCharts(tid);
     await saveAssignedCharts(tid, [...existing, chart]);
     { const tid = getTeamId(); if (tid && tid !== "local-dev") clearDraft(tid, DRAFT_KEY); }
     setSaved(true);
@@ -211,9 +234,15 @@ export default function SnapCoachesChartPage() {
   return (
     <main className="p-4 lg:p-6 max-w-lg mx-auto space-y-4">
       <Link href="/athlete/longsnap" className="text-xs text-muted hover:text-white transition-colors">&larr; Back</Link>
-      <h2 className="text-lg font-bold text-slate-100">{isCoach ? "Coaches Chart" : "Assigned Charts"}</h2>
+      <h2 className="text-lg font-bold text-slate-100">{editingChart ? "Edit Assigned Chart" : isCoach ? "Coaches Chart" : "Assigned Charts"}</h2>
 
-      {isCoach && (saved ? (
+      {isCoach && saved && editingChart ? (
+        <div className="space-y-4 text-center py-8">
+          <p className="text-2xl font-black text-sky-400">Chart Updated!</p>
+          <p className="text-sm text-muted">{totalSnaps} snaps — {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""}</p>
+          <Link href="/athlete" className="btn-primary block max-w-sm mx-auto py-3 text-sm text-center">Done</Link>
+        </div>
+      ) : isCoach && (saved ? (
         <div className="space-y-4 text-center py-8">
           <p className="text-2xl font-black text-sky-400">Chart Assigned!</p>
           <p className="text-sm text-muted">{totalSnaps} snaps — {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""}</p>
@@ -254,10 +283,10 @@ export default function SnapCoachesChartPage() {
             {athleteNames.length === 0 && <p className="text-xs text-muted mt-1">No athletes found.</p>}
           </div>
 
-          <div className="flex rounded-input border border-border overflow-hidden w-fit">
+          {!editingChart && <div className="flex rounded-input border border-border overflow-hidden w-fit">
             <button onClick={() => setChartAction("now")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors", chartAction === "now" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Chart Now</button>
             <button onClick={() => setChartAction("assign")} className={clsx("px-4 py-1.5 text-xs font-semibold transition-colors border-l border-border", chartAction === "assign" ? "bg-sky-500 text-slate-900" : "text-muted hover:text-white")}>Assign Chart</button>
-          </div>
+          </div>}
 
           {chartAction === "assign" && (
             <div>
@@ -268,7 +297,7 @@ export default function SnapCoachesChartPage() {
 
           {chartAction === "assign" ? (
             <button onClick={handleAssign} disabled={totalSnaps <= 0 || selectedPlayers.length === 0 || !dueDate} className="btn-primary w-full py-3 text-sm font-bold disabled:opacity-40">
-              Assign Chart ({totalSnaps} snap{totalSnaps !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
+              {editingChart ? "Save Changes" : "Assign Chart"} ({totalSnaps} snap{totalSnaps !== 1 ? "s" : ""} → {selectedPlayers.length} athlete{selectedPlayers.length !== 1 ? "s" : ""})
             </button>
           ) : (
             <Link
