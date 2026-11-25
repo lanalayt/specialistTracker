@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadScoutRankings, saveScoutRankings, newRankingId, type ScoutRanking } from "@/lib/scoutStore";
+import { loadScoutRankings, saveScoutRankings, loadArchivedRankingIds, newRankingId, type ScoutRanking } from "@/lib/scoutStore";
 import clsx from "clsx";
 
 interface Props {
@@ -18,14 +18,15 @@ interface Props {
 export function AssignRankingsModal({ teamId, sport, onConfirm, onClose }: Props) {
   const [rankings, setRankings] = useState<ScoutRanking[]>([{ id: "overall", name: "Overall" }]);
   const [selected, setSelected] = useState<Set<string>>(new Set(["overall"]));
+  const [archivedIds, setArchivedIds] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const list = await loadScoutRankings(teamId, sport);
-      if (active) setRankings(list);
+      const [list, arch] = await Promise.all([loadScoutRankings(teamId, sport), loadArchivedRankingIds(teamId)]);
+      if (active) { setRankings(list); setArchivedIds(arch); }
     })();
     return () => { active = false; };
   }, [teamId, sport]);
@@ -66,7 +67,7 @@ export function AssignRankingsModal({ teamId, sport, onConfirm, onClose }: Props
         <p className="text-[10px] text-muted">Choose which ranking(s) to add this chart to.</p>
 
         <div className="space-y-1.5">
-          {rankings.map((r) => (
+          {rankings.filter((r) => !archivedIds.includes(r.id)).map((r) => (
             <button
               key={r.id}
               onClick={() => toggle(r.id)}

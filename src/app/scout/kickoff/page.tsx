@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getTeamId } from "@/lib/teamData";
-import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, setEntryRankings, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, ALL_RANKING_ID, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
+import { loadScoutSessions, deleteAthleteFromSession, loadScoutProfiles, saveScoutProfiles, deleteScoutProfile, applyScoutDisciplines, insertScoutSession, setSessionRankings, loadSessionRankings, loadScoutRankings, removeEntryFromRanking, setEntryRankings, deleteScoutRanking, loadScoutAthletes, saveScoutAthletes, loadScoutNumbers, saveScoutNumbers, scoutDisplayName, ALL_RANKING_ID, isChartVisible, loadArchivedRankingIds, type ScoutSession, type ScoutProfile, type ScoutRanking } from "@/lib/scoutStore";
 import { AssignRankingsModal } from "@/components/ui/AssignRankingsModal";
 import { RankingTabs } from "@/components/ui/RankingTabs";
 import { EditChartModal } from "@/components/ui/EditChartModal";
@@ -44,7 +44,15 @@ function ScoutKOInner() {
   const [sessions, setSessions] = useState<ScoutSession[]>([]);
   const [rankings, setRankings] = useState<ScoutRanking[]>([{ id: "overall", name: "Overall" }]);
   const [sessionRankings, setSessionRankingsMap] = useState<Record<string, string[]>>({});
-  const [activeRanking, setActiveRanking] = useState(ALL_RANKING_ID);
+  const [activeRanking, setActiveRanking] = useState(searchParams.get("ranking") ?? ALL_RANKING_ID);
+  const [archivedRankings, setArchivedRankings] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      let tid = getTeamId();
+      for (let i = 0; i < 20 && !tid; i++) { await new Promise((r) => setTimeout(r, 150)); tid = getTeamId(); }
+      if (tid) setArchivedRankings(await loadArchivedRankingIds(tid));
+    })();
+  }, []);
   const [showLiveRankings, setShowLiveRankings] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, ScoutProfile>>({});
   const [loading, setLoading] = useState(true);
@@ -154,7 +162,7 @@ function ScoutKOInner() {
   const entryRanks = (sessionId: string, name: string) => sessionRankings[`${sessionId}|||${name}`] ?? sessionRankings[sessionId] ?? ["overall"];
   // Build per-session-per-athlete rows, keeping only the athletes in the active ranking.
   const rankedSessions = sessions
-    .map((s) => ({ ...s, entries: (s.entries as Record<string, unknown>[]).filter((e) => activeRanking === ALL_RANKING_ID || entryRanks(s.id, (e as { athlete?: string }).athlete ?? "").includes(activeRanking)) }))
+    .map((s) => ({ ...s, entries: (s.entries as Record<string, unknown>[]).filter((e) => isChartVisible(entryRanks(s.id, (e as { athlete?: string }).athlete ?? ""), activeRanking, archivedRankings)) }))
     .filter((s) => s.entries.length > 0);
   const ranked: { name: string; sessionId: string; date: string; entries: KOEntry[]; avg: number; notes?: string; weather?: string }[] = [];
   for (const s of rankedSessions) {
@@ -398,7 +406,7 @@ function ScoutKOInner() {
                 )}
               </div>
             )}
-            <RankingTabs teamId={getTeamId() ?? ""} sport="kickoff" rankings={rankings} onRankingsChange={setRankings} active={activeRanking} onActiveChange={setActiveRanking} onDeleteRanking={handleDeleteRanking} />
+            <RankingTabs teamId={getTeamId() ?? ""} sport="kickoff" rankings={rankings} onRankingsChange={setRankings} active={activeRanking} onActiveChange={setActiveRanking} onDeleteRanking={handleDeleteRanking} archived={archivedRankings} onArchivedChange={setArchivedRankings} />
             {loading ? (
               <p className="text-sm text-muted py-8 text-center">Loading...</p>
             ) : ranked.length === 0 ? (
@@ -486,7 +494,7 @@ function ScoutKOInner() {
           onSave={handleSaveProfile}
           onClose={() => { setProfileOpen(null); setProfileSession(null); }}
           ranking={profileSession ? {
-            rankings,
+            rankings: rankings.filter((r) => !archivedRankings.includes(r.id) || entryRanks(profileSession, profileOpen).includes(r.id)),
             currentIds: entryRanks(profileSession, profileOpen),
             onChange: async (ids) => {
               const tid = getTeamId();

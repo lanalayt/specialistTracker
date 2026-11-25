@@ -462,6 +462,52 @@ export async function loadScoutRankings(teamId: string, _sport?: string): Promis
   }
 }
 
+// ── Archived ranking groups ──────────────────────────────────────────────────
+// Archiving hides a group without deleting anything. The list of archived group
+// ids lives in the team's settings table (team_sport_settings, sport
+// "scout_groups") so it's shared by everyone on the team and needs no new table.
+
+const ARCHIVED_GROUPS_SPORT = "scout_groups";
+
+export async function loadArchivedRankingIds(teamId: string): Promise<string[]> {
+  if (!teamId || teamId === "local-dev") return [];
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("team_sport_settings")
+      .select("settings")
+      .eq("team_id", teamId)
+      .eq("sport", ARCHIVED_GROUPS_SPORT)
+      .maybeSingle();
+    const ids = (data?.settings as { archived?: unknown } | null)?.archived;
+    return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveArchivedRankingIds(teamId: string, ids: string[]): Promise<void> {
+  if (!teamId || teamId === "local-dev") return;
+  const supabase = createClient();
+  const { error } = await supabase.from("team_sport_settings").upsert(
+    { team_id: teamId, sport: ARCHIVED_GROUPS_SPORT, settings: { archived: ids }, updated_at: new Date().toISOString() },
+    { onConflict: "team_id,sport" }
+  );
+  if (error) throw error;
+}
+
+/**
+ * Should a chart with these group ids show in the ranking currently selected?
+ * - A specific group (archived or not): only charts in that group.
+ * - "Overall": every chart, except ones whose groups are ALL archived
+ *   (so a 2027 recruit who's also in "Kohls" still shows).
+ */
+export function isChartVisible(chartRankingIds: string[], activeRankingId: string, archivedIds: string[]): boolean {
+  if (activeRankingId !== ALL_RANKING_ID) return chartRankingIds.includes(activeRankingId);
+  if (archivedIds.length === 0 || chartRankingIds.length === 0) return true;
+  return !chartRankingIds.every((id) => archivedIds.includes(id));
+}
+
 export async function saveScoutRankings(teamId: string, _sport: string, rankings: ScoutRanking[]): Promise<void> {
   const supabase = createClient();
   // Authoritative ordered list: delete all then re-insert.

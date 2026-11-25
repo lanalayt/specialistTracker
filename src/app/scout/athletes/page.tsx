@@ -17,6 +17,7 @@ import {
   saveScoutNumbers,
   scoutDisplayName,
   loadScoutRankings,
+  loadArchivedRankingIds,
   loadSessionRankings,
   type ScoutProfile,
   type ScoutSession,
@@ -159,7 +160,7 @@ export default function ScoutAthletesPage() {
     }
     if (!tid) return;
 
-    const [prof, fg, punt, kickoff, snap, sFg, sPunt, sKo, sSnap, nums, rks, srk] = await Promise.all([
+    const [prof, fg, punt, kickoff, snap, sFg, sPunt, sKo, sSnap, nums, rksAll, srk, archivedIds] = await Promise.all([
       loadScoutProfiles(tid),
       loadScoutAthletes(tid, "fg"),
       loadScoutAthletes(tid, "punt"),
@@ -172,8 +173,11 @@ export default function ScoutAthletesPage() {
       loadScoutNumbers(tid, "fg"),
       loadScoutRankings(tid),
       loadSessionRankings(tid),
+      loadArchivedRankingIds(tid),
     ]);
     setScoutNumbers(nums);
+    // Archived groups are hidden from the Group filter.
+    const rks = rksAll.filter((r) => !archivedIds.includes(r.id));
     setRankings(rks);
     setSessionRankingsMap(srk);
 

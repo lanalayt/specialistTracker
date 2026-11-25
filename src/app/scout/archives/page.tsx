@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ArchivedGroupsCard } from "@/components/ui/ArchivedGroupsCard";
 import Link from "next/link";
 import { getTeamId } from "@/lib/teamData";
 import {
@@ -126,6 +127,8 @@ export default function ScoutArchivesPage() {
             {message}
           </div>
         )}
+
+        <ArchivedGroupsCard />
 
         {/* Archive creation */}
         <div className="card space-y-3">
