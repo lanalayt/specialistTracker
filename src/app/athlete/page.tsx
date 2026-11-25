@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { getTeamId } from "@/lib/teamData";
 import { loadAssignedCharts, saveAssignedCharts, type AssignedChart } from "@/lib/scoutStore";
 import Link from "next/link";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import React from "react";
 
 const SPORT_CARDS: { href: string; icon?: string; iconEl?: React.ReactNode; label: string }[] = [
@@ -220,10 +221,8 @@ export default function AthleteDashboardPage() {
         const isOverdue = !!previewChart.dueDate && new Date(previewChart.dueDate) < new Date(new Date().toDateString());
         const dueText = previewChart.dueDate ? new Date(previewChart.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
         return (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4" onClick={() => setPreviewChart(null)}>
-            <div className="bg-surface border border-white/10 w-full sm:max-w-md max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-3xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="sm:hidden mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/15" />
-              <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
+          <BottomSheet onClose={() => setPreviewChart(null)}>
+              <div className="flex items-start justify-between gap-3 px-5 pt-3 sm:pt-4 pb-3">
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-slate-100">{sportLabel(previewChart.sport)} Chart</h3>
                   <p className="text-xs text-muted">
@@ -238,7 +237,7 @@ export default function AthleteDashboardPage() {
                 <button onClick={() => setPreviewChart(null)} aria-label="Close" className="h-8 w-8 shrink-0 rounded-full bg-white/5 text-muted hover:text-white flex items-center justify-center text-lg leading-none">&times;</button>
               </div>
 
-              <div className="overflow-y-auto px-5 pb-2">
+              <div data-sheet-scroll className="overflow-y-auto overscroll-contain px-5 pb-2">
                 {rows.length === 0 ? (
                   <p className="text-sm text-muted py-4">No specific reps listed for this chart.</p>
                 ) : (
@@ -277,8 +276,7 @@ export default function AthleteDashboardPage() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
+          </BottomSheet>
         );
       })()}
     </>
