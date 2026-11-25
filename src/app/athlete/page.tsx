@@ -30,30 +30,48 @@ function sportLabel(sport: string): string {
   return sport === "ATHLETE_KICKING" ? "FG" : sport === "ATHLETE_PUNTING" ? "Punt" : "KO";
 }
 
-type PreviewRow = { main: string; details: string[] };
+const HASH_NAMES: Record<string, string> = {
+  Left: "Left hash", "Left Hash": "Left hash", LH: "Left hash",
+  Right: "Right hash", "Right Hash": "Right hash", RH: "Right hash",
+  M: "Middle", LM: "Left middle", RM: "Right middle", ANY: "Any hash",
+};
+const hashName = (h: string) => HASH_NAMES[h] ?? h;
 
-// Expand an assigned chart into the full ordered list of reps, matching how the chart pages build their schedule.
+// Turn a raw id that leaked into a label (e.g. "DIR_STRAIGHT") into something readable ("Straight").
+function prettyLabel(label: string): string {
+  if (!/^[A-Z0-9_]+$/.test(label) || !label.includes("_")) return label;
+  const parts = label.split("_");
+  const word = (parts.length > 1 ? parts.slice(1) : parts).join(" ").toLowerCase();
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+type PreviewRow = { title: string; subtitle: string; start: number; end: number };
+
+// Expand an assigned chart into its ordered reps, then merge back-to-back identical reps
+// so the preview reads "1–2  Blue ×2" instead of repeating the same line.
 function buildPreviewRows(chart: AssignedChart): PreviewRow[] {
-  const rows: PreviewRow[] = [];
+  const reps: { title: string; subtitle: string }[] = [];
   if (chart.sport === "ATHLETE_PUNTING") {
     for (const pt of (chart.puntTypes ?? []) as any[]) {
-      const label = String(pt.type ?? pt.typeLabel ?? "Punt");
-      const sub = pt.typeLabel && pt.typeLabel !== label ? String(pt.typeLabel) : "";
-      for (let i = 0; i < (pt.count ?? 0); i++) {
-        const details: string[] = [];
-        if (sub) details.push(sub);
-        if (pt.hash) details.push(pt.hash === "ANY" ? "Any hash" : `Hash: ${pt.hash}`);
-        if (pt.yardLine) details.push(`LOS: ${pt.yardLine}`);
-        rows.push({ main: label, details });
-      }
+      const category = String(pt.type ?? "Punt");
+      const sub = pt.typeLabel ? prettyLabel(String(pt.typeLabel)) : "";
+      const title = sub && sub !== category ? sub : category;
+      const bits = [title !== category ? category : "", pt.hash ? hashName(pt.hash) : "", pt.yardLine ? `LOS ${pt.yardLine}` : ""].filter(Boolean);
+      for (let i = 0; i < (pt.count ?? 0); i++) reps.push({ title, subtitle: bits.join(" · ") });
     }
   } else if (chart.sport === "ATHLETE_KICKOFF") {
     for (const r of chart.koRows ?? []) {
-      for (let i = 0; i < r.count; i++) rows.push({ main: r.typeLabel, details: [KO_HASH_LABELS[r.hash] ?? r.hash] });
+      for (let i = 0; i < r.count; i++) reps.push({ title: prettyLabel(r.typeLabel), subtitle: KO_HASH_LABELS[r.hash] ?? hashName(r.hash) });
     }
   } else {
-    for (const k of chart.kicks) rows.push({ main: `${k.distance}yd`, details: [k.hash] });
+    for (const k of chart.kicks) reps.push({ title: `${k.distance} yd`, subtitle: hashName(k.hash) });
   }
+  const rows: PreviewRow[] = [];
+  reps.forEach((r, i) => {
+    const last = rows[rows.length - 1];
+    if (last && last.title === r.title && last.subtitle === r.subtitle) last.end = i + 1;
+    else rows.push({ ...r, start: i + 1, end: i + 1 });
+  });
   return rows;
 }
 
@@ -183,53 +201,69 @@ export default function AthleteDashboardPage() {
 
       {previewChart && (() => {
         const rows = buildPreviewRows(previewChart);
-        const noun = previewChart.sport === "ATHLETE_PUNTING" ? "Punt" : "Kick";
+        const total = rows.length ? rows[rows.length - 1].end : (previewChart.reps ?? 0);
+        const noun = previewChart.sport === "ATHLETE_PUNTING" ? "punt" : "kick";
         const pending = previewChart.athletes.filter((a) => !previewChart.completedBy[a]);
         const completed = previewChart.athletes.filter((a) => !!previewChart.completedBy[a]);
-        const isOverdue = new Date(previewChart.dueDate) < new Date(new Date().toDateString());
+        const isOverdue = !!previewChart.dueDate && new Date(previewChart.dueDate) < new Date(new Date().toDateString());
+        const dueText = previewChart.dueDate ? new Date(previewChart.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
         return (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" onClick={() => setPreviewChart(null)}>
-            <div className="bg-surface border border-border w-full sm:max-w-md max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-start justify-between gap-3 p-4 border-b border-border">
-                <div>
-                  <h3 className="text-base font-bold text-slate-100">{sportLabel(previewChart.sport)} Chart Preview</h3>
-                  <p className="text-[11px] text-muted">
-                    From {previewChart.createdBy}
-                    {previewChart.dueDate ? <> — <span className={isOverdue ? "text-miss font-semibold" : "text-sky-400 font-semibold"}>{isOverdue ? "Overdue" : `Due ${new Date(previewChart.dueDate).toLocaleDateString()}`}</span></> : null}
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4" onClick={() => setPreviewChart(null)}>
+            <div className="bg-surface border border-white/10 w-full sm:max-w-md max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-3xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="sm:hidden mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/15" />
+              <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-slate-100">{sportLabel(previewChart.sport)} Chart</h3>
+                  <p className="text-xs text-muted">
+                    {total} {noun}{total !== 1 ? "s" : ""} each · From {previewChart.createdBy}
                   </p>
+                  {dueText && (
+                    <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${isOverdue ? "bg-red-500/15 text-miss" : "bg-sky-400/10 text-sky-300"}`}>
+                      {isOverdue ? `Overdue · ${dueText}` : `Due ${dueText}`}
+                    </span>
+                  )}
                 </div>
-                <button onClick={() => setPreviewChart(null)} aria-label="Close" className="text-muted hover:text-white text-xl leading-none px-1">&times;</button>
+                <button onClick={() => setPreviewChart(null)} aria-label="Close" className="h-8 w-8 shrink-0 rounded-full bg-white/5 text-muted hover:text-white flex items-center justify-center text-lg leading-none">&times;</button>
               </div>
 
-              <div className="overflow-y-auto p-4 space-y-1">
-                <p className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-2">{rows.length > 0 ? `${rows.length} ${noun}${rows.length !== 1 ? "s" : ""} per athlete` : `${previewChart.reps ?? 0} reps per athlete`}</p>
+              <div className="overflow-y-auto px-5 pb-2">
                 {rows.length === 0 ? (
-                  <p className="text-xs text-muted">No specific reps listed for this chart.</p>
+                  <p className="text-sm text-muted py-4">No specific reps listed for this chart.</p>
                 ) : (
-                  rows.map((r, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm py-1.5 border-b border-border/30 last:border-0">
-                      <span className="text-muted w-6 text-xs shrink-0">{i + 1}.</span>
-                      <span className="text-slate-100 font-bold">{r.main}</span>
-                      {r.details.map((d, j) => <span key={j} className="text-slate-300 text-xs">{d}</span>)}
-                    </div>
-                  ))
+                  <ol className="divide-y divide-white/5">
+                    {rows.map((r) => {
+                      const count = r.end - r.start + 1;
+                      return (
+                        <li key={r.start} className="flex items-center gap-3 py-3">
+                          <span className="w-10 shrink-0 text-xs tabular-nums text-muted opacity-60">{count > 1 ? `${r.start}–${r.end}` : r.start}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[15px] font-semibold text-slate-100 truncate">{r.title}</p>
+                            {r.subtitle && <p className="text-xs text-muted truncate">{r.subtitle}</p>}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
                 )}
               </div>
 
-              <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border space-y-2">
-                {completed.length > 0 && (
-                  <p className="text-[10px] text-make">Done: {completed.join(", ")}</p>
-                )}
+              <div className="px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-white/5 space-y-3">
                 <Link href={`${chartPathFor(previewChart.sport)}?assigned=${previewChart.id}`} className="btn-primary w-full py-3 text-sm font-bold block text-center">
-                  Start Chart{pending.length > 0 ? ` (${pending.join(", ")})` : ""}
+                  Start Chart
                 </Link>
+                {(pending.length > 0 || completed.length > 0) && (
+                  <p className="text-[11px] text-muted text-center">
+                    {pending.length > 0 && <>For {pending.join(", ")}</>}
+                    {pending.length > 0 && completed.length > 0 && " · "}
+                    {completed.length > 0 && <span className="text-make">Done: {completed.join(", ")}</span>}
+                  </p>
+                )}
                 {isCoach && (
-                  <div className="flex gap-2">
-                    <Link href={`${editPathFor(previewChart.sport)}?edit=${previewChart.id}`} className="btn-ghost flex-1 py-2 text-xs font-semibold text-center">Edit Chart</Link>
-                    <button onClick={() => handleDeleteChart(previewChart)} disabled={deleting} className="flex-1 py-2 text-xs font-semibold rounded-input border border-miss/40 text-miss hover:bg-miss/10 transition-colors disabled:opacity-40">{deleting ? "Deleting…" : "Delete Chart"}</button>
+                  <div className="flex justify-center gap-6 text-xs font-semibold">
+                    <Link href={`${editPathFor(previewChart.sport)}?edit=${previewChart.id}`} className="text-slate-300 hover:text-white transition-colors">Edit chart</Link>
+                    <button onClick={() => handleDeleteChart(previewChart)} disabled={deleting} className="text-miss opacity-80 hover:opacity-100 transition-opacity disabled:opacity-40">{deleting ? "Deleting…" : "Delete chart"}</button>
                   </div>
                 )}
-                <button onClick={() => setPreviewChart(null)} className="w-full text-xs text-muted hover:text-white transition-colors py-1">Close</button>
               </div>
             </div>
           </div>
