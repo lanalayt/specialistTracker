@@ -99,7 +99,7 @@ export function RankingTabs({ teamId, sport, rankings, onRankingsChange, active,
           <h3 className="text-lg font-bold text-slate-100">Edit Ranking Groups</h3>
           <p className="text-xs text-muted">&quot;Overall&quot; is fixed and always shows every chart.</p>
         </div>
-        <button onClick={cancelEdit} aria-label="Close" className="h-8 w-8 shrink-0 rounded-full bg-white/5 text-muted hover:text-white flex items-center justify-center text-lg leading-none">&times;</button>
+        <button onClick={cancelEdit} aria-label="Close" className="hidden sm:flex h-8 w-8 shrink-0 rounded-full bg-white/5 text-muted hover:text-white items-center justify-center text-lg leading-none">&times;</button>
       </div>
 
       <div data-sheet-scroll className="overflow-y-auto overscroll-contain px-5 pb-3 space-y-4">

@@ -234,7 +234,8 @@ export default function AthleteDashboardPage() {
                     </span>
                   )}
                 </div>
-                <button onClick={() => setPreviewChart(null)} aria-label="Close" className="h-8 w-8 shrink-0 rounded-full bg-white/5 text-muted hover:text-white flex items-center justify-center text-lg leading-none">&times;</button>
+                {/* Close button on computers only; on phones you drag the sheet down. */}
+                <button onClick={() => setPreviewChart(null)} aria-label="Close" className="hidden sm:flex h-8 w-8 shrink-0 rounded-full bg-white/5 text-muted hover:text-white items-center justify-center text-lg leading-none">&times;</button>
               </div>
 
               <div data-sheet-scroll className="overflow-y-auto overscroll-contain px-5 pb-2">
